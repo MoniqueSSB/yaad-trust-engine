@@ -373,6 +373,20 @@ svg.chart{width:100%;flex:1;min-height:0;display:block}
   .rk{grid-template-columns:minmax(0,1fr) auto;gap:8px}.rk .rb{display:none}
 }
 
+/* ---------- evidence, as a page ---------- */
+.evp .jphead{display:flex;flex-direction:column;gap:9px}
+.evpwho{display:flex;flex-direction:column;gap:3px;font-size:12.5px;line-height:1.5;border-left:3px solid var(--line2);padding-left:11px;margin-top:2px}
+.evpwho b{font-weight:700}
+.evpwho span{color:var(--dim)}
+.evpyou{color:var(--coral)}.evpcli{color:var(--mango)}.evpok{color:var(--tealb)}
+.evpmedia{margin:14px 0 4px}
+.evpmedia img,.evpmedia video{width:100%;max-height:440px;object-fit:contain;border-radius:12px;border:1px solid var(--line);background:rgba(7,7,26,.55);display:block}
+.evpnone{font-size:12.5px;color:var(--dim);border:1px dashed var(--line2);border-radius:12px;padding:22px 16px;text-align:center}
+
+/* ---------- the day, drawn ---------- */
+#dayViz{margin:4px 0 18px}
+#dayViz .wgb{gap:6px}
+
 /* ---------- page strips ---------- */
 .vz{display:grid;gap:10px;margin:14px 0 4px;grid-template-columns:minmax(150px,.7fr) minmax(0,2fr) minmax(0,1.3fr)}
 .vz.vz2{grid-template-columns:minmax(150px,.7fr) minmax(0,2fr)}
@@ -1029,6 +1043,7 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
 <section class="view" data-view="day">
   <h1 class="vh">The day</h1>
   <p class="vsub">Every open move, grouped by who owes it, then every live job by the stage it is at, then everything anybody said that wants an answer. Nothing here is a total: each line is something a named person has to do.</p>
+  <div id="dayViz"></div>
   <div class="ovband"><h2>The day, whose move is it</h2><span class="c" id="ovDayC">every open move, grouped by who owes it</span></div>
   <p class="ovbnote">Nothing here is a total. Every line is a move somebody has to make, and the lane it sits in says who. Open a lane to see them.</p>
 
@@ -1148,6 +1163,18 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
   <h1 class="vh">Sketch packs</h1>
   <p class="vsub">A record of what was filmed, never a survey. No measurement goes in one, and the database refuses to approve any that slips through. If a client needs dimensions, they need a surveyor.</p>
 
+  <!-- The packs come FIRST, above the form that makes a new one. The rail
+       badge beside "Sketch packs" counts the packs that want a person, and a
+       click on it used to land on four screens of upload form with the thing
+       it counted below the fold, which reads as nothing there. A badge is a
+       claim about work, so the work it names has to be the first thing on
+       the page. -->
+  <div class="card">
+    <div class="chd"><h3>Packs</h3><span class="sp" id="skWant"></span></div>
+    <div id="skListMsg"></div>
+    <div class="list" id="skList"><div class="empty"><b>Reading packs&hellip;</b></div></div>
+  </div>
+
   <div class="card">
     <div class="chd"><h3>Site Inspection Report</h3><span class="chip warn dot">Indicative only</span></div>
     <div id="skMsg"></div>
@@ -1212,10 +1239,6 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
     <iframe id="skPreview" title="Pack preview"></iframe>
   </div>
 
-  <div class="card">
-    <div class="chd"><h3>Recent packs</h3></div>
-    <div class="list" id="skList"></div>
-  </div>
 </section>
 
 <!-- ============================================ MATERIALS TRANCHES -->
@@ -1860,16 +1883,17 @@ const VIEWS = [
 
   { k:"evid", g:"Run the day", label:"Evidence", icon:"photo",
     title:"Evidence", table:"evidence",
-    sub:"The client reviews and approves each stage in their portal. You step in only when something is wrong: a dispute, or a comment they raise. Every set is bound to a SHA-256 fingerprint of the exact files, so if one changes afterwards the portal says so and this desk warns you before payout.",
+    sub:"The client reviews and approves each stage in their portal, and the sign-off column here reads that record: who approved it, when, and by what method. You step in only when something is wrong: a dispute open on the job, or a comment the client wrote about the work. Every set is bound to a SHA-256 fingerprint of the exact files, so if one changes afterwards the portal says so and this desk warns you before payout.",
     select:"*",
     order:"created_at", search:["job_id","label","uploaded_by"],
     empty:["No evidence filed","Workers upload from their portal. Nothing has been filed against a job yet."],
-    pre: preEvidence, panel: panelEvidence,
-    detailExtra: r => r.img
-      ? (String(r.mime || "").startsWith("video/")
-          ? `<div class="dfield"><span class="dk">file</span><video controls preload="metadata" src="${esc(r.img)}" style="max-width:100%;border-radius:10px"></video></div>`
-          : `<div class="dfield"><span class="dk">file</span><a href="${esc(r.img)}" target="_blank" rel="noopener"><img src="${esc(r.img)}" alt="${esc(r.label || "evidence")}" style="max-width:100%;border-radius:10px"></a></div>`)
-      : `<div class="dfield"><span class="dk">file</span><span class="dv empty">${r.storage_path ? "could not sign a link to this file just now, reopen the row to try again" : "no file recorded against this row"}</span></div>`,
+    pre: preEvidence, panel: panelEvidence, page: evidencePage,
+    titleOf: r => r.label || r.id,
+    // The badge and the count widget lead with what actually wants a person,
+    // which on this view is the whole rule: a dispute, or a comment a client
+    // wrote. Safe to read here because loadView runs preEvidence first, and
+    // that is what fills the maps evOwner() reads.
+    viz:{ want:r => evOwner(r).who === "you", wants:"raised by a client" },
     actions:[
       // A worker's answer is their claim about their own photograph, not a
       // ruling, and a wrong one puts it in the wrong section of the client's
@@ -1918,7 +1942,7 @@ const VIEWS = [
         + (r.pairs_with ? sub_("answers a before") : "")
         + (r.phase_set_by ? sub_("corrected by " + esc(r.phase_set_by)) : "")},
       {h:"Uploaded by", f:r => esc(r.uploaded_by || "unknown")},
-      {h:"Checked", f:r => r.ok ? chip_("ok","signed off") : chip_("warn","waiting on you")},
+      {h:"Signed off", f:r => evCheckedCell(r)},
       {h:"Fingerprint", f:r => r.sha256 ? `<span class="mono" style="color:var(--dim)">${esc(String(r.sha256).slice(0,16))}&hellip;</span>` : mute_("none")},
       {h:"Filed", f:r => mute_(ago_(r.created_at))},
     ]},
@@ -3503,6 +3527,10 @@ const SIGS = {};            // lower(email) -> { doc_type: version }
 const VET  = {};            // application id -> latest vetting_reviews row
 const VDOC = {};            // application id -> [vetting_documents]
 let   EVID_CTX = null;      // { group, job, pack, error } for the evidence panel
+const EAPPR = {};           // "job|stage" -> newest stage_approvals row
+const EDISP = new Set();    // job ids carrying an unresolved dispute
+const ECOM  = {};           // evidence id, or "job|stage" -> [client comments]
+let   EVID_SUM = null;      // { yours, client, done } counted off the rows on screen
 let   KICK_CTX = null;      // { pack, error } for the kickoff panel
 let   KICK_HELD = null;     // { rows, error }, drafts that did not become a pack
 let   KICK_HELD_MSG = null; // the last link result, kept across the redraw after it
@@ -3974,7 +4002,6 @@ function jobPage(r){
   const visits = (VISITS || []).filter(v => v.job_id === r.id).sort((a, b) => String(a.day).localeCompare(String(b.day)));
   const today = new Date().toISOString().slice(0, 10);
   const next = visits.filter(v => String(v.day) >= today).slice(0, 3);
-  const evOk = evs.filter(e => e.ok === true).length;
   const chips = [
     r.is_test ? chip_("mute", "test") : "",
     r.trade ? chip_("mute", r.trade) : "",
@@ -4320,21 +4347,174 @@ function photoCell(r){
   return mute_(r.storage_path ? "could not be signed" : "no file");
 }
 
-async function preEvidence(rows){
-  EVID_CTX = null;
-  await signEvidenceImgs(rows);
-  const waiting = (rows || []).filter(r => r.ok === false);
-  if (!waiting.length) return;
+// ---- Who a filed set is actually sitting with.
+//
+// evidence.ok is not the answer and never was. It defaults to true, nothing
+// anywhere in the system ever writes to it, and every row filed since
+// September carries null, so the column that used to draw "waiting on you"
+// against sixteen of nineteen items was reading a switch nobody has ever
+// thrown. The real record of a sign-off is stage_approvals: the job, the
+// stage, who approved it and by what method, portal or WhatsApp or in person.
+// A set with no row there is with the CLIENT to read, not with you.
+//
+// So a set reaches you on two things happening and nothing else: a dispute
+// open on the job, or a comment the client wrote about the work. Founder
+// instruction, 19 September 2026. Anything else filed is theirs to read and
+// yours to leave alone.
+const evKey   = (r) => String(r.job_id) + "|" + (r.stage ?? "");
+const evComs  = (r) => (ECOM[r.id] || []).concat(ECOM[evKey(r)] || []);
 
-  // Newest first, then everything filed against that same job and stage.
-  const head = waiting[0];
-  const group = (rows || []).filter(r => r.job_id === head.job_id && (r.stage ?? null) === (head.stage ?? null));
+function evOwner(r){
+  if (EDISP.has(r.job_id)) return { who:"you", why:"dispute" };
+  const c = evComs(r);
+  if (c.length) return { who:"you", why:"comment", com:c[0], n:c.length };
+  const a = EAPPR[evKey(r)];
+  if (a) return { who:"done", appr:a };
+  return { who:"client" };
+}
+
+// Colours follow concierge/README.md: teal proven, mango held, coral blocked.
+// With the client is mango because it is held, not because anybody is late.
+function evCheckedCell(r){
+  const o = evOwner(r);
+  if (o.who === "you" && o.why === "dispute")
+    return chip_("crit","dispute, waiting on you") + sub_("nothing moves on this job while it is open");
+  if (o.who === "you")
+    return chip_("crit","the client wrote about this") + sub_(o.n > 1 ? o.n + " comments, oldest " + ago_(o.com.created_at) + " ago" : ago_(o.com.created_at) + " ago");
+  // sub_ escapes what it is given, so this builds plain text, never markup.
+  if (o.who === "done")
+    return chip_("ok","signed off") + sub_((o.appr.approved_by || "somebody") + ", " + ago_(o.appr.approved_at) + " ago"
+      + (o.appr.confirmed_method ? ", by " + String(o.appr.confirmed_method).replace(/_/g, " ") : ""));
+  return chip_("warn","with the client") + sub_("filed " + ago_(r.created_at) + " ago, not approved yet");
+}
+
+// The drawer for one filed item, as a page rather than a print-out of its
+// columns. What matters about a photograph is the photograph, whose move it is
+// now, and whether the fingerprint binds it. The raw fields stay one click
+// down under "Every field, as stored", because a page that hides a value is
+// worse than a dump that shows it.
+const SECTION_WORD = {
+  before:["ok","Before, how it was before anybody touched it"],
+  during:["ok","During the work"],
+  after:["ok","After, how it was when the stage finished"],
+  issue:["warn","A problem with work already in scope and priced"],
+  new:["crit","Something new found, never in the job as agreed"],
+};
+
+function evidencePage(r){
+  const o = evOwner(r);
+  const kb = Number(r.bytes) || 0;
+  const size = kb ? (kb >= 1048576 ? (kb / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(kb / 1024)) + " KB") : null;
+  const isVid = String(r.mime || "").startsWith("video/");
+  const media = r.img
+    ? (isVid
+        ? `<video controls preload="metadata" src="${esc(r.img)}"></video>`
+        : `<a href="${esc(r.img)}" target="_blank" rel="noopener"><img src="${esc(r.img)}" alt="${esc(r.label || "evidence")}"></a>`)
+    : `<div class="evpnone">${r.storage_path
+        ? "A file is recorded against this row but a link to it could not be signed just now. Close the drawer and open it again."
+        : "No file was ever recorded against this row."}</div>`;
+
+  const sect = r.kind === "materials"
+    ? chip_("ok","materials")
+    : (SECTION_WORD[r.phase] ? chip_(SECTION_WORD[r.phase][0], r.phase) : chip_("mute","not marked"));
+  const chips = [
+    sect,
+    r.item_code ? chip_("mute", r.item_code) : "",
+    r.stage != null ? chip_("mute","stage " + r.stage) : "",
+    r.pairs_with ? chip_("mute","answers a before") : "",
+  ].filter(Boolean).join(" ");
+
+  // One sentence on whose move it is, in the same words the list column uses.
+  const whose = o.who === "you" && o.why === "dispute"
+      ? `<b class="evpyou">Yours, because a dispute is open on this job.</b><span>Nothing moves on this job and no payment is made until a named person rules on it, on the published timeline.</span>`
+    : o.who === "you"
+      ? `<b class="evpyou">Yours, because the client wrote about this work.</b><span>&ldquo;${esc(String(o.com.body || "").slice(0, 300))}&rdquo; ${o.n > 1 ? "First of " + o.n + ", " : ""}${esc(ago_(o.com.created_at))} ago. Answering them is a reply, not a ruling.</span>`
+    : o.who === "done"
+      ? `<b class="evpok">Signed off by the client.</b><span>${esc(o.appr.approved_by || "somebody")}, ${esc(ago_(o.appr.approved_at))} ago${o.appr.confirmed_method ? ", by " + esc(String(o.appr.confirmed_method).replace(/_/g, " ")) : ""}. The approval is theirs and it is already on the record.</span>`
+    : `<b class="evpcli">With the client to read and approve.</b><span>Filed ${esc(ago_(r.created_at))} ago and not approved yet. It is not waiting on you: it reaches you only if they dispute the job or write about the work.</span>`;
+
+  const sectWhat = r.kind === "materials"
+    ? "Materials: the receipt and the photographs of the store the client nominated. This is what transfers the risk in them."
+    : SECTION_WORD[r.phase]
+      ? SECTION_WORD[r.phase][1] + ", as the person filing it said" + (r.phase_set_by ? ", corrected at the desk by " + esc(r.phase_set_by) : "")
+      : "Nobody answered which section this belongs to when it was filed, so it sits under \"Not marked\" in the client's record. That is not the same as no.";
+
+  return `<div class="jp evp">
+    <div class="jphead">
+      <div class="jpt">${esc(r.label || "unlabelled")}</div>
+      <div class="jpchips">${chips}</div>
+      <div class="evpwho">${whose}</div>
+    </div>
+    <div class="evpmedia">${media}</div>
+    <div class="jpgrid two">
+      <div class="jpc"><h6>The job</h6>
+        <div class="jpv"><span>Reference</span><div class="jpvv">${id_(r.job_id)}</div></div>
+        <div class="jpv"><span>Stage</span><div class="jpvv">${r.stage != null ? "Stage " + esc(String(r.stage)) : mute_("none recorded")}</div></div>
+        <div class="jpv"><span>Filed by</span><div class="jpvv">${esc(r.uploaded_by || "unknown")}, ${esc(ago_(r.created_at))} ago</div></div>
+        <div class="jpv"><span>Taken</span><div class="jpvv">${r.captured_at ? esc(ago_(r.captured_at)) + " ago" : mute_("the file carried no capture time")}</div></div>
+        <button class="btn g" data-v="jobs" style="margin-top:10px">Open jobs</button></div>
+      <div class="jpc"><h6>The file, and what binds it</h6>
+        <div class="jpv"><span>Type</span><div class="jpvv">${esc(r.mime || "not recorded")}${size ? ", " + size : ""}</div></div>
+        <div class="jpv"><span>Fingerprint</span><div class="jpvv">${r.sha256
+          ? `<span class="mono" style="font-size:11px;word-break:break-all">${esc(r.sha256)}</span>`
+          : `<span style="color:var(--coral)">None recorded. An approval bound to nothing is a signature on air.</span>`}</div></div>
+        <div class="jpv"><span>Section</span><div class="jpvv">${sectWhat}</div></div>
+      </div>
+    </div>
+    <p class="conseq">The fingerprint is computed once, at upload, and never changes. If the file behind it is ever swapped, the client's portal says so and this desk warns you before any payment moves. Correcting the section below changes only which part of the client's record this sits in: never the image, the description or the fingerprint.</p>
+  </div>`;
+}
+
+async function preEvidence(rows){
+  EVID_CTX = null; EVID_SUM = null;
+  for (const k in EAPPR) delete EAPPR[k];
+  for (const k in ECOM)  delete ECOM[k];
+  EDISP.clear();
+  await signEvidenceImgs(rows);
+  if (!(rows || []).length) return;
+
+  const jobs = [...new Set((rows || []).map(r => r.job_id).filter(Boolean))].slice(0, 120);
+  if (!jobs.length) return;
+
+  const [apprR, dispR, comR] = await Promise.all([
+    sb.from("stage_approvals").select("job_id,stage,approved_by,approved_at,confirmed_method")
+      .in("job_id", jobs).limit(600),
+    sb.from("disputes").select("job_id,state").in("job_id", jobs).neq("state", "resolved").limit(200),
+    sb.from("evidence_comments").select("job_id,stage,evidence_id,from_role,body,created_at")
+      .in("job_id", jobs).eq("from_role", "client").order("created_at", { ascending:true }).limit(400),
+  ]);
+  for (const a of apprR.data || []) {
+    const k = evKey(a);
+    if (!EAPPR[k] || String(a.approved_at) > String(EAPPR[k].approved_at)) EAPPR[k] = a;
+  }
+  for (const d of dispR.data || []) EDISP.add(d.job_id);
+  // A comment with no evidence_id came in over WhatsApp, where a client can
+  // only name a stage, never one photograph. It lands against every item in
+  // that stage. That is the comment being less precise than the portal's, not
+  // this desk guessing which picture they meant.
+  for (const c of comR.data || []) {
+    const k = c.evidence_id || evKey(c);
+    (ECOM[k] = ECOM[k] || []).push(c);
+  }
+
+  let yoursN = 0, clientN = 0, doneN = 0, head = null;
+  for (const r of rows) {
+    const o = evOwner(r);
+    if (o.who === "you")   { yoursN++; if (!head) head = r; }
+    else if (o.who === "done") doneN++;
+    else clientN++;
+  }
+  EVID_SUM = { yours:yoursN, client:clientN, done:doneN };
+  if (!head) return;
+
+  // Everything filed against that same job and stage, so the set is read whole.
+  const group = rows.filter(r => r.job_id === head.job_id && (r.stage ?? null) === (head.stage ?? null));
 
   const [jobR, packR] = await Promise.all([
     sb.from("jobs").select("id,title,parish,stage,owed,worker_name,client_name,status").eq("id", head.job_id).maybeSingle(),
     sb.from("kickoff_packs").select("id,status,docs").eq("job_id", head.job_id).order("rev", { ascending:false }).limit(1).maybeSingle(),
   ]);
-  EVID_CTX = { group, job: jobR.data || null, pack: packR.data || null,
+  EVID_CTX = { group, head, owner: evOwner(head), job: jobR.data || null, pack: packR.data || null,
                error: jobR.error ? jobR.error.message : (packR.error ? packR.error.message : null) };
 }
 
@@ -4400,9 +4580,20 @@ function evidenceThumb(r){
 function panelEvidence(rows){
   if (!(rows || []).length) return "";
   if (!EVID_CTX) {
-    return `<div class="alert ok"><span class="ic">&#10003;</span><div><b>Nothing is waiting on a client</b><p>Every set filed against a job has been approved by the client in their portal. New uploads land at the top of this view, and you step in only if a client raises an issue.</p></div></div>`;
+    // Deliberately states the position rather than declaring victory. This box
+    // used to read "every set has been approved by the client", which was not
+    // true of a single screen it ever drew: it fired whenever no row carried
+    // ok = false, and no row anywhere has ever carried ok = false.
+    const su = EVID_SUM || { yours:0, client:0, done:0 };
+    const part = [];
+    if (su.client) part.push(`<b>${su.client}</b> ${su.client === 1 ? "set is" : "sets are"} with the client to read and approve`);
+    if (su.done)   part.push(`<b>${su.done}</b> ${su.done === 1 ? "is" : "are"} signed off`);
+    const where = part.length ? part.join(", ") + "." : "Nothing is filed against a job yet.";
+    return `<div class="alert ok"><span class="ic">&#10003;</span><div><b>Nothing here is waiting on you</b>`
+      + `<p>${where} No dispute is open on any of these jobs and no client has written about the work. `
+      + `A set reaches you on one of those two things and nothing else: approving the work is the client's, in their portal.</p></div></div>`;
   }
-  const { group, job, pack, error } = EVID_CTX;
+  const { group, job, pack, error, owner } = EVID_CTX;
   const labels = group.map(r => r.label || "");
   const filed = group.length;
   const stage = group[0].stage;
@@ -4432,12 +4623,18 @@ function panelEvidence(rows){
 
   return `<div class="card">
       <div class="chd"><h3>${esc(job ? (job.title || job.id) : group[0].job_id)}${stage != null ? " &middot; stage " + esc(stage) : ""}</h3>`
-    + `<span class="chip warn dot">${filed} item${filed === 1 ? "" : "s"}</span>`
+    + `<span class="chip crit dot">${filed} item${filed === 1 ? "" : "s"}</span>`
     + `<span class="sp">${esc(group[0].uploaded_by || "unknown")} &middot; ${esc(ago_(group[0].created_at))} ago</span></div>`
     + (error ? softFail("The job or its pack", error) : "")
     + journeyRail(job ? job.stage : null)
     + req + thumbs + fp
-    + `<p class="conseq">Signing off binds your approval to those exact fingerprints. ${owed ? `Passing it to the client is what releases <b>${owed}</b> on this job.` : "Nothing is recorded as owed on this job yet, so passing it releases no money."} Open any row below to sign one off.</p>`
+    + `<p class="conseq">${
+        owner && owner.why === "dispute"
+          ? `<b>A dispute is open on this job.</b> Nothing moves on it, and no payment is made, until a named person rules on it on the published timeline. Read the set against the fingerprints below before you do.`
+          : owner && owner.com
+            ? `<b>The client wrote about this work:</b> &ldquo;${esc(String(owner.com.body || "").slice(0, 240))}&rdquo; That is what put it in front of you. Answering them is a reply, not a ruling.`
+            : `This set is in front of you because something was raised against it.`
+      } ${owed ? `<b>${owed}</b> is agreed in writing on this job and Yaadly holds none of it.` : "Nothing is recorded as owed on this job yet."} The approval itself stays the client's, in their portal.</p>`
     + `</div>`;
 }
 
@@ -6332,6 +6529,39 @@ function renderStatsViz(d){
     + `</div>`;
 }
 
+// The same four lanes the list below draws, as a picture, at the top of the
+// screen rather than under it. Counts only: no ratio, no score, nothing
+// estimated, for the reason written over the CSS. Every bar clicks through to
+// the queue it counts, so the picture is a way in rather than a poster.
+function renderDayViz(d){
+  const host = $("dayViz");
+  if (!host) return;
+  const COL = { crit:"#F87171", client:"#C4AAFF", warn:"#F59E0B", ok:"#9B73F5" };
+  const moves = d.lanes.reduce((a, l) => a + l.n, 0);
+  const yoursN = (d.lanes.find(l => l.label === "Yours") || { n:0 }).n;
+
+  const big = `<div class="vzbig"><span class="v">${yoursN}</span>`
+    + `<span class="k">${yoursN === 1 ? "move wants you" : "moves want you"}</span>`
+    + `<span class="s">${moves ? plural_(moves, "open move", "open moves") + " in total, across all four lanes" : "nothing open anywhere"}</span></div>`;
+
+  const q = (d.queue || []).filter(x => x.n > 0).sort((a, b) => b.n - a.n);
+  const qMax = Math.max(1, ...q.map(x => x.n));
+  const rank = q.length
+    ? `<div class="rank">${q.map(x => `<button class="rk" data-v="${esc(x.view)}"><span class="rl">${esc(x.label)}</span>`
+        + `<span class="rb"><i style="width:${Math.round(100 * x.n / qMax)}%;background:${COL[x.tone] || COL.warn}"></i></span>`
+        + `<span class="rn">${x.n}</span></button>`).join("")}</div>`
+      + `<p class="stkey"><i style="background:${COL.warn}"></i>yours <i style="background:${COL.client}"></i>with a client <i style="background:${COL.crit}"></i>blocked</p>`
+    : `<div class="wgclear">Nothing is waiting in any queue.</div>`;
+
+  const laneLegend = d.lanes.map(l => `<button class="lg" data-v="${esc(l.view)}"><i style="background:${l.color}"></i>${esc(l.label)}<b>${l.n}</b></button>`).join("");
+
+  host.innerHTML = `<div class="vz">`
+    + widget("", "Yours, right now", "", big)
+    + widget("", "What is waiting, longest queue first", q.length ? plural_(q.reduce((a, x) => a + x.n, 0), "item", "items") : "clear", rank)
+    + widget("", "Whose move is it", plural_(moves, "move", "moves"), chartStack(d.lanes) + `<div class="lgs">${laneLegend}</div>`)
+    + `</div>`;
+}
+
 async function renderDash(d){
   // Four timestamp reads, for the two time charts. Every other number here
   // was counted by loadOverview already.
@@ -6484,6 +6714,37 @@ const countOf = (t, build) => {
   return q.then(r => r.count || 0).catch(() => 0);
 };
 
+// Evidence, split by whose move it actually is. Counted here rather than with
+// countOf because the answer is a join: an item is with the client when no row
+// in stage_approvals covers its job and stage. The old line counted
+// evidence.ok = false, which is a column with a default of true that nothing
+// writes, so it returned zero on every screen this desk has ever drawn and the
+// "evidence with clients" figure was permanently blank.
+//
+// needsYou is the whole of the rule: a dispute open on the job, or a comment
+// the client wrote. Nothing else about evidence is yours.
+async function evidenceOwnership(){
+  const [evR, apR, dpR, cmR] = await Promise.all([
+    sb.from("evidence").select("id,job_id,stage").limit(2000),
+    sb.from("stage_approvals").select("job_id,stage").limit(2000),
+    sb.from("disputes").select("job_id").neq("state", "resolved").limit(200),
+    sb.from("evidence_comments").select("job_id,stage,evidence_id").eq("from_role", "client").limit(600),
+  ]);
+  const ev = evR.data || [];
+  const key = (r) => String(r.job_id) + "|" + (r.stage ?? "");
+  const appr = new Set((apR.data || []).map(key));
+  const disp = new Set((dpR.data || []).map(d => d.job_id));
+  const com  = new Set();
+  for (const c of cmR.data || []) com.add(c.evidence_id || key(c));
+  let withClient = 0, needsYou = 0, signed = 0;
+  for (const r of ev) {
+    if (disp.has(r.job_id) || com.has(r.id) || com.has(key(r))) needsYou++;
+    else if (appr.has(key(r))) signed++;
+    else withClient++;
+  }
+  return { withClient, needsYou, signed, total:ev.length };
+}
+
 async function loadOverview(){
   const now = new Date();
   $("ovDate").textContent = DAYNAME[now.getDay()] + " " + now.getDate() + " " + MONTH[now.getMonth()];
@@ -6492,12 +6753,12 @@ async function loadOverview(){
   VISITS = vis.data || [];
   renderCal();
 
-  const [intakeNew, appsWaiting, evidWaiting, quotesOut, callsNew, disputesOpen,
+  const [intakeNew, appsWaiting, evidOwn, quotesOut, callsNew, disputesOpen,
          invDraft, invSent, pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsigned,
          enqNew, asksNew] = await Promise.all([
     countOf("intakes",     q => q.in("status", ["new","triaged"])),
     countOf("applications",q => q.in("status", ["submitted","reviewing"])),
-    countOf("evidence",    q => q.eq("ok", false)),
+    evidenceOwnership(),
     countOf("job_quotes",  q => q.eq("status", "sent")),
     countOf("calls",       q => q.eq("status", "requested")),
     countOf("disputes",    q => q.neq("state", "resolved")),
@@ -6513,6 +6774,9 @@ async function loadOverview(){
     countOf("enquiries",   q => q.not("status", "in", "(replied,converted,test,binned)")),
     countOf("questions",   q => q.eq("published", false)),
   ]);
+  // Whose move it is, named apart so nothing downstream can confuse the two.
+  const evidWaiting = evidOwn.withClient;   // theirs to read and approve
+  const evidYours   = evidOwn.needsYou;     // disputed, or the client wrote about it
 
   // ── how the assistant is actually doing ────────────────────────────────
   //
@@ -6845,8 +7109,10 @@ async function loadOverview(){
     push(yours, "crit", "No proof", plural(noEv, "stage was", "stages were") + " signed off with no evidence at all", null, null, "See sign-offs", "evid", false);
   if (noFp)
     push(yours, "warn", "No print", plural(noFp, "sign-off is", "sign-offs are") + " not bound to the exact files", null, null, "See sign-offs", "evid", false);
+  if (evidYours && !disputesOpen)
+    push(yours, "crit", "Raised", plural(evidYours, "evidence item has", "evidence items have") + " something raised against them", "a client wrote about the work, so it is yours to answer", null, "Read them", "evid", false);
   if (evidWaiting)
-    push(cli, "", "Reviewing", plural(evidWaiting, "evidence item is", "evidence items are") + " with the client to review", "you step in only if they raise an issue", null, "See them", "evid", false);
+    push(cli, "", "Reviewing", plural(evidWaiting, "evidence item is", "evidence items are") + " with the client to read and approve", "nothing here is yours unless they dispute it or write about it", null, "See them", "evid", false);
   if (intakeNew)
     push(yours, "warn", "Untriaged", plural(intakeNew, "intake is", "intakes are") + " untriaged", null, null, "Open intake", "intake", false);
   if (appsWaiting)
@@ -6903,7 +7169,7 @@ async function loadOverview(){
   // The zero queues, named rather than drawn. Nineteen tiles reading zero was
   // the diagnosis; one line saying which nineteen is the answer to it.
   const zeroes = [
-    [!disputesOpen, "disputes"], [!evidWaiting, "evidence to check"], [!intakeNew, "intake to triage"],
+    [!disputesOpen, "disputes"], [!evidYours, "evidence anybody raised"], [!intakeNew, "intake to triage"],
     [!appsWaiting, "applications"], [!quotesOut, "quotes to pass on"], [!callsNew, "calls requested"],
     [!enqNew, "enquiries to answer"], [!asksNew, "questions to publish"], [!invDraft, "invoice drafts"],
     [!pkDraft && !pkAppr, "sketch packs"], [!kickDraft, "kickoff packs"], [!held.length, "quote packs held"],
@@ -7111,6 +7377,35 @@ async function loadOverview(){
   const visitsToday = VISITS.filter(v => String(v.day) === todayIso2);
   const visitsNext = VISITS.filter(v => String(v.day) > todayIso2).sort((a, b) => String(a.day).localeCompare(String(b.day)));
   const pastPromise = CLOCK.filter(c => c.breached).length;
+  // One list of queues, read by both pictures, so the measurement tab and the
+  // top of The day can never disagree about what is waiting.
+  const QUEUE = [
+    { label:"Disputes open", n:disputesOpen, view:"jobs", tone:"crit" },
+    { label:"Evidence a client raised", n:evidYours, view:"evid", tone:"crit" },
+    { label:"Intake to triage", n:intakeNew, view:"intake" },
+    { label:"Enquiries to answer", n:enqNew, view:"enq" },
+    { label:"Threads handed to you", n:waitingNow.length, view:"owed" },
+    { label:"Applications in vetting", n:appsWaiting, view:"apps" },
+    { label:"Quotes to pass on", n:quotesOut, view:"quotes" },
+    { label:"Quote packs held", n:held.length, view:"qpd" },
+    { label:"Invoice drafts unsent", n:invDraft, view:"invoices:preview" },
+    { label:"Kickoff packs in draft", n:kickDraft, view:"kick" },
+    { label:"Sketch packs to read or issue", n:pkDraft + pkAppr, view:"sketch" },
+    { label:"Questions to publish", n:asksNew, view:"asks" },
+    { label:"Calls requested", n:callsNew, view:"calls" },
+    { label:"Built, never signed for", n:unsigned, view:"intake" },
+    { label:"Evidence with clients", n:evidWaiting, view:"evid", tone:"client" },
+    { label:"Waiting list", n:waitN, view:"waitlist", tone:"client" },
+    { label:"Feedback to read", n:fbN, view:"feedback", tone:"client" },
+  ];
+  const LANES = [
+    { label:"Yours", n:yours.length, color:CH.g, view:"day" },
+    { label:"A worker's", n:wrk.length, color:CH.p, view:"day" },
+    { label:"A client's", n:cli.length, color:CH.c, view:"day" },
+    { label:"Nobody's", n:non.length, color:CH.l, view:"day" },
+  ];
+  renderDayViz({ lanes:LANES, queue:QUEUE });
+
   renderStatsViz({
     funnel: [
       { label:"Conversations with the assistant", n:waTotal, view:"threads" },
@@ -7127,33 +7422,11 @@ async function loadOverview(){
     replies: { met:slaMet, of:answered.length },
     drafts: { accepted:drafts.accepted, of:drafts.decisions },
     quiet: { now:stalledNow, of:liveJobs },
-    queue: [
-      { label:"Disputes open", n:disputesOpen, view:"jobs", tone:"crit" },
-      { label:"Intake to triage", n:intakeNew, view:"intake" },
-      { label:"Enquiries to answer", n:enqNew, view:"enq" },
-      { label:"Threads handed to you", n:waitingNow.length, view:"owed" },
-      { label:"Applications in vetting", n:appsWaiting, view:"apps" },
-      { label:"Quotes to pass on", n:quotesOut, view:"quotes" },
-      { label:"Quote packs held", n:held.length, view:"qpd" },
-      { label:"Invoice drafts unsent", n:invDraft, view:"invoices:preview" },
-      { label:"Kickoff packs in draft", n:kickDraft, view:"kick" },
-      { label:"Sketch packs to read or issue", n:pkDraft + pkAppr, view:"sketch" },
-      { label:"Questions to publish", n:asksNew, view:"asks" },
-      { label:"Calls requested", n:callsNew, view:"calls" },
-      { label:"Built, never signed for", n:unsigned, view:"intake" },
-      { label:"Evidence with clients", n:evidWaiting, view:"evid", tone:"client" },
-      { label:"Waiting list", n:waitN, view:"waitlist", tone:"client" },
-      { label:"Feedback to read", n:fbN, view:"feedback", tone:"client" },
-    ],
+    queue: QUEUE,
     msgs: { failed:waFailed, held:waWaiting, oldest:owedOldest, people:CLOCK.length },
   });
   renderDash({
-    lanes: [
-      { label:"Yours", n:yours.length, color:CH.g, view:"day" },
-      { label:"A worker's", n:wrk.length, color:CH.p, view:"day" },
-      { label:"A client's", n:cli.length, color:CH.c, view:"day" },
-      { label:"Nobody's", n:non.length, color:CH.l, view:"day" },
-    ],
+    lanes: LANES,
     stages: [0, 1, 2, 3, 4, 5].map(i => ({ label:["On the board","Quotes in","Kickoff","Working","Sign-off","Done"][i], n:buckets[i].length, done:i === 5 })),
     waiting: [
       { label:"Intake to triage", n:intakeNew, view:"intake" },
@@ -7168,6 +7441,7 @@ async function loadOverview(){
       { label:"Questions to publish", n:asksNew, view:"asks" },
       { label:"Calls requested", n:callsNew, view:"calls" },
       { label:"Disputes open", n:disputesOpen, view:"jobs" },
+      { label:"Evidence a client raised", n:evidYours, view:"evid" },
       { label:"Built, never signed for", n:unsigned, view:"intake" },
     ],
     money: [
@@ -7187,7 +7461,7 @@ async function loadOverview(){
 
   setCount("intake", intakeNew, false);
   setCount("apps", appsWaiting, false);
-  setCount("evid", evidWaiting, false);
+  setCount("evid", evidYours, true);
   setCount("quotes", quotesOut, false);
   setCount("calls", callsNew, false);
   setCount("invoices", invDraft, false);
@@ -9805,7 +10079,9 @@ function skRenderPack(extra){
       ${draft || p.status === "approved" ? `<button class="btn d" id="skVoid">Void</button>` : ""}
     </div>
     ${draft ? `<p class="conseq">Approving is you saying you have <b>read every one of the ${rooms.length} room${rooms.length === 1 ? "" : "s"}</b> and it matches what you saw on site. It freezes the content. It does not send anything.</p>` : ""}
-    ${p.status === "approved" ? `<p class="conseq">Issuing makes this <b>visible to the client in their portal</b>. It emails nobody. Reopening clears your approval and starts a new revision.</p>` : ""}`;
+    ${p.status === "approved" ? (p.job_id
+      ? `<p class="conseq">Issuing makes this <b>visible to the client in their portal</b>. It emails nobody. Reopening clears your approval and starts a new revision.</p>`
+      : `<p class="conseq" style="color:var(--coral)">This pack has <b>no job attached</b>, so issuing it records the decision and <b>shows it to nobody</b>. A client reads a pack through their job, and this one has none. Reopening clears your approval and starts a new revision.</p>`) : ""}`;
 
   show("skPackCard", true);
 
@@ -9929,8 +10205,14 @@ function skRenderPack(extra){
 
   if ($("skApprove")) $("skApprove").addEventListener("click", () =>
     setStatus("approved", "Approve " + p.id + "?\n\nYou are saying you have read every room and it matches what you saw. This freezes the content."));
+  // The confirm says what issuing actually does for THIS pack. A pack with no
+  // job_id cannot be read by any client: the read policy wants status issued
+  // and a job whose client_email is theirs. Promising the portal there would
+  // be the desk telling her something untrue at the moment she decides.
   if ($("skIssue")) $("skIssue").addEventListener("click", () =>
-    setStatus("issued", "Issue " + p.id + " to the client?\n\nIt becomes visible to them in the portal. It does not email anybody."));
+    setStatus("issued", p.job_id
+      ? "Issue " + p.id + " to the client?\n\nIt becomes visible to them in the portal. It does not email anybody."
+      : "Issue " + p.id + "?\n\nThis pack has NO JOB attached, so no client can read it. Issuing records your decision and shows it to nobody. It does not email anybody."));
   if ($("skReopen")) $("skReopen").addEventListener("click", () =>
     setStatus("draft", "Reopen " + p.id + "?\n\nThis clears the approval and starts a new revision."));
   if ($("skVoid")) $("skVoid").addEventListener("click", () =>
@@ -9949,17 +10231,43 @@ $("skPrint").addEventListener("click", () => $("skPreview").contentWindow.print(
 
 let SK_LIST = [];
 
+// Which packs want a person. A draft is one nobody has read; an approved one
+// is read but not issued. Those are the only two states anybody can act on,
+// and they are exactly what the rail badge counts in loadOverview, so the
+// badge and this page read the same predicate and cannot disagree. Issued and
+// void are the log: still listed, because the log is the point of keeping
+// them, but sorted under the live ones and never counted as work.
+const SK_WANTS = p => p.status === "draft" || p.status === "approved";
+const SK_RANK  = { draft:0, approved:1, issued:2, void:3 };
+
 function renderSkList(){
   const q = ($("srch").value || "").trim().toLowerCase();
-  const rows = q ? SK_LIST.filter(p => (p.id + " " + p.property_label + " " + (p.client_name||"")).toLowerCase().includes(q)) : SK_LIST;
-  $("skList").innerHTML = rows.map(p => `
-    <div class="item">
+  const rows = (q ? SK_LIST.filter(p => (p.id + " " + p.property_label + " " + (p.client_name||"")).toLowerCase().includes(q)) : SK_LIST)
+    .slice().sort((a, b) => (SK_RANK[a.status] ?? 9) - (SK_RANK[b.status] ?? 9)
+      || String(b.created_at).localeCompare(String(a.created_at)));
+
+  const want = SK_LIST.filter(SK_WANTS).length;
+  $("skWant").innerHTML = `<span class="chip ${want ? "warn" : "ok"} dot">`
+    + (want ? `${want} ${want === 1 ? "wants" : "want"} you` : "nothing waiting")
+    + `</span> <span style="color:var(--dim);font-size:11.5px">`
+    + `${SK_LIST.length} held, newest 15</span>`;
+
+  $("skList").innerHTML = rows.map(p => {
+    const live = SK_WANTS(p);
+    // A pack reaches a client through its job: the client read policy wants
+    // status issued AND a job whose client_email is theirs. No job, no
+    // reader. Said here rather than only at the Issue button, so it is
+    // visible before the work of reading a pack, not after.
+    const orphan = live && !p.job_id;
+    return `
+    <div class="item"${live ? "" : ' style="opacity:.62"'}>
       <div><a href="#" data-skopen="${esc(p.id)}">${esc(p.id)}</a> ${chipFor(SK_CHIP, p.status)}
+        ${orphan ? '<span class="chip mute">no job attached</span>' : ""}
         <div style="color:var(--dim);font-size:11.5px;margin-top:3px">${esc(p.property_label)}${p.client_name ? " &middot; " + esc(p.client_name) : ""}</div></div>
       <div style="color:var(--dim);font-size:11.5px">${esc(String(p.created_at).slice(0,10))}</div>
-    </div>`).join("")
+    </div>`; }).join("")
     || (q ? '<div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div>'
-          : '<div class="empty"><b>Nothing yet</b>Pull the stills from a walkthrough above.</div>');
+          : '<div class="empty"><b>No packs yet</b>Pull the stills from a walkthrough below.</div>');
 
   $("skList").querySelectorAll("[data-skopen]").forEach(a => a.addEventListener("click", async (e) => {
     e.preventDefault();
@@ -9970,9 +10278,16 @@ function renderSkList(){
 
 async function loadSketchPacks(){
   const { data, error } = await sb.from("sketch_packs")
-    .select("id,property_label,client_name,status,created_at,rev")
+    .select("id,property_label,client_name,status,created_at,rev,job_id")
     .order("created_at", { ascending: false }).limit(15);
-  if (error) return;
+  // A failed read used to return in silence, which left the list holding
+  // whatever was there before, or nothing at all, under a badge still
+  // claiming there was work. An empty list has to mean an empty table.
+  if (error) {
+    $("skList").innerHTML = "";
+    return say("skListMsg","err","The packs could not be read, so this list is empty for that reason and not because there are none. " + error.message);
+  }
+  $("skListMsg").innerHTML = "";
   SK_LIST = data || [];
   renderSkList();
 }
