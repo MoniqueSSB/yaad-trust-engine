@@ -24,6 +24,21 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 ---
+---
+
+## 2026-09-19 · A sketch pack picks its job from a list, and voiding several is still one admin decision each
+
+**Why.** Two things, from the same session. First, the job defect flagged earlier the same day and left open: the capture form collected "Job reference" as free text into `job_ref`, and the desk never sent `job_id` at all, so every pack ever made has `job_id` null. A pack reaches a client only through its job (`sketch_client_read` wants `status = 'issued'` **and** a job whose `client_email` is the reader's), so no pack that existed could be sent to anybody. The field could not have worked even in principle: the placeholder read `JOB-2026-014` and a live job id is `JOB-WEB-1789253807959`. Second, founder instruction to void three test packs, which the database refused from a Claude session, correctly, and the honest answer was nine clicks. She asked for both to be fixed.
+
+**What, the job.** Desk only. `yaad-sketch` already accepted `body.job_id` and there is a foreign key to `jobs(id)`, so nothing server side needed to change and nothing was deployed there. The free-text box is now a picker of real jobs, so what is chosen exists and the foreign key can never be handed a job that does not. A draft pack also carries the same picker with an Attach button, which is the one repair available for every pack made before this, and it is on drafts only because an approved pack is frozen and reopening starts a new revision. A draft with no job says in coral that nobody can read it however far she takes it. `job_ref` is deliberately left alone: it is the client's **own** reference, free text, printed on the report, and writing a Yaadly job id into it would quietly redefine the field.
+
+**What, the voiding.** Tick the packs in the list, one confirm that names every pack it is about to void, and each row is written separately so a refusal names the pack it refused. Only `draft` and `approved` can be ticked. `sketch_guard_approval` still requires `is_admin()` on every single one, which is the point: this removes the repetition and not the decision, and it runs as her, in her browser, on her click.
+
+**The refusal that prompted it, recorded because it was right.** A Claude session cannot void a pack. Over the Supabase MCP or the service role there is no `auth.jwt()`, so `is_admin()` is false and the trigger raises "only a signed-in Yaadly admin may void a sketch pack"; the attempted update rolled back untouched. That is CLAUDE.md section 2 enforced in the database rather than described in a document, and the correct response was to hand the clicks back, not to route around it with a session claim or a softened trigger. Expect the same wherever a trigger stamps a named human.
+
+**One thing found while building it.** A tick inside a list row inherits the desk's blanket `input{width:100%}` rule, which pushed each row off the page. Fixed with a rule beside the table views' own bulk tick, same size and same accent, so a tick means one thing everywhere on this desk.
+
+---
 
 ## 2026-09-19 · Intake: her own tests are not people stuck at sign-up, and the queue table has no writer
 
@@ -43,6 +58,9 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **Partly superseded hours later, same day,** by the entry above. Two sessions worked this screen in parallel and reached the same diagnosis about `public.intakes` from opposite ends. This one kept the table and relabelled the screen honestly as a record; the other took the queue off it and onto the three tables intake actually lands in. The second is what is live, so the `viz:{ want, wants }` on `intakes`, the "Whose move" column, `intakeState()`, `preIntake()` and this entry's `intakePage()` are all gone, along with the subheading and empty state described above. **The count half of this entry stands and is untouched**: `unsignedJobs()`, `real` versus `mine`, and every place that reads them. So does the open `intakes` INSERT policy flagged below, which nothing here has closed.
 
+---
+
+
 ## 2026-09-19 · Jobs leads with real work, not with her own testing
 
 **Why.** Founder, 19 Sep 2026: "Job says 44 and there is only 1 Jobs." Both numbers were right. The `jobs` table holds 44 rows; 43 of them are marked `is_test`, and the one that is not is `JOB-DEMO-PHOTOS`, the villa roof demo listing. The page led with 44 and the rail badge carried 44, because Jobs had never declared `viz:{ want }` and so fell back to counting rows read. This is the same lie the public board was telling on 9 September, when every job on `app.yaadly.co.uk/jobs` was her own test and the public read them as demand. That is what "That was me testing" was built to stop, and the desk had quietly started telling it back to her on the page she opens first.
@@ -54,6 +72,9 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 **The Read more text, same change.** Two things were missing from it. It said nothing about her own tests being in the table, which is now what the number on top turns on. And on materials store it named the weaker of the two refusals: the database does block a materials tranche and materials evidence without an answer, but `trg_enforce_store_before_open` also refuses to put the job on the board at all, which is the refusal she will actually meet, pressing Open it to the board. Both are now in the paragraph.
 
 **Deployed** 19 September 2026, `yaadly-concierge` version `11327152`, from this branch after merging `origin/main` into it first. Main had moved twice while this was being written, and deploying without that merge would have reverted the Sketch packs badge and the evidence-ownership change, both of which were already live. wrangler uploaded one modified asset, so it was not a no-op, and Cloudflare Access still answers 302 in front of the hostname.
+
+---
+
 
 ---
 
@@ -78,6 +99,9 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 **What.** Desk only, no new data. `renderDayViz()` draws a three-widget strip at the top of The day using the chart vocabulary that already existed: the count of moves that want her, the queues ranked longest first and colour-keyed by whose they are, and the four lanes as one stacked bar. Both pictures now read one `QUEUE` array, shared with the measurement tab, so the two can never disagree about what is waiting. `evidencePage()` gives the Evidence view a `page`, so the drawer opens on the photograph at full width, one sentence in the item's own colour saying whose move it is and why, the job, the fingerprint and what the section means, with every raw field folded under "Every field, as stored" one click down.
 
 **Counts only, no scores.** Every figure on both is a count of rows from a named table. No ratio, no percentage, no index. At this volume a percentage swings twenty points on one event, which is the note already written over the dashboard CSS and the reason it holds here too.
+
+---
+
 
 ## 2026-09-19 · A badge lands on the work it counted, and Sketch packs says what issuing really does
 
