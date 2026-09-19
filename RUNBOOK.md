@@ -5629,3 +5629,12 @@ The note is optional as of 19 September 2026: press "Mark as followed up" on the
 3. **The queue table under the panel is empty or nearly so.** That is correct. Nothing in this repository writes to `public.intakes`: a job now arrives through `yaad-post-job` into `jobs`, a WhatsApp message through `yaad-inbound`, a contact form through `yaad-enquiry`. The newest row in `intakes` is a test from 12 August 2026.
 4. **The Intake badge and the headline number disagree with the rows on screen.** They are not the row count. Both read `viz.want` on the view, which is `status` of `new` or `triaged`, so a screen full of converted and binned rows correctly leads with zero.
 5. **`intakes` can still be written to by anyone with the publishable key.** The policy `public submits requests` is `INSERT ... WITH CHECK (true)`, left over from the old website form. Nothing calls it. If you want it shut, that is a one line migration dropping the policy; flagged 19 Sep 2026, not done, because it is a decision rather than a fix.
+
+## Outstanding, or any money figure, looks too low (19 Sep 2026)
+
+1. **It counts real work only.** Any invoice on a job you marked as your own test is left out of every total on the Invoices view, the Overview money card, the dashboard money widget and the Money view. It is never hidden: it is in the list, at the bottom, under "Your own tests, counted in none of the figures above", with its own chip. A line under each set of totals says how many were left out and what they come to.
+2. **To see the split:** `select j.is_test, count(*), sum(i.total_pence) from invoices i left join jobs j on j.id = i.job_id group by 1;`. On 19 Sep 2026 all 17 invoices on a job were on a test job and none on a real one.
+3. **A real invoice is in the tests group.** Its job is marked `is_test`. Open the job under Jobs and press "This one is real"; the invoice follows the job.
+4. **An invoice with no job at all counts as real.** It is a service, and a service has no test flag.
+5. **Money figures exclude what Yaadly pays tradespeople.** "Out with clients, unpaid" and "Awaiting payment" are money in. A worker payable used to be counted in both, which reported money Yaadly owes as money a client owes. Worker pay is in the Invoices lists under its own heading, and in Pay workers.
+6. **The rail badge on Invoices and the amount beside it come from the same rows.** Two `countOf` calls that counted every invoice were removed on 19 Sep 2026 so they cannot drift apart. Both now read the 600 row money query; if invoices ever pass 600, raise that limit.

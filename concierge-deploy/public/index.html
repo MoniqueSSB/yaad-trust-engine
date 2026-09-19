@@ -6834,7 +6834,7 @@ async function loadOverview(){
   renderCal();
 
   const [intakeNew, appsWaiting, evidOwn, quotesOut, callsNew, disputesOpen,
-         invDraft, invSent, pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsignedOwn,
+         pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsignedOwn,
          enqNew, asksNew] = await Promise.all([
     countOf("intakes",     q => q.in("status", ["new","triaged"])),
     countOf("applications",q => q.in("status", ["submitted","reviewing"])),
@@ -6842,8 +6842,6 @@ async function loadOverview(){
     countOf("job_quotes",  q => q.eq("status", "sent")),
     countOf("calls",       q => q.eq("status", "requested")),
     countOf("disputes",    q => q.neq("state", "resolved")),
-    countOf("invoices",    q => q.eq("status", "draft")),
-    countOf("invoices",    q => q.eq("status", "sent")),
     countOf("sketch_packs",q => q.eq("status", "draft")),
     countOf("sketch_packs",q => q.eq("status", "approved")),
     countOf("jobs",        q => q.eq("open", true)),
@@ -7004,10 +7002,11 @@ async function loadOverview(){
   // Columns named one by one, and budget_band deliberately absent. It is the
   // client's private figure and the rule is that it never arrives in this page,
   // not that the page fetches it and declines to draw it. Same rule as Jobs.
-  const [jobQ, quoteQ, invQ, dispQ, kickQ, revNoReply, workersN] = await Promise.all([
+  const [jobQ, quoteQ, invQ, testQ, dispQ, kickQ, revNoReply, workersN] = await Promise.all([
     sb.from("jobs").select("id,parish,trade,stage,status,open,owed,updated_at").eq("open", true).limit(300),
     sb.from("job_quotes").select("job_id").limit(600),
-    sb.from("invoices").select("id,job_id,client_name,status,total_pence,currency,created_at").limit(600),
+    sb.from("invoices").select("id,job_id,client_name,status,total_pence,currency,created_at,payable_to").limit(600),
+    sb.from("jobs").select("id").eq("is_test", true).limit(1000),
     sb.from("disputes").select("job_id").neq("state", "resolved").limit(200),
     sb.from("kickoff_packs").select("job_id,status").limit(300),
     countOf("reviews", q => q.is("reply", null)),
@@ -7022,12 +7021,30 @@ async function loadOverview(){
   for (const p of (kickQ.data || [])) kickBy[p.job_id] = p.status;
   const DISPUTED = new Set((dispQ.data || []).map(d => d.job_id));
 
-  const INV = invQ.data || [];
+  // Her own test jobs, so no money figure on this card counts one. Same rule
+  // as the Invoices view and for the same reason: on 19 Sep 2026 every invoice
+  // attached to a job was attached to a test job, so "Out with clients,
+  // unpaid" was reporting money no client owed. Named below, never counted.
+  const INV_TESTJOBS = new Set((testQ.data || []).map(j => j.id));
+  const invReal = (i) => !(i.job_id && INV_TESTJOBS.has(i.job_id));
+  // Money IN only, which is what all four figures on this card are. A worker
+  // payable is money Yaadly OWES, and counting it under "Out with clients,
+  // unpaid" pointed it the wrong way: on 19 Sep 2026 J$3,900 owed to a
+  // tradesperson was being reported as J$3,900 a client owed Yaadly.
+  const INV_ALL = (invQ.data || []).filter(i => (i.payable_to || "yaadly") !== "worker");
+  const INV = INV_ALL.filter(invReal);
+  const INV_MINE = INV_ALL.filter(i => !invReal(i));
   const sumOf = sumByCur;
   const draftsInv = INV.filter(i => i.status === "draft");
   const sentInv   = INV.filter(i => i.status === "sent");
   const mKey      = new Date().toISOString().slice(0, 7);
   const paidM     = INV.filter(i => i.status === "paid" && String(i.created_at || "").slice(0, 7) === mKey);
+  // The counts read at the top of this function counted every invoice, tests
+  // included. Recounted here off the same rows the amounts come from, so a
+  // number and the money beside it can never disagree.
+  const invDraftReal = draftsInv.length;
+  const invSentReal  = sentInv.length;
+  const invMineLive  = INV_MINE.filter(i => ["draft","sent","paid"].includes(String(i.status || ""))).length;
   // owed is a text column and is read the same way the Money view reads it.
   // It is an amount agreed in writing, never a balance and never held.
   const owedTotal = JOBS.reduce((t, j) => t + (Number(j.owed) || 0), 0);
@@ -7065,7 +7082,7 @@ async function loadOverview(){
     tile(callsNew ? "warn" : "ok", "Calls requested", String(callsNew), callsNew ? "Somebody wants to talk" : "None asked", "calls"),
     tile(enqNew ? "warn" : "ok", "Enquiries to answer", String(enqNew), enqNew ? "Somebody asked a question" : "All replied to", "enq"),
     tile(asksNew ? "warn" : "ok", "Questions to publish", String(asksNew), asksNew ? "Waiting on your read" : "Board is clear", "asks"),
-    tile((invDraft + pkDraft + pkAppr) ? "warn" : "ok", "Your documents", String(invDraft + pkDraft + pkAppr), "Drafts and packs on you"),
+    tile((invDraftReal + pkDraft + pkAppr) ? "warn" : "ok", "Your documents", String(invDraftReal + pkDraft + pkAppr), "Drafts and packs on you"),
     tile("", "Jobs on the board", String(jobsOpen), "Open to workers", "market"),
     tile(unsigned ? "warn" : "", "Built, never signed", String(unsigned),
       unsigned ? "A real person who walked away at sign-up"
@@ -7203,8 +7220,8 @@ async function loadOverview(){
     push(yours, "warn", "Vetting", plural(appsWaiting, "application is", "applications are") + " part way through vetting", "the agent flags, you decide", null, "Open", "apps", false);
   if (quotesOut)
     push(yours, "warn", "Decide", plural(quotesOut, "quote is", "quotes are") + " sitting with you", "the client has not seen these", null, "Compare", "quotes", false);
-  if (invDraft)
-    push(yours, "warn", "Unsent", plural(invDraft, "invoice draft is", "invoice drafts are") + " unsent", null, curText(sumOf(draftsInv)), "Open invoices", "invoices", false);
+  if (invDraftReal)
+    push(yours, "warn", "Unsent", plural(invDraftReal, "invoice draft is", "invoice drafts are") + " unsent", null, curText(sumOf(draftsInv)), "Open invoices", "invoices", false);
   if (kickDraft)
     push(yours, "warn", "Draft", plural(kickDraft, "kickoff pack is", "kickoff packs are") + " in draft", "approving freezes it", null, "Open packs", "kick", false);
   if (pkDraft)
@@ -7240,8 +7257,10 @@ async function loadOverview(){
     push(cli, "", "Choosing", plural(choosing.length, "job has", "jobs have") + " quotes out with a client", null, null, "Open quotes", "quotes", false);
   if (signing.length)
     push(cli, "warn", "Reading", plural(signing.length, "job is", "jobs are") + " waiting on a client sign-off", null, null, "Open jobs", "jobs", false);
-  if (invSent)
-    push(cli, "warn", "With client", plural(invSent, "invoice is", "invoices are") + " out and awaiting payment", null, curText(sumOf(sentInv)), "Open money", "money", false);
+  if (invSentReal)
+    push(cli, "warn", "With client", plural(invSentReal, "invoice is", "invoices are") + " out and awaiting payment", null, curText(sumOf(sentInv)), "Open money", "money", false);
+  else if (invMineLive)
+    push(non, "ok", "Testing", plural(invMineLive, "invoice is", "invoices are") + " on jobs you marked as your own tests", "counted in no money figure on this desk", null, "Open invoices", "invoices", false);
   if (waitN)
     push(cli, "", "Waiting", plural(waitN, "person is", "people are") + " on the waiting list", null, null, "Write to them", "waitlist", false);
   if (!cli.length)
@@ -7259,7 +7278,7 @@ async function loadOverview(){
   const zeroes = [
     [!disputesOpen, "disputes"], [!evidYours, "evidence anybody raised"], [!intakeNew, "intake to triage"],
     [!appsWaiting, "applications"], [!quotesOut, "quotes to pass on"], [!callsNew, "calls requested"],
-    [!enqNew, "enquiries to answer"], [!asksNew, "questions to publish"], [!invDraft, "invoice drafts"],
+    [!enqNew, "enquiries to answer"], [!asksNew, "questions to publish"], [!invDraftReal, "invoice drafts"],
     [!pkDraft && !pkAppr, "sketch packs"], [!kickDraft, "kickoff packs"], [!held.length, "quote packs held"],
     [!waFailed, "messages to follow up"], [!waWaiting, "replies waiting to send"],
     [!waitingNow.length, "conversations handed over"], [!noEv, "sign-offs with no evidence"],
@@ -7312,6 +7331,7 @@ async function loadOverview(){
         ${namedDrafts.length ? `<div class="sdiv">${namedDrafts.map(i =>
           `<div class="sl"><span>${esc(i.client_name || i.job_id || "unnamed draft")}</span><span class="v">${esc(curAmt(i.total_pence, i.currency))}</span></div>`).join("")}</div>` : ""}
         <div class="sdiv"><div class="sl"><span>Paid this month</span><span class="v ok">${esc(curText(sumOf(paidM)))}</span></div></div>
+        ${INV_MINE.length ? `<div class="slnote" style="margin-top:8px">${plural(INV_MINE.length, "invoice", "invoices")} on jobs you marked as your own testing ${INV_MINE.length === 1 ? "is" : "are"} left out of every figure here, ${esc(curText(sumOf(INV_MINE)))} in all.</div>` : ""}
       </div>
     </div>`;
 
@@ -7476,7 +7496,7 @@ async function loadOverview(){
     { label:"Applications in vetting", n:appsWaiting, view:"apps" },
     { label:"Quotes to pass on", n:quotesOut, view:"quotes" },
     { label:"Quote packs held", n:held.length, view:"qpd" },
-    { label:"Invoice drafts unsent", n:invDraft, view:"invoices:preview" },
+    { label:"Invoice drafts unsent", n:invDraftReal, view:"invoices:preview" },
     { label:"Kickoff packs in draft", n:kickDraft, view:"kick" },
     { label:"Sketch packs to read or issue", n:pkDraft + pkAppr, view:"sketch" },
     { label:"Questions to publish", n:asksNew, view:"asks" },
@@ -7523,7 +7543,7 @@ async function loadOverview(){
       { label:"Quotes to pass on", n:quotesOut, view:"quotes" },
       { label:"Applications in vetting", n:appsWaiting, view:"apps" },
       { label:"Quote packs held", n:held.length, view:"qpd" },
-      { label:"Invoice drafts unsent", n:invDraft, view:"invoices:preview" },
+      { label:"Invoice drafts unsent", n:invDraftReal, view:"invoices:preview" },
       { label:"Kickoff packs in draft", n:kickDraft, view:"kick" },
       { label:"Sketch packs unread", n:pkDraft + pkAppr, view:"sketch" },
       { label:"Questions to publish", n:asksNew, view:"asks" },
@@ -7552,7 +7572,7 @@ async function loadOverview(){
   setCount("evid", evidYours, true);
   setCount("quotes", quotesOut, false);
   setCount("calls", callsNew, false);
-  setCount("invoices", invDraft, false);
+  setCount("invoices", invDraftReal, false);
   setCount("sketch", pkDraft + pkAppr, false);
   setCount("kick", kickDraft, false);
   // Deliberately no count on Jobs. It used to carry the open-dispute total,
@@ -7569,16 +7589,24 @@ $("calNext").addEventListener("click", () => { calM++; if (calM > 11) { calM = 0
 async function loadMoney(){
   const host = $("v-money");
   host.innerHTML = '<div class="card"><div class="empty"><span class="spin"></span>Reading.</div></div>';
-  const [invR, svcR, jobR] = await Promise.all([
-    sb.from("invoices").select("id,client_name,status,total_pence,currency,created_at").limit(400),
+  const [invR, svcR, jobR, testR] = await Promise.all([
+    sb.from("invoices").select("id,client_name,status,total_pence,currency,created_at,job_id,payable_to").limit(400),
     sb.from("services").select("id,type,client_name,price,stage").limit(200),
     sb.from("jobs").select("id,owed,status,open").limit(400),
+    sb.from("jobs").select("id").eq("is_test", true).limit(1000),
   ]);
   if (invR.error) {
     host.innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>invoices could not be read</b><p>${esc(invR.error.message)}</p></div></div>`;
     return;
   }
-  const inv = invR.data || [], jobs = jobR.data || [];
+  // Money in, on real work. A worker payable points the other way, and a job
+  // she marked as her own test is not money anybody owes. Both are named under
+  // the figures rather than added into them. Same rule as the Invoices view.
+  const testJobs = new Set((testR.data || []).map(j => j.id));
+  const invAll = (invR.data || []).filter(i => (i.payable_to || "yaadly") !== "worker");
+  const inv    = invAll.filter(i => !(i.job_id && testJobs.has(i.job_id)));
+  const invMine = invAll.filter(i => i.job_id && testJobs.has(i.job_id));
+  const jobs = jobR.data || [];
   const sum = sumByCur;
   const drafts = inv.filter(i => i.status === "draft");
   const sent   = inv.filter(i => i.status === "sent");
@@ -7591,7 +7619,8 @@ async function loadMoney(){
         { label:"Drafted, unsent", v:sum(drafts), n:drafts.length, col:"#4A4A72", view:"invoices:preview" },
         { label:"Awaiting payment", v:sum(sent), n:sent.length, col:"#F59E0B", view:"invoices:out" },
         { label:"Paid this month", v:sum(paidM), n:paidM.length, col:"#9B73F5", view:"invoices:paid" },
-      ], `Owed on jobs, agreed in writing and not held: <b>${esc(jmd(owed))}</b>.`)}
+      ], `Owed on jobs, agreed in writing and not held: <b>${esc(jmd(owed))}</b>. Money coming in only: what Yaadly pays tradespeople is not in these figures.`
+        + (invMine.length ? ` <b>${plural_(invMine.length, "invoice", "invoices")} on jobs you marked as your own testing ${invMine.length === 1 ? "is" : "are"} left out</b>, ${esc(curText(sumByCur(invMine)))} in all.` : ""))}
     <div class="sechd">Fee model in force</div>
     <div class="card">
       <div class="kv">
@@ -8250,6 +8279,15 @@ $("printBtn").addEventListener("click", () => $("preview").contentWindow.print()
 // Nothing on this list sends, pays or marks anything by itself: each button
 // is the same click the editor below makes.
 let INV_LIST = [], INV_DUE = [], INV_CARD = {}, INV_TAB = "preview";
+// Jobs she has marked as her own testing. Every figure on this view that
+// claims money is owed, or is out, or came in, counts real work only, and
+// names the tests underneath instead of adding them up. On 19 September 2026
+// all seventeen invoices attached to a job were attached to a test job and
+// none to a real one, so Outstanding was reporting J$15,300 owed by clients
+// when no client owed anything. Same rule as Jobs and Intake: named, never
+// counted, and never hidden. The rows stay on screen, grouped and labelled.
+const INV_TEST = new Set();
+const invIsTest = (i) => !!(i && i.job_id && INV_TEST.has(i.job_id));
 let INV_JOBS = [], INV_QUOTES = new Map(), INV_FEELINES = [];
 // Paid, and fees taken, are shown one month at a time, this month first, so
 // the screen reads the same with ten jobs or ten thousand.
@@ -8306,16 +8344,22 @@ function invSummary(clientInv){
     { k:"out", label:"Outstanding", sub:"sent, waiting for the money", has:of("out") },
     { k:"paid", label:"Paid", sub:"in " + invMonthName(), has:of("paid") },
   ];
-  const curs = curOrder(clientInv.filter(i => cols.some(c => c.has(i))).map(i => i.currency || "GBP"));
-  if (!curs.length) return `<p class="hint">Nothing drafted, sent, outstanding or paid in ${esc(invMonthName())}.</p>`;
+  const real = clientInv.filter(i => !invIsTest(i));
+  const mine = clientInv.filter(invIsTest).filter(i => cols.some(c => c.has(i)));
+  const mineNote = mine.length
+    ? `<p class="hint" style="margin-top:2px"><b>${plural_(mine.length, "invoice", "invoices")} on jobs you marked as your own testing ${mine.length === 1 ? "is" : "are"} left out of every figure above</b>, ${esc(curText(sumByCur(mine)))} in all. They are still in the lists below, grouped at the bottom and labelled.</p>`
+    : "";
+  const curs = curOrder(real.filter(i => cols.some(c => c.has(i))).map(i => i.currency || "GBP"));
+  if (!curs.length) return `<p class="hint">Nothing real drafted, sent, outstanding or paid in ${esc(invMonthName())}.</p>` + mineNote;
   const cell = (c, cur) => {
-    const l = clientInv.filter(i => (i.currency || "GBP") === cur && c.has(i));
+    const l = real.filter(i => (i.currency || "GBP") === cur && c.has(i));
     const t = l.reduce((a, i) => a + Number(i.total_pence || 0), 0);
     return `<td><button class="ivcell${l.length ? "" : " zero"}" data-ivgo="${c.k}"><span class="a">${l.length ? esc(curAmt(t, cur)) : "none"}</span><span class="c">${plural_(l.length, "invoice", "invoices")}</span></button></td>`;
   };
   return `<div class="tw"><table class="ivsum"><thead><tr><th></th>${cols.map(c => `<th><b>${esc(c.label)}</b><span>${esc(c.sub)}</span></th>`).join("")}</tr></thead>`
     + `<tbody>${curs.map(cur => `<tr><th>${esc(CUR_LABEL[cur] || cur)}</th>${cols.map(c => cell(c, cur)).join("")}</tr>`).join("")}</tbody></table></div>`
-    + `<p class="hint" style="margin-top:2px">Money coming in only, each currency added up on its own. What Yaadly pays tradespeople is in the lists, labelled, and not in these figures. Sent counts what went out this month whatever happened after, so the same invoice is counted again under Outstanding or Paid.</p>`;
+    + `<p class="hint" style="margin-top:2px">Money coming in only, each currency added up on its own. What Yaadly pays tradespeople is in the lists, labelled, and not in these figures. Sent counts what went out this month whatever happened after, so the same invoice is counted again under Outstanding or Paid.</p>`
+    + mineNote;
 }
 
 // The same shape for Agency fees: one row per kind of fee, and when it is
@@ -8566,7 +8610,7 @@ function invJobMoney(jobId){
 // Asked for on 17 Sep 2026: "a section that showcases all the live jobs so
 // then I can click on it and then see all the invoices linked to that job".
 function invLiveJobs(){
-  return INV_JOBS.filter(j => j.status !== "cancelled").map(j => {
+  return INV_JOBS.filter(j => j.status !== "cancelled" && j.is_test !== true).map(j => {
     const m = invJobMoney(j.id), q = INV_QUOTES.get(j.id);
     const due = INV_DUE.find(d => d.job.id === j.id);
     return { j, m, q, due };
@@ -8730,14 +8774,14 @@ function renderInvoiceList(){
   $("ivTabs").innerHTML = INV_TABS.map(t => {
     if (t.k === "fees") return invFeeTab(t, t.k === tab.k);
     if (t.k === "jobs") return `<button class="ivtab${t.k === tab.k ? " on" : ""}" data-ivtab="jobs"><i style="background:${t.col}"></i>${esc(t.label)}<span class="n">${invLiveJobs().length}</span></button>`;
-    const l = INV_LIST.filter(t.has);
+    const l = INV_LIST.filter(t.has).filter(i => !invIsTest(i));
     const n = l.length + (t.k === "preview" ? INV_DUE.length : 0);
     const v = "";
     return `<button class="ivtab${t.k === tab.k ? " on" : ""}${t.k === "void" ? " quiet" : ""}" data-ivtab="${t.k}"><i style="background:${t.col}"></i>${esc(t.label)}<span class="n">${n}</span>${v}</button>`;
   }).join("");
   // A job bill split into parts can have a balance nobody has been sent yet.
   // It is not outstanding, but it is owed, so Outstanding says so.
-  const unbilled = INV_LIST.filter(i => invIsBill(i) && i.status === "draft" && INV_LIST.some(p => p.part_of === i.id && p.status !== "void"));
+  const unbilled = INV_LIST.filter(i => invIsBill(i) && i.status === "draft" && !invIsTest(i) && INV_LIST.some(p => p.part_of === i.id && p.status !== "void"));
   $("ivHint").textContent = tab.hint + (tab.k === "preview" && INV_DUE.length ? " Booked jobs with no bill yet are at the top." : "")
     + (tab.k === "out" && unbilled.length ? ` Job bills split into parts also have ${curText(sumByCur(unbilled))} not billed yet, on ${unbilled.map(i => i.id).join(", ")}.` : "");
 
@@ -8758,7 +8802,14 @@ function renderInvoiceList(){
       <td class="ivact"><button class="btn" data-ivraise="${esc(d.job.id)}">Raise draft</button></td>
     </tr>`);
 
-  const invRows = rows.map(invRowHtml);
+  // Never filtered out, only moved and labelled. A figure that counts them is
+  // a lie; a list that hides them is a different one.
+  const realRows = rows.filter(i => !invIsTest(i));
+  const testRows = rows.filter(invIsTest);
+  const invRows = realRows.map(invRowHtml).concat(testRows.length
+    ? [`<tr class="ivgrp"><td colspan="5">Your own tests &middot; ${testRows.length} &middot; counted in none of the figures above</td></tr>`]
+        .concat(testRows.map(invRowHtml))
+    : []);
 
   const all = tab.k === "fees" ? invFeeRows(q) : tab.k === "jobs" ? invJobRows(q) : dueRows.concat(invRows);
   $("ivList").innerHTML = all.length
@@ -8783,6 +8834,7 @@ function invRowHtml(i){
   const card = INV_CARD[i.id] || {};
   const tags = [
     invSign(i),
+    invIsTest(i) ? '<span class="chip mute">your own test</span>' : "",
     i.payable_to === "worker" ? '<span class="chip mute">Yaadly pays the worker</span>' : "",
     i.part_of ? `<span class="chip mute">part of ${esc(i.part_of)}</span>` : "",
     i.replaces ? `<span class="chip mute">replaces ${esc(i.replaces)}</span>` : "",
@@ -8924,7 +8976,7 @@ async function loadInvoices(){
     sb.from("invoices").select(COLS).eq("status", "paid").gte("paid_at", from).lt("paid_at", to).order("paid_at", { ascending: false }),
     sb.from("invoices").select(COLS).gte("sent_at", from).lt("sent_at", to).order("sent_at", { ascending: false }),
     sb.from("invoices").select(COLS).eq("status", "void").order("created_at", { ascending: false }).limit(50),
-    sb.from("jobs").select("id,title,client_email,status,trade")
+    sb.from("jobs").select("id,title,client_email,status,trade,is_test")
       .not("worker_email", "is", null).order("updated_at", { ascending: false }).limit(50),
   ]);
   const error = open.error || paidM.error || sentM.error || voids.error;
@@ -8945,6 +8997,16 @@ async function loadInvoices(){
   for (const i of [].concat(openRows, paidM.data || [], sentM.data || [], voids.data || [], onJobs.data || [], byBill.data || [], bills.data || [])) byId.set(i.id, i);
   INV_LIST = [...byId.values()].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
 
+  // Which of those sit on a job she marked as her own test. One read, by id,
+  // off the list actually on screen. An invoice with no job at all is a
+  // service and counts as real: there is no test flag on a service.
+  INV_TEST.clear();
+  const invJobIds = [...new Set(INV_LIST.map(i => i.job_id).filter(Boolean))];
+  if (invJobIds.length) {
+    const { data: tj } = await sb.from("jobs").select("id,is_test").in("id", invJobIds);
+    for (const j of tj || []) if (j.is_test === true) INV_TEST.add(j.id);
+  }
+
   // Ready to raise: a booked job with an accepted quote and no live client
   // bill. The figure is the sum raise_job_client_invoice writes: labour,
   // Yaadly's 15% on labour, and materials at cost.
@@ -8961,6 +9023,7 @@ async function loadInvoices(){
     for (const job of jobs) {
       const quote = quoteByJob.get(job.id);
       if (!quote || billed.has(job.id)) continue;
+      if (job.is_test === true) continue;   // her own test is not a bill waiting to be raised
       const labour = Math.round(quote.labour_jmd || 0), fee = Math.round(labour * 0.15);
       due.push({ job, worker: quote.worker_name, fee, bill: labour + fee + Math.round(quote.materials_jmd || 0) });
     }
