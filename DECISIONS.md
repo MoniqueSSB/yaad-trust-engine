@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · Jobs leads with real work, not with her own testing
+
+**Why.** Founder, 19 Sep 2026: "Job says 44 and there is only 1 Jobs." Both numbers were right. The `jobs` table holds 44 rows; 43 of them are marked `is_test`, and the one that is not is `JOB-DEMO-PHOTOS`, the villa roof demo listing. The page led with 44 and the rail badge carried 44, because Jobs had never declared `viz:{ want }` and so fell back to counting rows read. This is the same lie the public board was telling on 9 September, when every job on `app.yaadly.co.uk/jobs` was her own test and the public read them as demand. That is what "That was me testing" was built to stop, and the desk had quietly started telling it back to her on the page she opens first.
+
+**What.** Desk only, `concierge/concierge.html` and its deploy copy; no database change, no new action, nothing hidden from the table. Jobs declares `viz:{ want: not a test and still running, wants: "real, still running" }`, so the big number and the rail badge both read 1 today and "44 loaded" drops to the line underneath. Running means one of the six statuses a job is actually in flight in: `open_for_quotes`, `quoted`, `awaiting_payment`, `in_progress`, `evidence`, `disputed`. `draft` and `awaiting_client_setup` have not started and already have their own view; `complete` and `cancelled` are over.
+
+**Why not `jobs.open`.** It was the obvious column and it is not true. Four `complete` jobs carry `open = true` in the live database, and all 24 `awaiting_client_setup` rows carry `open = false`, so counting on it would have called finished work live. The status list is named out in `JOB_RUNNING` instead, next to `preJobs`, with a comment saying it is a display count and never a gate. If a status is added to `jobs_status_check` later, that set has to be looked at with it.
+
+**The Read more text, same change.** Two things were missing from it. It said nothing about her own tests being in the table, which is now what the number on top turns on. And on materials store it named the weaker of the two refusals: the database does block a materials tranche and materials evidence without an answer, but `trg_enforce_store_before_open` also refuses to put the job on the board at all, which is the refusal she will actually meet, pressing Open it to the board. Both are now in the paragraph.
+
+---
+
 ## 2026-09-19 · Pay workers: one state per row, and the route named on the button
 
 **Why.** Founder, 19 Sep 2026, looking at a blocked row: "this is confusing and not sure why there is so many boxes and loop, it should be clear to paid by strip or wise." Both halves were fair. One fact, "the client has not paid", was printed five times in a single row: the amber chip, the database's full sentence under it, the words "Waiting for the client to pay" in the action cell, the same sentence again as the disabled button's tooltip, and a footnote under the table. On top of that the row listed the job's three client invoice numbers, which nobody had asked for, and four buttons. Nine things carrying one meaning. And no payment route was named anywhere: "Mark as sent" actually meant *pay them in Wise, then record it*, but the word Wise appeared only on a small link at the bottom of the stack, and "Stripe: not set up" was grey text that read as something broken rather than as a worker who has not finished their own setup.

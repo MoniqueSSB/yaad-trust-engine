@@ -1750,7 +1750,16 @@ const VIEWS = [
 
   { k:"jobs", g:"Run the day", label:"Jobs", icon:"case",
     title:"Jobs", table:"jobs",
-    sub:"Every job and where it has got to, including everything that arrives by WhatsApp, email and the website form. What somebody actually typed is under In their own words, kept exactly as they wrote it. Hover to read the whole thing. A budget band is the client's private figure and is never shown here. Materials store is where the client said materials are to be kept: until that is answered the database will not let a materials tranche or materials evidence be recorded at all.",
+    sub:"Every job and where it has got to, including everything that arrives by WhatsApp, email and the website form. The big number counts jobs that are real and still running. Anything you marked as your own testing is left out of it, and so is anything finished, cancelled or still waiting for the client to sign up. Nothing is hidden by that: every row is still in the table underneath, and a test carries a test chip. What somebody actually typed is under In their own words, kept exactly as they wrote it. Hover to read the whole thing. A budget band is the client's private figure and is never shown here. Materials store is where the client said materials are to be kept. Until that is answered the database will not put the job on the board at all, and will not let a materials tranche or materials evidence be recorded against it.",
+    // 19 September 2026. This page led with 44 while one job on it was real:
+    // the other 43 were her own testing. That is the same lie the public
+    // board was telling on 9 September, which is what "That was me testing"
+    // was built to stop, and the desk had quietly started telling it back to
+    // her. A number here is a claim about work, so the big one counts jobs
+    // that are real and still running and demotes the row count to the line
+    // underneath. Nothing is filtered out of the table: the tests are all
+    // still there with a test chip, which is where marking one real lives.
+    viz:{ want:r => !r.is_test && JOB_RUNNING.has(String(r.status || "")), wants:"real, still running" },
     // Every column except budget_band, named one by one on purpose. "*" plus a
     // hide list would still fetch the client's private figure into this page
     // and merely decline to draw it. The rule is that it never arrives.
@@ -3676,6 +3685,14 @@ function applicantCard(r){
       <div class="note">${esc(body)}</div>
     </div>`;
 }
+
+// The statuses of a job that is actually in flight, out of the ten
+// jobs_status_check permits. draft and awaiting_client_setup have not started
+// (those are leads, and they have their own view); complete and cancelled are
+// over. Used for the count at the top of the Jobs page, never as a gate.
+// jobs.open is deliberately not used for this: four complete jobs carry
+// open = true in the live database, so that column no longer tells the truth.
+const JOB_RUNNING = new Set(["open_for_quotes", "quoted", "awaiting_payment", "in_progress", "evidence", "disputed"]);
 
 // ---- Jobs: what has been agreed and signed off, drawn as a record.
 //
