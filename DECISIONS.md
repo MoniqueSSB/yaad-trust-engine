@@ -18,6 +18,8 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **What it does not change.** Not one human gate. The client still approves every stage in their own portal, exactly as before, and nothing here approves, releases or rules on anything. `evidence.ok` is left in place, read by nothing on the desk now; a dead line in `jobPage` that counted it and used the result for nothing was removed.
 
+**Deployed** 19 September 2026, `yaadly-concierge` version `c77ab329`, from `origin/main` after the merge, with the branch merged up twice first because main moved under it both times. wrangler uploaded one modified asset, so it was not a no-op, and Cloudflare Access still answers 302 in front of the hostname.
+
 ## 2026-09-19 · The day opens with a picture, and a filed photograph opens as a page
 
 **Why.** Founder, same session: "there should be a visual dashboard when i open the actions", for both The day and the drawer that opens on a row. The day carried four lanes of text and no picture at all, while the Overview next to it had eight charts. And the drawer on an evidence row was a dump of its columns, `ok`, `meta`, `storage_path`, `bytes`, with the photograph itself one field among twenty.
