@@ -821,6 +821,10 @@ tbody tr[data-i]:hover td:first-child,tbody tr[data-openjob]:hover td:first-chil
 th.bkc,td.bkc{width:34px;padding-right:0}
 .bkc label{display:flex;align-items:center;justify-content:center;min-height:28px;cursor:pointer}
 .bkc input{width:16px;height:16px;accent-color:var(--teal);cursor:pointer}
+/* A tick on a list row. Without this the blanket input rule above gives it
+   width:100% and padding, which pushes the whole row off the page. Same
+   shape and accent as the table-view bulk tick, so a tick means one thing. */
+.list .item input[type=checkbox]{width:16px;height:16px;flex:none;align-self:flex-start;margin-top:4px;padding:0;accent-color:var(--teal);cursor:pointer}
 .bkbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px;min-height:34px;font-size:12.5px}
 .bkbar .n{color:var(--ink);font-weight:700}
 .bkbar .msg{margin:0;flex:1 1 100%}
@@ -1158,6 +1162,15 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
     <div class="chd"><h3>Packs</h3><span class="sp" id="skWant"></span></div>
     <div id="skListMsg"></div>
     <div class="list" id="skList"><div class="empty"><b>Reading packs&hellip;</b></div></div>
+    <!-- Voiding several at once. The database still refuses a void from
+         anything that is not a signed-in admin (sketch_guard_approval), and
+         that gate is untouched: this runs as her, in her browser, on her
+         click. It saves the repetition, not the decision. -->
+    <div class="brow hidden" id="skBulkRow" style="margin-top:12px">
+      <button class="btn d" id="skBulkVoid">Void selected</button>
+      <button class="btn g" id="skBulkClear">Clear selection</button>
+    </div>
+    <p class="conseq" id="skBulkNote" style="margin-top:6px"></p>
   </div>
 
   <div class="card">
@@ -1180,7 +1193,17 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
       <div><label>Date filmed</label><input id="skDate" type="date"></div>
       <div><label>Walked by</label><input id="skWho" placeholder="Who was on site"></div>
       <div><label>Conditions on the day</label><input id="skConditions" placeholder="Sunny, dry, after rain overnight"></div>
-      <div><label>Job reference, optional</label><input id="skJobRef" placeholder="JOB-2026-014"></div>
+      <!-- A picker, not free text. This was an input with the placeholder
+           "JOB-2026-014" and it wrote job_ref, a printed string nothing
+           reads. A live job id looks like JOB-WEB-1789253807959, so nobody
+           was ever going to type one, and job_id stayed null on every pack
+           ever made. A pack with no job reaches nobody: the client read
+           policy wants status issued AND a job whose client_email is theirs.
+           The list is the jobs themselves, so what is picked is real and the
+           foreign key can never be given a job that does not exist. The
+           client's own reference is a separate free-text field, filled in on
+           the draft, and this does not touch it. -->
+      <div><label>Job this belongs to</label><select id="skJob"><option value="">No job, this pack will not be sendable</option></select></div>
       <div><label>Contractor, if one is appointed</label><input id="skContractor" placeholder="Nobody appointed yet"></div>
     </div>
     <div class="row">
@@ -9618,7 +9641,11 @@ $("skAssemble").addEventListener("click", async () => {
       visit_date: $("skDate").value || null,
       captured_by: $("skWho").value.trim(),
       conditions: $("skConditions").value.trim(),
-      job_ref: $("skJobRef").value.trim(),
+      // job_id is the link that decides who can read the pack. job_ref is a
+      // different thing, the client's OWN reference, free text printed on the
+      // report, and it is filled in on the draft where the label says so.
+      // Putting a Yaadly job id in it would quietly redefine that field.
+      job_id: $("skJob").value || null,
       contractor: $("skContractor").value.trim(),
       visit_notes: $("skVisitNotes").value.trim(),
     });
@@ -9767,6 +9794,11 @@ function skRenderPack(extra){
 
   $("skPackBody").innerHTML = `
     <p class="vsub" style="margin:0 0 10px">${esc(p.property_label)}${p.client_name ? " &middot; " + esc(p.client_name) : ""}${p.parish ? " &middot; " + esc(p.parish) : ""}</p>
+    ${draft ? `<div class="row" style="align-items:flex-end;margin-bottom:12px">
+      <div style="flex:1"><label>Job this belongs to</label><select id="skPackJob"><option value="">No job, this pack will not be sendable</option>${skJobOptions(p.job_id || "")}</select></div>
+      <div><button class="btn g" id="skPackJobSave">Attach</button></div>
+    </div>
+    ${p.job_id ? "" : `<p class="conseq" style="color:var(--coral);margin-top:-6px">No job attached, so <b>nobody can read this pack</b> however far you take it. A client reads one through their job. Attach it here, on the draft: an approved pack is frozen, and reopening to fix it starts a new revision.</p>`}` : ""}
     <div class="row" style="align-items:flex-end;margin-bottom:12px">
       <div style="flex:1"><label>Property address, printed on the report with a map</label><input id="skAddress" value="${esc(p.address || "")}" placeholder="12 Hope Road, Kingston 6" ${draft ? "" : "disabled"}></div>
       ${draft ? `<div><button class="btn g" id="skMapBtn">${p.map_image ? "Update the map" : "Add the map"}</button></div>` : ""}
@@ -9913,6 +9945,20 @@ function skRenderPack(extra){
     } catch (e) { say("skPackMsg","err", e.message); }
   });
 
+  // Attaching a job to a draft. The one repair for every pack made before the
+  // capture form had a picker, all of which have job_id null. Written straight
+  // to the row: the guard only fires on a status change, so this is an
+  // ordinary edit, and the foreign key refuses a job that does not exist.
+  if ($("skPackJobSave")) $("skPackJobSave").addEventListener("click", async () => {
+    const job = $("skPackJob").value || null;
+    if (job === (p.job_id || null)) return say("skPackMsg","ok","That is already the job on this pack. Nothing changed.");
+    if (!job && !confirm("Take the job off " + p.id + "?\n\nIt goes back to being readable by nobody.")) return;
+    const { error } = await sb.from("sketch_packs").update({ job_id: job }).eq("id", p.id);
+    if (error) return say("skPackMsg","err", error.message);
+    await skReload(p.id);
+    say("skPackMsg","ok", job ? "Attached to " + job + ". It can be issued to that job's client once you approve it." : "Job removed.");
+  });
+
   const setStatus = async (status, confirmText) => {
     if (confirmText && !confirm(confirmText)) return;
     const { error } = await sb.from("sketch_packs").update({ status }).eq("id", p.id);
@@ -9978,10 +10024,11 @@ function renderSkList(){
     const orphan = live && !p.job_id;
     return `
     <div class="item"${live ? "" : ' style="opacity:.62"'}>
-      <div><a href="#" data-skopen="${esc(p.id)}">${esc(p.id)}</a> ${chipFor(SK_CHIP, p.status)}
+      ${live ? `<input type="checkbox" data-skpick="${esc(p.id)}"${SK_PICKED.has(p.id) ? " checked" : ""} title="Select for voiding">` : ""}
+      <div style="flex:1"><a href="#" data-skopen="${esc(p.id)}">${esc(p.id)}</a> ${chipFor(SK_CHIP, p.status)}
         ${orphan ? '<span class="chip mute">no job attached</span>' : ""}
         <div style="color:var(--dim);font-size:11.5px;margin-top:3px">${esc(p.property_label)}${p.client_name ? " &middot; " + esc(p.client_name) : ""}</div></div>
-      <div style="color:var(--dim);font-size:11.5px">${esc(String(p.created_at).slice(0,10))}</div>
+      <div style="flex:none;white-space:nowrap;color:var(--dim);font-size:11.5px">${esc(String(p.created_at).slice(0,10))}</div>
     </div>`; }).join("")
     || (q ? '<div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div>'
           : '<div class="empty"><b>No packs yet</b>Pull the stills from a walkthrough below.</div>');
@@ -9991,9 +10038,83 @@ function renderSkList(){
     await skReload(e.target.dataset.skopen);
     $("skPackCard").scrollIntoView({ behavior:"smooth" });
   }));
+
+  $("skList").querySelectorAll("[data-skpick]").forEach(c => c.addEventListener("change", (e) => {
+    const id = e.target.dataset.skpick;
+    e.target.checked ? SK_PICKED.add(id) : SK_PICKED.delete(id);
+    skBulkBar();
+  }));
+  skBulkBar();
+}
+
+// Which packs are ticked for voiding. Only ones that want a person can be
+// ticked; an issued or void pack is the log and is not going anywhere.
+const SK_PICKED = new Set();
+
+function skBulkBar(){
+  // Drop anything ticked that is no longer voidable, so a stale tick from
+  // before a reload cannot end up in the list the confirm names.
+  for (const id of [...SK_PICKED]) if (!SK_LIST.some(p => p.id === id && SK_WANTS(p))) SK_PICKED.delete(id);
+  const n = SK_PICKED.size;
+  show("skBulkRow", n > 0);
+  $("skBulkNote").textContent = n
+    ? `Voiding keeps the ${n === 1 ? "pack" : "packs"} on the record, marked void, and nothing is deleted. A void pack can be set back to draft later.`
+    : "";
+}
+
+$("skBulkClear").addEventListener("click", () => { SK_PICKED.clear(); renderSkList(); });
+
+$("skBulkVoid").addEventListener("click", async () => {
+  const ids = [...SK_PICKED];
+  if (!ids.length) return;
+  const named = ids.map(id => {
+    const p = SK_LIST.find(x => x.id === id);
+    return "  " + id + (p && p.property_label ? "  (" + p.property_label + ")" : "");
+  }).join("\n");
+  if (!confirm(`Void ${ids.length} pack${ids.length === 1 ? "" : "s"}?\n\n${named}\n\nThey stay on the record, marked void. Nothing is deleted, and a void pack can be set back to draft later.`)) return;
+  $("skBulkVoid").disabled = true;
+  // One at a time, so a refusal names the pack it refused rather than failing
+  // the whole set anonymously. The database checks is_admin() on every one.
+  const failed = [];
+  for (const id of ids) {
+    const { error } = await sb.from("sketch_packs").update({ status:"void" }).eq("id", id);
+    if (error) failed.push(id + ": " + error.message);
+  }
+  $("skBulkVoid").disabled = false;
+  SK_PICKED.clear();
+  await loadSketchPacks();
+  if (failed.length) return say("skListMsg","err", `${ids.length - failed.length} voided. ${failed.length} refused: ${failed.join(" | ")}`);
+  say("skListMsg","ok", `${ids.length} pack${ids.length === 1 ? "" : "s"} voided.`);
+});
+
+// The jobs the pickers offer, newest first. Held here rather than shared with
+// the Jobs view, which loads its own and may never have been opened.
+let SK_JOBS = [];
+
+// One line per job, the same wording in the capture form and on a pack, so a
+// job reads the same wherever it is being attached.
+function skJobLabel(j){
+  return j.id + (j.title ? " \u00b7 " + j.title : "") + (j.parish ? " \u00b7 " + j.parish : "")
+    + (j.client_email ? "" : "  (no client email, cannot be read by anybody yet)");
+}
+function skJobOptions(selected){
+  return SK_JOBS.map(j => `<option value="${esc(j.id)}"${j.id === selected ? " selected" : ""}>${esc(skJobLabel(j))}</option>`).join("");
 }
 
 async function loadSketchPacks(){
+  // Jobs for the pickers. A failure here is not fatal: the packs still list,
+  // the picker is just empty, and it says so rather than looking like there
+  // are no jobs.
+  const jq = await sb.from("jobs").select("id,title,parish,client_email")
+    .order("updated_at", { ascending: false }).limit(200);
+  SK_JOBS = jq.data || [];
+  const sel = $("skJob");
+  if (sel) {
+    const keep = sel.value;
+    sel.innerHTML = `<option value="">${SK_JOBS.length ? "No job, this pack will not be sendable" : "No jobs could be read, so none can be attached"}</option>`
+      + skJobOptions(keep);
+  }
+
   const { data, error } = await sb.from("sketch_packs")
     .select("id,property_label,client_name,status,created_at,rev,job_id")
     .order("created_at", { ascending: false }).limit(15);
