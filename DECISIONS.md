@@ -6,6 +6,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · A drafted bill is not the client's fault either
+
+**Why.** Same fault as the entry below, found by checking the same data one level deeper. Splitting "billed" from "paid" fixed two jobs and left a third wrong: JOB-TEST-KICKOFF-1 has the materials line on INV-2026-0024, which is a draft that has never been sent. The row called that the client not paying. The client has not seen the bill.
+
+**What changed.** Desk only, both copies. The money side is three states rather than two, from three sums over the job's non-void Yaadly invoices: billed at all, sent, paid. Nothing billed and the bill still a draft are both Yaadly's move and say so. Only a bill that actually reached the client can read as waiting on them. The store question is unchanged and still theirs.
+
+**The general shape, worth remembering.** Twice in one day the desk turned Yaadly's own next move into a sentence blaming the client, because the code tested the last gate in the chain and named it. When a row says somebody is waiting, the useful question is not which gate is shut but whose hand is on it.
+
+**What did not move.** No database change, no gate. `materials_paid_jmd()` still decides whether a tranche can go, and it still counts only paid invoices.
+
 ## 2026-09-19 · Everything deployed reconciled against main, and two functions found running ahead of it
 
 **Why.** Founder: "fix everything outstanding". `scripts/check-deploy-drift.sh` says "No drift", and it compares names, not content, so it cannot see a function whose deployed code is a different version of the same file. Every one of the 44 deployed functions was downloaded and diffed against `main` instead.
