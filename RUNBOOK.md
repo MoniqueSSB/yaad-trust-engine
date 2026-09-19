@@ -5657,3 +5657,11 @@ The note is optional as of 19 September 2026: press "Mark as followed up" on the
 - **"Nothing to follow up for that number"** is also the old function. The new one returns 0 quietly and the row simply disappears on reload.
 - **"That is not a usable number"** is real: the row's `to_addr` has fewer than seven digits, so there is nobody to have followed up with. Nothing to do but leave it.
 - **"Admin only"** or **"No signed-in email on this session"** means the desk session is not what it should be. Sign out and back in.
+
+## Intake says nobody is stuck, or the queue looks empty (19 Sep 2026)
+
+1. **"Built, never signed" reads 0 and you expected a number.** It counts real people only: `NOT (is_test IS TRUE)` on jobs at `awaiting_client_setup`. Your own test jobs are named, never counted. To see the split: `select is_test, count(*) from jobs where status = 'awaiting_client_setup' group by 1;`. On 19 Sep 2026 that was 24 rows, all `true`, and six places on the desk were calling them people waiting on you.
+2. **A real lead is missing from that panel.** It reads the newest 50 at that stage. Check the job's `is_test`: if it was marked as testing by mistake, the row is folded into the details block underneath, not lost. Open it there and unmark it.
+3. **The queue table under the panel is empty or nearly so.** That is correct. Nothing in this repository writes to `public.intakes`: a job now arrives through `yaad-post-job` into `jobs`, a WhatsApp message through `yaad-inbound`, a contact form through `yaad-enquiry`. The newest row in `intakes` is a test from 12 August 2026.
+4. **The Intake badge and the headline number disagree with the rows on screen.** They are not the row count. Both read `viz.want` on the view, which is `status` of `new` or `triaged`, so a screen full of converted and binned rows correctly leads with zero.
+5. **`intakes` can still be written to by anyone with the publishable key.** The policy `public submits requests` is `INSERT ... WITH CHECK (true)`, left over from the old website form. Nothing calls it. If you want it shut, that is a one line migration dropping the policy; flagged 19 Sep 2026, not done, because it is a decision rather than a fix.
