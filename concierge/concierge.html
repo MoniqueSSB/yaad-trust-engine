@@ -808,8 +808,8 @@ iframe{width:100%;height:640px;border:1px solid var(--line);border-radius:12px;b
 .dv.empty{color:var(--dim)}
 .dacts{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:14px 0 0;margin-top:18px}
 @media(max-width:700px){.dfield{grid-template-columns:1fr;gap:3px}.drw{padding:14px 16px 40px}}
-tbody tr[data-i]{cursor:pointer}
-tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
+tbody tr[data-i],tbody tr[data-openjob]{cursor:pointer}
+tbody tr[data-i]:hover td:first-child,tbody tr[data-openjob]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
 /* Tick boxes for acting on several rows at once (Enquiries). The label fills
    the cell so a slightly missed tick does not open the drawer instead. */
 th.bkc,td.bkc{width:34px;padding-right:0}
@@ -3953,24 +3953,56 @@ function jobPage(r){
 // that tells the truth about whether this is still stuck.
 async function preIntake(){
   const { data } = await sb.from("jobs")
-    .select("id,title,trade,parish,status,client_name,client_email,client_phone,updated_at")
+    .select("id,title,trade,parish,status,client_name,client_email,client_phone,updated_at,is_test")
     .eq("status", "awaiting_client_setup").order("updated_at", { ascending:false }).limit(50);
   INTAKE_DRAFTS = data || [];
 }
 
-function panelIntake(){
-  if (!INTAKE_DRAFTS.length) return "";
-  const rows = INTAKE_DRAFTS.map(r =>
-    `<tr><td>${id_(r.id)}${sub_(r.title || "")}</td>`
+// This panel was a printed table until 19 September 2026: no click, no button,
+// nothing that could finish a row. Every row now opens the job itself, which
+// is where opening it to the board, cancelling it, correcting what it says and
+// marking it as your own test already live. Nothing can be decided here that
+// could not be decided there. What changed is that you can reach it.
+//
+// Her own tests are separated out and folded away. On the day this was written
+// all twenty-four rows at this stage were tests, and a list that calls them
+// leads reads as twenty-four people waiting on her, which is a lie the screen
+// was telling every time she opened it.
+function draftRow(r){
+  return `<tr data-openjob="${esc(r.id)}">`
+  + `<td>${id_(r.id)}${r.is_test ? " " + chip_("mute", "test") : ""}${sub_(r.title || "")}</td>`
   + `<td>${esc(r.trade || "not classified")}${sub_(r.parish || "")}</td>`
   + `<td>${esc(r.client_name || "no name")}${sub_(r.client_phone || r.client_email || "no way to reply")}</td>`
   + `<td>${tone_(r.status)}</td>`
-  + `<td>${mute_(ago_(r.updated_at))}</td></tr>`).join("");
-  return `<div class="sechd">Built a job, never signed</div>`
-    + `<p class="vsub" style="margin-top:0">No client account is attached to these, so they cannot go on the board. You still have the trade, the parish and what they typed, which makes each one a lead and an email you can send.</p>`
-    + `<div class="card pad0"><div class="tw"><table><thead><tr><th>Job</th><th>Trade &amp; area</th><th>Who</th><th>State</th><th>Last touched</th></tr></thead><tbody>${rows}</tbody></table></div></div>`
-    + `<p class="hint">${INTAKE_DRAFTS.length} row${INTAKE_DRAFTS.length === 1 ? "" : "s"}, read from <span class="mono">jobs</span> where <span class="mono">status</span> is <span class="mono">awaiting_client_setup</span>. These are not in the queue below; they are already jobs.</p>`
-    + `<div class="sechd">The queue</div>`;
+  + `<td>${mute_(ago_(r.updated_at))}</td></tr>`;
+}
+
+const draftTable = (rows) => `<div class="card pad0"><div class="tw"><table><thead><tr>`
+  + `<th>Job</th><th>Trade &amp; area</th><th>Who</th><th>State</th><th>Last touched</th>`
+  + `</tr></thead><tbody>${rows.map(draftRow).join("")}</tbody></table></div></div>`;
+
+function panelIntake(){
+  const tail = `<div class="sechd">The queue</div>`;
+  if (!INTAKE_DRAFTS.length) return `<div class="sechd">Built a job, never signed</div>`
+    + `<p class="vsub" style="margin-top:0">Nobody is stuck at sign-up. Anyone who builds a job and walks away before an account exists lands here.</p>`
+    + tail;
+
+  const mine = INTAKE_DRAFTS.filter(r => r.is_test);
+  const real = INTAKE_DRAFTS.filter(r => !r.is_test);
+
+  let out = `<div class="sechd">Built a job, never signed</div>`
+    + `<p class="vsub" style="margin-top:0">No client account is attached to these, so they cannot go on the board. You still have the trade, the parish and what they typed, which makes each one a lead and an email you can send. <b>Click any row to open the job</b>, and finish it there: open it to the board, cancel it, correct what it says, or mark it as your own test.</p>`;
+
+  out += real.length
+    ? draftTable(real)
+      + `<p class="hint">${real.length} row${real.length === 1 ? "" : "s"}, read from <span class="mono">jobs</span> where <span class="mono">status</span> is <span class="mono">awaiting_client_setup</span>. These are not in the queue below; they are already jobs.</p>`
+    : `<div class="card"><div class="empty"><b>No lead is stuck at sign-up</b>Everything sitting at this stage is your own testing, folded away below.</div></div>`;
+
+  if (mine.length) out += `<details class="allfields"><summary>${mine.length} of your own test job${mine.length === 1 ? "" : "s"} at this stage</summary>`
+    + `<p class="vsub">Marked as testing by you, so they are already off the public board. They stay here until you cancel them; open one to do it.</p>`
+    + draftTable(mine) + `</details>`;
+
+  return out + tail;
 }
 
 // ---- Evidence: the review card the framework puts at the top of this view.
@@ -5463,10 +5495,17 @@ function fieldValue(val){
 
 let OPEN = null;   // { k, row }
 
+// Where to go back to when this drawer shuts. Set only when a job was opened
+// from another view's panel, so closing it, or finishing an action on it,
+// puts her back on the list she was working through rather than stranding
+// her on Jobs. Cleared as it is used: one journey back, not a history.
+let BACK_TO = null;
+
 function closeDrawer(){
   const o = document.querySelector(".ovl");
   if (o) o.remove();
   OPEN = null;
+  if (BACK_TO) { const v = BACK_TO; BACK_TO = null; go(v); }
 }
 
 function openDetail(k, i){
@@ -5684,6 +5723,11 @@ function go(v){
   if (String(v).startsWith("invoices:job:")) { jobPick = v.slice(13); v = "invoices"; }
   else if (String(v).startsWith("invoices:")) { INV_TAB = v.slice(9); v = "invoices"; }
   if (v === "invoices" && typeof INV_JOB !== "undefined") { INV_JOB = jobPick; INV_JOB_INFO = null; }
+  // A journey back is only owed while she is still on the job she opened. A
+  // link out of that drawer (every invoice on this job, say) ends it, so a
+  // drawer she closes an hour later does not jump her somewhere she has left.
+  // openJobById sets BACK_TO after its own go("jobs"), so this never eats it.
+  if (v !== "jobs") BACK_TO = null;
   currentView = v;
   document.querySelectorAll(".rlink").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   document.querySelectorAll(".view").forEach(s => s.classList.toggle("on", s.dataset.view === v));
@@ -5693,7 +5737,33 @@ function go(v){
   foldIntro(v);
   window.scrollTo({ top:0, behavior:"instant" });
   const b = BESPOKE[v];
-  if (b) b(); else if (VIEW[v] && VIEW[v].table) loadTableView(v);
+  // Handed back, not just fired: openJobById has to wait for the rows before
+  // it can open one. Every other caller ignores this and behaves as before.
+  if (b) return b();
+  if (VIEW[v] && VIEW[v].table) return loadTableView(v);
+}
+
+// ---- Open one job from somewhere that is not the Jobs table.
+//
+// A row on another view's panel knows a job id and nothing else. This moves to
+// Jobs, waits for the read, and opens that job's page with every action on it.
+// Deliberately no second copy of those actions anywhere else: a button that
+// cancels a job should exist once, on the page that shows what is being
+// cancelled.
+async function openJobById(id){
+  const from = currentView;
+  await go("jobs");
+  const row = (ROWS.jobs || []).find(r => String(r.id) === String(id));
+  if (row) {
+    openDetail("jobs", row.__i);
+    // Set after the drawer exists, never before: a BACK_TO left standing
+    // because nothing opened would fire on the next drawer she closes.
+    if (from && from !== "jobs") BACK_TO = from;
+    return;
+  }
+  // Jobs reads the newest 200. Older than that, say so plainly rather than
+  // opening the wrong record or silently doing nothing.
+  alert(id + " is not in the newest 200 jobs, so it could not be opened from here. Search for it on the Jobs view.");
 }
 
 document.addEventListener("click", (e) => {
@@ -5743,6 +5813,8 @@ document.addEventListener("click", (e) => {
   const bkc = e.target.closest("[data-bk-clear]");
   if (bkc) { const k = bkc.dataset.bkClear; BULK[k] = new Set(); delete BULK_MSG[k]; renderTableView(k); return; }
   if (e.target.closest("td.bkc, th.bkc")) return;
+  const oj = e.target.closest("tr[data-openjob]");
+  if (oj && !e.target.closest(".drw")) { openJobById(oj.dataset.openjob); return; }
   const tr = e.target.closest("tr[data-i]");
   if (tr && !e.target.closest(".drw")) { openDetail(currentView, Number(tr.dataset.i)); return; }
 });
