@@ -30,6 +30,30 @@ export function withStatusCallback(params: URLSearchParams): URLSearchParams {
   return params;
 }
 
+/** Name the Messaging Service on any send that carries a ContentSid.
+ *
+ *  19 September 2026, and it cost four days to find. Twilio: "A Messaging
+ *  Service is a prerequisite for using Content Templates." A send with a
+ *  ContentSid and only a From is refused with 20422 Invalid Parameter, every
+ *  time, before Twilio tries anything. A plain Body send has no such
+ *  requirement, which is exactly why this hid: every ordinary message from
+ *  the same number went out normally, so it read as a template fault.
+ *
+ *  The From number does NOT have to be in the service's sender pool. Naming
+ *  the service is the whole of it.
+ *
+ *  Called on every params object, template or not: it does nothing when
+ *  there is no ContentSid, so one call at each send site is enough and
+ *  nobody has to remember which branch they are in. With no service
+ *  configured it leaves the params alone and the send fails as it did
+ *  before, loudly, rather than this quietly appearing to work. */
+export function withMessagingService(params: URLSearchParams): URLSearchParams {
+  if (!params.has("ContentSid")) return params;
+  const mg = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID") ?? "";
+  if (mg) params.set("MessagingServiceSid", mg);
+  return params;
+}
+
 /* ── What the message was ────────────────────────────────────────────────────
  *
  * Added 16 September 2026. The status callback says where a message got to,
