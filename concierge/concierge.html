@@ -7155,6 +7155,22 @@ async function evidenceOwnership(){
   return { withClient, needsYou, signed, total:ev.length };
 }
 
+// Jobs built and walked away from before an account existed. Her own test
+// rows are counted apart and never reported as somebody stuck, because on
+// 19 September 2026 all twenty four rows at this stage were her own tests and
+// six places on this desk were calling them leads waiting on her. A number
+// that cannot be zero is not a queue, it is a decoration.
+//
+// not("is_test","is",true) is NOT (is_test IS TRUE), so a row where the column
+// was never set counts as real. A test has to be marked one.
+async function unsignedJobs(){
+  const [real, mine] = await Promise.all([
+    countOf("jobs", q => q.eq("status", "awaiting_client_setup").not("is_test", "is", true)),
+    countOf("jobs", q => q.eq("status", "awaiting_client_setup").is("is_test", true)),
+  ]);
+  return { real, mine };
+}
+
 async function loadOverview(){
   const now = new Date();
   $("ovDate").textContent = DAYNAME[now.getDay()] + " " + now.getDate() + " " + MONTH[now.getMonth()];
@@ -7164,7 +7180,7 @@ async function loadOverview(){
   renderCal();
 
   const [intakeNew, appsWaiting, evidOwn, quotesOut, callsNew, disputesOpen,
-         invDraft, invSent, pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsigned,
+         invDraft, invSent, pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsignedOwn,
          enqNew, asksNew] = await Promise.all([
     // Was countOf("intakes", ...) until 19 September 2026, which is to say it
     // counted a table nothing has written to since 31 August. The tile it
@@ -7186,13 +7202,15 @@ async function loadOverview(){
     countOf("waitlist",    null),
     countOf("feedback",    null),
     countOf("kickoff_packs", q => q.eq("status", "draft")),
-    countOf("jobs",        q => q.eq("status", "awaiting_client_setup").not("is_test", "is", true)),
+    unsignedJobs(),
     countOf("enquiries",   q => q.not("status", "in", "(replied,converted,test,binned)")),
     countOf("questions",   q => q.eq("published", false)),
   ]);
   // Whose move it is, named apart so nothing downstream can confuse the two.
   const evidWaiting = evidOwn.withClient;   // theirs to read and approve
   const evidYours   = evidOwn.needsYou;     // disputed, or the client wrote about it
+  const unsigned     = unsignedOwn.real;    // a real person who walked away
+  const unsignedMine = unsignedOwn.mine;    // her own testing, named, never counted
 
   // ── how the assistant is actually doing ────────────────────────────────
   //
@@ -7401,7 +7419,9 @@ async function loadOverview(){
     tile(asksNew ? "warn" : "ok", "Questions to publish", String(asksNew), asksNew ? "Waiting on your read" : "Board is clear", "asks"),
     tile((invDraft + pkDraft + pkAppr) ? "warn" : "ok", "Your documents", String(invDraft + pkDraft + pkAppr), "Drafts and packs on you"),
     tile("", "Jobs on the board", String(jobsOpen), "Open to workers", "market"),
-    tile(unsigned ? "warn" : "", "Built, never signed", String(unsigned), unsigned ? "A job with nobody behind it" : "Every real job has a client", "intake"),
+    tile(unsigned ? "warn" : "", "Built, never signed", String(unsigned),
+      unsigned ? "A real person who walked away at sign-up"
+               : (unsignedMine ? "Nobody real. " + plural_(unsignedMine, "row", "rows") + " at this stage, all your own testing" : "Every job has a client"), "intake"),
     tile("", "Waiting list", String(waitN), "People to write to", "waitlist"),
     tile("", "Feedback", String(fbN), "Unprompted, from the site", "feedback"),
   ].join("");
@@ -7564,6 +7584,10 @@ async function loadOverview(){
 
   if (unsigned)
     push(cli, "crit", "Stuck", plural(unsigned, "job was", "jobs were") + " built and never signed for", "a lead, not a loss: you still have everything they typed", null, "Open intake", "intake", false);
+  // Named, never counted. Her own tests sitting at the same stage are not a
+  // queue, and drawing them as one is what made this row read 24 for weeks.
+  else if (unsignedMine)
+    push(non, "ok", "Testing", plural(unsignedMine, "job is", "jobs are") + " parked at sign-up, all your own tests", "marked as testing, so they are off the board and counted nowhere", null, "Open intake", "intake", false);
   if (choosing.length)
     push(cli, "", "Choosing", plural(choosing.length, "job has", "jobs have") + " quotes out with a client", null, null, "Open quotes", "quotes", false);
   if (signing.length)
@@ -7605,7 +7629,7 @@ async function loadOverview(){
     + laneBody("you", yours.length ? yours : [`<div class="mv"><span class="tag ok">Clear</span><div class="wt">Nothing is waiting on you<span> &middot; no open dispute, no untriaged intake, nothing half sent</span></div></div>`])
     + laneHead("wrk", "wrk", "A worker's", boardNoQuotes.length || stalledNow ? plural(stalledNow, "job", "jobs") + " quiet, " + onSite.length + " on site" : onSite.length + " on site, nothing overdue", wrk.length)
     + laneBody("wrk", wrk)
-    + laneHead("cli", "cli", "A client's", unsigned ? unsigned + " never signed, " + signing.length + " reading a sign-off" : signing.length + " reading a sign-off", cli.length)
+    + laneHead("cli", "cli", "A client's", unsigned ? unsigned + " never signed, " + signing.length + " reading a sign-off" : signing.length + " reading a sign-off, nobody stuck at sign-up", cli.length)
     + laneBody("cli", cli)
     + laneHead("non", "non", "Nobody's", doneJobs.length + " signed off, " + paidM.length + " invoices paid this month", non.length)
     + laneBody("non", non)
@@ -7973,7 +7997,7 @@ async function loadHealth(){
     countOf("app_state", null),
     countOf("jobs", q => q.is("trade", null)),
     countOf("job_quotes", q => q.is("worker_user", null)),
-    countOf("jobs", q => q.eq("status", "awaiting_client_setup")),
+    countOf("jobs", q => q.eq("status", "awaiting_client_setup").not("is_test", "is", true)),
     countOf("evidence", q => q.is("sha256", null)),
   ]);
   const staleSigs = staleW + staleC;
@@ -8012,7 +8036,7 @@ async function loadHealth(){
     "Everything this desk starts is stopped, in the one guard fn() and skFn() both go through. yaad-inbound is covered too, as of 4 Sep 2026: it is woken by an incoming message rather than by this desk, so it reads app_settings.agents_paused itself before calling a model, which is what makes this switch mean what it looks like it means. It stops the model and nothing else: the message, the photographs and the push to your phone all still happen.");
 
   if (unsigned) add("warn", unsigned + " job" + (unsigned === 1 ? " has" : "s have") + " no client account behind them",
-    "status is stuck at awaiting_client_setup, so client_go_live() has nothing signed in to open. They are at the top of the Intake view.");
+    "status is stuck at awaiting_client_setup, so client_go_live() has nothing signed in to open. They are at the top of the Intake view. Jobs you marked as your own testing are left out of this count, on purpose: on 19 Sep 2026 every row at this stage was one, and counting them read as two dozen people stuck at sign-up.");
 
   if (noTrade) add("warn", noTrade + " job" + (noTrade === 1 ? " has" : "s have") + " no trade classified",
     "yaad-match routes on trade. A job without one reaches nobody.");
