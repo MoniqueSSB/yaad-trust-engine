@@ -6,6 +6,13 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · A materials tranche has two gates, so the desk names both
+
+**Why.** Founder, reading the Materials releases view: "Waiting on the client's materials store, what is this mean". The chip was true and it was not the whole truth. Two separate things hold a tranche, the client naming where materials are kept and the client actually paying the materials line on their bill, and both can be outstanding at the same time. The panel tested the store first and showed that chip alone, so an unpaid bill was invisible behind a question about a cupboard. Answer the store and the chip would simply change to the money one, with nothing having moved and no warning that a second gate was ever there.
+
+**What changed.** Desk only, `concierge/concierge.html` and its deploy copy. No database change, no function change, no gate moved. Where both are outstanding the row now reads "Waiting on the client: the bill is not paid yet, and where materials are kept". Where one is, it names that one. Bill first, because that is the gate that actually holds the money, and it matches the wording the Pay workers view took the same day.
+
+**What did not move.** The store gate stays in `trg_enforce_store_before_open` and the two guards in `20260828c`, and the paid-for test stays in `materials_paid_jmd()`, which has the last word. This panel shows those refusals and has never re-checked them.
 ## 2026-09-19 · Desk deployed: concierge version 3ed5934a, after the deploy copy had gone stale
 
 **What went live.** Everything on `main` at the time: the evidence, intake and money work from this session, plus another session's Overview to-do band and its badge rule. `yaadly-concierge` version `3ed5934a`, one modified asset uploaded so it was not a no-op, Cloudflare Access still answering 302.

@@ -9610,11 +9610,18 @@ async function loadMaterials(keepMsg){
       ? (receiptsDue
           ? `<span class="jichip ready"><span class="dot"></span>Released, ${receiptsDue} receipt${receiptsDue === 1 ? "" : "s"} to come</span>`
           : `<span class="jichip paid"><span class="dot"></span>Fully released and receipted</span>`)
-      : !storeOk
-        ? `<span class="jichip"><span class="dot"></span>Waiting on the client's materials store</span>`
-        : canGo <= 0
-          ? `<span class="jichip"><span class="dot"></span>Waiting on the client paying for the materials</span>`
-          : `<span class="jichip ready"><span class="dot"></span>Ready to release</span>`;
+      : (!storeOk || canGo <= 0)
+        // Two separate things gate a tranche and both can be outstanding at
+        // once. This used to test the store first and show that chip alone,
+        // so an unpaid bill was invisible behind a question about a cupboard:
+        // answer the store and the chip simply changed to the money one, with
+        // nothing having moved. Name whichever are outstanding, bill first,
+        // because that is the one that actually holds the money.
+        ? `<span class="jichip"><span class="dot"></span>Waiting on the client: ${[
+            canGo <= 0 ? "the bill is not paid yet" : null,
+            !storeOk ? "where materials are kept" : null,
+          ].filter(Boolean).join(", and ")}</span>`
+        : `<span class="jichip ready"><span class="dot"></span>Ready to release</span>`;
 
     const history = done.length
       ? `<div class="jicond" style="margin-top:6px">` + done.map((r) => {
