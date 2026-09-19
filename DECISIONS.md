@@ -25,6 +25,8 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **No gate moves, and this is the change most likely to be mistaken for one.** Nothing here records a receipt, releases money, approves a stage or pays anybody. `receipt_ref` is still written by one named person at the desk, and the row only stops appearing when they write it. What changed is who the room says it is waiting on, which is the truth in all three states rather than in two.
 
+**Deployed** 19 September 2026, `yaadly-app` version `73e541e3`, `app.yaadly.co.uk`, built and deployed with `npm run deploy` off `origin/main`. Proved by `wrangler deployments list`: the new version is the one serving 100% of traffic, over `0ae07dcb`. The app answers normally, and the portal still redirects a signed-out reader to sign in.
+
 **Not built: a client confirmation.** The founder asked for the closed row to read "awaiting client confirmation". No such step exists on this product: a client approves stage evidence, and Yaadly records the materials receipt against the money. Writing that sentence would have named a confirmation nobody is asked for and no button can give, so the row names Yaadly and tells the client they can read the receipt. If a real client sign-off on materials receipts is wanted it is a new gate, a column and a button, and it is hers to call.
 
 ## 2026-09-19 · The copy sweep reaches the app, and the public board counts one parish as one
