@@ -6,6 +6,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · The holding sentence is gone, and a CI sweep stops it coming back
+
+**Why.** Flagged in the entry below and then, on the founder's instruction, fixed. The Money view said "Holding goes live once PI insurance is in force" and "Yaadly holds no money today. Holding starts when PI insurance is in force." On 3 September Yaadly became the principal contractor and stopped holding anybody's money, before or after any insurance, so the sentence had been untrue for a fortnight. It is the exact failure CLAUDE.md section 8 describes: no single word in it is banned, so `guardrails.scan` walks straight past it, and section 8 itself once prescribed a sentence of the same shape.
+
+**What the copy says now.** The sentence docs/COPY-GUIDELINES.md section 2 prescribes, stated rather than denied: the client pays Yaadly one agreed price, and Yaadly engages and pays the tradesperson under its own separate agreement. Nothing about insurance, because what the cover is for is an insurance fact and not a display decision. Four more places on the desk carried the bare denial "Yaadly holds none of it", which section 2 bans in that form because it keeps the picture alive by denying it; all four now state the structure instead.
+
+**The sweep is the actual fix.** A sentence corrected by hand comes back. `scripts/check-copy.mjs` greps `concierge/`, `docs/` and `preview/` for the exact phrases in COPY-GUIDELINES section 6, and runs in CI in the Admin desk job. It is deliberately narrow, exact phrases and three folders of pure page copy, for the reason already written over that job: a check that cries wolf gets switched off. `web/` and `supabase/` are left out on purpose, because their source comments discuss these phrases in order to ban them and they carry their own guardrail suites. `docs/` keeps the one sanctioned exception, the explicit "does not operate an escrow service" denial a worried reader needs answered.
+
+**It paid for itself on the first run.** Two more copies of the same false sentence that nobody had found by reading: `concierge/README.md`, where the desk's own documentation asserted it, and `preview/index.html`, the clickable prototype served at yaadly.co.uk/preview/. Both fixed in the same commit. It also caught the first replacement wording written for the Money view, which said "no money is held on anybody's behalf": true, but a denial, which is the thing section 2 says not to write. That is the check doing its job on the person adding it.
+
 ## 2026-09-19 · Outstanding counts real money: not her own tests, and not what Yaadly owes
 
 **Why.** Founder, 19 Sep 2026: "fix outstanding". Two separate wrong numbers under one word.

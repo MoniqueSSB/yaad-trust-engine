@@ -5700,3 +5700,12 @@ The note is optional as of 19 September 2026: press "Mark as followed up" on the
 4. **An invoice with no job at all counts as real.** It is a service, and a service has no test flag.
 5. **Money figures exclude what Yaadly pays tradespeople.** "Out with clients, unpaid" and "Awaiting payment" are money in. A worker payable used to be counted in both, which reported money Yaadly owes as money a client owes. Worker pay is in the Invoices lists under its own heading, and in Pay workers.
 6. **The rail badge on Invoices and the amount beside it come from the same rows.** Two `countOf` calls that counted every invoice were removed on 19 Sep 2026 so they cannot drift apart. Both now read the 600 row money query; if invoices ever pass 600, raise that limit.
+
+## CI says "Page copy carries no banned language" (19 Sep 2026)
+
+1. **Read the finding.** It names the file, the line and the exact phrase. The phrases come from `docs/COPY-GUIDELINES.md` section 6.
+2. **The copy is wrong, not the list.** Rewrite the sentence to say what happens rather than to deny what does not: the client pays Yaadly one agreed price, and Yaadly engages and pays the tradesperson under its own separate agreement. A denial ("no money is held", "Yaadly holds none of it") trips the check on purpose, because section 2 bans the bare denial too.
+3. **It only reads `concierge/`, `docs/` and `preview/`**, the folders that are page copy end to end. `web/` and `supabase/` are left out on purpose: their source comments discuss these phrases in order to ban them, and they have their own guardrail test suites.
+4. **`docs/` may answer the escrow worry head on**, with the exact words "does not operate an escrow service", and nothing else may say the word at all. That asymmetry is in COPY-GUIDELINES section 2.
+5. **To add or remove a phrase**, change `docs/COPY-GUIDELINES.md` and `scripts/check-copy.mjs` in the same commit, and say so to Monique: the list is a rule about what the business claims, not a lint preference.
+6. **Run it by hand:** `node scripts/check-copy.mjs`. Prints one line when clean.

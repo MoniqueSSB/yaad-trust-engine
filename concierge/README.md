@@ -260,8 +260,11 @@ a wait.
 Every number is counted from the table it names. Where a figure cannot be
 counted it is not drawn:
 
-- **Yaadly holds no money.** Holding starts when PI insurance is in force.
-  Money shows amounts agreed in writing and invoices raised, never a balance.
+- **Yaadly is the principal contractor.** The client pays Yaadly one agreed
+  price and Yaadly engages and pays the tradesperson under its own separate
+  agreement, so Money shows amounts agreed in writing and invoices raised,
+  never a balance. This bullet used to tie that to PI insurance, which was
+  wrong from 3 September 2026 and stood until 19 September.
 - **There is no fair-price band.** The quote column compares a quote to the
   others on the same job, which is real, rather than to a benchmark that does
   not exist yet.
