@@ -9582,21 +9582,27 @@ async function loadMaterials(keepMsg){
   // materials, not against a receipt, so this reads what has been paid:
   // materials lines on the job's paid Yaadly invoices, the same test
   // materials_paid_jmd() applies in the database, which has the last word.
-  const [{ data: quotes }, { data: rels }, { data: paidInvs }] = await Promise.all([
+  //
+  // Unpaid bills are read too, for the reason in the chip below: "paid" and
+  // "on a bill at all" are different questions and only one of them is the
+  // client's to answer. Void bills are left out of both, they were cancelled.
+  const [{ data: quotes }, { data: rels }, { data: invs }] = await Promise.all([
     sb.from("job_quotes").select("job_id,worker_name,materials_jmd").eq("status", "accepted").in("job_id", jobIds),
     sb.from("materials_releases").select("id,job_id,amount_jmd,released_at,receipt_ref,receipt_at,stage,sent_at,sent_by,sent_method,sent_ref").in("job_id", jobIds).not("released_at", "is", null).order("released_at", { ascending: true }),
-    sb.from("invoices").select("job_id,currency,invoice_lines(description,line_total_pence)").in("job_id", jobIds).eq("payable_to", "yaadly").eq("status", "paid"),
+    sb.from("invoices").select("job_id,currency,status,invoice_lines(description,line_total_pence)").in("job_id", jobIds).eq("payable_to", "yaadly").neq("status", "void"),
   ]);
   const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
   const relByJob = new Map();
   for (const r of rels || []) { const a = relByJob.get(r.job_id) || []; a.push(r); relByJob.set(r.job_id, a); }
-  const paidMatByJob = new Map();
-  for (const inv of paidInvs || []) {
+  const paidMatByJob = new Map(), billedMatByJob = new Map();
+  for (const inv of invs || []) {
     if (String(inv.currency || "JMD").toUpperCase() !== "JMD") continue;
     const m = (inv.invoice_lines || [])
       .filter((l) => /^materials, at cost/i.test(l.description || ""))
       .reduce((t, l) => t + Number(l.line_total_pence || 0), 0);
-    paidMatByJob.set(inv.job_id, (paidMatByJob.get(inv.job_id) || 0) + m);
+    if (!m) continue;
+    billedMatByJob.set(inv.job_id, (billedMatByJob.get(inv.job_id) || 0) + m);
+    if (inv.status === "paid") paidMatByJob.set(inv.job_id, (paidMatByJob.get(inv.job_id) || 0) + m);
   }
 
   const rows = jobs.map((job) => {
@@ -9604,10 +9610,12 @@ async function loadMaterials(keepMsg){
     if (!q || !(Number(q.materials_jmd) > 0)) return "";
     const quoted = Number(q.materials_jmd);
     const paidFor = paidMatByJob.get(job.id) || 0;
+    const billedFor = billedMatByJob.get(job.id) || 0;
     const done = relByJob.get(job.id) || [];
     const soFar = done.reduce((t, r) => t + Number(r.amount_jmd || 0), 0);
     const left = Math.max(quoted - soFar, 0);
     const canGo = Math.max(Math.min(quoted, paidFor) - soFar, 0);
+    const billedLeft = Math.max(Math.min(quoted, billedFor) - soFar, 0);
     const storeOk = !!job.materials_store_type;
     const full = left <= 0;
     const receiptsDue = done.filter((r) => r.sent_at && !String(r.receipt_ref || "").trim()).length;
@@ -9621,16 +9629,30 @@ async function loadMaterials(keepMsg){
           ? `<span class="jichip ready"><span class="dot"></span>Released, ${receiptsDue} receipt${receiptsDue === 1 ? "" : "s"} to come</span>`
           : `<span class="jichip paid"><span class="dot"></span>Fully released and receipted</span>`)
       : (!storeOk || canGo <= 0)
-        // Two separate things gate a tranche and both can be outstanding at
-        // once. This used to test the store first and show that chip alone,
-        // so an unpaid bill was invisible behind a question about a cupboard:
-        // answer the store and the chip simply changed to the money one, with
-        // nothing having moved. Name whichever are outstanding, bill first,
-        // because that is the one that actually holds the money.
-        ? `<span class="jichip"><span class="dot"></span>Waiting on the client: ${[
-            canGo <= 0 ? "the bill is not paid yet" : null,
-            !storeOk ? "where materials are kept" : null,
-          ].filter(Boolean).join(", and ")}</span>`
+        // Three separate things gate a tranche and more than one can be
+        // outstanding at once. This used to test the store first and show that
+        // chip alone, so the money was invisible behind a question about a
+        // cupboard: answer the store and the chip simply changed to the money
+        // one, with nothing having moved.
+        //
+        // "Not paid" and "not billed" are not the same waiting, and saying the
+        // first when the second is true sends you to chase a client who owes
+        // nothing. On 19 September two jobs had every bill paid and no
+        // materials line on any of them, and read as the client's fault.
+        // Billing the materials is yours; paying and naming the store are
+        // theirs, and the chip says whose move it is.
+        ? (() => {
+            // Every string here is a literal, so it is written straight in.
+            const theirs = [
+              billedLeft > 0 && canGo <= 0 ? "the bill is not paid yet" : "",
+              !storeOk ? "where materials are kept" : "",
+            ].filter(Boolean);
+            const said = [
+              billedLeft <= 0 ? "The materials are not on a bill yet" : "",
+              theirs.length ? "Waiting on the client: " + theirs.join(", and ") : "",
+            ].filter(Boolean).join(" &middot; ");
+            return `<span class="jichip"><span class="dot"></span>${said}</span>`;
+          })()
         : `<span class="jichip ready"><span class="dot"></span>Ready to release</span>`;
 
     const history = done.length
