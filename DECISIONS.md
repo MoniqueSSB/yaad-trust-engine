@@ -20,6 +20,8 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **Deliberately not done, both hers.** The Intake item in the rail points at a table with no writer, and whether that becomes a rename, a merge into Jobs, or stays as a record is a product decision, not a display fix. And `intakes` still carries an INSERT policy, "public submits requests", `WITH CHECK (true)`, from when the old website form wrote to it directly with the publishable key. It is an open door on a table nothing uses. Closing it is a one line migration and it is flagged rather than folded in here.
 
+**Deployed** 19 September 2026, `yaadly-concierge` version `1e207348`, from `origin/main` off disk. wrangler uploaded one modified asset, so it was not a no-op, and Cloudflare Access still answers 302. This deploy also carried the Jobs count change from the same afternoon, which had been merged but not deployed.
+
 ## 2026-09-19 · Jobs leads with real work, not with her own testing
 
 **Why.** Founder, 19 Sep 2026: "Job says 44 and there is only 1 Jobs." Both numbers were right. The `jobs` table holds 44 rows; 43 of them are marked `is_test`, and the one that is not is `JOB-DEMO-PHOTOS`, the villa roof demo listing. The page led with 44 and the rail badge carried 44, because Jobs had never declared `viz:{ want }` and so fell back to counting rows read. This is the same lie the public board was telling on 9 September, when every job on `app.yaadly.co.uk/jobs` was her own test and the public read them as demand. That is what "That was me testing" was built to stop, and the desk had quietly started telling it back to her on the page she opens first.
