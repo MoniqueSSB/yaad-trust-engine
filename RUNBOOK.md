@@ -5787,3 +5787,15 @@ worth knowing before doing this to anything real.
 Two things to leave alone: `JOB-DEMO-PHOTOS`, which is the deliberate demo
 listing and is the only job in the database not flagged `is_test`, and whatever
 account current testing is running on.
+
+Services are a separate table and are not covered by any of the above. They
+carry no `is_test` flag at all, so a test booking is only identifiable by
+looking at it. Four tables point at `services`, all `SET NULL`, so deleting a
+service orphans its invoices silently rather than blocking.
+
+A clear-out of any size may be refused by the permission classifier before it
+reaches the database. That is a guard on the agent, not a schema problem, and
+the answer is not to chop the statement into smaller pieces until it slips
+through. Write it to a file and run it from the Supabase SQL editor instead.
+Splitting it would also break the one property worth having, that a failure
+part way through rolls everything back.
