@@ -2254,6 +2254,32 @@ select wa_id, answers->>'worker_email' as worker_email,
 
 **If a worker seems stuck reprompting, check what they actually typed against `answers->'job_choices'` in that row first.** The most common real cause is a worker typing the bare digits ("0042") without the code's letters, which is deliberate, not a bug: the code match requires the string Twilio was shown, precisely so a worker cannot confirm a job by accident. Tell them to reply with the exact code shown in the message.
 
+## A worker's note on the photos they just sent, and where it goes
+
+**The filing confirmation invites one (20 Sep 2026).** "Filed 2 items against JOB-…, the after. **Anything to say about them? Type it now and it goes on the same update.**" Founder's instruction: a worker should be told they can comment, not merely allowed to. Before this the question only ever came up when a photograph arrived with no caption, so a worker who captioned theirs was never asked anything and had no way of knowing more was welcome.
+
+**Why it is offered there and nowhere earlier.** Every free-text reply before that point is already the answer to a question: first the job code, then "what do these show", then the section. An invitation anywhere earlier gets typed into the wrong slot. Once the batch is filed the evidence session is closed and the worker's words are free again, which is why this is the only place it fits.
+
+**The note is NOT filed when it arrives.** It goes through the same `update_draft` lane every typed update has used since 17 September: held, read back in full, filed only on a reply of 1. Being invited to comment buys no way past that gate, and a test in `asking_test.ts` fails if the note lane ever inserts into `evidence` directly.
+
+**What makes it a note rather than a separate line on the record:** it is filed sharing the photographs' `evidence.batch_id`, so `updatesOf()` draws the whole thing as one update in the portal instead of words sitting beside pictures nobody connected them to. Two things had to change for that to work:
+
+- **Every filed batch now gets a `batch_id`, including a batch of one.** It used to be null for a single photograph. The portal already draws a batch of one exactly as it drew a null, so nothing moved on the page, but without it a lone photograph was the only evidence a worker could not attach anything to.
+- **The window is 30 minutes** (`NOTE_WINDOW_MINUTES`), measured from when the pictures landed. `recentFiledBatch()` only looks at rows with a `storage_path`, which is what stops a note renewing its own window and sweeping a genuinely new update half an hour later onto old photographs.
+
+**With more than one job running it does not ask which one.** The worker filed on that job minutes ago, so the job is known, and asking would be asking them about photographs they have just sent. The read-back names the job ("Ready to go on JOB-… (title), with the photos you just sent") so they can still drop it with a "no".
+
+**If a note lands on its own instead of with the photos:** check the gap. Past 30 minutes it is an ordinary update and correctly stands alone. Inside it, look for a `batch_id` on the photo rows:
+
+```sql
+select id, label, phase, batch_id, storage_path is not null as has_file, created_at
+from evidence where job_id = 'JOB-…' order by created_at desc limit 10;
+```
+
+Photo rows with a null `batch_id` are from before 20 Sep 2026 and are not backfilled, by the same reasoning as `DECISIONS.md` gives for never backfilling it: a filing is a filing, and inferring a group after the fact would overstate the record.
+
+**Trace attributes:** `yaadly.worker_update.outcome` reads `held_for_confirm_as_note` when it was taken as a note and `filed_as_note` once the 1 lands. Plain `held_for_confirm` and `filed` mean it was read as an ordinary standalone update.
+
 ## Proving the Twilio signature check without a real Twilio secret
 
 **Run `deno test supabase/functions/yaad-inbound/twilio-signature_test.ts` and `deno test supabase/functions/yaad-inbound/job-match_test.ts`.** Both run with no network and no live credentials, `twilio-signature_test.ts` signs a request the same way Twilio does using a throwaway test token, not the real `TWILIO_AUTH_TOKEN`, and checks `checkTwilioSignature()` in `twilio-signature.ts` agrees. This is what "the algorithm is proven, the live endpoint is not yet" actually means in practice: everything the signature check does is exercised here, the one thing not exercised is Twilio's real servers signing with the real production secret and reaching the real URL.

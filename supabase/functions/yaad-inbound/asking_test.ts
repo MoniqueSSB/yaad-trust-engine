@@ -516,3 +516,66 @@ Deno.test("askPhase still falls back to a real question when the menu is refused
     "the fallback question is gone, so a refused menu leaves the worker asked nothing "
     + "while the session waits for their answer and files whatever they say next unmarked");
 });
+
+/* ── a worker may comment on what they just sent (20 Sep 2026) ────────────
+   Founder: a worker should be TOLD they can say something about their
+   photographs, not merely allowed to. The invitation goes on the filing
+   confirmation, because that is the only point in the evidence lane where a
+   worker's free text is not already the answer to a question: before it, it
+   is the job code, then the caption, then the section.
+
+   The note that answers it is held and read back like any other typed
+   update. The 1 is still the gate. The realistic regression here is somebody
+   filing the note on arrival, because the worker was invited so it "must" be
+   wanted, and that is the 17 September rule going out of the building. */
+
+Deno.test("the filing confirmation invites a comment", () => {
+  const at = src.indexOf("const invite =");
+  assert(at > 0, "the invitation on the filing confirmation is gone");
+  const line = src.slice(at, src.indexOf("\n", at));
+  assert(/Type it now/.test(line), "the invitation no longer tells the worker what to do");
+  const body = src.slice(src.indexOf("let body = phase"), src.indexOf("let body = phase") + 700);
+  assert((body.match(/\$\{invite\}/g) ?? []).length === 2,
+    "the invitation is on one wording of the confirmation and not the other, so whether a "
+    + "worker is told they can comment depends on whether the section answer was understood");
+});
+
+Deno.test("a note is held and read back, never filed on arrival", () => {
+  const at = src.indexOf("const justFiled = found ?");
+  assert(at > 0, "the note lane is gone or renamed");
+  const branch = src.slice(at, at + 1600);
+  assert(branch.includes('_lane: "update_draft"'),
+    "the note no longer goes through the draft lane, so it is not waiting for a 1");
+  assert(branch.includes("draftReadBack("),
+    "the note is no longer read back to the worker before it is filed");
+  assert(!branch.includes('from("evidence").insert'),
+    "the note lane inserts evidence directly, which files a worker's words without the 1 "
+    + "they have had to give since 17 September 2026");
+});
+
+Deno.test("only a note carries a batch id onto a typed update", () => {
+  const at = src.indexOf("const notesBatch =");
+  assert(at > 0, "the note's batch link is gone");
+  const branch = src.slice(at, at + 500);
+  assert(/batch_id: notesBatch/.test(branch), "the insert no longer carries the batch");
+  assert(/a\.notes_batch/.test(branch),
+    "the batch is no longer read off the draft, so it is being guessed at filing time");
+});
+
+Deno.test("the window a note may arrive in is not renewed by notes", () => {
+  const body = fnBody("recentFiledBatch");
+  assert(/storage_path/.test(body),
+    "recentFiledBatch no longer requires an actual file, so a note renews its own window "
+    + "and an unrelated update half an hour later joins old photographs");
+  assert(/uploaded_by/.test(body), "the batch is no longer scoped to the worker who sent it");
+});
+
+Deno.test("every filed batch gets a batch id, including a single photo", () => {
+  const at = src.indexOf("const batchId =");
+  assert(at > 0, "the batch id is gone");
+  const line = src.slice(at, src.indexOf("\n", at));
+  assert(!/length > 1/.test(line),
+    "a single photograph is back to having no batch id, so it is the one kind of evidence "
+    + "a worker cannot attach a note to");
+  assert(/crypto\.randomUUID\(\)/.test(line), "the batch id is no longer minted");
+});

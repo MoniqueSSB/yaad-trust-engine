@@ -329,6 +329,37 @@ async function beforesOnJob(admin: { from: (t: string) => any }, jobId: string):
   return (data ?? []) as BeforeShot[];
 }
 
+// How long after filing a batch a worker's words are still taken to be about
+// it. Long enough that they can put the phone down, climb off the ladder and
+// type; short enough that the next thing they say an hour later is their own
+// update and not a comment on old photographs.
+const NOTE_WINDOW_MINUTES = 30;
+
+// The batch of photographs or videos this worker has just filed, if they
+// filed one recently enough for their next words to be about it.
+//
+// Only batches carrying an actual file count, which is what `storage_path is
+// not null` is doing. A note filed against a batch shares its batch_id, so
+// without that filter a note would renew the window it arrived in and a
+// genuinely new update half an hour later would be swept onto old photos.
+// The window runs from when the pictures landed and nothing extends it.
+async function recentFiledBatch(
+  admin: { from: (t: string) => any },
+  workerEmail: string,
+): Promise<{ batchId: string; jobId: string; stage: number; at: string } | null> {
+  if (!workerEmail) return null;
+  const since = new Date(Date.now() - NOTE_WINDOW_MINUTES * 60_000).toISOString();
+  const { data } = await admin.from("evidence")
+    .select("batch_id, job_id, stage, created_at")
+    .eq("uploaded_by", workerEmail)
+    .not("batch_id", "is", null)
+    .not("storage_path", "is", null)
+    .gte("created_at", since)
+    .order("created_at", { ascending: false }).limit(1);
+  const row = (data ?? [])[0];
+  return row ? { batchId: row.batch_id, jobId: row.job_id, stage: row.stage, at: row.created_at } : null;
+}
+
 // Added to the section question only when there is a before to point at. A
 // worker who photographed the finished work first has done nothing wrong and
 // should not be offered a code list with nothing in it.
@@ -2912,14 +2943,24 @@ Deno.serve(async (req: Request) => {
             root.setAttributes({ "yaadly.worker_update.outcome": "draft_job_not_open" });
             return twiml(`${a.job_id} is not open for updates any more, so nothing was filed. If you need a person, just say so.`);
           }
+          // batch_id carries only when this draft was held as a note about a
+          // batch just filed. Null for every other update, which is what it
+          // has always been, and what makes the portal draw it on its own.
+          const notesBatch = String(a.notes_batch ?? "") || null;
           const { error } = await supabase.from("evidence").insert({
             job_id: job.id, label: String(a.text ?? "").slice(0, 1000), stage: job.stage,
-            kind: "work", uploaded_by: found.email,
+            kind: "work", uploaded_by: found.email, batch_id: notesBatch,
           });
-          root.setAttributes({ "yaadly.worker_update.job": job.id, "yaadly.worker_update.outcome": error ? "insert_failed" : "filed" });
+          root.setAttributes({
+            "yaadly.worker_update.job": job.id,
+            "yaadly.worker_update.outcome": error ? "insert_failed" : (notesBatch ? "filed_as_note" : "filed"),
+          });
+          const landed = notesBatch
+            ? `On record for ${job.id} (${job.title}), with the photos you sent.`
+            : `On record for ${job.id} (${job.title}).`;
           return twiml(error
             ? "That did not save properly. Reply 1 again in a moment."
-            : `On record for ${job.id} (${job.title}). The client hears about it once it is drafted. If you need a person instead, just say so.`);
+            : `${landed} The client hears about it once it is drafted. If you need a person instead, just say so.`);
         }
         // "replace": falls through to the general door below.
       }
@@ -3049,7 +3090,15 @@ Deno.serve(async (req: Request) => {
 
           const stamped = pending.map((item) => ({ ...item, phase, pairsWith }));
           let filed = 0;
-          const batchId = stamped.length > 1 ? crypto.randomUUID() : null;
+          // Minted for one item as well as for several, since 20 Sep 2026.
+          // It used to be null for a single photograph, and the portal draws
+          // an item with no batch as its own update, which was right while
+          // nothing else ever joined a batch. A note filed afterwards joins by
+          // batch_id, so a lone photograph needs one or it is the only kind of
+          // evidence a worker cannot say anything about. Grouping is unchanged
+          // either way: updatesOf() draws a batch of one as one card, exactly
+          // as it drew a null.
+          const batchId = crypto.randomUUID();
           for (const item of stamped) if (await finalizeEvidenceItem(supabase, confirmedJob.id, confirmedJob.stage, workerEmail, item, batchId)) filed++;
           await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
           root.setAttributes({
@@ -3059,9 +3108,18 @@ Deno.serve(async (req: Request) => {
           if (!filed) return twiml("Nothing saved properly there. Try sending the photo again.");
           const filedLabel = await stageLabel(supabase, confirmedJob.id, confirmedJob.stage);
           const answering = named ? `, answering ${named.item_code}` : "";
+          // The invitation to say something about them, offered every time
+          // rather than only when a photograph arrived with no caption.
+          // Founder, 20 Sep 2026: a worker should be told they can comment,
+          // not merely allowed to. It goes here and nowhere earlier because
+          // this is the only point in the lane where a worker's free text is
+          // not already the answer to a question: before this it is the job
+          // code, the caption, or the section.
+          const them = filed === 1 ? "it" : "them";
+          const invite = ` Anything to say about ${them}? Type it now and it goes on the same update.`;
           let body = phase
-            ? `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}, marked as ${PHASE_SAID[phase]}${answering}. Keep them coming.`
-            : `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}. I could not tell which part of the job that was, so it is on record unmarked. Keep them coming.`;
+            ? `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}, marked as ${PHASE_SAID[phase]}${answering}.${invite}`
+            : `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}. I could not tell which part of the job that was, so it is on record unmarked.${invite}`;
           // Said, not silently swallowed. The evidence is filed either way;
           // what is missing is only the link between the two photographs, and
           // the desk can put that right without the worker resending anything.
@@ -3723,6 +3781,44 @@ Deno.serve(async (req: Request) => {
             root.setAttributes({ "yaadly.worker_update.outcome": "too_short_not_update" });
             return twiml("Nothing is waiting to be filed. Send a few words on how the work went, a photo, or a voice note.");
           }
+          // A note about the photographs just filed, 20 Sep 2026. The filing
+          // confirmation invites one, and this is where the answer lands,
+          // because by then the evidence session is closed and a worker's
+          // words are free text again.
+          //
+          // It holds and reads back exactly as any other typed update does.
+          // Being invited to comment does not buy a way past the 17 September
+          // rule, and the 1 is still the gate. What changes is only where the
+          // words end up: sharing the batch_id of the photographs, so the
+          // portal draws them as one update rather than as a line of text
+          // standing beside pictures nobody connected it to.
+          //
+          // This runs ahead of the one-job and many-jobs branches below and
+          // covers both. With several jobs running it also removes the code
+          // question, which would be asking a worker which job they meant
+          // about photographs they filed four minutes ago. The read-back
+          // names the job, so the worker still sees where it is going and
+          // can drop it.
+          const justFiled = found ? await recentFiledBatch(supabase, found.email) : null;
+          const noteJob = justFiled ? found!.jobs.find((j) => j.id === justFiled.jobId) : undefined;
+          if (found && justFiled && noteJob) {
+            await supabase.from("wa_intake_sessions").upsert({
+              wa_id: msg.from,
+              answers: {
+                _lane: "update_draft", worker_email: found.email,
+                job_id: noteJob.id, job_title: noteJob.title, text: text.slice(0, 1000),
+                notes_batch: justFiled.batchId,
+              },
+              photo_count: 0,
+              updated_at: new Date().toISOString(),
+            });
+            root.setAttributes({
+              "yaadly.worker_update.job": noteJob.id,
+              "yaadly.worker_update.outcome": "held_for_confirm_as_note",
+            });
+            return twiml(draftReadBack(noteJob.id, noteJob.title, text, true));
+          }
+
           // Held and read back, never filed on arrival (17 Sep 2026). The
           // reply of 1 is handled by the update_draft lane above.
           if (found && found.jobs.length === 1) {
