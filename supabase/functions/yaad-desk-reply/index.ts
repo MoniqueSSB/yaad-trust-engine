@@ -42,6 +42,7 @@
  */
 
 import { httpAttrs, SpanKind, Trace } from "./otel.ts";
+import { withMessagingService } from "./twilio-status.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -88,7 +89,11 @@ async function isAdmin(req: Request): Promise<boolean> {
 /* Twilio, same shape as yaad-portal-code and yaad-notify-client. A copy
    rather than a shared module for the reason recorded in yaad-portal-code:
    sync-shared.sh copies one file into every function, and this send is a few
-   lines that three functions already carry independently. */
+   lines that three functions already carry independently.
+   One exception, 19 Sep 2026: withMessagingService is imported, not copied.
+   A ContentSid send without a Messaging Service is refused by Twilio with
+   20422, which went unnoticed for four days in one function; four separate
+   copies of that rule is four chances to fix it in three places. */
 async function sendTwilio(
   to: string, body: string, channel: "whatsapp" | "sms", trace: Trace,
   template?: { sid: string; vars: Record<string, string> },
@@ -113,9 +118,9 @@ async function sendTwilio(
       // Same two shapes yaad-notify-client uses: free text, or an approved
       // template with its fixed variable slots. A template is only ever sent
       // with the variables it was approved for.
-      const params = template
+      const params = withMessagingService(template
         ? new URLSearchParams({ To: dest, From: from, ContentSid: template.sid, ContentVariables: JSON.stringify(template.vars) })
-        : new URLSearchParams({ To: dest, From: from, Body: body });
+        : new URLSearchParams({ To: dest, From: from, Body: body }));
       // Ask Twilio to tell us what actually happens to it. A 201 means Twilio
       // took the message, not that a phone received it, and this is the one
       // message a client has been promised. Only set when the URL is

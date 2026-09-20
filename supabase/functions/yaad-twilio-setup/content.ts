@@ -31,6 +31,16 @@ export function sectionMenuContent() {
   };
 }
 
+/** What Meta is asked to approve the section menu as, 19 Sep 2026.
+ *
+ *  Submitted on the founder's instruction after the menu was found never to
+ *  have sent once: Twilio refuses it with "Invalid Parameter" and yaad-inbound
+ *  falls back to the typed letters. Utility, because it is a question about a
+ *  job the worker is already doing, never marketing. Approval was believed
+ *  unnecessary for an in-session send; that belief had never been tested, and
+ *  submitting costs nothing either way. */
+export const SECTION_MENU_APPROVAL = { name: SECTION_MENU_NAME, category: "UTILITY" };
+
 // The worker update template, 17 Sep 2026. The one Yaadly template that goes
 // out to people who have NOT written in within 24 hours, so unlike the section
 // menu it needs Meta's approval before it is any use, and the setting that

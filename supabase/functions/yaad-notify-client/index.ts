@@ -52,7 +52,7 @@ import { pickTextProvider, providerAttrs, chatWithFailover } from "./textmodel.t
 import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, type VisionProvider, visionAttrs } from "./visionmodel.ts";
 import * as guardrails from "./guardrails.ts";
 import { checkAttrs, deskPack, runEvidenceChecks, workerGaps, workerNotes } from "./evidence-checks.ts";
-import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
+import { recordAccepted, type SendMeta, withMessagingService, withStatusCallback } from "./twilio-status.ts";
 import { hasWorkerTemplateDecision, insideWindow, samePhoneDigits, templateVar, WINDOW_MS, workerTemplateSummary } from "./worker-template.ts";
 import { Image } from "jsr:@matmen/imagescript";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
@@ -130,9 +130,9 @@ async function sendTwilio(
       // same risk as putting an arbitrary sentence through it.
       let params: URLSearchParams;
       if (template?.sid && channel === "whatsapp") {
-        params = new URLSearchParams({
+        params = withMessagingService(new URLSearchParams({
           To: dest, From: from, ContentSid: template.sid, ContentVariables: JSON.stringify(template.vars),
-        });
+        }));
       } else {
         params = new URLSearchParams({ To: dest, From: from, Body: body });
         // Twilio's own form: MediaUrl repeated once per attachment, not

@@ -417,3 +417,28 @@ Deno.test("the WhatsApp alert and the push cannot take each other down", () => {
     "the WhatsApp alert is sent after the no-topic bail out, so not configuring " +
     "ntfy silently switches off her WhatsApp alerts too");
 });
+
+/* ── the section menu names a Messaging Service ───────────────────────────
+   19 Sep 2026. The menu was refused by Twilio with 20422 Invalid Parameter
+   on every send from the day it went live, because the request carried a
+   From number and no MessagingServiceSid, and Twilio requires a Messaging
+   Service for any ContentSid send. Plain Body sends do not, which is why
+   nothing else on the same number was affected and this looked like a
+   template problem for four days. */
+
+Deno.test("the section menu send names a Messaging Service, not just a From", () => {
+  const body = fnBody("sendPhaseMenu");
+  assert(body.includes("MessagingServiceSid"),
+    "sendPhaseMenu no longer sends MessagingServiceSid, so Twilio will refuse it with 20422 again");
+  assert(body.includes("ContentSid"), "sendPhaseMenu no longer sends a ContentSid");
+  assert(/if \(!messagingServiceSid\)/.test(body),
+    "sendPhaseMenu no longer refuses to try without a Messaging Service, so it will fail on the wire instead");
+});
+
+Deno.test("askPhase reads the Messaging Service the same way it reads the template", () => {
+  const at = src.indexOf("const askPhase =");
+  assert(at > 0, "askPhase is gone or renamed");
+  const body = src.slice(at, at + 1200);
+  assert(body.includes("TWILIO_MESSAGING_SERVICE_SID"), "the secret is no longer read");
+  assert(body.includes("twilio_messaging_service_sid"), "the app_settings row is no longer read");
+});
