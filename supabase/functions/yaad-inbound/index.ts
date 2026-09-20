@@ -298,8 +298,8 @@ type PhaseAnswer = "before" | "during" | "after" | "issue" | "new";
 // is the rarer answer. Nothing here blocks either way: an unrecognised reply
 // still files the evidence unmarked.
 //
-// An after may name the before it answers on the same reply, "A P3", so the
-// code is stripped before the word is read.
+// An after may name the before it answers on the same reply, "After P3" or
+// "A P3", so the code is stripped before the word is read.
 function readPhaseAnswer(text: string): PhaseAnswer | undefined {
   const t = text.trim().toLowerCase().replace(/\s+p\d+\b/, "").replace(/[.!,]+$/, "").trim();
   if (/^(b|before|bfore|befor|the before|before pic|before photo|before shot)$/.test(t)) return "before";
@@ -335,14 +335,28 @@ async function beforesOnJob(admin: { from: (t: string) => any }, jobId: string):
 function pairHint(befores: BeforeShot[]): string {
   if (!befores.length) return "";
   const codes = befores.map((b) => b.item_code).filter(Boolean).join(", ");
-  return ` If it is the after for one of the befores on this job (${codes}), put its code after the letter, like "A ${befores[0].item_code}".`;
+  return ` If it is the after for one of the befores on this job (${codes}), put its code after the word, like "After ${befores[0].item_code}".`;
 }
 
 // One short question, in the words a worker would use. Kept as a constant
 // because it goes out from three places in the evidence lane and they must not
 // drift into three slightly different questions.
+//
+// It offers the words, not the letters. Founder, 15 September 2026: "the
+// letters would be confusing and not clear", and again on 20 September, after
+// five days of this question going out because the menu was being refused,
+// "the letter needs to go". The letters are still accepted by
+// readPhaseAnswer(), because the menu's own row ids are the letters and a
+// worker who learnt them should not be told they are wrong. They are simply
+// no longer the thing a worker is asked for.
+//
+// This is the fallback, not the question. On WhatsApp the menu goes first and
+// this only runs when the send is refused. It is deliberately still a real
+// question rather than nothing: the session is already waiting on a section
+// answer, so a worker asked nothing would say something else and the evidence
+// would file unmarked with nobody the wiser.
 const PHASE_QUESTION =
-  'Which is this? Reply B for before, D for during the work, A for after, P for a problem with the work, or N for something new you found that was not in the job. Reply S to skip.';
+  'Which is this? Reply Before, During, After, Problem for something wrong with the work, or New for something you found that was not in the job. Reply Skip to skip.';
 
 // What the worker is told it went down as. "the before" reads naturally, "the
 // issue" does not, and a worker who has just reported rot behind a panel
@@ -623,6 +637,29 @@ async function sendWhatsAppTo(to: string, body: string, trace: Trace, meta: Send
       return false;
     }
   });
+}
+
+/** A Twilio template id, or nothing.
+ *
+ *  A ContentSid is HX and thirty-two hex digits. Anything else is not an id
+ *  and cannot be sent, so it is worth one regular expression to find that out
+ *  here rather than from Twilio.
+ *
+ *  Why this exists. On 15 September 2026 the TWILIO_CONTENT_SID_PHASE secret
+ *  was set to the literal text "HX...", pasted straight off the command in
+ *  RUNBOOK.md, which carried the placeholder. The secret wins over the desk
+ *  setting, so that placeholder went on the wire on every section menu send
+ *  for five days while the correct id sat on the desk untouched. Twilio
+ *  refused each one with 20422 Invalid Parameter, the typed question covered
+ *  for it, and two separate investigations looked past it at the template and
+ *  then at the Messaging Service. yaad-twilio-setup has checked this shape
+ *  since the day it was written. This side did not.
+ *
+ *  It takes the first value that IS an id rather than the first value that is
+ *  set, which is the part that matters: junk in one slot can no longer hide a
+ *  good id in the other. */
+function firstTemplateSid(...candidates: string[]): string {
+  return candidates.find((c) => /^HX[0-9a-f]{32}$/i.test(c.trim()))?.trim() ?? "";
 }
 
 /** The section question as a tappable menu, 15 September 2026.
@@ -1958,9 +1995,12 @@ Deno.serve(async (req: Request) => {
   const askPhase = async (settings: SettingsReader, to: string, channel: string, lead: string) => {
     if (channel === "whatsapp") {
       const set = await readSettings(settings, ["twilio_content_sid_phase", "twilio_messaging_service_sid"]);
-      const contentSid = Deno.env.get("TWILIO_CONTENT_SID_PHASE") || set.twilio_content_sid_phase || "";
+      const contentSid = firstTemplateSid(
+        Deno.env.get("TWILIO_CONTENT_SID_PHASE") ?? "",
+        set.twilio_content_sid_phase ?? "",
+      );
       // Both are needed, and either one blank turns the menu off and leaves
-      // the typed letters, which is still the switch.
+      // the typed question, which is still the switch.
       const serviceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID") || set.twilio_messaging_service_sid || "";
       if (contentSid && await sendPhaseMenu(to, lead, contentSid, serviceSid, trace)) return twimlSilent();
     }

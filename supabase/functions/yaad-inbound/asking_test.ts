@@ -36,7 +36,11 @@ const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
  *  the fourth time nobody looks. Bounded by the next top-level declaration
  *  instead, so it grows with the function. */
 function fnBody(name: string): string {
-  const at = src.indexOf(`async function ${name}(`);
+  // Either shape. It took only `async function` until 20 Sep 2026, so the
+  // first plain one checked here failed as "gone or renamed" while sitting in
+  // the file, which is the same wrong-reason red the comment above is about.
+  const at = [`async function ${name}(`, `function ${name}(`]
+    .map((d) => src.indexOf(d)).find((i) => i >= 0) ?? -1;
   if (at < 0) throw new Error(`${name} is gone or renamed`);
   const rest = src.slice(at + 10);
   const next = rest.search(/\n(?:async function |function |const [A-Z_]+ =|Deno\.serve)/);
@@ -441,4 +445,74 @@ Deno.test("askPhase reads the Messaging Service the same way it reads the templa
   const body = src.slice(at, at + 1200);
   assert(body.includes("TWILIO_MESSAGING_SERVICE_SID"), "the secret is no longer read");
   assert(body.includes("twilio_messaging_service_sid"), "the app_settings row is no longer read");
+});
+
+/* ── a template id that is not a template id never goes on the wire ───────
+   20 Sep 2026. The TWILIO_CONTENT_SID_PHASE secret was set on 15 September to
+   the literal text "HX...", off the copy-paste line in RUNBOOK.md, which had
+   the placeholder still in it. Because the secret wins over the desk setting,
+   every section menu send for the next five days carried "HX..." as its
+   ContentSid and was refused by Twilio with 20422, while the correct id sat
+   in app_settings unused. The typed question covered for it so completely
+   that two investigations went past it, one at the template and one at the
+   Messaging Service.
+
+   The fix is the shape check yaad-twilio-setup has always had, and the rule
+   that the FIRST VALUE THAT IS AN ID wins, not the first value that is set.
+   Both halves matter: without the second, junk in the secret still hides a
+   good id on the desk, which is the whole fault. */
+
+Deno.test("askPhase will not send a template id that is not shaped like one", () => {
+  const at = src.indexOf("const askPhase =");
+  const body = src.slice(at, at + 1200);
+  assert(body.includes("firstTemplateSid("),
+    "askPhase no longer checks the shape of the template id, so a placeholder can go on the wire again");
+  assert(!/Deno\.env\.get\("TWILIO_CONTENT_SID_PHASE"\)\s*\|\|/.test(body),
+    "the secret is being taken on truthiness again, so junk in it hides the id on the desk");
+});
+
+Deno.test("firstTemplateSid takes the first id, not the first value that is set", () => {
+  const body = fnBody("firstTemplateSid");
+  assert(/HX\[0-9a-f\]\{32\}/.test(body), "the ContentSid shape is no longer checked");
+  assert(body.includes("find("),
+    "firstTemplateSid no longer scans its candidates, so a bad first one wins again");
+});
+
+/* ── the typed question offers words, not letters ─────────────────────────
+   Founder, 15 Sep 2026: "the letters would be confusing and not clear". Again
+   on 20 Sep, having had them for five days because the menu was being
+   refused: "the letter needs to go".
+
+   The letters stay ACCEPTED, because the menu's own row ids are the letters
+   and a worker who learnt them should not be told they are wrong. They are
+   only no longer what a worker is asked for. And the fallback stays a real
+   question: the session is already waiting on a section answer, so a worker
+   asked nothing says something else and the evidence files unmarked. */
+
+Deno.test("the typed section question asks for words, not single letters", () => {
+  const at = src.indexOf("const PHASE_QUESTION");
+  assert(at > 0, "PHASE_QUESTION is gone or renamed");
+  const q = src.slice(at, src.indexOf(";", at));
+  assert(!/\bReply [BDAPNS] for\b/.test(q), "the single letters are back in the question");
+  for (const word of ["Before", "During", "After", "Problem", "New", "Skip"]) {
+    assert(q.includes(word), `the question no longer offers "${word}"`);
+  }
+});
+
+Deno.test("every word the typed question offers is a word readPhaseAnswer accepts", () => {
+  const at = src.indexOf("function readPhaseAnswer");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  // Skip is deliberately absent: an unrecognised answer files the evidence
+  // unmarked and says so, which is exactly what skipping means here.
+  for (const word of ["before", "during", "after", "problem", "new"]) {
+    assert(body.includes(word), `the question offers "${word}" but readPhaseAnswer no longer reads it`);
+  }
+});
+
+Deno.test("askPhase still falls back to a real question when the menu is refused", () => {
+  const at = src.indexOf("const askPhase =");
+  const body = src.slice(at, at + 1200);
+  assert(body.includes("PHASE_QUESTION"),
+    "the fallback question is gone, so a refused menu leaves the worker asked nothing "
+    + "while the session waits for their answer and files whatever they say next unmarked");
 });
