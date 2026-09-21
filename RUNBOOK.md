@@ -2254,6 +2254,32 @@ select wa_id, answers->>'worker_email' as worker_email,
 
 **If a worker seems stuck reprompting, check what they actually typed against `answers->'job_choices'` in that row first.** The most common real cause is a worker typing the bare digits ("0042") without the code's letters, which is deliberate, not a bug: the code match requires the string Twilio was shown, precisely so a worker cannot confirm a job by accident. Tell them to reply with the exact code shown in the message.
 
+## A worker's note on the photos they just sent, and where it goes
+
+**The filing confirmation invites one (20 Sep 2026).** "Filed 2 items against JOB-…, the after. **Anything to say about them? Type it now and it goes on the same update.**" Founder's instruction: a worker should be told they can comment, not merely allowed to. Before this the question only ever came up when a photograph arrived with no caption, so a worker who captioned theirs was never asked anything and had no way of knowing more was welcome.
+
+**Why it is offered there and nowhere earlier.** Every free-text reply before that point is already the answer to a question: first the job code, then "what do these show", then the section. An invitation anywhere earlier gets typed into the wrong slot. Once the batch is filed the evidence session is closed and the worker's words are free again, which is why this is the only place it fits.
+
+**The note is NOT filed when it arrives.** It goes through the same `update_draft` lane every typed update has used since 17 September: held, read back in full, filed only on a reply of 1. Being invited to comment buys no way past that gate, and a test in `asking_test.ts` fails if the note lane ever inserts into `evidence` directly.
+
+**What makes it a note rather than a separate line on the record:** it is filed sharing the photographs' `evidence.batch_id`, so `updatesOf()` draws the whole thing as one update in the portal instead of words sitting beside pictures nobody connected them to. Two things had to change for that to work:
+
+- **Every filed batch now gets a `batch_id`, including a batch of one.** It used to be null for a single photograph. The portal already draws a batch of one exactly as it drew a null, so nothing moved on the page, but without it a lone photograph was the only evidence a worker could not attach anything to.
+- **The window is 30 minutes** (`NOTE_WINDOW_MINUTES`), measured from when the pictures landed. `recentFiledBatch()` only looks at rows with a `storage_path`, which is what stops a note renewing its own window and sweeping a genuinely new update half an hour later onto old photographs.
+
+**With more than one job running it does not ask which one.** The worker filed on that job minutes ago, so the job is known, and asking would be asking them about photographs they have just sent. The read-back names the job ("Ready to go on JOB-… (title), with the photos you just sent") so they can still drop it with a "no".
+
+**If a note lands on its own instead of with the photos:** check the gap. Past 30 minutes it is an ordinary update and correctly stands alone. Inside it, look for a `batch_id` on the photo rows:
+
+```sql
+select id, label, phase, batch_id, storage_path is not null as has_file, created_at
+from evidence where job_id = 'JOB-…' order by created_at desc limit 10;
+```
+
+Photo rows with a null `batch_id` are from before 20 Sep 2026 and are not backfilled, by the same reasoning as `DECISIONS.md` gives for never backfilling it: a filing is a filing, and inferring a group after the fact would overstate the record.
+
+**Trace attributes:** `yaadly.worker_update.outcome` reads `held_for_confirm_as_note` when it was taken as a note and `filed_as_note` once the 1 lands. Plain `held_for_confirm` and `filed` mean it was read as an ordinary standalone update.
+
 ## Proving the Twilio signature check without a real Twilio secret
 
 **Run `deno test supabase/functions/yaad-inbound/twilio-signature_test.ts` and `deno test supabase/functions/yaad-inbound/job-match_test.ts`.** Both run with no network and no live credentials, `twilio-signature_test.ts` signs a request the same way Twilio does using a throwaway test token, not the real `TWILIO_AUTH_TOKEN`, and checks `checkTwilioSignature()` in `twilio-signature.ts` agrees. This is what "the algorithm is proven, the live endpoint is not yet" actually means in practice: everything the signature check does is exercised here, the one thing not exercised is Twilio's real servers signing with the real production secret and reaching the real URL.
@@ -5609,15 +5635,42 @@ Since 19 Sep 2026 a blocked row carries no payment controls at all. It says **Wa
 
 ## The section menu: "which is this?" as rows a worker taps, not letters
 
-**Two things must be set or the question goes out as text with the letters: the template id AND a Messaging Service.** (The Messaging Service half was found the hard way on 19 Sep 2026, see below.)
+**✅ SOLVED, 20 September 2026. The cause was a placeholder pasted out of this file. Read this before anything below it.**
+
+The `TWILIO_CONTENT_SID_PHASE` function secret was set on 15 September at 08:31 UTC to the literal five characters `HX...`, straight off the `supabase secrets set` line further down this page, which carried the placeholder. That secret wins over the `twilio_content_sid_phase` row on the desk, so **every section menu `yaad-inbound` tried to send for the next five days carried `HX...` as its ContentSid** and was refused by Twilio with 20422 Invalid Parameter, while the correct id sat on the desk unused the whole time.
+
+Proved rather than guessed, because two investigations had already gone past it:
+
+```bash
+supabase secrets list --project-ref leffyisvfvjwzilydlwf   # digest for TWILIO_CONTENT_SID_PHASE
+printf 'HX...' | shasum -a 256                             # the same digest, f46a9c1d…37990
+```
+
+The function log had been saying so since 19 September, in the last field, which nobody read as a value: `sendPhaseMenu: Twilio refused the template: HTTP 400 | Twilio code 20422 | Invalid Parameter | … | ContentSid HX...`
+
+**The fix was to remove the secret**, after which the desk row is read and the menu sends. Nothing was redeployed for that; both are read on every request.
+
+```bash
+supabase secrets unset TWILIO_CONTENT_SID_PHASE --project-ref leffyisvfvjwzilydlwf
+```
+
+**And so it cannot happen again:** `askPhase` now runs both candidates through `firstTemplateSid()`, which takes the first value shaped like a real ContentSid (`HX` and thirty-two hex digits) rather than the first value that is set. That second half is the part that matters: a shape check alone would still have let junk in the secret hide the good id on the desk. `yaad-twilio-setup` had this check from the day it was written; `yaad-inbound` did not. Held by two tests in `asking_test.ts`.
+
+**What this also means:** the Messaging Service work of 19 September was never proven to be the cause and still is not. It stays because Twilio's documentation asks for it. It is not what was wrong.
+
+**Two things must be set or the question goes out as text: the template id AND a Messaging Service.** (The Messaging Service half was found the hard way on 19 Sep 2026, see below.)
 
 **Until `TWILIO_CONTENT_SID_PHASE` is set, the question goes out as text with the letters, exactly as before.** Founder, 15 Sep 2026: "the letters would be confusing and not clear", she wants separate words they can click. `askPhase()` in `yaad-inbound` is now the one place the question is asked: on WhatsApp it first tries `sendPhaseMenu()`, which sends a Twilio Content Template through the Messages API and answers the webhook with an empty response; if the secret is missing or Twilio refuses, it sends the typed question instead. The menu is an upgrade, never a gap.
+
+**The typed fallback asks for words, not letters (20 Sep 2026).** Founder, 15 Sep: "the letters would be confusing and not clear". Again on 20 Sep, having had them for five days while the menu was being refused: "the letter needs to go". It now reads *"Which is this? Reply Before, During, After, Problem for something wrong with the work, or New for something you found that was not in the job. Reply Skip to skip."* **The letters are still accepted**, by `readPhaseAnswer()`, because the menu's own row ids are the letters and a worker who learnt them should not be told they are wrong. They are only no longer what anybody is asked for. The pair hint changed with it, from `like "A P3"` to `like "After P3"`; both still parse.
+
+**The fallback is still a question, and must stay one.** It is tempting to send nothing once the menu works. Do not. By the time this runs the session already has `awaiting_phase` set, so the next thing the worker types is read as their section answer. A worker asked nothing says something else, and the evidence files unmarked with nobody the wiser, which is the failure this whole question exists to prevent. Held by a test.
 
 **Why a list and not buttons.** WhatsApp allows three Quick Reply buttons per message. This question has six answers. A List Picker shows one button ("Choose") that opens up to ten rows.
 
 **Why no Meta approval is needed here, unlike the daily check-in.** A worker has just sent a photo, so Yaadly is inside the 24 hour customer-service window and a Content Template can be sent without approval. The template still has to exist in Twilio.
 
-**Switched on 15 September 2026, from the server, not the console.** The Twilio key is a function secret nobody can read back, so `yaad-twilio-setup` creates the template from `supabase/functions/yaad-twilio-setup/content.ts` (the six rows, tested) and writes its ContentSid to `app_settings.twilio_content_sid_phase`, which `yaad-inbound` reads whenever the `TWILIO_CONTENT_SID_PHASE` secret is unset. Live template: `yaadly_section_menu_v1`, created that day, visible on the desk under Settings as `twilio_content_sid_phase`. To recreate it after a Twilio account change, run the function once with the cron secret (the same way the scheduled jobs present it) or from an admin session, `{"action":"create-section-menu"}`; it reuses an existing template of that name rather than making a second. `{"action":"list"}` shows every template on the account. **Blanking the `twilio_content_sid_phase` row on the desk turns the menu off** and the typed letters go out again; that is the switch.
+**Switched on 15 September 2026, from the server, not the console.** The Twilio key is a function secret nobody can read back, so `yaad-twilio-setup` creates the template from `supabase/functions/yaad-twilio-setup/content.ts` (the six rows, tested) and writes its ContentSid to `app_settings.twilio_content_sid_phase`, which `yaad-inbound` reads whenever the `TWILIO_CONTENT_SID_PHASE` secret is unset. Live template: `yaadly_section_menu_v1`, created that day, visible on the desk under Settings as `twilio_content_sid_phase`. To recreate it after a Twilio account change, run the function once with the cron secret (the same way the scheduled jobs present it) or from an admin session, `{"action":"create-section-menu"}`; it reuses an existing template of that name rather than making a second. `{"action":"list"}` shows every template on the account. **Blanking the `twilio_content_sid_phase` row on the desk turns the menu off** and the typed question goes out again; that is the switch. Since 20 Sep 2026 that typed question offers the words, not the letters.
 
 **Doing it by hand instead, in the Twilio console:** Messaging, Content Template Builder (Products and Services, then Templates, on the newer console), **Create new template**:
 
@@ -5643,11 +5696,14 @@ The six rows, in this order. **The Item ID column is the whole point: it must be
 
 Save. **Do not try to submit it for WhatsApp approval: a list picker cannot be approved, ever.** Twilio answers a submission with "Richest content type on template, twilio/list-picker, is not eligible for WhatsApp approval" (tried 19 Sep 2026, on the founder's instruction). Twilio's own documentation says the same: a list picker works on WhatsApp only, only inside a 24 hour session the worker opened, and can never start one. That is fine for this question, which is only ever asked after a worker has just sent a photo. This paragraph used to say submitting it as Utility cost nothing and would let it go out later outside the window; both halves were wrong. Copy its ContentSid (`HX...`) and either paste it into the `twilio_content_sid_phase` setting on the desk, or set it as a secret, which wins over the setting:
 
+⚠️ **Paste the real `HX…` id into the command below. Do not run it as written.** The line here used to end `=HX...`, somebody ran it exactly like that on 15 September 2026, and that placeholder went out as the ContentSid on every section menu for five days. See the SOLVED entry at the top of this section. Since 20 September `askPhase` checks the shape and ignores anything that is not a real id, so the same paste now leaves the menu working off the desk row instead of breaking it, but do not lean on that.
+
 ```bash
-supabase secrets set TWILIO_CONTENT_SID_PHASE=HX... --project-ref leffyisvfvjwzilydlwf
+# replace HXxxxx… with the ContentSid you copied. This command is not runnable as it stands.
+supabase secrets set TWILIO_CONTENT_SID_PHASE=HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx --project-ref leffyisvfvjwzilydlwf
 ```
 
-No redeploy needed; both are read on every request.
+The desk row is the easier of the two and needs no command at all. No redeploy either way; both are read on every request.
 
 **The job question asks for 1, not the code (19 Sep 2026).** With exactly one job on offer the message reads "Reply 1 to confirm it is that job, or tell us the right job." The ordinal was always accepted there, `pickJobChoice` has taken one inside an evidence session since 31 August; the message simply never said so. The full code still works for anyone who sends it, and so does a yes that points at the job ("yes for that job", "yes that one", "correct"), though a bare "yes" deliberately does not. **With more than one job the code is still the only thing asked for**, and the client approval reply (`matchApprovingJob`) is still code only and untouched, because that one releases money. The copy says confirm and never approve: approving is a named human deciding about money or a stage, and the two words must not blur in front of a worker.
 
@@ -5655,7 +5711,7 @@ No redeploy needed; both are read on every request.
 
 **If the menu never appears:** the function log line `sendPhaseMenu: Twilio refused the template:` carries Twilio's reason. Since 19 Sep 2026 it carries the HTTP status, Twilio's numbered error code, its message, its help link and the ContentSid that was tried; before that it carried the sentence alone, which is how four days went by on "Invalid Parameter" with nothing to look up. The typed question still went, so nothing was lost.
 
-**It has never yet sent, and here is where that stands (19 Sep 2026).** The founder filed a photo that morning and got the letters. At 09:33:16 UTC `yaad-inbound` logged `Twilio refused the template: Invalid Parameter` and fell back, exactly as designed. `message_deliveries` has no row of kind `section menu`, ever, so no section menu has been accepted by Twilio since the day it was switched on. What has been ruled out, by reading Twilio's own copy of the template back (`{"action":"describe-section-menu"}`, read only, added the same day): the ContentSid is right and matches the row on the desk, the template exists on the account (`yaadly_section_menu_v1`, created 15 Sep 08:36 UTC), its type is `twilio/list-picker`, its body takes exactly one variable, and all six row ids are the bare letters. So it is none of the three usual causes above. **The worker update template is approved and switched on (19 Sep 2026).** Meta approved `yaadly_worker_job_update_v1`, and `{"action":"worker-update-status"}` wrote `twilio_content_sid_worker_update`, which is the setting `yaad-notify-client` reads. Until 19 September the job notices sent to a worker who had not messaged in 24 hours were refused by Twilio with **63016**, outside the messaging window: on 19 September alone both "stage released" and "materials sent" failed that way. On its own the approval would have turned a 63016 into a 20422, because the template send had the Messaging Service fault below. Both were fixed the same afternoon, in that order.
+**Superseded by the SOLVED entry at the top of this section. It was the placeholder secret. Kept because the ruling out below is still sound and saved repeating it. It has never yet sent, and here is where that stands (19 Sep 2026).** The founder filed a photo that morning and got the letters. At 09:33:16 UTC `yaad-inbound` logged `Twilio refused the template: Invalid Parameter` and fell back, exactly as designed. `message_deliveries` has no row of kind `section menu`, ever, so no section menu has been accepted by Twilio since the day it was switched on. What has been ruled out, by reading Twilio's own copy of the template back (`{"action":"describe-section-menu"}`, read only, added the same day): the ContentSid is right and matches the row on the desk, the template exists on the account (`yaadly_section_menu_v1`, created 15 Sep 08:36 UTC), its type is `twilio/list-picker`, its body takes exactly one variable, and all six row ids are the bare letters. So it is none of the three usual causes above. **The worker update template is approved and switched on (19 Sep 2026).** Meta approved `yaadly_worker_job_update_v1`, and `{"action":"worker-update-status"}` wrote `twilio_content_sid_worker_update`, which is the setting `yaad-notify-client` reads. Until 19 September the job notices sent to a worker who had not messaged in 24 hours were refused by Twilio with **63016**, outside the messaging window: on 19 September alone both "stage released" and "materials sent" failed that way. On its own the approval would have turned a 63016 into a 20422, because the template send had the Messaging Service fault below. Both were fixed the same afternoon, in that order.
 
 **⚠️ CORRECTION, 19 Sep 2026, 14:01. The Messaging Service is NOT proven to be the cause. Read this before trusting the paragraph under it.** The menu now sends: `{"action":"test-send-section-menu"}` returned HTTP 201 and the message was delivered. But that probe sends `To`, `From`, `ContentSid` and `StatusCallback` and **no MessagingServiceSid** (Twilio's own response confirms `messaging_service_sid: null`), which is byte for byte the request that was refused with 20422 at 13:42:32 the same day. The same request now succeeds. So whatever changed was on Twilio's or Meta's side, not in the request, and the Messaging Service fix cannot be credited with it.
 
