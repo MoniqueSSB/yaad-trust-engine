@@ -6,6 +6,35 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-23 · Two sellers on one website: the founder sells the professional services, Yaadly Ltd sells the jobs
+
+The six professional services (Deposit Protection Check, Visual Check,
+Condition Report, Technical Sign-off, Property Care, Oversight Retainer) are
+sold by Monique as a sole trader. Jobs, Full Project Management and the
+business page stay with Yaadly Ltd. Founder decision, 22 and 23 September
+2026, and it is a legal and financial one, not a technical one.
+
+The site now says so in the places where it matters: who you contract with, who
+supplies the report, who is paid, the data controller, both anti fraud
+warnings, the FAQ and the footer on all eleven pages. Customer facing copy says
+"the founder"; her full name appears only where the law or a payment needs it.
+
+The part worth remembering is the sequencing, because getting it wrong costs
+real money. Publishing the wording and keeping the card links was not an
+option: every link in `docs/services.html` paid the company's Stripe account,
+so a client would have read that they were buying from her and then paid
+Yaadly Ltd for it. The links are therefore emptied out, not repointed, until
+her own Stripe account is activated. The booking form is unchanged and falls
+through to a path that was already written for the case where no link exists:
+the scope and price are confirmed in writing, and an invoice follows. So the
+site is truthful at every step, just slower to take money than it was.
+
+Her Stripe account (`acct_1UIPuy28HX175y5b`) exists but was still in onboarding
+on 23 September 2026 and is not connected to any Claude session, so nobody but
+her can create anything in it.
+
+---
+
 ## 2026-09-19 · The menu sends, and I cannot prove why, so the entry below is corrected not deleted
 
 **What happened.** At 14:01 the probe sent the section menu to the founder's phone: HTTP 201, delivered four seconds later. The menu works. The entry below says the cause was a missing Messaging Service and that naming it was the fix. **That claim does not survive the evidence and is withdrawn.**
