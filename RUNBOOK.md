@@ -5892,3 +5892,32 @@ the answer is not to chop the statement into smaller pieces until it slips
 through. Write it to a file and run it from the Supabase SQL editor instead.
 Splitting it would also break the one property worth having, that a failure
 part way through rolls everything back.
+
+## Putting the card buttons back on the professional services (23 Sep 2026)
+
+The eight links in `PAYMENT_LINKS` in `docs/services.html` were emptied on
+23 September 2026 because they paid Yaadly Ltd for services the site now says
+the founder sells. Nothing else was touched: with the map empty, a booking
+tells the client the scope and price are confirmed in writing and an invoice
+follows, which is the path the page already had.
+
+To put them back, in this order, and none of it before the one above it:
+
+1. Her own Stripe account is activated, not just created. Identity, address and
+   a bank account for payouts, in her name, not the company's.
+2. Make eight payment links in THAT account: deposit £149, visual £95,
+   condition £249, signoff £245, care £45, care-large £70, care-villa £95, all
+   seven as a hold (manual capture), and retainer £495 a month as a monthly
+   subscription. The seven holds must stay under £500 or the hold is not
+   allowed at all, which is why the weekly retainer never gets a link.
+3. Paste them into `PAYMENT_LINKS`, keeping those exact keys, and restore the
+   two sentences the same commit changed, on `docs/services.html` (the booking
+   panel and the How you pay note) and on `docs/payments.html`.
+4. Deactivate the old Yaadly Ltd links in the company's Stripe account, or a
+   client with an old email still pays the wrong payee. The old URLs are in
+   git history and must never be pasted back.
+
+Check it the same way each time: book a service on the live site and read what
+the confirmation says. No button means the map is empty. A button means the
+receipt has to say her name, so click it and look.
+
