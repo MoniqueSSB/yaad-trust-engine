@@ -579,3 +579,46 @@ Deno.test("every filed batch gets a batch id, including a single photo", () => {
     + "a worker cannot attach a note to");
   assert(/crypto\.randomUUID\(\)/.test(line), "the batch id is no longer minted");
 });
+
+/* ── a half-finished session is not for ever (23 Sep 2026) ────────────────
+   The evidence session had no age at all. The stale drop written for exactly
+   that case sits AFTER the evidence block, and that block returns on every
+   path it has, so the one lane whose comment promised an orphaned photo would
+   be dropped was the one lane it could never run on.
+
+   Live effect, which is how it was found: three photographs staged on 20
+   September were still waiting for a section answer on the 23rd, and the next
+   thing the founder typed, about anything at all, would have been read as
+   that answer and filed them under it.
+
+   The guard is load bearing because of the ORDER, so the order is asserted
+   here too. Move the drop above the block and the guard stops mattering;
+   remove the guard and the drop stops running. Either alone is a silent
+   return to filing days-old photographs under a stray word. */
+
+Deno.test("an evidence session goes stale, the same as a typed draft", () => {
+  const at = src.indexOf("const evSession =");
+  assert(at > 0, "evSession is gone or renamed");
+  const decl = src.slice(at, src.indexOf(";", at));
+  assert(decl.includes("SESSION_STALE_MS"),
+    "the evidence session has no age again, so a message days later is read as the answer "
+    + "to a question nobody remembers being asked");
+  assert(/updated_at/.test(decl), "the age is no longer measured against the session's own clock");
+});
+
+Deno.test("the stale drop still sits after the evidence block, which is why the guard is needed", () => {
+  const block = src.indexOf("if (!evidenceHeld && evSession) {");
+  const drop = src.indexOf("A stale evidence session is dropped");
+  assert(block > 0 && drop > 0, "one of the two is gone or renamed");
+  assert(drop > block,
+    "the stale drop has moved above the evidence block. That is not wrong in itself, but the "
+    + "age guard on evSession was added because it was below, so check both together");
+});
+
+Deno.test("one staleness number, not a copy per lane", () => {
+  assert(/const SESSION_STALE_MS = 48 \* 3600_000;/.test(src), "SESSION_STALE_MS is gone or changed");
+  const copies = (src.match(/48 \* 3600_000/g) ?? []).length;
+  assert(copies === 1,
+    `48 hours is written out ${copies} times. It was three, and they drift: put every lane on `
+    + "SESSION_STALE_MS so a change to one is a change to all");
+});

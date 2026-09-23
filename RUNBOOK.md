@@ -2244,6 +2244,30 @@ select wa_id, answers->>'worker_email' as worker_email,
 
 **This was never fully proven with a real, signed inbound message during development**, because doing so requires `TWILIO_AUTH_TOKEN` to sign a test request, which nobody building this held. Every piece of logic underneath that signature check was verified directly against the live database; the signature check, the media fetch, and the reply mechanism are pre-existing code already handling real client messages on this same endpoint. The first real worker photo sent to the number is the genuine end-to-end proof. If it does not work as described here, that is the first place to look, not a reason to assume the whole design is wrong.
 
+## A half-finished WhatsApp session, and how long it waits
+
+**48 hours, every lane, one number (`SESSION_STALE_MS` in `yaad-inbound`).** Past that the row is deleted on the next message from that number and the message is read fresh, as though no session existed.
+
+**The evidence lane had no age at all until 23 September 2026.** The stale drop was written for exactly that case, and its comment says so, but it sits after the evidence block and that block returns on every path it has. So the one lane the comment names was the one lane it could never run on. An evidence session waited for ever.
+
+**What that does in practice**, which is how it was found: three photographs staged on 20 September were still waiting for a section answer on the 23rd. The next thing that number sent, about anything at all, would have been read as the answer to that question and filed all three under it. A photograph sent instead would have joined the three-day-old batch rather than starting a new one.
+
+**The fix is an age on `evSession`, not a delete.** Going stale is this lane letting go, not a decision about anybody's evidence. Once `evSession` is null the drop below is reachable and does what it always said it would.
+
+**The order matters and is asserted by a test.** Move the drop above the evidence block and the age guard stops mattering. Remove the guard and the drop stops running. Either one alone is a silent return to filing days-old photographs under a stray word.
+
+**The cost, stated plainly:** a worker who sends photographs on Friday evening and answers on Monday morning is past 48 hours, and their staged photographs are gone. They resend. That was already the written intent for this lane and is what the typed-update lane has always done. If it turns out to bite a real worker, the alternative is to keep the staged items and re-ask the question rather than dropping, which costs a round trip and is a bigger change.
+
+**To see what is staged right now:**
+
+```sql
+select wa_id, photo_count, updated_at, answers->>'_lane' as lane,
+       answers->>'confirmed_job' as job, answers->>'awaiting_phase' as awaiting
+from wa_intake_sessions order by updated_at desc;
+```
+
+A row older than 48 hours is already dead as far as the lanes are concerned; it is deleted the next time that number sends anything, not on a timer, because nothing sweeps this table.
+
 ## A worker's photo never files itself. It always waits for the job's code back.
 
 **Even with exactly one live job, nothing is filed until the worker replies with that job's own code.** This was a deliberate safety fix, 31 Aug 2026, replacing an earlier version that filed straight away when a worker's number matched only one active job. A photo is staged the moment it arrives either way, but staged is not filed: it sits in `wa_intake_sessions.answers->'pending'` until `pickJobChoice()` in `yaad-inbound` accepts the reply.

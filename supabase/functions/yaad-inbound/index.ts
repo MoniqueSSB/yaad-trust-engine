@@ -329,6 +329,12 @@ async function beforesOnJob(admin: { from: (t: string) => any }, jobId: string):
   return (data ?? []) as BeforeShot[];
 }
 
+// How long a half-finished WhatsApp session is still the conversation the
+// next message belongs to. Past this it is not a pause, it is a different
+// day, and a message read as the answer to a question nobody remembers being
+// asked is worse than no session at all.
+const SESSION_STALE_MS = 48 * 3600_000;
+
 // How long after filing a batch a worker's words are still taken to be about
 // it. Long enough that they can put the phone down, climb off the ladder and
 // type; short enough that the next thing they say an hour later is their own
@@ -2558,14 +2564,29 @@ Deno.serve(async (req: Request) => {
     if (msg.channel === "whatsapp" && msg.from) {
       const { data: sess } = await supabase.from("wa_intake_sessions")
         .select("wa_id,answers,photo_count,updated_at").eq("wa_id", msg.from).maybeSingle();
-      const evSession = sess && String((sess.answers as any)?._lane ?? "") === "evidence" ? sess : null;
+      // Aged, 23 Sep 2026, the same way the draft lane below has always been.
+      //
+      // It was not, and the stale drop written for exactly this case sits
+      // AFTER the evidence block, which returns on every path it has. So the
+      // one lane whose comment says an orphaned photo nobody answered for
+      // gets dropped was the one lane it could never run on. Left alone, an
+      // evidence session waited for ever: the founder's own three photographs
+      // from 20 September were still staged and still waiting for a section
+      // answer on the 23rd, and the next thing she typed, about anything at
+      // all, would have been read as that answer and filed them under it.
+      //
+      // Null here rather than deleted here. Going stale is not a decision
+      // about anybody's evidence, it is this lane letting go, and the drop
+      // below is then reachable and does what its comment always said.
+      const evSession = sess && String((sess.answers as any)?._lane ?? "") === "evidence"
+        && Date.now() - new Date(sess.updated_at as string).getTime() <= SESSION_STALE_MS ? sess : null;
       // A document (PDF or Word) waiting on "which job", from either side.
       const fileSession = sess && String((sess.answers as any)?._lane ?? "") === "job_file" ? sess : null;
       const reportSession = sess && String((sess.answers as any)?._lane ?? "") === "report_confirm" ? sess : null;
       const textUpdateSession = sess && String((sess.answers as any)?._lane ?? "") === "text_update" ? sess : null;
       // A worker's typed update, read back and waiting on a reply of 1. See update-draft.ts.
       const draftSession = sess && String((sess.answers as any)?._lane ?? "") === "update_draft"
-        && Date.now() - new Date(sess.updated_at as string).getTime() <= 48 * 3600_000 ? sess : null;
+        && Date.now() - new Date(sess.updated_at as string).getTime() <= SESSION_STALE_MS ? sess : null;
 
       // ── the job alert list ──────────────────────────────────────────────
       //
@@ -3187,10 +3208,15 @@ Deno.serve(async (req: Request) => {
         return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, `Got it, that's for ${pick.id} (${pick.title}), ${await stageSaid(supabase, pick.id, pick.stage)}. Anything you send now files against that stage.${pairHint(await beforesOnJob(supabase, pick.id))}`);
       }
 
-      if (sess && Date.now() - new Date(sess.updated_at as string).getTime() > 48 * 3600_000) {
+      if (sess && Date.now() - new Date(sess.updated_at as string).getTime() > SESSION_STALE_MS) {
         // A stale evidence session is dropped, not salvaged: there is no
         // job description to write down, only an orphaned photo nobody
         // answered for. Falls through and this message is read fresh.
+        //
+        // Unreachable for an evidence session until 23 Sep 2026, because
+        // the block above returned on every path whenever one existed. The
+        // age guard on evSession is what lets this line finally do the job
+        // it was written for.
         await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
       }
 
