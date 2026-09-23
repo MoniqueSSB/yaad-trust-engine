@@ -5924,9 +5924,18 @@ part way through rolls everything back.
 `docs/services.html`. What follows is the history and what is still open, so
 that the next person reading this knows why the map was ever empty.
 
-Still open on 23 Sep 2026: the old Yaadly Ltd links are not deactivated yet,
-and the public business name on her Stripe account reads "Yaadly Founder"
-rather than her own name, which the terms and the site say a client will see.
+The old Yaadly Ltd links were deactivated the same day, all eight, each with
+an inactive message pointing at yaadly.co.uk/services. Verified after: that
+account has no active payment links and no subscriptions at all, so nobody
+was left mid-billing on the old retainer. The second company account
+(`acct_1UGGbRS1wkpxla5u`) has none either.
+
+Her account's public business name reads "Yaadly Founder" and she is keeping
+it, so a card statement shows that rather than her own name. Rather than let
+the site promise something else, four places now name it in advance: the
+services note, the booking confirmation, the payments anti fraud block and
+the terms payee line. If the Stripe name is ever changed, those four have to
+change with it.
 
 ### The history
 
