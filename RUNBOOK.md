@@ -5945,6 +5945,22 @@ the founder sells. Nothing else was touched: with the map empty, a booking
 tells the client the scope and price are confirmed in writing and an invoice
 follows, which is the path the page already had.
 
+**A link is not finished when it takes money.** Each of the eight also
+collects, at checkout, the two things the old Yaadly Ltd links collected and
+that a plain new link does not:
+
+- a required tick accepting the 14 day cancellation terms, with the wording
+  shown on the page rather than only linked, and
+- a dropdown, "When should we start?", offering start now or wait the full
+  14 days.
+
+That dropdown is the client's express request to begin inside the
+cancellation period. It is what allows a proportionate charge for work
+already done if they cancel part way, and `docs/cancellation.html` is written
+on the assumption that it was asked. The links were built without it on
+23 Sep 2026 and it was added the same day. Any link rebuilt from scratch has
+to carry both, or the cancellation page is describing a consent nobody gave.
+
 How it was put back, and the order to repeat if it ever has to be done again:
 
 1. Her own Stripe account is activated, not just created. Identity, address and
