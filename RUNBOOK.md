@@ -5893,7 +5893,18 @@ through. Write it to a file and run it from the Supabase SQL editor instead.
 Splitting it would also break the one property worth having, that a failure
 part way through rolls everything back.
 
-## Putting the card buttons back on the professional services (23 Sep 2026)
+## The card buttons on the professional services, and whose account they pay (23 Sep 2026)
+
+**Done the same day.** The eight links below were built in HER account
+(`acct_1UIPus2B5v0diTai`, "Yaadly Founder", live mode) and are in
+`docs/services.html`. What follows is the history and what is still open, so
+that the next person reading this knows why the map was ever empty.
+
+Still open on 23 Sep 2026: the old Yaadly Ltd links are not deactivated yet,
+and the public business name on her Stripe account reads "Yaadly Founder"
+rather than her own name, which the terms and the site say a client will see.
+
+### The history
 
 The eight links in `PAYMENT_LINKS` in `docs/services.html` were emptied on
 23 September 2026 because they paid Yaadly Ltd for services the site now says
@@ -5901,7 +5912,7 @@ the founder sells. Nothing else was touched: with the map empty, a booking
 tells the client the scope and price are confirmed in writing and an invoice
 follows, which is the path the page already had.
 
-To put them back, in this order, and none of it before the one above it:
+How it was put back, and the order to repeat if it ever has to be done again:
 
 1. Her own Stripe account is activated, not just created. Identity, address and
    a bank account for payouts, in her name, not the company's.
