@@ -459,7 +459,7 @@ footer {
     <div class="panel rv" id="book">
       <div class="kick">Book a service</div>
       <h3 class="heading" style="font-size:clamp(22px,2.6vw,28px);margin-bottom:12px">Nothing is <em>charged now.</em></h3>
-      <p style="font-size:14.5px;color:var(--mute);line-height:1.65;margin-bottom:16px">Nothing is taken when you book. Your booking goes on record, the founder confirms the scope and the exact price with you in writing, and the invoice follows only after that. You have 14 days to <a href="/cancellation">cancel</a>.</p>
+      <p style="font-size:14.5px;color:var(--mute);line-height:1.65;margin-bottom:16px">Every one-off service on this page can be paid by card, and the card button appears here the moment your booking is registered. Nothing is taken at that point: on a one-off service your card is authorised and only charged once the work is done and you have accepted it. You have 14 days to <a href="/cancellation">cancel</a>.</p>
       <div class="form-row">
         <div class="fgroup"><label for="bk-svc">Which service</label>
           <select id="bk-svc">
@@ -514,7 +514,7 @@ footer {
     </div>
 
     <!-- HOW YOU PAY -->
-    <div class="note rv"><b>How you pay:</b> payment terms are agreed in writing for each job, before anything starts. Above £500 the job is invoiced and paid by bank transfer in GBP, USD or CAD. Every service on this page is invoiced and paid by bank transfer in GBP, USD or CAD, while card payment moves across to the founder's own account. The fortnightly Oversight Retainer is invoiced monthly, with 30 days notice to stop, and so is the weekly one. You have 14 days to <a href="/cancellation">cancel</a>. <b>You pay the founder for these services, and your receipt shows her name. Nobody holds money on your behalf.</b> <a href="/payments">Full payment terms.</a></div>
+    <div class="note rv"><b>How you pay:</b> payment terms are agreed in writing for each job, before anything starts. Above £500 the job is invoiced and paid by bank transfer in GBP, USD or CAD. At or under £500, which is every one-off service on this page, you can pay by card: your card is authorised at booking and charged once the work is done and accepted. The fortnightly Oversight Retainer is a monthly card subscription instead, billed from the day you start, with 30 days notice to stop. The weekly retainer is over £500 a month, so it is invoiced monthly. You have 14 days to <a href="/cancellation">cancel</a>. <b>You pay the founder for these services, and your receipt shows her name. Nobody holds money on your behalf.</b> <a href="/payments">Full payment terms.</a></div>
 
     <!-- WHAT THIS IS NOT -->
     <div class="note rv"><b>Inspection and oversight, not a guarantee.</b> Yaadly records condition, judges workmanship against the standard for that trade, and oversees progress. Yaadly does not guarantee an outcome, and four things always go out to a named professional in writing rather than being guessed at: <b>valuation</b> to a licensed valuer, <b>title and legal opinion</b> to an attorney, <b>structural engineering</b> to a PERB registered engineer, and <b>boundaries</b> to a commissioned land surveyor. The same boundaries in full are on <a href="/business">Yaadly for business</a>.</div>
@@ -633,20 +633,28 @@ const BOOKING_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-
    Confirmed again by the founder on 5 Sep 2026 when the card path was made
    visible: more prominent, still after the record, never instead of it. */
 const PAYMENT_LINKS = {
-  /* Emptied 23 Sep 2026, on the founder's instruction, the day the site
-     started saying the professional services are sold by her as a sole
-     trader and not by Yaadly Ltd. Every link in here paid the company, so
-     leaving them would have taken a client's money for her service into
-     the wrong account, which is the exact thing that change exists to fix.
+  /* THE FOUNDER'S OWN Stripe account (acct_1UIPus2B5v0diTai), live mode,
+     created 23 Sep 2026, the day the site started saying she sells these
+     services as a sole trader rather than Yaadly Ltd.
 
-     With the map empty the booking still records everything and the client
-     is told the scope and price are confirmed in writing and an invoice
-     follows. That path is already written below and needs no other change.
+     The previous set of links paid Yaadly Ltd and was emptied out on the
+     same day, because a client reading that they buy from her and then
+     paying the company is the exact fault that change exists to fix. Those
+     old URLs are in git history and must never be pasted back here.
 
-     Put the eight links back, from HER Stripe account, once it is activated:
-     deposit, visual, condition, signoff, care, care-large, care-villa and
-     retainer. The old Yaadly Ltd links are in git history and must not be
-     reused. */
+     Every one-off link is a hold (manual capture in Stripe): the card is
+     authorised at booking and only taken once the work is done and the
+     client has accepted it. The retainer is a monthly subscription and
+     bills on the spot, which is why it is worded separately below. */
+  deposit:        "https://buy.stripe.com/eVqeV64pddNufgs33eew800",
+  visual:         "https://buy.stripe.com/eVq3co3l9gZG6JWcDOew801",
+  condition:      "https://buy.stripe.com/3cIbIU1d18ta5FS8nyew802",
+  signoff:        "https://buy.stripe.com/5kQ4gsbRFcJq4BO33eew803",
+  care:           "https://buy.stripe.com/5kQ8wI5thdNu5FSbzKew804",
+  "care-large":   "https://buy.stripe.com/aFa14gf3R6l23xK5bmew805",
+  "care-villa":   "https://buy.stripe.com/3cIcMY7BpaBi9W88nyew806",
+  /* Weekly has no link on purpose: it is over £500 and is invoiced. */
+  retainer:       "https://buy.stripe.com/9B64gsaNB8ta1pC7juew807"
 };
 
 /* The retainer link is a monthly subscription, so it bills on the spot and
