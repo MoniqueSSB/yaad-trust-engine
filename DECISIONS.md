@@ -6,6 +6,59 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-25 · The report reads its own paperwork, and the desk is the renderer
+
+Monique, late on 25 September: "I need the AI agent to be able to read a
+PDF and photo copies to then make the deposit check document." Four decisions
+follow, and the shape of them matters more than any one.
+
+**Reading and drafting are two functions and two buttons, with a person in
+between.** `yaad-report-read` transcribes documents verbatim and captions
+photographs factually; it drafts nothing and is not screened, because it is
+the record of the source and a scrubbed transcript would be a false record.
+`yaad-report` drafts from the notes and is screened at every layer. The
+transcript lands in the notes box and the person corrects it before pressing
+draft. That pause is the design, not friction to remove: a vision model
+misreads a digit on a handwritten quote, and a wrong digit in the notes
+becomes a wrong finding with a straight face. A single "make the deposit
+check" button that read and drafted in one go would have removed the only
+point at which a human sees the source before the agent characterises it.
+
+**A PDF becomes images in the browser.** pdf.js renders each page on the
+desk, so the function only ever sees images. One document format server
+side, no PDF parser to defend, and a quote arrives the same way whether it
+was photographed or exported.
+
+**Where the pictures go.** `pickVisionProvider("report")`, a fourth named
+vision job, routed to Mistral EU with evidence and sketch under the "move
+the photos to Mistral" decision of 15 September. A contractor's quote
+carries their name and number, and this is the first time a contractor's
+paperwork has gone to a model at all, so it is a named job in
+`_shared/visionmodel.ts` and a line in the data inventory rather than a
+reuse of "evidence". Not a new destination. A new kind of document at an
+existing one, said out loud. The vetting read is still on NVIDIA and still
+not moved; that stays her call by name.
+
+**The desk builds the document; the Node script mirrors it.** "Open the
+document" reads `reports` and `report_findings` under her own session and
+opens the full report in a tab to print to PDF. It writes nothing and holds
+no model call. `scripts/render-report.mjs` is the same template for a
+laptop without the desk, and the two are kept in step by hand: an
+acknowledged second copy, chosen over a shared module because the desk is
+one static file on purpose and a build step for it would be a bigger change
+than the duplication. The checklist lines live in `yaad-report`, fixed, with
+the model supplying only a state and a note per line, so the same service
+produces the same list every time, and the drafter throws at load if the
+list and the brief drift apart.
+
+Left open: the desk lists reports and shows the document, but a finding
+still cannot be corrected in place. A wrong transcript is fixed by drafting
+again from corrected notes. That is deliberate for now, because an edited
+finding is no longer the screened one, and the right shape for an edit that
+re-screens is a separate decision.
+
+---
+
 ## 2026-09-25 · A figure is a rule with a scrubber and a gate behind it, and the report is a document
 
 Three decisions from the same evening, all following from reading the first

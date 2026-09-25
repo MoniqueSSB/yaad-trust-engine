@@ -92,7 +92,36 @@ Your findings are about the deal, not the building. The ground they cover:
 
 A building observation only belongs here when it bears on the deal, for example a condition the quote does not mention but plainly needs to cover. You are not inspecting the property and you must not read one from photographs.
 
-Questions of title, ownership, transfer, structural soundness and boundaries come up constantly on this service. Rule 5 is absolute and they go in "questions", naming the professional, with no finding written about them.`,
+Questions of title, ownership, transfer, structural soundness and boundaries come up constantly on this service. Rule 5 is absolute and they go in "questions", naming the professional, with no finding written about them.
+
+Each finding also carries "why": one to three plain sentences on what this exposes the client to and how. Not how serious it is. That is a rating and it is not yours.
+
+IN ADDITION, for this service only, return a top-level "sections" object beside "findings", exactly this shape:
+{"sections":{"scope_included":[],"scope_not_stated":[],"payment_stages":[{"stage":"","when":"","evidence":""}],"ask_the_builder":"","checklist":[{"state":"","note":""}]}}
+
+- "scope_included": what the quote says it covers, one line per element, in the contractor's own wording where the notes give it.
+- "scope_not_stated": what the quote does not say and therefore is not agreed either way: quantities, brands, who supplies, purlins, fascia, making good, waste, access, protection from rain, who receives deliveries. Only items the notes support.
+- "payment_stages": the ORDER money should move in for this job, three to six stages, each with "when" (the condition) and "evidence" (what must exist before it moves: dated photographs, a supplier invoice in the client's name, a short video, a signed snag list). Never a share, never a percentage, never a figure. The person signing decides the shares.
+- "ask_the_builder": one message the client can copy and send as it stands, in plain warm British English, numbering the things the contractor needs to provide in writing, then one paragraph proposing staged payment against evidence, then one paragraph on changes: stop, write down what changed and what it does to time and price, agree before carrying on. No figures anywhere in it. No dashes.
+- "checklist": exactly 18 entries, in this order, one per line below. For each give "state", one of: provided, confirmed, not_provided, not_found, referred, not_applicable, and a short "note" only where the notes give a reason. Do not repeat the line text; the order is the key.
+  1 Contractor named on the quote
+  2 Business registration or TRN
+  3 Verifiable address and a number other than WhatsApp
+  4 Independent trace of the business
+  5 Quote in writing and dated
+  6 Quote itemised by element of work
+  7 Labour and materials separated
+  8 Quantities and specification stated
+  9 Who supplies the materials
+  10 Who owns the materials once paid for
+  11 Who receives deliveries on site
+  12 Payment structure written down
+  13 What the client is exposed to at each stage
+  14 Receipt for anything already paid
+  15 Insurance held by the contractor
+  16 Start date, working duration and completion date
+  17 What happens if the contractor is late
+  18 What happens if the client stops the work`,
 
   condition: `SERVICE BRIEF: Condition Report.
 
@@ -194,6 +223,40 @@ const CORS = {
 
 const KINDS = ["deposit_check", "condition", "technical_signoff", "visual_check"] as const;
 
+// The house checklist for a Deposit Protection Check. The model supplies a
+// state and a note against each line; the line itself is fixed here, so a
+// client buying the same service twice gets the same list twice, including
+// the lines where nothing was wrong. Keep this in step with the numbered list
+// in the deposit_check brief above; the two are asserted equal at load.
+const DEPOSIT_CHECKLIST: { item: string; group: string }[] = [
+  ["Contractor named on the quote", "identity"],
+  ["Business registration or TRN", "identity"],
+  ["Verifiable address and a number other than WhatsApp", "identity"],
+  ["Independent trace of the business", "identity"],
+  ["Quote in writing and dated", "the quote"],
+  ["Quote itemised by element of work", "the quote"],
+  ["Labour and materials separated", "the quote"],
+  ["Quantities and specification stated", "the quote"],
+  ["Who supplies the materials", "materials"],
+  ["Who owns the materials once paid for", "materials"],
+  ["Who receives deliveries on site", "materials"],
+  ["Payment structure written down", "money"],
+  ["What the client is exposed to at each stage", "money"],
+  ["Receipt for anything already paid", "money"],
+  ["Insurance held by the contractor", "risk"],
+  ["Start date, working duration and completion date", "programme"],
+  ["What happens if the contractor is late", "programme"],
+  ["What happens if the client stops the work", "programme"],
+].map(([item, group]) => ({ item, group }));
+
+for (const [i, row] of DEPOSIT_CHECKLIST.entries()) {
+  if (!BRIEFS.deposit_check.includes(`${i + 1} ${row.item}`)) {
+    throw new Error(`yaad-report: checklist line ${i + 1} differs between DEPOSIT_CHECKLIST and the brief.`);
+  }
+}
+
+const CHECK_STATES = new Set(["provided", "confirmed", "not_provided", "not_found", "referred", "not_applicable"]);
+
 // A kind with no brief would silently fall back to a generic draft, which is
 // the exact failure this change exists to end. Fail at module load instead, so
 // the deploy is what breaks and not a client's report.
@@ -230,6 +293,9 @@ Deno.serve(async (req: Request) => {
     const captions = Array.isArray(body.captions) ? (body.captions as unknown[]).map(String) : [];
     const jobId = body.job_id ? String(body.job_id) : null;
     const serviceId = body.service_id ? String(body.service_id) : null;
+    // What yaad-report-read transcribed, kept verbatim on the report as the
+    // record of the source. Not screened, on purpose: see 20260925230000.
+    const sourceText = body.source_text ? String(body.source_text).slice(0, 40_000) : null;
 
     if (!KINDS.includes(kind as typeof KINDS[number])) {
       return fail(`kind must be one of ${KINDS.join(", ")}.`, 400);
@@ -323,11 +389,45 @@ Deno.serve(async (req: Request) => {
       return fail("The agent produced no usable findings from those notes.", 502);
     }
 
+    // The deposit check's other sections, screened exactly like a finding:
+    // measurements and figures scrubbed, ratings removed, and the whole lot
+    // goes through the banned-language screen below with the findings. The
+    // checklist keeps only a state and a note per line; the line text is
+    // DEPOSIT_CHECKLIST's, never the model's. Empty object on the other
+    // three services.
+    const clean = (v: unknown, where: string) => deRate(scrub(String(v ?? "").trim(), where, found), where, found);
+    const list = (v: unknown, where: string, n: number) =>
+      (Array.isArray(v) ? v : []).slice(0, n).map((x, i) => clean(x, `${where} ${i + 1}`)).filter(Boolean);
+    let sections: Record<string, unknown> = {};
+    if (kind === "deposit_check") {
+      const sx = (parsed.sections && typeof parsed.sections === "object") ? parsed.sections as Record<string, unknown> : {};
+      const stages = (Array.isArray(sx.payment_stages) ? sx.payment_stages : []).slice(0, 8)
+        .map((st: Record<string, unknown>, i: number) => ({
+          stage: clean(st?.stage, `payment stage ${i + 1}`),
+          when: clean(st?.when, `payment stage ${i + 1} when`),
+          evidence: clean(st?.evidence, `payment stage ${i + 1} evidence`),
+        })).filter((st: { stage: string; when: string }) => st.stage && st.when);
+      const states = Array.isArray(sx.checklist) ? sx.checklist : [];
+      const checklist = DEPOSIT_CHECKLIST.map((row, i) => {
+        const st = (states[i] && typeof states[i] === "object") ? states[i] as Record<string, unknown> : {};
+        const state = CHECK_STATES.has(String(st.state)) ? String(st.state) : "not_provided";
+        return { item: row.item, group: row.group, state, note: clean(st.note, `checklist ${i + 1} note`) || null };
+      });
+      sections = {
+        scope_included: list(sx.scope_included, "scope included", 20),
+        scope_not_stated: list(sx.scope_not_stated, "scope not stated", 30),
+        payment_stages: stages,
+        ask_the_builder: clean(sx.ask_the_builder, "message to the builder").slice(0, 6000),
+        checklist,
+      };
+    }
+    const sectionsText = JSON.stringify(sections);
+
     // The banned-language screen, on everything a client would read. A hit is
     // reported rather than silently rewritten, because the desk needs to know
     // the model reached for that word at all.
     const blob = findings.map((f: { heading: string; body: string; why: string | null; action: string | null }) =>
-      `${f.heading}\n${f.body}\n${f.why ?? ""}\n${f.action ?? ""}`).join("\n\n");
+      `${f.heading}\n${f.body}\n${f.why ?? ""}\n${f.action ?? ""}`).join("\n\n") + "\n\n" + sectionsText;
     const banned = guardrails.scan(blob);
     root.setAttributes({
       ...guardrails.screenAttrs(banned),
@@ -364,6 +464,8 @@ Deno.serve(async (req: Request) => {
         // that asked for the draft. 20260925220000 added the columns.
         omitted: Array.isArray(parsed.omitted) ? parsed.omitted.slice(0, 20) : [],
         questions: Array.isArray(parsed.questions) ? parsed.questions.slice(0, 20) : [],
+        source_text: sourceText,
+        sections,
       }),
     });
     if (!ins.ok) {
@@ -401,6 +503,7 @@ Deno.serve(async (req: Request) => {
       ok: true,
       report_id: report.id,
       findings: findings.length,
+      sections: Object.keys(sections),
       scrubbed: found,
       omitted: Array.isArray(parsed.omitted) ? parsed.omitted.slice(0, 20) : [],
       questions: Array.isArray(parsed.questions) ? parsed.questions.slice(0, 20) : [],
