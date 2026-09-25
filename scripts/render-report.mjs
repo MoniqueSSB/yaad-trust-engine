@@ -113,6 +113,22 @@ function page(d) {
   @page{size:A4;margin:20mm 16mm 18mm}
   *{box-sizing:border-box}
   body{margin:0;color:var(--ink);font-family:var(--body);font-size:10.6pt;line-height:1.55;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .cover{height:257mm;display:flex;flex-direction:column;break-after:page;page-break-after:always}
+  .cover .top{display:flex;align-items:center;gap:12px;padding-bottom:10px;border-bottom:1.6pt solid var(--ink)}
+  .cover .top img{width:14mm;height:14mm;object-fit:contain}
+  .cover .top .wm{font-family:var(--disp);font-size:22pt;letter-spacing:-0.01em}
+  .cover .top .wm span{color:var(--mango)}
+  .cover .mid{flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 0 30mm}
+  .cover .kicker{font:600 8.5pt/1 var(--mono);text-transform:uppercase;letter-spacing:.14em;color:var(--mango);margin-bottom:16px}
+  .cover h1{font-size:34pt;margin:0 0 10mm;max-width:150mm}
+  .cover .sub{font-family:var(--disp);font-size:14pt;color:var(--mute);max-width:150mm;line-height:1.35;margin:0 0 14mm}
+  .cover dl{display:grid;grid-template-columns:38mm 1fr;gap:6px 14px;margin:0;font-size:11pt;max-width:150mm}
+  .cover dt{font:600 7.4pt/1.8 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--mute)}
+  .cover dd{margin:0}
+  .cover .stamp{display:inline-block;font:600 8pt/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--coral);border:1.2pt dashed var(--coral);border-radius:99px;padding:6px 11px;margin-top:8mm}
+  .cover .stamp.issued{color:var(--teal);border-style:solid;border-color:var(--teal)}
+  .cover .bottom{border-top:1pt solid var(--line);padding-top:10px;font-size:8.6pt;color:var(--mute);line-height:1.5}
+  .cover .bottom b{color:var(--ink)}
   table.doc{width:100%;border-collapse:collapse} table.doc td{padding:0}
   table.doc thead{display:table-header-group}
   .runhead{display:flex;align-items:center;gap:9px;border-bottom:1.6pt solid var(--ink);padding-bottom:5px;margin-bottom:8mm}
@@ -169,6 +185,30 @@ function page(d) {
   .scope p{margin:0 0 6px} .scope p:last-child{margin:0}
   footer{margin-top:22px;padding-top:10px;border-top:1pt solid var(--line);font-size:8.4pt;color:var(--mute)}
 </style></head><body>
+
+<div class="cover">
+  <div class="top">
+    ${logo ? `<img src="${logo}" alt="">` : ""}
+    <div class="wm">Yaad<span>ly</span></div>
+  </div>
+  <div class="mid">
+    <div class="kicker">${esc(service)}</div>
+    <h1>${esc(d.report.cover_title || d.report.title || service)}</h1>
+    <p class="sub">${esc(d.report.cover_sub || "Your contractor and their quote, checked before any money moves. The red flags, the payment schedule to ask for instead, and the questions to send, in plain English.")}</p>
+    <dl>
+      <dt>Prepared for</dt><dd>${esc(d.report.client_name || "Not named")}</dd>
+      <dt>Property</dt><dd>${esc(d.report.property || "Not given")}</dd>
+      <dt>Subject</dt><dd>${esc(d.report.subject || "Not given")}</dd>
+      <dt>Prepared</dt><dd>${esc(d.report.prepared_on || "")}</dd>
+      <dt>Reference</dt><dd>${esc(d.report.number || "Number minted on issue")}</dd>
+    </dl>
+    <div><span class="stamp${issued ? " issued" : ""}">${issued ? "Issued" : "Draft, not issued"}</span></div>
+  </div>
+  <div class="bottom">
+    <b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS.<br>
+    Every finding in this report is rated, and the verdict written, by her and nobody else. What it does not do: value the property, confirm title, give a structural opinion, or estimate what the work should cost.
+  </div>
+</div>
 
 <table class="doc"><thead><tr><td>
 <div class="runhead">
