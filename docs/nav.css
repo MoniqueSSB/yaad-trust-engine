@@ -38,10 +38,15 @@
   font-family:var(--disp); font-weight:500; font-size:18px;
   color:var(--ink); text-decoration:none;
 }
+/* The mark is the Yaadly logo, added 25 Sep 2026. It used to be a rounded
+   gradient tile with the letter Y set in it. The logo is its own roundel, so
+   it gets no tile behind it and no border radius: that would put a square
+   round a circle. flex:none stops the 8px brand gap squeezing it on narrow
+   screens, and the width and height are also set on the img itself so the
+   header does not jump while the file loads. */
 .site-nav .brand .mark{
-  display:inline-flex; align-items:center; justify-content:center;
-  width:30px; height:30px; border-radius:8px;
-  background:var(--grad); color:#fff; font-weight:700; font-size:16px;
+  display:block; flex:none;
+  width:30px; height:30px;
 }
 .site-nav .brand b{font-size:inherit; font-weight:500}
 .site-nav .brand b span{color:var(--mute); font-weight:300}

@@ -5981,3 +5981,53 @@ Check it the same way each time: book a service on the live site and read what
 the confirmation says. No button means the map is empty. A button means the
 receipt has to say her name, so click it and look.
 
+
+## The logo: where the master is, and how to remake the sizes (25 Sep 2026)
+
+The mark in the top left of every page on `yaadly.co.uk`, and the tab icon,
+used to be a rounded purple tile with the letter Y set in it, written inline
+into all twelve pages as a `data:` URI. It is now Monique's real logo.
+
+The master is `brand/yaadly-logo-master.png`, 832 by 832, transparent, exactly
+as she supplied it. It is outside `docs/` on purpose, so GitHub Pages does not
+publish a 117KB file nobody asked for. Everything served is generated from it.
+
+What is served, and why each size:
+
+| File | Size | What it is for |
+|---|---|---|
+| `docs/logo.png` | 160px | The header mark. Drawn at 30px, so this covers a 5x screen. |
+| `docs/favicon.png` | 48px | The browser tab. |
+| `docs/apple-touch-icon.png` | 180px | Saved to a phone home screen. Flattened onto `#0D0D28`, because iOS puts black behind a transparent icon. |
+
+To remake them, crop the master to the mark first, then resample:
+
+1. Crop `brand/yaadly-logo-master.png` to the alpha bounding box, which is
+   x 140 to 705, y 127 to 692, then pad it back out to a 600 by 600 square
+   centred on that, so the mark keeps a small even margin.
+2. `sips -z 160 160 <that file> --out docs/logo.png`
+3. `sips -z 48 48 <that file> --out docs/favicon.png`
+4. For the touch icon, flatten the 600px file onto `#0D0D28` so nothing is
+   transparent, then `sips -z 180 180 <flattened> --out docs/apple-touch-icon.png`.
+
+Two things to know before you touch any of it:
+
+- The master has about 130px of transparent border on each side. `docs/logo.png`
+  was trimmed to the mark before resizing, so it fills its 30px box. Resizing
+  the master straight to 160px gives a mark that looks about a third too small
+  in the header, and the fix is to crop to the alpha bounding box first, not to
+  make the CSS box bigger.
+- There is one CSS rule, `.site-nav .brand .mark` in `docs/nav.css`, and one
+  line of markup repeated on all twelve pages. Change the header mark there,
+  not on a page. The rule deliberately sets no background and no border radius:
+  the logo is already a roundel and a rounded square behind it puts a box round
+  a circle.
+
+Check it by serving the site and looking at the top left:
+
+```bash
+python3 -m http.server 8932 --directory docs
+```
+
+`curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8932/logo.png` must
+say 200. A 404 there is a header with a broken image icon in it on every page.
