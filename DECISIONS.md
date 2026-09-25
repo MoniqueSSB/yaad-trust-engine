@@ -4091,3 +4091,41 @@ So nothing behavioural was missing from production. The gap was an unused export
 **How.** Deployed the five from disk anyway, so the next content diff tells the truth instead of reporting drift that does not matter. `--no-verify-jwt` preserved on `yaad-inbound` and `yaad-portal-code`, withheld from the other three, per the list in CLAUDE.md 12. Proved by version bump rather than by the deploy output, which printed only a CLI upgrade notice and would have looked identical on a no-op: 18 to 19, 186 to 187, 52 to 53, 51 to 52, 15 to 16. Re-downloaded and diffed clean. Probed all three shapes: intake answers 403 "Signature check failed" to an unsigned post, `yaad-portal-code` reaches its own validation at 400, `yaad-job-health` still answers 401 from the platform.
 
 **Rejected.** Trusting "No drift" from the script. Trusting the deploy output. Deploying only the ones that looked important, which would have left drift behind and taught the next person to ignore the check.
+
+## 2026-09-25 · The logo is shipped as her artwork, not as a redrawn SVG
+
+Monique supplied the Yaadly logo: a purple ring with a gold Y whose right arm
+carries on past the ring and reads as a tick. It replaces the letter Y that
+stood in the header and the tab icon on all twelve pages of `docs/`.
+
+The tempting move was to redraw it as an SVG. An SVG is smaller, stays crisp at
+any size, and could pick up the site's own gradient variables. Measuring the
+file to trace it showed why not. The ring is a 45.5px stroke on a 259px radius
+centred at (422, 410), and it has a gap in the upper right where the tick
+crosses, from 301 to 323.5 degrees. That gap is not centred on the crossing:
+it runs about 16 degrees on one side of the arm and 6 on the other, and it is
+wider than the tick by roughly 23px of clearance on each side. Some of that is
+deliberate and some of it may not be, and there is no way to tell from the
+pixels which is which. A traced SVG would have quietly made that judgement on
+her behalf and shipped a logo that is nearly but not exactly hers. A logo is
+one of the few things in this repository where "nearly" is a defect, so the
+PNG she drew is what gets served.
+
+The colours turned out to already be the site palette, which is a point in the
+logo's favour rather than a coincidence worth acting on: the gold is `#FBBF24`,
+exactly `--goldb`, and the ring runs from about `#8156E4` to `#956CF1` across
+the existing `#7B4FE0` to `#9B73F5` purple range.
+
+The master lives at `brand/yaadly-logo-master.png`, outside `docs/`, so Pages
+does not publish the full 832px file on every visit. Three derived files are
+served, and `RUNBOOK.md` carries the sizes and how to remake them.
+
+Two Y glyphs on the site were deliberately left alone. `.crew-y` on the home
+page is the gold gate badge at the end of the assistants row, sitting beside
+four purple badges reading SC, PA, EV and CH; it is a typographic badge in a
+set, and dropping a purple roundel into the one gold position would break both
+the set and the gold halo animation around it. The `.av` initials in the
+decision-log illustration on `how-we-use-ai.html` are avatars, sitting next to
+"DW" for a worker called Devon W., and they read as initials because the thing
+beside them is initials. Neither is the logo lockup. If Monique wants either
+changed, they are one rule each.
