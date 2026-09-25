@@ -6,6 +6,51 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-25 · The report drafter gets a brief per service, because a Deposit Protection Check is not a site visit
+
+`yaad-report` drafts four different priced documents and, until today, drafted
+all four from one prompt that opened "You turn an inspector's raw notes and
+photograph captions into the findings of a draft report". Three of the four are
+a site visit. The Deposit Protection Check is not. It is a desk review of a
+contractor and their written quote, done before any money moves, usually with
+nobody having been to the property at all. The only thing that changed between
+a Condition Report and a £149 Deposit Protection Check was the line
+`SERVICE: deposit_check` inside the user block, which the model was free to
+read as a label rather than an instruction. The agent was being asked to
+inspect a building when the client had paid it to read a deal.
+
+So the ten rules stay exactly as they were, one cross-cutting list, and a
+`SERVICE BRIEF` is appended per kind: what the source material is, and what the
+findings are supposed to be about. The deposit check brief names its ground
+directly (who the contractor is and what could be confirmed, what the quote
+leaves undefined, how the payment is structured and what the client is exposed
+to at each stage, what is not written down anywhere, and what does not
+reconcile) and says in terms that the agent is not inspecting a property and
+must not read a building condition out of photographs.
+
+Two clarifications came with it, both narrowing rather than loosening. Rule 6
+now separates a gap in the notes from an absence the notes record: "the notes
+do not say whether he is insured" is an omission, "the notes record that the
+quote names no insurer" is a finding, and on a paperwork review that difference
+is most of the product. Rule 4 now says the draft may describe the SHAPE of an
+arrangement ("most of the price is payable before any materials are on site")
+while still never stating a figure, and explicitly bars repeating a number out
+of the notes: the person signing decides which numbers go in the document.
+Saying a figure is too high remains a rating, which rule 1 already forbids.
+
+Nothing here touches §2 or §3. No brief grants a severity, a verdict, a
+measurement or a figure, there is deliberately no per-service exception
+mechanism for any of those, and a kind deployed without a brief throws at
+module load so the deploy breaks rather than a client's report quietly
+reverting to the generic draft.
+
+Written because the drafter had never actually produced a Deposit Protection
+Check. The only row in `reports` on 25 September 2026 was a practice one
+inserted by hand on 4 September, `provider` "seeded by hand", so what the
+agent does on this service had never been looked at.
+
+---
+
 ## 2026-09-23 · Two sellers on one website: the founder sells the professional services, Yaadly Ltd sells the jobs
 
 The six professional services (Deposit Protection Check, Visual Check,
