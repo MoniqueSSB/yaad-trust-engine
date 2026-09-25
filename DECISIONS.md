@@ -6,6 +6,62 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-25 · A figure is a rule with a scrubber and a gate behind it, and the report is a document
+
+Three decisions from the same evening, all following from reading the first
+real Deposit Protection Check the drafter ever produced.
+
+**A prompt rule with nothing behind it is a wish.** Rule 4 had forbidden
+figures since the prompt was written and had just been tightened to forbid
+repeating one out of the notes. The next draft carried four. The measurement
+rule already had the right shape: the prompt forbids it, `_shared/measurements.ts`
+scrubs it and reports it, `has_measurement()` refuses to issue. Figures now get
+exactly the same three layers: `_shared/figures.ts`, `has_figure()` in
+`20260925220000`, and `figures_test.ts` reads the migration and fails if the
+Postgres copy drifts by a character. Percentages and grouped counts of things
+are deliberately not figures: "60 percent up front" is the shape of an
+arrangement and is the client's business. A year has no comma in it, so 2026
+is safe; 1,240,000 is not, because a grouped number in a condition note is a
+price or a quantity, and rule 4 bans both. The gate does not read the verdict.
+A person writes that, and which numbers belong in the document is that
+person's call.
+
+**The referrals and the omissions are columns now.** Rule 5 exists to keep
+Yaadly out of title, valuation, structure and boundaries by naming the
+professional instead. The agent did that correctly on its first run and the
+answer lived exactly as long as the browser tab, because `reports` had no
+column for `questions` or `omitted`. Now it does. Neither is shown to a client
+automatically.
+
+**Findings carry a `why`.** The service is sold as "every risk, in plain
+English, with why it matters". The drafted finding had a heading, a body and
+an action. The reason was in the reviewer's head. `why` is drafted like the
+body, screened like the body, and read by both gates like the body. The
+action wording in the prompt changed with it: an action should remove or
+reduce the exposure, not only ask for it in writing, because on the first run
+four of five actions were "request it in writing" and the exposure was
+untouched.
+
+**The report is a document, and the renderer is not an agent.** Nothing had
+ever produced the deliverable: issuing a report minted a number and changed a
+status. `scripts/render-report.mjs` produces the HTML and the PDF from one
+JSON input, with the logo on every page, in the order the service is sold:
+verdict, red flags with why, the payment schedule Yaadly would put in its
+place with the shares left blank, the message to send the builder, then the
+checklist, scope in and out, and the variation rule agreed at the start. It
+holds no model call on purpose. Everything on the page was either drafted by
+the agent and screened, or typed by a named person, and a renderer that could
+write a sentence would be a second door for an unrated judgment to reach a
+client. The checklist is the house standard for the service and lives in the
+script, not in the model: a client paying for a review is owed the same list
+every time, including the lines where nothing was wrong.
+
+Still open after this: the desk lists reports and counts findings but cannot
+show one, so the person rating finding 3 cannot read finding 3 on the same
+screen. That is a desk change and its own deploy.
+
+---
+
 ## 2026-09-25 · The report drafter gets a brief per service, because a Deposit Protection Check is not a site visit
 
 `yaad-report` drafts four different priced documents and, until today, drafted

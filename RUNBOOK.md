@@ -6052,3 +6052,17 @@ On the live site, **do not request a new asset URL until the Pages build says
 `built`**, or you teach Cloudflare a 404 that outlives the mistake by four
 hours. `gh api repos/MoniqueSSB/yaad-trust-engine/pages/builds/latest --jq
 '.status'` is the thing to wait on.
+
+## 30. A client needs the document for a report, or a report will not issue because of a figure
+
+**The document.** Nothing in the database is the deliverable. `scripts/render-report.mjs` makes it. It takes one JSON file (the report, its findings, the checklist states, the scope in and out, the payment stages and the message to the builder) and writes the HTML and, through headless Chrome, the PDF. It holds no model call on purpose. Worked example of the input, with every section filled, in the 25 September 2026 practice run: the report, the findings with their `why` lines, an 18 line checklist, a five stage payment schedule with the shares left blank, and the copy and paste message. Pull the rows from `reports` and `report_findings`, put them in that shape, then:
+
+```bash
+node scripts/render-report.mjs report-input.json --out ~/Desktop
+```
+
+`--no-pdf` stops at the HTML. If Chrome is missing the script says so and leaves the HTML, which prints to PDF from any browser. The header with the logo repeats on every page because it sits in a table `thead`, which Chrome repeats across page breaks; a `position: fixed` header overlaps page two onwards, which is why it is not one.
+
+**"A drafted finding on this report states a figure."** The issue gate is refusing because a finding still carries a sum of money or a grouped number (`has_figure()`, 20260925220000). Drafts made before 25 September 2026 can carry one, because the figure scrubber did not exist. Draft it again from the desk and the scrubber takes the figure out and lists it under "Measurements pulled". Do not edit the finding by hand to slip the number through: if the number belongs in the document, put it in the verdict, where it is your judgment and not the agent's.
+
+**Percentages are not figures.** "60 percent up front" passes the gate and is meant to. The shape of an arrangement is what the client needs told.

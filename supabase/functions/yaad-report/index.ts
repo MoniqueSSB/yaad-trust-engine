@@ -3,6 +3,7 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { pickTextProvider, providerAttrs, chatWithFailover, answerText, firstJsonObject, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
 import { measurementRegExp } from "./measurements.ts";
+import { figureRegExp } from "./figures.ts";
 
 // yaad-report
 //
@@ -44,7 +45,7 @@ import { measurementRegExp } from "./measurements.ts";
 const SYSTEM = `You are the Report Drafting Agent for Yaadly Ltd, a UK company providing construction project management, procurement review and independent oversight for property work in Jamaica. You turn the raw notes behind one of Yaadly's priced services, and any photograph captions with them, into the findings of a draft report, in Yaadly's house structure, for a named person to rate and sign. Not all four services are a site visit. The SERVICE BRIEF below tells you which one this is and what its findings are about, and it is as binding as the rules.
 
 Return STRICT JSON only, no markdown fences, exactly this shape:
-{"findings":[{"heading":"","body":"","action":""}],"omitted":[],"questions":[]}
+{"findings":[{"heading":"","body":"","why":"","action":""}],"omitted":[],"questions":[]}
 
 Rules, all of them absolute:
 1. You may NEVER rate a finding. There is no severity field. Do not write "severe", "moderate", "low", "urgent", "critical" or "minor" anywhere, and do not rank the findings by seriousness.
@@ -53,7 +54,7 @@ Rules, all of them absolute:
 4. You may NEVER state, estimate or imply a cost, a price, a day rate or a quantity of materials to buy. There is no field for one. Do not repeat a figure out of the notes either, even one the client already has in front of them: the person signing decides which numbers go in the document. The SHAPE of an arrangement is not a cost and you may describe it: "most of the price is payable before any materials are on site", "the whole of it is one figure with no breakdown", "payment is in three stages and the last is the smallest". Saying a figure is too high or too low is a rating, which rule 1 already forbids.
 5. You may NEVER say anything about what a property is worth, who owns it, whether title is clean, whether a structure is sound, or where a boundary runs. Those four go to a licensed valuer, an attorney, a PERB registered engineer and a commissioned land surveyor. If the notes raise one, put it in "questions" naming which professional it belongs to, and write no finding about it.
 6. Add nothing the notes did not record. If the notes do not say whether the gutter is blocked, the report does not say. There is a difference between a gap in the notes and an absence the notes record, and it matters most on a paperwork review: "the notes do not say whether he is insured" goes in "omitted", but "the notes record that the quote names no insurer" is something that was checked and found missing, and that is a finding. Anything you could not source from the notes goes in "omitted" so the person knows what is missing before they sign.
-7. "heading" is one short line naming the finding. "body" is two to four plain sentences describing what was recorded, in British English. "action" is what the client should do about it, practically, in one or two sentences. If the notes do not support an action, leave "action" empty rather than inventing one.
+7. "heading" is one short line naming the finding. "body" is two to four plain sentences describing what was recorded, in British English. "why" is one to three sentences on why this matters to the client, in plain terms: what it exposes them to and how, without rating it and without a figure. "action" is what the client should do about it, practically, in one or two sentences, and it should remove or reduce the exposure rather than only ask for it to be written down. If the notes do not support an action, leave "action" empty rather than inventing one.
 8. Never promise an outcome, a date, or that anything is guaranteed, fully covered or risk free. Never use the word escrow. Never say Yaadly holds anyone's money.
 9. No em dashes and no en dashes anywhere. Use a comma, a colon, brackets or a full stop.
 10. Write so an anxious person four thousand miles away can read it once and understand it. Plain, warm, specific. Never alarming for effect and never soothing past what the notes support.
@@ -126,13 +127,24 @@ function systemFor(kind: string): string {
 // English. A fresh regex each call, because a global one carries lastIndex.
 const measurementRe = () => measurementRegExp("gi");
 
+// The figure rule, from _shared/figures.ts, added 25 September 2026 after the
+// first real Deposit Protection Check came back carrying four sums of money
+// lifted out of the notes, hours after rule 4 had been rewritten to forbid
+// exactly that. A rule that lives only in the prompt is a wish. A fresh regex
+// each call, because a global one carries lastIndex.
+const figureRe = () => figureRegExp("gi");
+
 type Scrub = { where: string; text: string };
 
 function scrub(text: string, where: string, found: Scrub[]): string {
   if (!text) return text;
-  const out = text.replace(measurementRe(), (m) => {
+  let out = text.replace(measurementRe(), (m) => {
     found.push({ where, text: m.trim() });
     return " [size removed] ";
+  });
+  out = out.replace(figureRe(), (m) => {
+    found.push({ where, text: m.trim() });
+    return " [figure removed] ";
   });
   return out.replace(/\s{2,}/g, " ").trim();
 }
@@ -233,9 +245,20 @@ Deno.serve(async (req: Request) => {
 
     root.setAttributes({ "yaadly.report.kind": kind, "yaadly.report.captions": captions.length });
 
+    // The heading over the notes used to say "INSPECTOR'S NOTES FROM THE VISIT"
+    // for all four services, which contradicts a deposit check brief that says
+    // in terms that usually nobody visited. Two instructions disagreeing in one
+    // prompt is worse than either alone.
+    const NOTES_LABEL: Record<string, string> = {
+      deposit_check: "REVIEWER'S NOTES ON THE CONTRACTOR, THE QUOTE AND WHAT THE CLIENT WAS TOLD",
+      condition: "INSPECTOR'S NOTES FROM THE VISIT",
+      technical_signoff: "INSPECTOR'S NOTES FROM THE ATTENDANCE",
+      visual_check: "INSPECTOR'S NOTES FROM THE VISIT",
+    };
+
     const userBlock = [
       `SERVICE: ${kind}`,
-      `INSPECTOR'S NOTES FROM THE VISIT:\n${notes}`,
+      `${NOTES_LABEL[kind]}:\n${notes}`,
       captions.length ? `PHOTOGRAPH CAPTIONS:\n${captions.map((c, i) => `${i + 1}. ${c}`).join("\n")}` : "",
     ].filter(Boolean).join("\n\n");
 
@@ -290,8 +313,9 @@ Deno.serve(async (req: Request) => {
       .map((f: Record<string, unknown>, i: number) => {
         const heading = deRate(scrub(String(f?.heading ?? "").trim(), `finding ${i + 1} heading`, found), `finding ${i + 1} heading`, found);
         const bodyText = deRate(scrub(String(f?.body ?? "").trim(), `finding ${i + 1} body`, found), `finding ${i + 1} body`, found);
+        const why = deRate(scrub(String(f?.why ?? "").trim(), `finding ${i + 1} why`, found), `finding ${i + 1} why`, found);
         const action = deRate(scrub(String(f?.action ?? "").trim(), `finding ${i + 1} action`, found), `finding ${i + 1} action`, found);
-        return { ord: i + 1, heading, body: bodyText, action: action || null };
+        return { ord: i + 1, heading, body: bodyText, why: why || null, action: action || null };
       })
       .filter((f: { heading: string; body: string }) => f.heading && f.body);
 
@@ -302,8 +326,8 @@ Deno.serve(async (req: Request) => {
     // The banned-language screen, on everything a client would read. A hit is
     // reported rather than silently rewritten, because the desk needs to know
     // the model reached for that word at all.
-    const blob = findings.map((f: { heading: string; body: string; action: string | null }) =>
-      `${f.heading}\n${f.body}\n${f.action ?? ""}`).join("\n\n");
+    const blob = findings.map((f: { heading: string; body: string; why: string | null; action: string | null }) =>
+      `${f.heading}\n${f.body}\n${f.why ?? ""}\n${f.action ?? ""}`).join("\n\n");
     const banned = guardrails.scan(blob);
     root.setAttributes({
       ...guardrails.screenAttrs(banned),
@@ -334,6 +358,12 @@ Deno.serve(async (req: Request) => {
         model: prov.model,
         provider: prov.name,
         scrubbed: found,
+        // Kept, not just returned. Until 25 September 2026 these two lived
+        // only in the HTTP response, so rule 5's referrals to an attorney or a
+        // PERB registered engineer survived exactly as long as the browser tab
+        // that asked for the draft. 20260925220000 added the columns.
+        omitted: Array.isArray(parsed.omitted) ? parsed.omitted.slice(0, 20) : [],
+        questions: Array.isArray(parsed.questions) ? parsed.questions.slice(0, 20) : [],
       }),
     });
     if (!ins.ok) {
