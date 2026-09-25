@@ -5996,24 +5996,24 @@ What is served, and why each size:
 
 | File | Size | What it is for |
 |---|---|---|
-| `docs/logo.png` | 160px | The header mark. Drawn at 30px, so this covers a 5x screen. |
-| `docs/favicon.png` | 48px | The browser tab. |
-| `docs/apple-touch-icon.png` | 180px | Saved to a phone home screen. Flattened onto `#0D0D28`, because iOS puts black behind a transparent icon. |
+| `docs/logo-v1.png` | 160px | The header mark. Drawn at 30px, so this covers a 5x screen. |
+| `docs/favicon-v1.png` | 48px | The browser tab. |
+| `docs/apple-touch-icon-v1.png` | 180px | Saved to a phone home screen. Flattened onto `#0D0D28`, because iOS puts black behind a transparent icon. |
 
 To remake them, crop the master to the mark first, then resample:
 
 1. Crop `brand/yaadly-logo-master.png` to the alpha bounding box, which is
    x 140 to 705, y 127 to 692, then pad it back out to a 600 by 600 square
    centred on that, so the mark keeps a small even margin.
-2. `sips -z 160 160 <that file> --out docs/logo.png`
-3. `sips -z 48 48 <that file> --out docs/favicon.png`
+2. `sips -z 160 160 <that file> --out docs/logo-v2.png`
+3. `sips -z 48 48 <that file> --out docs/favicon-v2.png`
 4. For the touch icon, flatten the 600px file onto `#0D0D28` so nothing is
-   transparent, then `sips -z 180 180 <flattened> --out docs/apple-touch-icon.png`.
+   transparent, then `sips -z 180 180 <flattened> --out docs/apple-touch-icon-v2.png`.
 
 Two things to know before you touch any of it:
 
-- The master has about 130px of transparent border on each side. `docs/logo.png`
-  was trimmed to the mark before resizing, so it fills its 30px box. Resizing
+- The master has about 130px of transparent border on each side. The served
+  logo was trimmed to the mark before resizing, so it fills its 30px box. Resizing
   the master straight to 160px gives a mark that looks about a third too small
   in the header, and the fix is to crop to the alpha bounding box first, not to
   make the CSS box bigger.
@@ -6023,11 +6023,32 @@ Two things to know before you touch any of it:
   the logo is already a roundel and a rounded square behind it puts a box round
   a circle.
 
+**The filenames carry a version number, and that is the whole point.** The
+site sits behind Cloudflare, which caches an asset for four hours, and it
+caches a 404 for four hours too. On 25 Sep 2026 these three files were first
+published as `logo.png`, `favicon.png` and `apple-touch-icon.png`, and they
+were requested once while the Pages build was still running. Cloudflare cached
+the 404 it got, and went on serving that 404 from the London edge after the
+real files existed at origin. The stored Cloudflare token has no `cache_purge`
+scope, so there was no way to clear it from here.
+
+So: **never replace one of these files in place. Add a new one.** Bump to
+`logo-v2.png`, repoint the twelve pages at it, and delete the old file in the
+same commit. A name Cloudflare has never seen cannot be serving a stale
+anything. Purging from the Cloudflare dashboard also works if you would rather
+keep the name, and it is under Caching, Configuration, Purge Everything.
+
 Check it by serving the site and looking at the top left:
 
 ```bash
 python3 -m http.server 8932 --directory docs
 ```
 
-`curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8932/logo.png` must
-say 200. A 404 there is a header with a broken image icon in it on every page.
+`curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8932/logo-v1.png`
+must say 200. A 404 there is a header with a broken image icon in it on every
+page.
+
+On the live site, **do not request a new asset URL until the Pages build says
+`built`**, or you teach Cloudflare a 404 that outlives the mistake by four
+hours. `gh api repos/MoniqueSSB/yaad-trust-engine/pages/builds/latest --jq
+'.status'` is the thing to wait on.
