@@ -894,6 +894,35 @@ th.bkc,td.bkc{width:34px;padding-right:0}
 }
 @media(max-width:700px){.thumbs{grid-template-columns:repeat(2,1fr)}}
 
+/* ---------- the report page ---------- */
+.rpp .rph{font-family:var(--disp);font-weight:400;text-transform:uppercase;font-size:15px;letter-spacing:.02em;margin:22px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.rpp .rph span{font:11px var(--mono);letter-spacing:.06em;text-transform:none;color:var(--dim)}
+.rpf{border:1px solid var(--line);border-radius:var(--r);background:var(--panel2);padding:12px 14px;margin-bottom:10px}
+.rpfh{display:flex;align-items:flex-start;gap:10px;margin-bottom:6px}
+.rpfh .n{font-family:var(--mono);font-size:11px;color:var(--dim);padding-top:3px}
+.rpfh b{flex:1;font-size:13.5px;line-height:1.35}
+.rpfh .rpfs{flex:none;text-align:right}
+.rpf p{margin:0;font-size:12.8px;line-height:1.6;color:var(--ink)}
+.rpfw,.rpfa{margin-top:8px;padding-top:8px;border-top:1px dotted var(--line);font-size:12.6px;line-height:1.55}
+.rpfw span,.rpfa span{display:block;font:600 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+.rpfw span{color:var(--mango)} .rpfa span{color:var(--tealb)}
+.rpv{border:1px solid var(--line);border-radius:var(--r);padding:11px 13px;background:var(--panel2)}
+.rpv b{display:block;font-family:var(--disp);font-size:16px;line-height:1.3;margin-bottom:6px}
+.rpv p{margin:0;font-size:12.6px;line-height:1.55;color:var(--mute)}
+.rpv.held{border-style:dashed;border-color:var(--mango)} .rpv.held b{color:var(--mango)}
+table.rpt{width:100%;border-collapse:collapse;font-size:12.4px}
+table.rpt th{font:600 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);text-align:left;padding:0 8px 6px 0;border-bottom:1px solid var(--line)}
+table.rpt td{padding:8px 8px 8px 0;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.5}
+.rpcopy{white-space:pre-wrap;font:12.4px/1.55 var(--body);color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--tealb);border-radius:var(--r);padding:12px 14px;margin:0}
+.rpck{display:grid;grid-template-columns:1fr;gap:0}
+.rpg{font:600 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);padding:12px 0 4px}
+.rpc{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px;align-items:start}
+.rpnote{display:block;color:var(--dim);font-size:11.5px;margin-top:2px}
+ul.rpl{margin:0;padding-left:18px;font-size:12.5px;line-height:1.55} ul.rpl li{margin-bottom:5px}
+.rpd{margin-top:14px;border:1px solid var(--line);border-radius:var(--r);padding:10px 14px}
+.rpd summary{cursor:pointer;font-size:12.5px;color:var(--mute)}
+.rpd pre.rpcopy,.rpd ul{margin-top:10px}
+
 /* ---------- job invoices ---------- */
 .jicard{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden;margin-bottom:20px}
 .jihead{padding:16px 18px;border-bottom:1px solid var(--line);background:var(--panel2);display:flex;flex-wrap:wrap;align-items:center;gap:11px}
@@ -1726,6 +1755,9 @@ const VIEWS = [
 
   { k:"reports", g:"Documents & money", label:"Reports", icon:"case",
     title:"Reports", table:"v_reports_open",
+    pre: preReports, page: reportPage,
+    titleOf: r => (RPT_SERVICE[r.kind] || r.kind || "Report") + (r.number ? ", " + r.number : ", draft"),
+    hide: ["_verdict","_verdict_line","_sections","_omitted","_questions","_scrubbedList","_source","_model","_provider","_issued_by","_findingRows"],
     sub:"The priced reports: Deposit Protection Checks, Condition Reports, Technical Sign-offs and Visual Checks. yaad-report drafts the findings. It cannot rate one and it cannot write the verdict, because that is the judgment the client actually paid for. A report will not issue while a single finding is unrated, while the verdict is empty, or while any sentence in it states a measurement. Each of those refusals is the gate working, not a bug.",
     select:"*",
     order:"drafted_at",
@@ -10355,6 +10387,127 @@ async function rptImagesFrom(files){
     }
   }
   return images.slice(0, MAX);
+}
+
+// ------------------------------------------------------ the report, as a page
+//
+// "There should be a visual dashboard where I can see everything." Until 26
+// September 2026 the Reports view listed a report, counted its findings and
+// offered Rate a finding, and nowhere on the desk could the finding being
+// rated actually be read. This is that screen: the whole report on one page,
+// the drafted parts and the human parts told apart by colour, and the row's
+// actions underneath it. It draws; it changes nothing. Rating, the verdict
+// and issuing stay the buttons at the foot, through the same Postgres
+// functions and the same gates.
+//
+// Colour convention, same as the rest of the desk: teal proven (a rating
+// made, a verdict written, a checklist line provided), mango held (unrated,
+// not written), coral blocked or missing.
+
+async function preReports(rows){
+  const ids = (rows || []).map(r => r.id).filter(Boolean);
+  if (!ids.length) return rows;
+  const [{ data: reps }, { data: fs }] = await Promise.all([
+    sb.from("reports").select("id,verdict,verdict_line,sections,omitted,questions,scrubbed,source_text,model,provider,issued_by,issued_at").in("id", ids),
+    sb.from("report_findings").select("report_id,ord,heading,body,why,action,severity,rated_by,rated_at").in("report_id", ids).order("ord"),
+  ]);
+  const byId = Object.fromEntries((reps || []).map(r => [r.id, r]));
+  const fBy = {};
+  for (const f of (fs || [])) (fBy[f.report_id] = fBy[f.report_id] || []).push(f);
+  for (const r of rows) {
+    const x = byId[r.id] || {};
+    r._verdict = x.verdict || ""; r._verdict_line = x.verdict_line || "";
+    r._sections = (x.sections && typeof x.sections === "object") ? x.sections : {};
+    r._omitted = x.omitted || []; r._questions = x.questions || [];
+    r._scrubbedList = x.scrubbed || []; r._source = x.source_text || "";
+    r._model = x.model || ""; r._provider = x.provider || "";
+    r._issued_by = x.issued_by || ""; r._findingRows = fBy[r.id] || [];
+  }
+  return rows;
+}
+
+function reportPage(r){
+  const sx = r._sections || {};
+  const service = RPT_SERVICE[r.kind] || r.kind;
+  const fs = r._findingRows || [];
+  const unrated = fs.filter(f => !f.severity).length;
+  const sevChip = (f) => f.severity
+    ? chip_(f.severity === "severe" ? "crit" : f.severity === "moderate" ? "warn" : "ok", f.severity) + sub_((f.rated_by || "").split("@")[0] + (f.rated_at ? ", " + ago_(f.rated_at) + " ago" : ""))
+    : chip_("warn", "unrated");
+  const state = r.status === "issued"
+    ? `<b class="evpok">Issued${r._issued_by ? " by " + esc(r._issued_by.split("@")[0]) : ""}${r.issued_at ? ", " + esc(ago_(r.issued_at)) + " ago" : ""}.</b><span>Readable in the client's portal. Nothing on it changes now.</span>`
+    : (unrated === 0 && r._verdict_line)
+      ? `<b class="evpok">Ready to issue.</b><span>Every finding is rated and the verdict is written. Issue it below and the number is minted.</span>`
+      : `<b class="evpyou">Yours to finish.</b><span>${unrated ? unrated + " finding" + (unrated === 1 ? "" : "s") + " unrated" : "All findings rated"}${r._verdict_line ? ", verdict written." : ", verdict not written."} The report cannot issue until both are done, and nothing here drafts either.</span>`;
+
+  const findings = fs.length ? fs.map(f => `
+    <div class="rpf">
+      <div class="rpfh"><span class="n">${esc(f.ord)}</span><b>${esc(f.heading)}</b><span class="rpfs">${sevChip(f)}</span></div>
+      <p>${esc(f.body)}</p>
+      ${f.why ? `<div class="rpfw"><span>Why it matters</span>${esc(f.why)}</div>` : ""}
+      ${f.action ? `<div class="rpfa"><span>What to do</span>${esc(f.action)}</div>` : ""}
+    </div>`).join("") : `<p class="none">No findings on this report.</p>`;
+
+  const stages = (sx.payment_stages || []);
+  const check = (sx.checklist || []);
+  const groups = [];
+  for (const it of check) { if (!groups.length || groups[groups.length-1].name !== it.group) groups.push({ name: it.group, rows: [] }); groups[groups.length-1].rows.push(it); }
+  const st = (s) => ({ confirmed:["ok","confirmed"], provided:["ok","provided"], not_provided:["crit","not provided"], not_found:["crit","not found"], referred:["mute","referred on"], not_applicable:["mute","n/a"] }[s] || ["crit","not provided"]);
+  const gaps = check.filter(c => c.state === "not_provided" || c.state === "not_found").length;
+
+  return `<div class="jp rpp">
+    <div class="jphead">
+      <div class="jpt">${esc(service)}${r.number ? ", " + esc(r.number) : ", draft"}</div>
+      <div class="jpchips">${tone_(r.status)} ${chip_("mute", fs.length + " finding" + (fs.length === 1 ? "" : "s"))} ${unrated ? chip_("warn", unrated + " unrated") : chip_("ok", "all rated")} ${r._verdict_line ? chip_("ok", "verdict written") : chip_("warn", "no verdict")} ${check.length ? chip_(gaps ? "crit" : "ok", gaps + " gap" + (gaps === 1 ? "" : "s") + " in the paperwork") : ""} ${r._scrubbedList.length ? chip_("warn", r._scrubbedList.length + " scrubbed") : ""}</div>
+      <div class="evpwho">${state}</div>
+    </div>
+
+    <div class="jpgrid two">
+      <div class="jpc"><h6>Who and where</h6>
+        <div class="jpv"><span>Client</span><div class="jpvv">${esc(r.client_name || "Not named")}</div></div>
+        <div class="jpv"><span>Property</span><div class="jpvv">${esc(r.property || "Not given")}</div></div>
+        <div class="jpv"><span>Drafted</span><div class="jpvv">${r.drafted_at ? esc(ago_(r.drafted_at)) + " ago" : mute_("unknown")}${r._model ? sub_(r._provider + ", " + r._model) : ""}</div></div>
+      </div>
+      <div class="jpc"><h6>The verdict, page one</h6>
+        ${r._verdict_line
+          ? `<div class="rpv"><b>${esc(r._verdict_line)}</b><p>${esc(r._verdict)}</p></div>`
+          : `<div class="rpv held"><b>Not written.</b><p>Read the findings below first. Then Write the verdict at the foot of this page. No model has seen this field and none will.</p></div>`}
+      </div>
+    </div>
+
+    <h5 class="rph">${r.kind === "deposit_check" ? "The red flags" : "Findings"} <span>drafted by the agent, rated by you</span></h5>
+    ${findings}
+
+    ${stages.length ? `<h5 class="rph">Payment schedule to put in its place <span>order and evidence drafted, shares yours</span></h5>
+    <table class="rpt"><tr><th>Stage</th><th>Paid when</th><th>Evidence before it moves</th></tr>
+    ${stages.map(s => `<tr><td><b>${esc(s.stage)}</b></td><td>${esc(s.when)}</td><td>${esc(s.evidence)}</td></tr>`).join("")}</table>` : ""}
+
+    ${sx.ask_the_builder ? `<h5 class="rph">The message to the builder <span>drafted, for the client to copy</span></h5>
+    <pre class="rpcopy">${esc(sx.ask_the_builder)}</pre>` : ""}
+
+    ${groups.length ? `<h5 class="rph">What was checked <span>18 fixed lines, states drafted from the notes</span></h5>
+    <div class="rpck">${groups.map(g => `<div class="rpg">${esc(g.name)}</div>${g.rows.map(c => { const [t, w] = st(c.state); return `<div class="rpc"><div>${esc(c.item)}${c.note ? `<span class="rpnote">${esc(c.note)}</span>` : ""}</div><div>${chip_(t, w)}</div></div>`; }).join("")}`).join("")}</div>` : ""}
+
+    ${(sx.scope_included || []).length || (sx.scope_not_stated || []).length ? `<h5 class="rph">Scope, as the quote defines it</h5>
+    <div class="jpgrid two">
+      <div class="jpc"><h6>Included</h6><ul class="rpl">${(sx.scope_included || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+      <div class="jpc"><h6>Not stated, so not agreed</h6><ul class="rpl">${(sx.scope_not_stated || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+    </div>` : ""}
+
+    ${(r._questions.length || r._omitted.length) ? `<div class="jpgrid two">
+      ${r._questions.length ? `<div class="jpc"><h6>Referred to another professional</h6><ul class="rpl">${r._questions.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
+      ${r._omitted.length ? `<div class="jpc"><h6>Could not be established</h6><ul class="rpl">${r._omitted.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
+    </div>` : ""}
+
+    ${r._scrubbedList.length ? `<details class="rpd"><summary>${r._scrubbedList.length} thing${r._scrubbedList.length === 1 ? "" : "s"} the screens took out of the draft</summary>
+      <ul class="rpl">${r._scrubbedList.map(s => `<li><span class="mono">${esc(s.where)}</span>: &ldquo;${esc(s.text)}&rdquo;</li>`).join("")}</ul>
+      <p class="conseq">Measurements, figures and rating words the agent wrote anyway. Removed before saving and listed here rather than hidden, because the desk needs to know the model reached for them at all.</p></details>` : ""}
+
+    ${r._source ? `<details class="rpd"><summary>What the reader transcribed, as it went into the notes</summary><pre class="rpcopy">${esc(r._source)}</pre>
+      <p class="conseq">Unscreened on purpose: this is the record of what the documents said, not the agent's words. Never shown to a client.</p></details>` : ""}
+
+    <p class="conseq">Everything above in the drafted sections was written by the agent and screened before it was saved. The ratings, the verdict and the payment shares are the parts a person writes, and they are what the client paid for. Open the document below to see it as it will be handed over.</p>
+  </div>`;
 }
 
 // -------------------------------------------------- the report as a document
