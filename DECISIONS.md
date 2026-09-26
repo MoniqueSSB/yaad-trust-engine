@@ -6,6 +6,160 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-25 · The report reads its own paperwork, and the desk is the renderer
+
+Monique, late on 25 September: "I need the AI agent to be able to read a
+PDF and photo copies to then make the deposit check document." Four decisions
+follow, and the shape of them matters more than any one.
+
+**Reading and drafting are two functions and two buttons, with a person in
+between.** `yaad-report-read` transcribes documents verbatim and captions
+photographs factually; it drafts nothing and is not screened, because it is
+the record of the source and a scrubbed transcript would be a false record.
+`yaad-report` drafts from the notes and is screened at every layer. The
+transcript lands in the notes box and the person corrects it before pressing
+draft. That pause is the design, not friction to remove: a vision model
+misreads a digit on a handwritten quote, and a wrong digit in the notes
+becomes a wrong finding with a straight face. A single "make the deposit
+check" button that read and drafted in one go would have removed the only
+point at which a human sees the source before the agent characterises it.
+
+**A PDF becomes images in the browser.** pdf.js renders each page on the
+desk, so the function only ever sees images. One document format server
+side, no PDF parser to defend, and a quote arrives the same way whether it
+was photographed or exported.
+
+**Where the pictures go.** `pickVisionProvider("report")`, a fourth named
+vision job, routed to Mistral EU with evidence and sketch under the "move
+the photos to Mistral" decision of 15 September. A contractor's quote
+carries their name and number, and this is the first time a contractor's
+paperwork has gone to a model at all, so it is a named job in
+`_shared/visionmodel.ts` and a line in the data inventory rather than a
+reuse of "evidence". Not a new destination. A new kind of document at an
+existing one, said out loud. The vetting read is still on NVIDIA and still
+not moved; that stays her call by name.
+
+**The desk builds the document; the Node script mirrors it.** "Open the
+document" reads `reports` and `report_findings` under her own session and
+opens the full report in a tab to print to PDF. It writes nothing and holds
+no model call. `scripts/render-report.mjs` is the same template for a
+laptop without the desk, and the two are kept in step by hand: an
+acknowledged second copy, chosen over a shared module because the desk is
+one static file on purpose and a build step for it would be a bigger change
+than the duplication. The checklist lines live in `yaad-report`, fixed, with
+the model supplying only a state and a note per line, so the same service
+produces the same list every time, and the drafter throws at load if the
+list and the brief drift apart.
+
+Left open: the desk lists reports and shows the document, but a finding
+still cannot be corrected in place. A wrong transcript is fixed by drafting
+again from corrected notes. That is deliberate for now, because an edited
+finding is no longer the screened one, and the right shape for an edit that
+re-screens is a separate decision.
+
+---
+
+## 2026-09-25 · A figure is a rule with a scrubber and a gate behind it, and the report is a document
+
+Three decisions from the same evening, all following from reading the first
+real Deposit Protection Check the drafter ever produced.
+
+**A prompt rule with nothing behind it is a wish.** Rule 4 had forbidden
+figures since the prompt was written and had just been tightened to forbid
+repeating one out of the notes. The next draft carried four. The measurement
+rule already had the right shape: the prompt forbids it, `_shared/measurements.ts`
+scrubs it and reports it, `has_measurement()` refuses to issue. Figures now get
+exactly the same three layers: `_shared/figures.ts`, `has_figure()` in
+`20260925220000`, and `figures_test.ts` reads the migration and fails if the
+Postgres copy drifts by a character. Percentages and grouped counts of things
+are deliberately not figures: "60 percent up front" is the shape of an
+arrangement and is the client's business. A year has no comma in it, so 2026
+is safe; 1,240,000 is not, because a grouped number in a condition note is a
+price or a quantity, and rule 4 bans both. The gate does not read the verdict.
+A person writes that, and which numbers belong in the document is that
+person's call.
+
+**The referrals and the omissions are columns now.** Rule 5 exists to keep
+Yaadly out of title, valuation, structure and boundaries by naming the
+professional instead. The agent did that correctly on its first run and the
+answer lived exactly as long as the browser tab, because `reports` had no
+column for `questions` or `omitted`. Now it does. Neither is shown to a client
+automatically.
+
+**Findings carry a `why`.** The service is sold as "every risk, in plain
+English, with why it matters". The drafted finding had a heading, a body and
+an action. The reason was in the reviewer's head. `why` is drafted like the
+body, screened like the body, and read by both gates like the body. The
+action wording in the prompt changed with it: an action should remove or
+reduce the exposure, not only ask for it in writing, because on the first run
+four of five actions were "request it in writing" and the exposure was
+untouched.
+
+**The report is a document, and the renderer is not an agent.** Nothing had
+ever produced the deliverable: issuing a report minted a number and changed a
+status. `scripts/render-report.mjs` produces the HTML and the PDF from one
+JSON input, with the logo on every page, in the order the service is sold:
+verdict, red flags with why, the payment schedule Yaadly would put in its
+place with the shares left blank, the message to send the builder, then the
+checklist, scope in and out, and the variation rule agreed at the start. It
+holds no model call on purpose. Everything on the page was either drafted by
+the agent and screened, or typed by a named person, and a renderer that could
+write a sentence would be a second door for an unrated judgment to reach a
+client. The checklist is the house standard for the service and lives in the
+script, not in the model: a client paying for a review is owed the same list
+every time, including the lines where nothing was wrong.
+
+Still open after this: the desk lists reports and counts findings but cannot
+show one, so the person rating finding 3 cannot read finding 3 on the same
+screen. That is a desk change and its own deploy.
+
+---
+
+## 2026-09-25 · The report drafter gets a brief per service, because a Deposit Protection Check is not a site visit
+
+`yaad-report` drafts four different priced documents and, until today, drafted
+all four from one prompt that opened "You turn an inspector's raw notes and
+photograph captions into the findings of a draft report". Three of the four are
+a site visit. The Deposit Protection Check is not. It is a desk review of a
+contractor and their written quote, done before any money moves, usually with
+nobody having been to the property at all. The only thing that changed between
+a Condition Report and a £149 Deposit Protection Check was the line
+`SERVICE: deposit_check` inside the user block, which the model was free to
+read as a label rather than an instruction. The agent was being asked to
+inspect a building when the client had paid it to read a deal.
+
+So the ten rules stay exactly as they were, one cross-cutting list, and a
+`SERVICE BRIEF` is appended per kind: what the source material is, and what the
+findings are supposed to be about. The deposit check brief names its ground
+directly (who the contractor is and what could be confirmed, what the quote
+leaves undefined, how the payment is structured and what the client is exposed
+to at each stage, what is not written down anywhere, and what does not
+reconcile) and says in terms that the agent is not inspecting a property and
+must not read a building condition out of photographs.
+
+Two clarifications came with it, both narrowing rather than loosening. Rule 6
+now separates a gap in the notes from an absence the notes record: "the notes
+do not say whether he is insured" is an omission, "the notes record that the
+quote names no insurer" is a finding, and on a paperwork review that difference
+is most of the product. Rule 4 now says the draft may describe the SHAPE of an
+arrangement ("most of the price is payable before any materials are on site")
+while still never stating a figure, and explicitly bars repeating a number out
+of the notes: the person signing decides which numbers go in the document.
+Saying a figure is too high remains a rating, which rule 1 already forbids.
+
+Nothing here touches §2 or §3. No brief grants a severity, a verdict, a
+measurement or a figure, there is deliberately no per-service exception
+mechanism for any of those, and a kind deployed without a brief throws at
+module load so the deploy breaks rather than a client's report quietly
+reverting to the generic draft.
+
+Written because the drafter had never actually produced a Deposit Protection
+Check. The only row in `reports` on 25 September 2026 was a practice one
+inserted by hand on 4 September, `provider` "seeded by hand", so what the
+agent does on this service had never been looked at.
+
+---
+
 ## 2026-09-23 · Two sellers on one website: the founder sells the professional services, Yaadly Ltd sells the jobs
 
 The six professional services (Deposit Protection Check, Visual Check,

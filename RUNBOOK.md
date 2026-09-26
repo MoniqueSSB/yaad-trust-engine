@@ -6052,3 +6052,38 @@ On the live site, **do not request a new asset URL until the Pages build says
 `built`**, or you teach Cloudflare a 404 that outlives the mistake by four
 hours. `gh api repos/MoniqueSSB/yaad-trust-engine/pages/builds/latest --jq
 '.status'` is the thing to wait on.
+
+## 30. A client needs the document for a report, or a report will not issue because of a figure
+
+**The document.** Nothing in the database is the deliverable. `scripts/render-report.mjs` makes it. It takes one JSON file (the report, its findings, the checklist states, the scope in and out, the payment stages and the message to the builder) and writes the HTML and, through headless Chrome, the PDF. It holds no model call on purpose. Worked example of the input, with every section filled, in the 25 September 2026 practice run: the report, the findings with their `why` lines, an 18 line checklist, a five stage payment schedule with the shares left blank, and the copy and paste message. Pull the rows from `reports` and `report_findings`, put them in that shape, then:
+
+```bash
+node scripts/render-report.mjs report-input.json --out ~/Desktop
+```
+
+`--no-pdf` stops at the HTML. If Chrome is missing the script says so and leaves the HTML, which prints to PDF from any browser. The header with the logo repeats on every page because it sits in a table `thead`, which Chrome repeats across page breaks; a `position: fixed` header overlaps page two onwards, which is why it is not one.
+
+**"A drafted finding on this report states a figure."** The issue gate is refusing because a finding still carries a sum of money or a grouped number (`has_figure()`, 20260925220000). Drafts made before 25 September 2026 can carry one, because the figure scrubber did not exist. Draft it again from the desk and the scrubber takes the figure out and lists it under "Measurements pulled". Do not edit the finding by hand to slip the number through: if the number belongs in the document, put it in the verdict, where it is your judgment and not the agent's.
+
+**Percentages are not figures.** "60 percent up front" passes the gate and is meant to. The shape of an arrangement is what the client needs told.
+
+## 31. Making a Deposit Protection Check, start to finish
+
+Desk, **Reports**. Service: Deposit Protection Check. Client name and property as they should read on the cover.
+
+1. **Attach the files.** The quote (a photo of the handwritten page, or a PDF), any receipt, screenshots of the messages, the site photographs. Up to eight images in one read; a PDF counts one per page. Press **Read the files**. The reader transcribes each document word for word and captions each photograph, then drops it into the notes box under a heading. The images go to Mistral in the EU (`pickVisionProvider("report")`), the same place as job photographs. Nothing is saved at this step.
+2. **Read the transcript and correct it.** This is the hold point, and it is the reason the reader and the drafter are two buttons and not one. A model reading handwriting gets a digit wrong, and a wrong digit in the notes becomes a wrong finding with a straight face. Add your own notes above or below it: who the client is, what you could and could not confirm about the contractor, and **when the next payment is due to move**, which is the line the agent cannot know unless you write it.
+3. **Draft the findings.** The agent returns the red flags with a why on each, the scope in and out, the payment stages (never a share), the message to the builder, the checklist states against the fixed 18 lines, the referrals and the omissions. Every sentence is screened for measurements, figures, rating words and banned language before it is saved. The transcript is kept on the report as `source_text`, unscreened, as the record of what the documents said.
+4. **Rate every finding** (Severe, Moderate, Low) and **Write the verdict**. Nothing drafts either. The database refuses to issue until both are done.
+5. **Issue it.** Mints the number. Refused while a finding is unrated, the verdict is empty, or a drafted sentence states a measurement or a figure.
+6. **Open the document.** Builds the full report in a new tab: cover with the logo, header on every page, verdict, red flags, payment schedule, message to the builder, checklist, scope in and out, the variation rule, referrals. Press **Print** in the top right and choose **Save as PDF**. Before issue it opens with the blanks showing, which is useful for reading it whole before you rate.
+
+**"The browser blocked the new tab."** Allow pop-ups for `concierge.yaadly.co.uk` once. The document opens with `window.open`, and the first time a browser sees that from a site it asks.
+
+**Reading a PDF does nothing.** pdf.js is fetched on first use from `cdn.jsdelivr.net`, the CDN the desk already loads supabase-js from. If the browser console shows it blocked, the desk's script sources have been tightened since 25 September 2026 and jsdelivr needs re-allowing; a photograph of each page works in the meantime.
+
+**The reader misread a figure.** Correct it in the notes box before drafting. If the draft was already made, draft again from corrected notes; a finding cannot be edited in place by design, because an edited finding is no longer the screened one.
+
+**A finding reads "[figure removed]".** The agent repeated a sum out of the notes and the scrubber took it out. The finding still reads; if the number belongs in the document, put it in the verdict, which is yours.
+
+**The document has no logo.** It loads `https://yaadly.co.uk/logo-v1.png` from the marketing site. If the site is down or the file is renamed, the wordmark still prints and the logo does not. Renaming the logo means changing `RPT_LOGO` in `concierge.html`.

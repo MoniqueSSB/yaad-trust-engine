@@ -131,3 +131,24 @@ Deno.test("the override still wins over Mistral", () => {
     assertEquals(pickVisionProvider("evidence")!.name, "somewhere");
   });
 });
+
+// The report read, 25 September 2026. A contractor's quote and a client's site
+// photographs go where the job photographs go: Mistral, EU. With no Mistral
+// key they fall to NVIDIA and say so, the same as evidence and sketch, never
+// to nothing and never quietly.
+Deno.test("a quote photographed for a report goes to Mistral in the EU, and is named as the report job", () => {
+  withEnv({ ...CLEAR, MISTRAL_API_KEY: "m", NVIDIA_API_KEY: "n" }, () => {
+    const p = pickVisionProvider("report")!;
+    assertEquals(p.name, "mistral");
+    assertEquals(p.region, "eu");
+    assertEquals(p.job, "report");
+  });
+});
+
+Deno.test("with no Mistral key the report read falls to NVIDIA, declared as United States", () => {
+  withEnv({ ...CLEAR, MISTRAL_API_KEY: null, NVIDIA_API_KEY: "n" }, () => {
+    const p = pickVisionProvider("report")!;
+    assertEquals(p.name, "nvidia_nim");
+    assertEquals(p.region, "us");
+  });
+});

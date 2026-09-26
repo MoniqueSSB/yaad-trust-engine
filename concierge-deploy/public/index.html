@@ -1747,8 +1747,12 @@ const VIEWS = [
           <input id="rptClient" class="inp" placeholder="As it should read on the report">
           <label class="fl" style="margin-top:10px">Property</label>
           <input id="rptProperty" class="inp" placeholder="Town or parish, and the kind of building">
-          <label class="fl" style="margin-top:10px">Your notes from the visit</label>
-          <textarea id="rptNotes" class="inp" rows="8" placeholder="Everything you saw, in any order. The agent adds nothing you did not write down, and tells you what it could not source."></textarea>
+          <label class="fl" style="margin-top:10px">The quote, receipts, messages and photographs</label>
+          <input id="rptFiles" type="file" class="inp" multiple accept="image/*,application/pdf">
+          <button class="btn" id="rptRead" style="margin-top:8px">Read the files</button>
+          <p class="mute" id="rptReadOut" style="margin-top:6px">Photographs and PDFs, up to eight pages in one go. The reader transcribes each document word for word and captions each photograph, and drops it into the notes below for you to check. It does not draft anything.</p>
+          <label class="fl" style="margin-top:10px">Your notes, and what the reader transcribed</label>
+          <textarea id="rptNotes" class="inp" rows="12" placeholder="Everything you know, in any order: the client, the property, the contractor and what you could confirm, the quote line by line, the money and when it is due to move, insurance, dates, and anything the client asked that belongs to another professional. The agent adds nothing you did not write down. Correct the reader's transcript here before you draft, especially the figures."></textarea>
           <button class="btn g" id="rptGo" style="margin-top:12px">Draft the findings</button>
           <p class="mute" id="rptOut" style="margin-top:10px"></p>
         </div>
@@ -1763,6 +1767,9 @@ const VIEWS = [
       {h:"Visited", f:r => mute_(r.visited_on ? ago_(r.visited_on) : "not given")},
     ],
     actions:[
+      { label:"Open the document", cls:"",
+        says:r => `Builds ${r.number || "this draft"} as it will be handed over: cover, header on every page, verdict, the red flags, the payment schedule, the message to the builder, the checklist, scope in and out, the variation rule, the referrals. Blank where a rating or the verdict is not there yet. Opens in a new tab; print it to PDF from there. Reads the rows and changes nothing.`,
+        nav:r => openReportDocument(r.id).catch(e => alert(String(e.message || e))) },
       { label:"Rate a finding", cls:"",
         when:r => r.status !== "issued" && r.unrated > 0,
         rpc:"rate_finding",
@@ -6178,6 +6185,26 @@ function renderTableView(k){
 // field, so the worst outcome here is a draft nobody wanted, sitting at draft.
 function wireReportDrafter(){
   const go = $("rptGo"); if (!go) return;
+  const read = $("rptRead");
+  if (read) read.addEventListener("click", async () => {
+    const files = Array.from(($("rptFiles").files) || []);
+    const out = $("rptReadOut");
+    if (!files.length) { out.innerHTML = '<span style="color:var(--coral)">Attach the quote and the photographs first.</span>'; return; }
+    read.disabled = true; out.textContent = "Preparing the images.";
+    try {
+      const images = await rptImagesFrom(files);
+      if (!images.length) throw new Error("Nothing usable: attach photographs (JPEG, PNG) or a PDF.");
+      out.textContent = "Reading " + images.length + " image" + (images.length === 1 ? "" : "s") + ". This takes a little while.";
+      const j = await rptReadFn(images);
+      RPT_SOURCE = j.notes_block || "";
+      const ta = $("rptNotes");
+      ta.value = (ta.value.trim() ? ta.value.trim() + "\n\n" : "") + "WHAT THE READER TRANSCRIBED (check every figure):\n\n" + RPT_SOURCE;
+      const docs = (j.documents || []).filter(d => d.kind !== "photo").length, photos = (j.documents || []).length - docs;
+      out.innerHTML = `Read ${docs} document${docs === 1 ? "" : "s"} and ${photos} photograph${photos === 1 ? "" : "s"} (${esc(j.provider || "")}, ${esc(j.region || "")}). <b>Read the transcript below and correct anything wrong before you draft.</b> A misread digit becomes a wrong finding with a straight face.`;
+    } catch (e) {
+      out.innerHTML = '<span style="color:var(--coral)">' + esc(String(e.message || e)) + "</span>";
+    } finally { read.disabled = false; }
+  });
   go.addEventListener("click", async () => {
     const notes = ($("rptNotes").value || "").trim();
     const out = $("rptOut");
@@ -6192,6 +6219,7 @@ function wireReportDrafter(){
         client_name: ($("rptClient").value || "").trim() || null,
         property: ($("rptProperty").value || "").trim() || null,
         notes,
+        source_text: RPT_SOURCE || null,
       });
       const bits = [`Drafted ${j.findings} finding${j.findings === 1 ? "" : "s"}, all unrated, no verdict.`];
       if (j.scrubbed && j.scrubbed.length) {
@@ -6199,9 +6227,12 @@ function wireReportDrafter(){
       }
       if (j.omitted && j.omitted.length) bits.push(`It could not source: ${j.omitted.map(esc).join("; ")}.`);
       if (j.questions && j.questions.length) bits.push(`For you to answer: ${j.questions.map(esc).join("; ")}.`);
-      bits.push("Now rate every finding and write the verdict. It will not issue until you have.");
+      if (j.sections && j.sections.length) bits.push("Also drafted: " + j.sections.map(x => esc(String(x).replace(/_/g, " "))).join(", ") + ". They are in the document.");
+      bits.push("Now rate every finding and write the verdict. It will not issue until you have. Open the document from the row below to read it all in one place.");
       out.innerHTML = bits.join("<br><br>");
       $("rptNotes").value = "";
+      RPT_SOURCE = "";
+      if ($("rptFiles")) $("rptFiles").value = "";
       await loadTableView("reports");
     } catch (e) {
       out.innerHTML = '<span style="color:var(--coral)">' + esc(String(e.message || e)) + "</span>";
@@ -10239,6 +10270,302 @@ async function rptFn(payload){
   const j = await r.json().catch(() => ({ error: "the function returned something unreadable" }));
   if (!r.ok) throw new Error(j.error || ("http " + r.status));
   return j;
+}
+
+const READ_FN = SUPABASE_URL + "/functions/v1/yaad-report-read";
+
+// What the reader transcribed for the draft that is about to be made. Held
+// here between "Read the files" and "Draft the findings", so the transcript
+// the person corrected in the notes box AND the transcript as the reader gave
+// it both reach the report: the first as the notes the draft was made from,
+// the second as source_text, the record of what the documents said.
+let RPT_SOURCE = "";
+
+// The reader's door. Same pause rule as rptFn(): reading a quote is a model
+// call, and the switch in the top bar has to stop it.
+async function rptReadFn(images){
+  if (AGENTS_PAUSED) {
+    throw new Error("Agents are paused. The switch in the top bar turns them back on. Nothing was sent to a model.");
+  }
+  const r = await fetch(READ_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify({ images })
+  });
+  const j = await r.json().catch(() => ({ error: "the reader returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+  return j;
+}
+
+// Files into images the reader accepts. A photograph is resized in the
+// browser to a sensible width and re-encoded as JPEG, so a 12 MB phone
+// picture does not go over the wire. A PDF is rendered here, one page per
+// image, with pdf.js fetched on first use from the same CDN the desk already
+// loads supabase-js from; the function only ever sees images, so there is no
+// PDF parser server side and no second document format to defend.
+const RPT_MAX_EDGE = 1600;
+let PDFJS = null;
+async function pdfjs(){
+  if (PDFJS) return PDFJS;
+  const v = "4.10.38";
+  const mod = await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@" + v + "/legacy/build/pdf.min.mjs");
+  mod.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@" + v + "/legacy/build/pdf.worker.min.mjs";
+  PDFJS = mod;
+  return mod;
+}
+function canvasToJpeg(canvas){
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
+async function imageFileToJpeg(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = url; });
+    const scale = Math.min(1, RPT_MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    return canvasToJpeg(c);
+  } finally { URL.revokeObjectURL(url); }
+}
+async function pdfFileToJpegs(file, budget){
+  const lib = await pdfjs();
+  const doc = await lib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const out = [];
+  for (let p = 1; p <= doc.numPages && out.length < budget; p++) {
+    const page = await doc.getPage(p);
+    const base = page.getViewport({ scale: 1 });
+    const scale = RPT_MAX_EDGE / Math.max(base.width, base.height);
+    const vp = page.getViewport({ scale });
+    const c = document.createElement("canvas");
+    c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+    await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+    out.push({ name: file.name + ", page " + p, data: canvasToJpeg(c) });
+  }
+  return out;
+}
+async function rptImagesFrom(files){
+  const MAX = 8;
+  const images = [];
+  for (const f of files) {
+    if (images.length >= MAX) break;
+    if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
+      images.push(...await pdfFileToJpegs(f, MAX - images.length));
+    } else if (/^image\//.test(f.type)) {
+      images.push({ name: f.name, data: await imageFileToJpeg(f) });
+    }
+  }
+  return images.slice(0, MAX);
+}
+
+// -------------------------------------------------- the report as a document
+//
+// The deliverable. Until 25 September 2026 nothing produced one: issuing a
+// report minted a number and changed a status. This builds the document from
+// the rows, in the order the service is sold, and opens it in a tab to be
+// printed to PDF. It holds no model call and it writes nothing. Everything on
+// the page was drafted by the agent and screened, or typed by a named person,
+// and a renderer that could write a sentence would be a second door for an
+// unrated judgment to reach a client. Blank where the verdict or a rating is
+// not yet there, because a blank is honest and a guess is not.
+//
+// scripts/render-report.mjs is the same template for a laptop with no desk.
+// This copy is the one that matters; keep the two in step by hand.
+
+const RPT_LOGO = "https://yaadly.co.uk/logo-v1.png";
+const RPT_SERVICE = { deposit_check:"Deposit Protection Check", condition:"Condition Report", technical_signoff:"Technical Sign-off", visual_check:"Visual Check" };
+const RPT_STATE = { confirmed:["Confirmed","ok"], provided:["Provided","ok"], not_provided:["Not provided","gap"], not_found:["Not found","gap"], referred:["Referred on","ref"], not_applicable:["Not applicable","na"] };
+
+async function openReportDocument(id){
+  const w = window.open("", "_blank");
+  if (!w) throw new Error("The browser blocked the new tab. Allow pop-ups for the desk and try again.");
+  w.document.write("<p style='font:15px sans-serif;padding:24px'>Building the document.</p>");
+  const { data: rep, error: e1 } = await sb.from("reports").select("*").eq("id", id).single();
+  if (e1 || !rep) { w.close(); throw new Error(e1 ? e1.message : "Report not found."); }
+  const { data: fs, error: e2 } = await sb.from("report_findings").select("*").eq("report_id", id).order("ord");
+  if (e2) { w.close(); throw new Error(e2.message); }
+  const html = reportDocumentHtml(rep, fs || []);
+  w.document.open(); w.document.write(html); w.document.close();
+  w.document.title = (RPT_SERVICE[rep.kind] || rep.kind) + (rep.number ? ", " + rep.number : ", draft");
+}
+
+function reportDocumentHtml(rep, findings){
+  const service = RPT_SERVICE[rep.kind] || rep.kind;
+  const issued = !!rep.number;
+  const sx = (rep.sections && typeof rep.sections === "object") ? rep.sections : {};
+  const practice = /practice/i.test(String(rep.client_name || "")) || /practice/i.test(String(rep.property || ""));
+  const dateOf = (s) => s ? new Date(s).toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" }) : "";
+  const list = (a) => (Array.isArray(a) ? a : []).map(x => `<li>${esc(x)}</li>`).join("");
+  const sev = (f) => f.severity ? `<div class="sev s-${esc(f.severity)}">${esc(f.severity)}</div>` : `<div class="sev blankchip">rating to add</div>`;
+  const groups = [];
+  for (const it of (Array.isArray(sx.checklist) ? sx.checklist : [])) {
+    if (!groups.length || groups[groups.length - 1].name !== it.group) groups.push({ name: it.group, rows: [] });
+    groups[groups.length - 1].rows.push(it);
+  }
+  const deposit = rep.kind === "deposit_check";
+  const coverSub = deposit
+    ? "Your contractor and their quote, checked before any money moves. The red flags, the payment schedule to ask for instead, and the questions to send, in plain English."
+    : "What was seen, recorded plainly, with what to do about it. Rated and signed by a named person.";
+  const title = deposit ? "Contractor and quote review, before any deposit is paid" : service;
+
+  return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8">
+<title>${esc(service)}${rep.number ? ", " + esc(rep.number) : ", draft"}</title>
+<style>
+:root{--ink:#15161c;--mute:#5c6070;--line:#dcdde5;--wash:#f7f7fa;--mango:#c77a17;--teal:#0f6b63;--coral:#b3372f;
+--disp:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--body:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+@page{size:A4;margin:20mm 16mm 18mm}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);background:#fff;font-family:var(--body);font-size:10.6pt;line-height:1.55;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.wrap{max-width:178mm;margin:0 auto;padding:12mm 0 20mm}
+.printbar{position:fixed;top:14px;right:14px;z-index:9;display:flex;gap:8px;align-items:center;font:600 12px var(--body)}
+.printbar button{font:600 13px var(--body);padding:9px 14px;border-radius:8px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer}
+.printbar span{color:var(--mute);background:#fff;padding:6px 10px;border:1px solid var(--line);border-radius:8px}
+.cover{height:257mm;display:flex;flex-direction:column;break-after:page;page-break-after:always}
+.cover .top{display:flex;align-items:center;gap:12px;padding-bottom:10px;border-bottom:1.6pt solid var(--ink)}
+.cover .top img{width:14mm;height:14mm;object-fit:contain}
+.cover .top .wm{font-family:var(--disp);font-size:22pt;letter-spacing:-0.01em}.cover .top .wm span{color:var(--mango)}
+.cover .mid{flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 0 30mm}
+.cover .kicker{font:600 8.5pt/1 var(--mono);text-transform:uppercase;letter-spacing:.14em;color:var(--mango);margin-bottom:16px}
+.cover h1{font-size:34pt;margin:0 0 10mm;max-width:150mm}
+.cover .sub{font-family:var(--disp);font-size:14pt;color:var(--mute);max-width:150mm;line-height:1.35;margin:0 0 14mm}
+.cover dl{display:grid;grid-template-columns:38mm 1fr;gap:6px 14px;margin:0;font-size:11pt;max-width:150mm}
+.cover dt{font:600 7.4pt/1.8 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--mute)}.cover dd{margin:0}
+.cover .stamp{display:inline-block;font:600 8pt/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--coral);border:1.2pt dashed var(--coral);border-radius:99px;padding:6px 11px;margin-top:8mm}
+.cover .stamp.issued{color:var(--teal);border-style:solid;border-color:var(--teal)}
+.cover .bottom{border-top:1pt solid var(--line);padding-top:10px;font-size:8.6pt;color:var(--mute);line-height:1.5}.cover .bottom b{color:var(--ink)}
+table.doc{width:100%;border-collapse:collapse}table.doc td{padding:0}table.doc thead{display:table-header-group}
+.runhead{display:flex;align-items:center;gap:9px;border-bottom:1.6pt solid var(--ink);padding-bottom:5px;margin-bottom:8mm}
+.runhead img{width:8.5mm;height:8.5mm;object-fit:contain}.runhead .wm{font-family:var(--disp);font-size:14pt;letter-spacing:-0.01em}.runhead .wm span{color:var(--mango)}
+.runhead .svc{margin-left:auto;font:600 7.6pt/1 var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--mute);text-align:right}
+.draftbar{background:#fff6e6;border:1pt solid #e8cf9a;border-left:3pt solid var(--mango);padding:8px 12px;border-radius:2pt;font-size:9pt;margin-bottom:16px}
+h1{font-family:var(--disp);font-weight:400;font-size:23pt;line-height:1.1;margin:4px 0 16px;letter-spacing:-0.015em}
+.meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px 18px;background:var(--wash);border:1pt solid var(--line);border-radius:2pt;padding:11px 14px;margin-bottom:20px}
+.meta div{padding:3px 0}.meta dt{font:600 7.2pt/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--mute);margin-bottom:2px}.meta dd{margin:0;font-size:10pt}
+h2{font-family:var(--disp);font-weight:400;font-size:14.5pt;margin:24px 0 10px;padding-bottom:5px;border-bottom:1pt solid var(--line)}
+.lead{color:var(--mute);font-size:9.4pt;margin:-4px 0 10px}
+.blank{border:1pt dashed #b9bbc8;background:#fcfcfe;border-radius:2pt;padding:13px 15px;color:var(--mute);font-size:9.6pt}
+.blank .lbl{font:600 7.2pt/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--coral);margin-bottom:6px}.blank p{margin:0 0 7px}.blank p:last-child{margin:0}
+.vline{font-family:var(--disp);font-size:14pt;line-height:1.3;margin:0 0 9px}
+.f{border:1pt solid var(--line);border-radius:2pt;margin-bottom:10px;break-inside:avoid}
+.f-head{display:flex;gap:10px;align-items:flex-start;padding:9px 13px;background:var(--wash);border-bottom:1pt solid var(--line)}
+.n{font:600 9pt/1.45 var(--mono);color:var(--mute);flex:none;min-width:14px}.f-head h3{margin:0;font-size:11.4pt;font-weight:650;line-height:1.3;flex:1}
+.sev{flex:none;font:600 7.2pt/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;border-radius:99px;padding:4.5px 9px;white-space:nowrap}
+.blankchip{color:var(--coral);border:1pt dashed var(--coral)}.s-severe{color:#fff;background:var(--coral)}.s-moderate{color:#fff;background:var(--mango)}.s-low{color:#fff;background:var(--teal)}
+.f-body{padding:10px 13px 12px}.f-body p{margin:0}
+.why{margin-top:8px;padding-top:8px;border-top:1pt dotted var(--line);font-size:10.2pt}.why b{font:600 7.2pt/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--mango);display:block;margin-bottom:3px}
+.act{margin-top:8px;padding-top:8px;border-top:1pt dotted var(--line);font-size:10.2pt}.act b{font:600 7.2pt/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--teal);display:block;margin-bottom:3px}
+table.sc{width:100%;border-collapse:collapse;font-size:9.8pt;table-layout:fixed}
+table.sc th{font:600 7.2pt/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--mute);text-align:left;padding:0 8px 6px 0;border-bottom:1pt solid var(--line)}
+table.sc td{padding:7px 8px 7px 0;border-bottom:1pt solid var(--line);vertical-align:top}table.sc tr{break-inside:avoid}
+table.sc td.in{border-left:2.5pt solid var(--teal);padding-left:9px}table.sc td.ex{border-left:2.5pt solid var(--coral);padding-left:9px}
+table.pay th.stg{width:26mm}table.pay th.shr{width:20mm;text-align:right}table.pay td.shr{text-align:right}
+.fill{display:inline-block;min-width:15mm;border-bottom:1pt dashed #b9bbc8;color:var(--coral);font:600 7.2pt/1.9 var(--mono);text-align:center}
+.copy{border:1pt solid var(--line);border-left:3pt solid var(--teal);background:#fbfcfc;border-radius:2pt;padding:13px 15px;font-size:9.8pt;white-space:pre-wrap;line-height:1.5}
+table.ck{width:100%;border-collapse:collapse;font-size:9.8pt}table.ck tr{break-inside:avoid}
+table.ck td{border-bottom:1pt solid var(--line);padding:6px 4px;vertical-align:top}
+table.ck td.g{font:600 7.2pt/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--mute);padding-top:13px;border:none}table.ck td.s{width:29mm;text-align:right;white-space:nowrap}
+.tag{font:600 7.2pt/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;border-radius:99px;padding:4px 8px;display:inline-block}
+.t-ok{color:#fff;background:var(--teal)}.t-gap{color:#fff;background:var(--coral)}.t-ref{color:var(--ink);background:#eceef4;border:1pt solid var(--line)}.t-na{color:var(--mute);border:1pt solid var(--line)}
+.note{display:block;color:var(--mute);font-size:8.8pt;margin-top:2px}
+ul.q{margin:0;padding-left:17px}ul.q li{margin-bottom:6px}
+.scope{background:var(--wash);border:1pt solid var(--line);border-radius:2pt;padding:12px 15px;font-size:9.4pt}.scope p{margin:0 0 6px}.scope p:last-child{margin:0}
+footer{margin-top:22px;padding-top:10px;border-top:1pt solid var(--line);font-size:8.4pt;color:var(--mute)}
+@media print{.printbar{display:none}.wrap{max-width:none;padding:0}}
+</style></head><body>
+<div class="printbar"><span>Print, then choose Save as PDF</span><button onclick="window.print()">Print</button></div>
+<div class="wrap">
+
+<div class="cover">
+  <div class="top"><img src="${RPT_LOGO}" alt=""><div class="wm">Yaad<span>ly</span></div></div>
+  <div class="mid">
+    <div class="kicker">${esc(service)}</div>
+    <h1>${esc(title)}</h1>
+    <p class="sub">${esc(coverSub)}</p>
+    <dl>
+      <dt>Prepared for</dt><dd>${esc(rep.client_name || "Not named")}</dd>
+      <dt>Property</dt><dd>${esc(rep.property || "Not given")}</dd>
+      <dt>Prepared</dt><dd>${esc(dateOf(rep.issued_at || rep.drafted_at))}</dd>
+      <dt>Reference</dt><dd>${esc(rep.number || "Number minted on issue")}</dd>
+    </dl>
+    <div><span class="stamp${issued ? " issued" : ""}">${issued ? "Issued" : "Draft, not issued"}</span></div>
+  </div>
+  <div class="bottom">
+    <b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS.<br>
+    Every finding in this report is rated, and the verdict written, by her and nobody else. What it does not do: value the property, confirm title, give a structural opinion, or estimate what the work should cost.
+  </div>
+</div>
+
+<table class="doc"><thead><tr><td>
+<div class="runhead"><img src="${RPT_LOGO}" alt=""><div class="wm">Yaad<span>ly</span></div><div class="svc">${esc(service)}<br>${esc(rep.number || "Draft, not issued")}</div></div>
+</td></tr></thead><tbody><tr><td>
+
+${practice ? `<div class="draftbar"><b>Practice document.</b> Invented client, invented contractor, invented quote. Nothing in it relates to a real person or a real property.</div>` : ""}
+
+<h1>${esc(title)}</h1>
+<div class="meta">
+  <div><dt>Client</dt><dd>${esc(rep.client_name || "Not named")}</dd></div>
+  <div><dt>Property</dt><dd>${esc(rep.property || "Not given")}</dd></div>
+  <div><dt>Prepared</dt><dd>${esc(dateOf(rep.issued_at || rep.drafted_at))}</dd></div>
+  <div><dt>Status</dt><dd>${issued ? "Issued" : "Draft, not issued"}</dd></div>
+  <div><dt>Reference</dt><dd>${esc(rep.number || "Number minted on issue")}</dd></div>
+  <div><dt>Visited</dt><dd>${esc(rep.visited_on ? dateOf(rep.visited_on) : (deposit ? "Desk review, no visit" : "Not given"))}</dd></div>
+</div>
+
+<h2>Verdict</h2>
+${rep.verdict_line || rep.verdict ? `<p class="vline">${esc(rep.verdict_line || "")}</p><p style="margin:0">${esc(rep.verdict || "")}</p>`
+: `<div class="blank"><div class="lbl">Not written yet</div><p><b>The one line for page one.</b></p><p><b>The paragraph under it.</b> What you would do and why, in your own words.</p><p>No model has seen this field and none ever will. The report cannot issue until it is written and every finding below carries a rating.</p></div>`}
+
+<h2>${deposit ? "The red flags" : "Findings"}</h2>
+${deposit ? `<p class="lead">Every risk this review found in the quote and the arrangement around it, in plain English, with why each one matters to you.</p>` : ""}
+${findings.map(f => `<div class="f">
+  <div class="f-head"><div class="n">${esc(f.ord)}</div><h3>${esc(f.heading)}</h3>${sev(f)}</div>
+  <div class="f-body"><p>${esc(f.body)}</p>
+  ${f.why ? `<div class="why"><b>Why it matters</b>${esc(f.why)}</div>` : ""}
+  ${f.action ? `<div class="act"><b>What to do</b>${esc(f.action)}</div>` : ""}</div>
+</div>`).join("")}
+
+${(sx.payment_stages || []).length ? `<h2>Payment schedule we would put in its place</h2>
+<p class="lead">Not a valuation and not a price. This is the ORDER money should move in, and what has to exist before each stage is paid. The shares are left blank on purpose: that is your judgment and the contractor's agreement, not a number this document decides. Agree the whole table in writing before anything is paid.</p>
+<table class="sc pay"><tr><th class="stg">Stage</th><th>Paid when</th><th>Evidence before it moves</th><th class="shr">Share</th></tr>
+${sx.payment_stages.map(r => `<tr><td><b>${esc(r.stage)}</b></td><td>${esc(r.when)}</td><td>${esc(r.evidence)}</td><td class="shr"><span class="fill">&nbsp;</span></td></tr>`).join("")}
+</table>` : ""}
+
+${sx.ask_the_builder ? `<h2>The questions to send your builder</h2>
+<p class="lead">Written out, ready to copy and send as one message. A builder with nothing to hide answers these without much trouble. One who will not answer them has told you something too.</p>
+<div class="copy">${esc(sx.ask_the_builder)}</div>` : ""}
+
+${groups.length ? `<h2>What was checked</h2>
+<p class="lead">The same list on every ${esc(service)}, including the lines where nothing was wrong. A line marked not provided is a gap in the paperwork, not an accusation.</p>
+<table class="ck">${groups.map(g => `<tr><td class="g" colspan="2">${esc(g.name)}</td></tr>${g.rows.map(r => { const [label, tone] = RPT_STATE[r.state] || RPT_STATE.not_provided; return `<tr><td>${esc(r.item)}${r.note ? `<span class="note">${esc(r.note)}</span>` : ""}</td><td class="s"><span class="tag t-${tone}">${esc(label)}</span></td></tr>`; }).join("")}`).join("")}</table>` : ""}
+
+${(sx.scope_included || []).length || (sx.scope_not_stated || []).length ? `<h2>Scope of work, as the quote defines it</h2>
+<p class="lead">Taken from the contractor's own wording. Anything on the right is not excluded by him, it is simply not written down, which means it is not yet agreed either way and it is where a variation later comes from.</p>
+<table class="sc"><tr><th style="width:50%">Included in the quote</th><th>Not stated, so not agreed</th></tr><tr><td class="in"><ul class="q">${list(sx.scope_included)}</ul></td><td class="ex"><ul class="q">${list(sx.scope_not_stated)}</ul></td></tr></table>` : ""}
+
+${deposit ? `<h2>If the scope changes</h2>
+<p class="lead">Agreed at the start, before anybody is on site, because a variation argued about afterwards is the most common way a job of this kind goes wrong.</p>
+<div class="scope">
+  <p><b>Nothing outside the table above is part of this job.</b> If the contractor finds something extra, or either side wants a change, the work stops at that point and nobody proceeds on a verbal yes.</p>
+  <p><b>A change is agreed in writing before it starts, and it records five things:</b> what changed and why, who asked for it, the effect on the programme, the effect on the price, and who agreed it, dated. A WhatsApp message with those five things in it is in writing. A voice note is not.</p>
+  <p><b>Work done without that record is not payable and is not the client's risk.</b> Say so at the start, in the same message that agrees the payment schedule, so it is a shared rule rather than something produced in an argument later.</p>
+</div>` : ""}
+
+${(rep.questions || []).length ? `<h2>Questions for other professionals</h2><p class="lead">Raised by the review and deliberately not answered here. Each belongs to a different profession.</p><ul class="q">${list(rep.questions)}</ul>` : ""}
+${(rep.omitted || []).length ? `<h2>What this review could not establish</h2><ul class="q">${list(rep.omitted)}</ul>` : ""}
+
+<h2>Scope</h2>
+<div class="scope">
+  <p>${deposit ? "This is a review of a contractor, their written quote and the arrangement around it. It is a desk review. Nobody attended the property." : "This report records what was seen on the day, and nothing beyond it."}</p>
+  <p>It does not value the property, confirm who owns it, interpret a contract, give an opinion on whether any structure is sound, or say where a boundary runs. It does not estimate what the work should cost: that is quantity surveying and Yaadly does not sell it. What Yaadly guarantees is project management, procurement and oversight judgment.</p>
+  <p>Findings describe what was recorded in the notes. Anything the notes could not establish is named rather than answered.</p>
+</div>
+
+<footer>
+  Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077.<br>
+  Findings drafted by the Yaadly report agent${rep.model ? ` (${esc(rep.model)}, EU)` : ""} from the reviewer's notes, then screened for language, measurements and figures. Every finding is rated, and the verdict written, by a named person before the report is issued.
+</footer>
+</td></tr></tbody></table>
+</div>
+</body></html>`;
 }
 
 const QPR_FN = SUPABASE_URL + "/functions/v1/yaad-quote-pack-rescan";
