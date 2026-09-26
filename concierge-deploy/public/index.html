@@ -917,6 +917,7 @@ table.rpt td{padding:8px 8px 8px 0;border-bottom:1px solid var(--line);vertical-
 .rpck{display:grid;grid-template-columns:1fr;gap:0}
 .rpg{font:600 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);padding:12px 0 4px}
 .rpc{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px;align-items:start}
+.rpnote{display:block;color:var(--dim);font-size:11.5px;margin-top:2px}
 ul.rpl{margin:0;padding-left:18px;font-size:12.5px;line-height:1.55} ul.rpl li{margin-bottom:5px}
 .rpd{margin-top:14px;border:1px solid var(--line);border-radius:var(--r);padding:10px 14px}
 .rpd summary{cursor:pointer;font-size:12.5px;color:var(--mute)}
@@ -10465,7 +10466,7 @@ function reportPage(r){
       <div class="jpc"><h6>Who and where</h6>
         <div class="jpv"><span>Client</span><div class="jpvv">${esc(r.client_name || "Not named")}</div></div>
         <div class="jpv"><span>Property</span><div class="jpvv">${esc(r.property || "Not given")}</div></div>
-        <div class="jpv"><span>Drafted</span><div class="jpvv">${r.drafted_at ? esc(ago_(r.drafted_at)) + " ago" : mute_("unknown")}${r._model ? sub_(esc(r._provider) + ", " + esc(r._model)) : ""}</div></div>
+        <div class="jpv"><span>Drafted</span><div class="jpvv">${r.drafted_at ? esc(ago_(r.drafted_at)) + " ago" : mute_("unknown")}${r._model ? sub_(r._provider + ", " + r._model) : ""}</div></div>
       </div>
       <div class="jpc"><h6>The verdict, page one</h6>
         ${r._verdict_line
@@ -10485,7 +10486,7 @@ function reportPage(r){
     <pre class="rpcopy">${esc(sx.ask_the_builder)}</pre>` : ""}
 
     ${groups.length ? `<h5 class="rph">What was checked <span>18 fixed lines, states drafted from the notes</span></h5>
-    <div class="rpck">${groups.map(g => `<div class="rpg">${esc(g.name)}</div>${g.rows.map(c => { const [t, w] = st(c.state); return `<div class="rpc"><div>${esc(c.item)}${c.note ? sub_(esc(c.note)) : ""}</div><div>${chip_(t, w)}</div></div>`; }).join("")}`).join("")}</div>` : ""}
+    <div class="rpck">${groups.map(g => `<div class="rpg">${esc(g.name)}</div>${g.rows.map(c => { const [t, w] = st(c.state); return `<div class="rpc"><div>${esc(c.item)}${c.note ? `<span class="rpnote">${esc(c.note)}</span>` : ""}</div><div>${chip_(t, w)}</div></div>`; }).join("")}`).join("")}</div>` : ""}
 
     ${(sx.scope_included || []).length || (sx.scope_not_stated || []).length ? `<h5 class="rph">Scope, as the quote defines it</h5>
     <div class="jpgrid two">
