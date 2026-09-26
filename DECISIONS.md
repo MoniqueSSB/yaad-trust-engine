@@ -51,8 +51,12 @@ the model supplying only a state and a note per line, so the same service
 produces the same list every time, and the drafter throws at load if the
 list and the brief drift apart.
 
-Left open: the desk lists reports and shows the document, but a finding
-still cannot be corrected in place. A wrong transcript is fixed by drafting
+Closed the next morning, 26 September: the Reports view now opens each
+report as a page in the drawer (`reportPage`), with the verdict, every
+finding and its rating, the payment stages, the message to the builder, the
+checklist, scope, referrals, what the screens scrubbed, and the transcript it
+was drafted from, with the row's actions underneath. It draws and changes
+nothing. Still open: a finding cannot be corrected in place. A wrong transcript is fixed by drafting
 again from corrected notes. That is deliberate for now, because an edited
 finding is no longer the screened one, and the right shape for an edit that
 re-screens is a separate decision.
