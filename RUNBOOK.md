@@ -6228,8 +6228,8 @@ transaction.
 7. **Who is told what.** The worker is told when the client writes or changes an add-on, and when its invoice is paid (they may start). The client is told when the worker changes it, with the PDF attached and a CONFIRM code. Both are told when it is agreed; the other side is told when it is turned down or withdrawn. A message that finds the add-on has moved on sends nothing, on purpose.
 8. **"CONFIRM ABC123" did not work.** The reply is refused unless it comes from the client's phone on the job, and the code is the latest one (every change makes a new code). The refusal is sent back to them as the database wrote it. They can always accept on the Extra work tab instead.
 9. **The PDF link says "not valid" or "replaced".** Not valid means the link was altered. Replaced means the add-on was changed after that message; the newer message has the current PDF.
-11. **Cancelling an agreed add-on** (29 Sep 2026). Desk, Add-ons, open it, **Cancel add-on**, give the reason. A draft invoice is voided with it. If its invoice was already sent, void that on Invoices first. If anything was paid, it refuses: that is a refund, decided separately. Nobody is messaged, so tell both sides.
 10. **Deploy.** `yaad-addon-pdf` is public (Twilio fetches the attachment with no session), so it is deployed with `--no-verify-jwt` and belongs on the CLAUDE.md §12 list. `yaad-notify-client` and `yaad-inbound` import the new `_shared/addon-link.ts` (notify) and `addon-confirm.ts` (inbound): run `supabase/functions/sync-shared.sh` first.
+11. **Cancelling an agreed add-on** (29 Sep 2026). Desk, Add-ons, open it, **Cancel add-on**, give the reason. A draft invoice is voided with it. If its invoice was already sent, void that on Invoices first. If anything was paid, it refuses: that is a refund, decided separately. Nobody is messaged, so tell both sides.
 
 ## 39. A client posted a job and cannot see it in their portal (29 Sep 2026)
 
