@@ -42,6 +42,19 @@ export type InvoiceRow = {
   paid_reference?: string | null;
 };
 
+/** One agreed add-on, priced for the side reading it. */
+export type ExtraWorkLine = {
+  id: string;
+  scope: string;
+  /** the amount agreed for the work */
+  work: number;
+  /** client: Yaadly's 15% on top. worker: Yaadly's 5%, taken off. */
+  fee: number;
+  /** client: what they pay for it. worker: what they are paid for it. */
+  total: number;
+  status: string;
+};
+
 /** The independent check, once a client has added one, as a line in the job
  *  total. Priced and invoiced in pounds; jmd is the page's conversion at the
  *  rate named in jmdPerGbp. Client side only: it is never the worker's money. */
@@ -94,10 +107,12 @@ export function MoneyPanel({
   bankDetails = "",
   extraWork = null,
 }: {
-  /** Agreed extra work (add-ons agreed or approved), already included in
-   *  allIn for the client and in takeHome for the worker. Founder, 28 Sep
-   *  2026: it was left out of "What this job costs". */
-  extraWork?: { jmd: number; count: number } | null;
+  /** Agreed extra work (add-ons agreed or approved), one row each, shown as
+   *  its own section UNDER the main work. NOT included in allIn or takeHome,
+   *  which are the main work only. Founder, 28 Sep 2026: "What this job
+   *  costs" has two sections, the main work and the additional work, so
+   *  there is no confusion between them. */
+  extraWork?: ExtraWorkLine[] | null;
   side: "client" | "worker";
   labour: number | null;
   materials: number | null;
@@ -125,6 +140,9 @@ export function MoneyPanel({
 }) {
   const agreed = labour != null;
   const showCheck = side === "client" && check != null;
+  const hasExtra = !!extraWork && extraWork.length > 0;
+  const extraTotal = (extraWork ?? []).reduce((t, x) => t + x.total, 0);
+  const mainTotal = side === "client" ? allIn : takeHome;
 
   return (
     <>
@@ -151,6 +169,9 @@ export function MoneyPanel({
           </div>
         ) : (
           <>
+            {hasExtra && (
+              <h4 className="mb-2.5 text-[10.5px] font-bold uppercase tracking-[.16em] text-tealb">Main work</h4>
+            )}
             <div className="flex flex-col gap-3">
               <MoneyRow
                 colour="bg-purple"
@@ -184,21 +205,6 @@ export function MoneyPanel({
                     : "Yaadly's 5%, taken from your labour price rather than invoiced to you."
                 }
               />
-              {extraWork && extraWork.count > 0 && (
-                <MoneyRow
-                  colour="bg-mango"
-                  label={"Extra work, " + extraWork.count + " agreed add-on" + (extraWork.count === 1 ? "" : "s")}
-                  value={money(extraWork.jmd) ?? "—"}
-                  width={
-                    allIn != null && allIn > 0 ? Math.max(Math.round((extraWork.jmd / allIn) * 100), 6) : 6
-                  }
-                  caption={
-                    side === "client"
-                      ? "Agreed on the Extra work tab, with Yaadly's 15% on top. Billed on its own invoice, below."
-                      : "Agreed on the Extra work tab, less Yaadly's 5%. Paid once the client approves the finished work."
-                  }
-                />
-              )}
               {showCheck && check && (
                 <MoneyRow
                   colour="bg-teal"
@@ -228,12 +234,60 @@ export function MoneyPanel({
             </div>
             <div className="mt-4 flex items-baseline justify-between border-t border-line2 pt-3.5">
               <span className="text-[13px] font-semibold text-ink">
-                {side === "client" ? "All in, everything you pay" : "Paid to you in total"}
+                {hasExtra
+                  ? side === "client" ? "Main work, what you pay" : "Main work, paid to you"
+                  : side === "client" ? "All in, everything you pay" : "Paid to you in total"}
               </span>
-              <span className="font-mono-app text-[22px] font-semibold text-ink">
-                {money(side === "client" ? allIn : takeHome) ?? "—"}
+              <span className={"font-mono-app font-semibold text-ink " + (hasExtra ? "text-[17px]" : "text-[22px]")}>
+                {money(mainTotal) ?? "—"}
               </span>
             </div>
+            {hasExtra && extraWork && (
+              <div className="mt-5 border-t border-line2 pt-4">
+                <h4 className="text-[10.5px] font-bold uppercase tracking-[.16em] text-mango">Additional work</h4>
+                <p className="mb-3 mt-1 text-[12px] leading-relaxed text-dim">
+                  Extra work agreed after the job was booked, on the Extra work tab. Each one is billed on its own
+                  invoice and does not change the main work above.
+                </p>
+                <div className="flex flex-col gap-2.5">
+                  {extraWork.map((x) => (
+                    <div key={x.id} className="rounded-xl border border-line bg-bg/40 px-3.5 py-3">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <b className="min-w-0 truncate text-[13px] font-semibold text-ink" title={x.scope}>{x.scope}</b>
+                        <span className="flex-none text-[10.5px] font-bold uppercase tracking-wide text-dim">
+                          {x.status === "signed_off" ? "Done and approved" : "Agreed"}
+                        </span>
+                      </div>
+                      <div className="mt-2 grid gap-1 text-[12.5px]">
+                        <div className="flex justify-between gap-3"><span className="text-dim">The work</span><span className="font-mono-app">{money(x.work)}</span></div>
+                        <div className="flex justify-between gap-3">
+                          <span className="text-dim">{side === "client" ? "Yaadly Guarantee & Support, 15%" : "Yaadly's 5%, taken off"}</span>
+                          <span className="font-mono-app">{side === "client" ? "" : "−"}{money(x.fee)}</span>
+                        </div>
+                        <div className="flex justify-between gap-3 border-t border-line pt-1 font-semibold">
+                          <span className="text-mute">{side === "client" ? "You pay for this" : "Paid to you for this"}</span>
+                          <span className="font-mono-app text-ink">{money(x.total)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-baseline justify-between">
+                  <span className="text-[13px] font-semibold text-ink">
+                    {side === "client" ? "Additional work, what you pay" : "Additional work, paid to you"}
+                  </span>
+                  <span className="font-mono-app text-[17px] font-semibold text-ink">{money(extraTotal)}</span>
+                </div>
+                <div className="mt-4 flex items-baseline justify-between border-t-2 border-line2 pt-3.5">
+                  <span className="text-[13px] font-semibold text-ink">
+                    {side === "client" ? "All in, main and additional work" : "Paid to you in total, main and additional work"}
+                  </span>
+                  <span className="font-mono-app text-[22px] font-semibold text-ink">
+                    {money(mainTotal == null ? null : mainTotal + extraTotal) ?? "—"}
+                  </span>
+                </div>
+              </div>
+            )}
             {/* Said "You take home" over labour plus materials until 28 Sep
                 2026. The materials money is spent on the materials, so a
                 worker reading J$119,250 as what they keep was reading the

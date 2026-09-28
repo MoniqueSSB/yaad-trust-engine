@@ -407,11 +407,11 @@ export default async function JobRoom({
   }
   /* Agreed extra work counts in the job's money (founder, 28 Sep 2026: it
      was on the Extra work tab only, and "What this job costs" left it out).
+     Shown as its own "Additional work" section under the main work, never
+     folded into the main work's total, so the two cannot be confused.
      Agreed and approved add-ons only; one still being agreed, turned down,
      withdrawn or cancelled is not money anybody owes. */
   const countedAddons = addons.filter((a) => a.status === "agreed" || a.status === "signed_off");
-  const addonClientTotal = countedAddons.reduce((t, a) => t + addonClientBill(a.amount_jmd, a.terms).total, 0);
-  const addonWorkerTotal = countedAddons.reduce((t, a) => t + addonWorkerPay(a.amount_jmd), 0);
 
   /* Who has been paid (20260929060000), for the Money tab. Read on its own
      and allowed to fail: before that migration is applied the function does
@@ -1958,15 +1958,19 @@ export default async function JobRoom({
           labour={labour}
           materials={won?.materials_jmd ?? null}
           fee={role === "worker" ? workerFeeJmd : feeJmd}
-          allIn={role === "client" ? (clientAllIn == null ? null : clientAllIn + addonClientTotal) : allIn}
-          takeHome={takeHome == null ? null : takeHome + addonWorkerTotal}
+          allIn={role === "client" ? clientAllIn : allIn}
+          takeHome={takeHome}
           invoices={invoices}
           money={money}
           materialsReleased={materialsReleasedJmd}
           check={role === "client" ? checkLine : null}
-          extraWork={role === "client"
-            ? (addonClientTotal > 0 ? { jmd: addonClientTotal, count: countedAddons.length } : null)
-            : (addonWorkerTotal > 0 ? { jmd: addonWorkerTotal, count: countedAddons.length } : null)}
+          extraWork={countedAddons.map((a) => {
+            const c = addonClientBill(a.amount_jmd, a.terms);
+            const pay = addonWorkerPay(a.amount_jmd);
+            return role === "client"
+              ? { id: a.id, scope: a.scope, work: c.amount, fee: c.fee, total: c.total, status: a.status }
+              : { id: a.id, scope: a.scope, work: a.amount_jmd, fee: a.amount_jmd - pay, total: pay, status: a.status };
+          })}
         />
         </>
       )}
