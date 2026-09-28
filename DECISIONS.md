@@ -42,6 +42,153 @@ Each body was read live with `pg_get_functiondef` and matched the repository bef
 
 ---
 
+## 2026-09-28 · A pay invoice records the labour and the worker fee it was worked out from
+
+Monique asked for Yaadly's worker fee to show on the worker's pay invoice.
+Both functions that raise pay (`raise_job_worker_payable`,
+`raise_job_stage_worker_payable`) already computed the quoted labour and the
+5% and then kept only the difference. Working the fee back from that
+difference can be a dollar out, and before 9 Sep 2026 the fee was 12%, so a
+figure derived on screen would sometimes be wrong on the one document a
+worker reads to check their pay. Instead each pay invoice now stores
+`worker_labour_jmd` and `worker_fee_jmd` as it is raised (20260928230000),
+with a check that they only appear on worker pay and that the fee is never
+more than the labour. The functions are the live definitions of that day
+with the two columns added to their insert; the amounts are computed exactly
+as before. The HTML invoice, the PDF, the desk and the worker's portal all
+read those two columns. Pay raised earlier is not backfilled and shows no
+breakdown: no figure is better than a guessed one.
+
+---
+
+## 2026-09-28 · The worker signs with a button, first, and no Yaadly person's name is ever on the report
+
+Monique, the same evening, while this was being deployed: "the worker always
+needs to sign off first", "it has to be a button the work presses", "through
+whatsapp or the portal", and "it shund never be my name".
+
+**A button, two doors, one core** (`20260928220000`). The portal form's typed
+name is gone: one Sign the report button, the name taken from the worker's
+Yaadly profile. On WhatsApp the worker's message is followed by a Sign the
+report quick-reply button (`yaadly_sign_completion_report_v1`, created by
+`yaad-twilio-setup` action `create-sign-report`, used in session so no Meta
+approval). Its payload is the job's own code, so a tap reaches `yaad-inbound`
+the way the client's Approve button does, and signs through
+`sign_completion_report_via_whatsapp()`, with the phone on the worker's profile
+as the credential. A WhatsApp tap signs the words as they stand; changing them
+is the portal's job. Both doors share `_do_sign_completion_report()`, and the
+trail records which one was used. Nothing moves towards a client without that
+signature: the screen reads only a signed report, and release reads only a
+held one, which exists only after a signature.
+
+**Never her name.** The report, the worker's messages and the review trail say
+"Yaadly" for anything done from the desk. The name typed on the desk is kept
+in the database as the internal record of who acted and is never printed to a
+client or a worker. The worker's and the owner's own steps keep their own
+names, because those are theirs.
+
+---
+
+## 2026-09-28 · The Completion Report is the worker's document, and Yaadly steps in only when it goes wrong
+
+Supersedes the order in the entry below, the same afternoon. Monique, on
+seeing a desk that let her edit the words: "no i dont edit it, it is the
+workers document, not mine to edit", then "i only step in when things go
+wrong and a dispute is raised". Offered three questions, she took each
+recommended answer.
+
+**It runs on its own.** A job completing fires `yaad-completion-flow` (step
+`start`), which drafts care notes and opens the report for the worker; the
+trigger on `completion_reports` then sends them the link through
+`yaad-notify-client`. If the drafter is down, the report opens with no care
+notes and the worker writes their own. When the worker signs, the same
+function (step `screen`) checks their words for money amounts and the banned
+list both runtimes share. Clean, it is issued to the client. Found anything,
+it is held and Monique is alerted by the ordinary desk alert. The client's
+"Something is wrong or missing" is a dispute row, so the worker hears first,
+Monique is alerted, and it can be escalated, exactly like any other dispute.
+
+**Nobody at Yaadly can write a word of it.** `save_completion_report`,
+`accept_completion_report` and `issue_completion_report` are dropped. What
+she has is `release_completion_report` (a held report goes out unchanged,
+under her name) and `return_completion_report` (back to the worker with her
+reason: new revision, new code, signature cleared). The screen, too, can
+only hold.
+
+**Against the governing rule, argued rather than assumed.** A named human
+still confirms the words before any client reads them: the worker, who signs
+them. Issuing a report moves no money, rules on no dispute and changes no
+reputation, and it is not in `HUMAN_ONLY_DECISIONS`. The automatic step can
+refuse to send; it can never write, edit or approve anything. And the report
+does not pretend otherwise: one that passed the screen says it was sent when
+the worker signed and that Yaadly does not edit it, with no name implying a
+review. A person's name appears only when a person released it.
+
+**A new public door.** `yaad-completion-flow` is deployed with
+`--no-verify-jwt`, because the database triggers hold no session. Its door is
+the notify trigger secret or an admin token, the shape `yaad-notify-client`
+already has. The list in CLAUDE.md section 12 is Monique's file and names
+the functions allowed without platform auth; it needs this one added.
+
+---
+
+## 2026-09-28 · The Completion Report is signed by the worker and issued by a named person
+
+Monique asked for the report to be updated after looking at comparable
+documents. A research pass read twenty two (the JCT and NEC completion
+certificates, the RICS Level 3 survey, new build snagging reports, the IET
+minor works certificate, Checkatrade, TrustMark and NHBC guarantee documents,
+Jobber, Housecall Pro, Fixflo, AppFolio and home watch reports). Nearly all
+open with a one line outcome and the dates that matter, keep what was found
+outside the scope apart from the work done, and end on a named person
+signing. Ours did none of those, and it appeared on its own the moment a job
+completed although PORTAL-SPEC.md says "No auto-published Completion Report".
+She approved a clickable preview and then decided the rest.
+
+**The order is hers: worker first, then the desk, then the client.** The agent
+(yaad-completion, built in August and never called until now) drafts care
+notes; a named person edits and accepts; the worker reads the whole report,
+may change the words and signs with their typed name and a code; a named
+person reads what was signed and issues it; the client can then read it and
+either confirm it or say something is wrong. A worker's change never reaches
+the client unread, because issuing is always a person. A desk edit after the
+worker has signed starts a new revision and sends it back to them, the same
+rule the Kickoff Pack keeps: a changed text is a new claim.
+
+**Only words are stored, and only words can change.** `completion_reports`
+holds the care notes and the worker's own account. Every fact on the report
+(dates, arrivals, approvals, photographs, fingerprints, what was agreed) is
+read from the record by the page at render time, so there is nothing for the
+worker, or the desk, to edit. That is what makes the signature worth
+anything. The outcome line at the top is built by rules in
+`web/lib/portal/completion-report.ts`, never by a model, and its tests assert
+that a new find, an arrival away from the site and a dispute are never left
+out of it.
+
+**A deliberate exception to CLAUDE.md section 9.** The worker changes the words
+and signs on one portal page, `/portal/jobs/[id]/completion?code=`. Section 9
+keeps the worker's web side to sign-up and file upload, and on 1 September
+Monique herself moved the Kickoff Pack confirmation to a WhatsApp reply for
+that reason. Asked on 28 September, with the WhatsApp route offered and
+recommended, she chose the page. It is one page, reached from a WhatsApp link,
+editing two fields. Do not grow it into a worker dashboard, and do not
+"correct" it back to WhatsApp without asking her.
+
+**What else she decided.** No money on the report, materials amounts included,
+so it can be forwarded to family or a buyer. A new find stays on the report as
+a permanent record and also carries "Ask for a quote for this", which opens
+`/jobs/new` with the find described (`?about=`): its own job, its own quote,
+never an addition to this one. Evidence comments are left off the report:
+they are a conversation between the two sides, not a checked record, and can
+carry money talk into a document people forward.
+
+**The legal text.** `completion_section6` carries its own `<h5>6 · ...</h5>`
+from the Kickoff Pack. The page now draws its own numbered heading and drops
+that one when rendering; the words are unchanged. It had been printing a
+second heading, with the wrong number whenever the sections moved.
+
+---
+
 ## 2026-09-28 · The invoice email carries the invoice as a PDF, drawn by yaad-invoice
 
 Monique asked for the PDF on the client's email too, and chose option A of

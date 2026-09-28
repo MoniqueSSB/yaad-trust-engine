@@ -26,6 +26,19 @@ const AMBER = rgb(0.541, 0.353, 0);
 const AMBER_BG = rgb(1, 0.984, 0.949);
 const NOTE_BG = rgb(0.957, 0.969, 0.965);
 
+/** Yaadly's worker fee on a worker's pay invoice (28 Sep 2026): the quoted
+ *  labour, the fee kept out of it, and the agreed rate that is paid. Read
+ *  from the figures the pay invoice recorded when it was raised
+ *  (20260928230000), never worked back from the rate. Null on anything else,
+ *  and on pay raised before then, which shows no breakdown rather than a
+ *  guessed one. Used by the HTML invoice, the PDF and nothing else. */
+export function workerFeeBreakdown(inv: Row) {
+  if (inv.payable_to !== "worker" || inv.worker_labour_jmd == null || inv.worker_fee_jmd == null) return null;
+  const labour = Number(inv.worker_labour_jmd), fee = Number(inv.worker_fee_jmd);
+  const pct = labour > 0 ? Math.round((fee / labour) * 100) : 0;
+  return { labour, fee, rate: labour - fee, pct };
+}
+
 const dt = (d: string) =>
   new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
@@ -166,6 +179,18 @@ export async function invoicePdf(
     y = ly - 2;
     page.drawLine({ start: { x: M, y: y + 6 }, end: { x: M + W, y: y + 6 }, thickness: 0.6, color: LINE });
     y -= 12;
+  }
+
+  // ------------------------------------------------ worker fee breakdown
+  const wf = workerFeeBreakdown(inv);
+  if (wf) {
+    need(70);
+    text("HOW THIS PAY IS WORKED OUT", M, y, 7.5, bold, MUTE); y -= 15;
+    const row = (label: string, v: string, f: PDFFont = reg) => { text(label, M, y, 10, f); right(v, cAmt, y, 10, f); y -= 14; };
+    row("Quoted labour", money(wf.labour, "JMD"));
+    row(`Less Yaadly's worker fee (${wf.pct}%)`, "-" + money(wf.fee, "JMD"));
+    row("Agreed rate, paid to you", money(wf.rate, "JMD"), bold);
+    y -= 8;
   }
 
   // ------------------------------------------------------------ totals

@@ -255,7 +255,8 @@ create table public.invoices (id text primary key, client_name text, client_emai
   status text not null default 'draft' check (status in ('draft','sent','paid','void')), drafted_by text, currency text,
   issue_date date default current_date, due_date date, period_label text, subtotal_pence int default 0, vat_pence int default 0,
   total_pence int default 0, notes text, sent_at timestamptz, paid_at timestamptz, stage int, payable_to text default 'yaadly',
-  worker_email text, part_of text references invoices(id), starts_job boolean default false);
+  worker_email text, part_of text references invoices(id), starts_job boolean default false,
+  worker_labour_jmd integer, worker_fee_jmd integer);
 create table public.invoice_lines (id bigint generated always as identity primary key, invoice_id text references invoices(id),
   catalogue_id text, description text, qty numeric, unit_amount_pence int, line_total_pence int, price_source text, sort int, is_fee boolean default false);
 create function public.line_guard() returns trigger language plpgsql as $$ begin

@@ -36,9 +36,11 @@
 -- decides when the job is complete. A stage bolted on breaks one or the other.
 --
 -- THE FIVE LIVE FUNCTIONS THIS TOUCHES, each read live with pg_get_functiondef
--- on 28 September 2026 and identical to the repository; the ONLY change in
--- each is that an add-on invoice (addon_id set) is kept out of the job's own
--- money:
+-- on 28 September 2026 and identical to the repository, except
+-- raise_job_worker_payable, which is restated from 20260928230000 (the pay
+-- invoice records worker_labour_jmd and worker_fee_jmd), merged the same day.
+-- The ONLY change in each is that an add-on invoice (addon_id set) is kept
+-- out of the job's own money:
 --   invoice_starts_job_default    an add-on invoice never starts the job
 --   raise_job_client_invoice      an add-on invoice is not "the job's bill"
 --   raise_job_worker_payable      an add-on payable is not "the job's payable"
@@ -573,8 +575,8 @@ begin
   -- mark_worker_paid, which waits for every client invoice on this add-on.
   v_rate := v_a.amount_jmd - round(v_a.amount_jmd * 0.05);
   v_pay := public.new_invoice_number();
-  insert into public.invoices (id, client_name, client_email, worker_email, job_id, addon_id, drafted_by, currency, period_label, payable_to, notes)
-  values (v_pay, 'Yaadly Ltd', 'payable@yaadly.invalid', v_job.worker_email, v_a.job_id, v_a.id, 'human', 'JMD', 'Add-on completed', 'worker',
+  insert into public.invoices (id, client_name, client_email, worker_email, job_id, addon_id, drafted_by, currency, period_label, payable_to, worker_labour_jmd, worker_fee_jmd, notes)
+  values (v_pay, 'Yaadly Ltd', 'payable@yaadly.invalid', v_job.worker_email, v_a.job_id, v_a.id, 'human', 'JMD', 'Add-on completed', 'worker', v_a.amount_jmd, v_a.amount_jmd - v_rate,
     'What Yaadly owes ' || coalesce(v_job.worker_name, 'the tradesperson') || ' for agreed add-on work on this job: the amount agreed with the client less 5%, with nothing else deducted. Yaadly pays this directly. The client is not a party to it.');
   insert into public.invoice_lines (invoice_id, catalogue_id, description, qty, unit_amount_pence, price_source)
   values (v_pay, null, 'Add-on: ' || left(regexp_replace(btrim(v_a.scope), '\s+', ' ', 'g'), 100) || ', agreed amount less 5%', 1, v_rate, 'manual');
@@ -623,7 +625,8 @@ create trigger invoices_addon_never_a_part
 
 -- =========================================================================
 -- The five live functions. Each body is production's, read live on
--- 28 September 2026; the add-on lines are marked "20260928235000".
+-- 28 September 2026 (raise_job_worker_payable: 20260928230000's body); the
+-- add-on lines are marked "20260928235000".
 -- =========================================================================
 
 create or replace function public.invoice_starts_job_default()
@@ -767,8 +770,8 @@ begin
   v_total     := v_rate + v_materials;
 
   v_id := public.new_invoice_number();
-  insert into public.invoices (id, client_name, client_email, worker_email, job_id, drafted_by, currency, period_label, payable_to, notes)
-  values (v_id, 'Yaadly Ltd', 'payable@yaadly.invalid', v_quote.worker_email, p_job, 'human', 'JMD', 'Work completed', 'worker',
+  insert into public.invoices (id, client_name, client_email, worker_email, job_id, drafted_by, currency, period_label, payable_to, worker_labour_jmd, worker_fee_jmd, notes)
+  values (v_id, 'Yaadly Ltd', 'payable@yaadly.invalid', v_quote.worker_email, p_job, 'human', 'JMD', 'Work completed', 'worker', v_labour, v_margin,
     'What Yaadly owes ' || coalesce(v_quote.worker_name, 'the tradesperson') || ' for this job. Yaadly engaged them at their quoted labour price less 5%, agreed in writing before they accepted, plus any materials at cost not already paid to them, with nothing deducted. Yaadly pays this directly. The client is not a party to it.');
 
   insert into public.invoice_lines (invoice_id, catalogue_id, description, qty, unit_amount_pence, price_source)

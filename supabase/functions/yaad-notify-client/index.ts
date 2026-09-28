@@ -70,7 +70,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -913,7 +913,7 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
     }
-    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "completion_report_worker") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
@@ -955,7 +955,7 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "completion_report_worker") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -978,6 +978,8 @@ Deno.serve(async (req: Request) => {
 
     let subject = "";
     let line = "";
+    // Set by completion_report_worker, for the template fallback below.
+    let reportSignLink = "";
     let photoUrls: EvidencePhoto[] = [];
     let attachPhotos: string[] = [];
     // Only quote_arrived has an approved WhatsApp Content Template
@@ -1534,6 +1536,18 @@ Deno.serve(async (req: Request) => {
             (d.reply ? `The worker replied: "${clip(String(d.reply), limit)}"` : "The worker has not replied.") +
             `\n\nNothing on the job can be approved while it is open.`;
         }
+      } else if (event === "report_held") {
+        // The automatic screen on a signed Completion Report found money or a
+        // word Yaadly never uses (yaad-completion-flow). It only holds; the
+        // words are the worker's and nothing has been changed.
+        const { data: r } = await admin.from("completion_reports")
+          .select("hold_reason, worker_signed_name").eq("job_id", jobId).maybeSingle();
+        if (!r) return json({ error: "No report on this job." }, 404);
+        what = "a Completion Report was held";
+        pushTitle = "Yaadly: a Completion Report was held";
+        detail = (limit) => `The Completion Report on ${title}, signed by ${r.worker_signed_name || "the worker"}, was held before it reached the client.\n\n` +
+          `The screen found: ${clip(String(r.hold_reason ?? ""), limit)}\n\n` +
+          `On the desk under Completion reports: release it unchanged, or send it back to the worker with your reason.`;
       } else {
         return json({ error: "Unknown desk alert." }, 400);
       }
@@ -1627,6 +1641,43 @@ Deno.serve(async (req: Request) => {
         (ask ? `What they want walked through: "${ask.slice(0, 600)}"\n\n` : "") +
         `Arrange the call with them over WhatsApp as usual, then paste the link into the job so it is on the record: ${roomLink}\n\n` +
         `This does not change the evidence you file or how the job is approved.`;
+    } else if (kind === "completion_report_worker") {
+      // The Completion Report is the worker's document (20260928210000). The
+      // link carries the signing code, read here by job, never passed in, so
+      // a stale trigger cannot send yesterday's code. A report sent back says
+      // why, signed as Yaadly, never a person's name.
+      const { data: r } = await admin.from("completion_reports")
+        .select("status, sign_code, return_reason").eq("job_id", jobId).maybeSingle();
+      if (!r || r.status !== "with_worker" || !r.sign_code) return json({ ok: true, skipped: "not with the worker" });
+      const signLink = `${APP_URL}/portal/jobs/${encodeURIComponent(job.id)}/completion?code=${encodeURIComponent(r.sign_code)}`;
+      reportSignLink = signLink;
+      subject = `Your Completion Report to sign: ${job.title}`;
+      line = r.return_reason
+        ? `Yaadly has sent the Completion Report for ${job.title} back to you:\n\n"${clip(String(r.return_reason), 600)}"\n\n` +
+          `It is your document. Change your words and sign it again here: ${signLink}`
+        : `The Completion Report for ${job.title} (${job.id}) is ready. It is your document: read it, change the care notes ` +
+          `or add your own account of the work if anything is wrong, then press Sign. It goes to the owner when you sign: ${signLink}\n\n` +
+          `If it is right as it stands, you can sign it from here: tap Sign the report, or reply ${job.id}.`;
+      // The Sign button follows, the same way the client's Approve button
+      // follows an evidence report: its payload is the job's code, which
+      // yaad-inbound signs through sign_completion_report_via_whatsapp().
+      // No template recorded means no button; the reply and the portal still work.
+      let signSid = Deno.env.get("TWILIO_CONTENT_SID_SIGN_REPORT") ?? "";
+      if (!signSid) {
+        const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_sign_report").maybeSingle();
+        try { signSid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { signSid = String(st?.value ?? ""); }
+      }
+      if (/^HX[0-9a-f]{32}$/i.test(signSid)) {
+        approveButton = { sid: signSid, vars: { "1": `${job.title ?? "your job"} (${job.id})`, "2": String(job.id) } };
+      }
+    } else if (kind === "completion_report_issued") {
+      const { data: r } = await admin.from("completion_reports")
+        .select("status, worker_signed_name").eq("job_id", jobId).maybeSingle();
+      if (!r || r.status !== "issued") return json({ ok: true, skipped: "not issued" });
+      subject = `Your Completion Report: ${job.title}`;
+      line = `The Completion Report for ${job.title} is ready, signed by ${r.worker_signed_name || "the worker"}. ` +
+        `Keep it with the house papers. If anything in it is wrong or missing, there is a button at the bottom to raise it: ` +
+        `${roomLink}/completion`;
     } else if (kind === "walkthrough_notes_ready") {
       subject = `Notes from your video walkthrough: ${job.title}`;
       line = `The worker has written up what came out of your video walkthrough on ${job.title}. ` +
@@ -1725,7 +1776,10 @@ Deno.serve(async (req: Request) => {
         const last = (seen ?? []).find((r: { from_addr: string }) => samePhoneDigits(r.from_addr, recipientPhone));
         if (!insideWindow(last?.seen_at ?? null)) {
           // A job the worker is not booked on opens nothing for them, so those two go to the portal itself.
-          const link = kind === "worker_requested" || kind === "quote_not_selected" ? `${APP_URL}/portal` : roomLink;
+          // The Completion Report link carries its signing code, or the
+          // worker lands on a page that will not let them sign.
+          const link = kind === "worker_requested" || kind === "quote_not_selected" ? `${APP_URL}/portal`
+            : kind === "completion_report_worker" ? (reportSignLink || roomLink) : roomLink;
           workerTemplate = { sid, vars: { "1": templateVar(`${job.title ?? "your job"} (${job.id})`), "2": templateVar(summary, 300), "3": link } };
         }
       }

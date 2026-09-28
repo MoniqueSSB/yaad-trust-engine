@@ -6134,7 +6134,67 @@ Desk, **Reports**. Service: Deposit Protection Check. Client name and property a
 3. When it can be paid, **Pay the worker** opens Pay workers with a card for that invoice at the top, offering only the way the worker asked to be paid: **Pay with Stripe** if they set up a Stripe payout account, **Pay by Wise** if they gave bank details in Wise from the portal, and Wise with "take them by phone" if they gave nothing. If nobody has phoned them to check their bank details yet, the card says so first, with **Call-back done**.
 4. On Pay workers, a row waiting on the client has a button that opens the client's bill holding it up (for example **Open INV-2026-0024**). It used to open the job's invoice list, whose Pay the worker came straight back to Pay workers, round and round.
 
-## 34. Extra work on a booked job: add-ons (28 Sep 2026)
+## 34. A Completion Report: it runs on its own, and when to step in (28 Sep 2026)
+
+It is the worker's document. Nothing on the desk edits it. When a job
+completes, the report opens for the worker with drafted care notes and they
+get a WhatsApp link; when they sign, an automatic check sends it to the client
+or holds it for you. Desk: **Documents & money, Completion reports**. The
+picture at the top counts only the ones that need you.
+
+**Red, "did not start".** The job completed but nothing opened. Press **Start
+it now**. Most likely `yaad-completion-flow` was not deployed, or the call from
+the trigger failed; `net._http_response` has the answer.
+
+**Red, "held for you".** The check found money or a banned word in what the
+worker signed; the row says which. Open the report and read it. If it is fine
+as it stands, **Release it unchanged** (your name goes on it as the person who
+released it). If the words need to change, **Send it back to the worker** with
+your reason. They get a new link automatically; the old one stops working.
+
+**Amber, "signed, checking" for more than a few minutes.** The check did not
+come back. **Screen it again**.
+
+**How the worker signs.** A button, on WhatsApp (Sign the report, under the
+message with the link) or in the portal (Sign the report, at the top of the
+report). WhatsApp signs the words as they stand; to change them they use the
+portal. Typing the job code on WhatsApp does the same as the button. If the
+button never appears, the template is not recorded: run `yaad-twilio-setup`
+with action `create-sign-report` (admin token or cron secret), which writes
+`app_settings.twilio_content_sid_sign_report`. Outside 24 hours of their last
+message WhatsApp drops the button; the link still works.
+
+**Nothing on the report or in the worker's messages carries a staff name.**
+The desk asks for your name for Yaadly's own record; it prints as "Yaadly".
+
+**Amber, "with the worker" and they say they never got it.** WhatsApp refuses
+outside 24 hours of their last message and falls back to the worker template,
+which carries the signing link. If that failed too, **Send the worker the link
+again** by email or from your own phone. The link must carry `?code=`.
+
+**The client raised a dispute on the report.** It is an ordinary dispute: the
+worker hears first and you are alerted. If the report must change, **Send it
+back to the worker**; the client stops seeing it until the worker signs again
+and it passes the check.
+
+**Deploying.** `yaad-completion-flow`, `yaad-notify-client` and `yaad-inbound`
+WITH `--no-verify-jwt`, as each runs; `yaad-twilio-setup` WITHOUT it. All from
+disk, after `supabase/functions/sync-shared.sh`.
+
+**Checking the rules still hold:** `supabase/tests/completion_report_guards.sql`,
+23 checks. Run it inside `begin; ... rollback;` with
+`supabase db query --linked --project-ref leffyisvfvjwzilydlwf -f <file>`. It
+switches the user triggers on jobs, completion_reports and disputes off for
+its own run, so nothing is messaged, which is why it must be inside a
+transaction.
+
+## 35. Finding what a worker is owed, and Yaadly's 5% (28 Sep 2026)
+
+1. **Invoices, Worker pay.** Every worker's pay invoice, grouped under its job, with what is owed and what is paid on that job. Jobs with money owed come first. The summary at the top counts real jobs only; your own tests are listed underneath and counted in none of the figures. **Pay the worker** on a row opens Pay workers on that invoice, with the way the worker asked to be paid.
+2. **Invoices, Worker fees.** Yaadly's 5% from each tradesperson, job by job. It is kept out of their pay, so it is never an invoice of its own. The figure is worked out from the accepted quote at today's rate, not read from an invoice. **Agency fees** now holds only the client side: the 15% and services.
+3. **The fee on a pay invoice.** Since 28 Sep 2026 each pay invoice records the quoted labour and Yaadly's worker fee as it is raised (`worker_labour_jmd`, `worker_fee_jmd`, migration 20260928230000), and the invoice, its PDF, the desk and the worker's portal show: quoted labour, less the fee, is the agreed rate. Pay raised before that has no figures and shows no breakdown, on purpose: the fee cannot be worked back exactly from the rate, and before 9 Sep 2026 it was 12%.
+
+## 36. Extra work on a booked job: add-ons (28 Sep 2026)
 
 1. **Deploy order matters.** Apply migration `20260928235000_add_on_work_on_a_booked_job.sql` first, then deploy the app, then the desk. The job page reads the add-on tables on their own, so an app deployed first shows an empty Extra work tab rather than breaking, but nothing works until the migration is in. Afterwards run `supabase/tests/job_addons_guards.sql`; every line should read PASS.
 2. **Where it lives.** The client and the booked worker use the **Extra work** tab on the job page. The desk uses **Add-ons** under Documents & money. The add-on's invoices appear on **Invoices** like any other, labelled "Add-on" (or "Add-on, first half" / "second half").

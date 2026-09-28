@@ -1614,6 +1614,8 @@ const TONE = {
   sent:"warn", accepted:"ok", rejected:"mute", withdrawn:"mute",
   // invoices / packs
   draft:"warn", paid:"ok", void:"mute", issued:"ok", failed:"crit", ready:"ok", approved:"ok",
+  // add-ons on a booked job (20260928200000)
+  with_worker:"warn", with_client:"warn", agreed:"warn", signed_off:"ok",
   // calls / waitlist
   // reports. reviewed is amber, not grey: it has been read and still is not
   // with the client, so it is outstanding rather than finished.
@@ -1628,6 +1630,10 @@ const TONE = {
   sent:"ok", no_email:"mute", throttled:"warn",
   // disputes
   raised:"crit", answered:"warn", resolved:"ok",
+  // completion reports, 28 Sep 2026: a report that never started is red,
+  // because it only happens when something went wrong. Waiting on the worker
+  // is amber. "held" already reads amber above, from the waiting list.
+  not_started:"crit", with_worker:"warn", worker_signed:"warn",
 };
 const tone_ = (s) => chip_(TONE[String(s || "").toLowerCase()] || "mute", s || "none");
 
@@ -1829,6 +1835,69 @@ const VIEWS = [
         rpc:"issue_report",
         args:(r) => ({ p_report:r.id }),
         says:r => `Mints the number and records that you issued it, which is what makes it readable in the client's portal. Refused while any finding is unrated, while the verdict is empty, or while a sentence states a measurement.` },
+    ]},
+
+  // The Completion Report, 28 Sep 2026 (20260928200000, 20260928210000). It
+  // is the worker's document: it starts on its own when a job completes, the
+  // worker changes the words and signs, an automatic screen for money and
+  // banned wording can only hold it, and it goes to the client. Founder: "i
+  // only step in when things go wrong and a dispute is raised." So nothing
+  // here writes a word of it. What is here is for when it goes wrong: start
+  // one that did not start, release a held one unchanged, or send it back to
+  // the worker with the reason.
+  { k:"completion", g:"Documents & money", label:"Completion reports", icon:"doc",
+    title:"Completion reports", table:"v_completion_reports",
+    sub:"Every finished job and where its Completion Report is. It runs on its own: when a job completes the report opens for the worker with drafted care notes, they change the words and sign, an automatic check for money and banned words either sends it to the client or holds it for you. It is the worker's document and nothing here edits it. You step in when something goes wrong: a report that did not start, a held report, or a dispute. Send it back to the worker with your reason and they correct it and sign again.",
+    select:"*",
+    order:"job_updated_at",
+    search:["id","title","client_name","worker_name","parish"],
+    titleOf: r => "Completion Report, " + r.id,
+    viz:{ date:"job_updated_at", state:"report_status", want:r => !r.is_test && ["not_started","held"].includes(r.report_status), wants:"real, needs you" },
+    hide:["sign_code","is_test"],
+    empty:["No finished jobs yet","A job lands here the moment its last stage is approved, and its report starts on its own."],
+    cols:[
+      {h:"Job", f:r => id_(r.id) + sub_((r.title || "") + (r.is_test ? " · test" : ""))},
+      {h:"Client & worker", f:r => esc(r.client_name || "Not named") + sub_(r.worker_name || "No worker")},
+      {h:"Report", f:r => crState_(r)},
+      {h:"Worker", f:r => r.worker_signed_at ? esc("Signed " + ago_(r.worker_signed_at)) + sub_(r.worker_changed ? "changed the words" : "no changes") : mute_(r.report_status === "with_worker" ? "not signed yet" : "")},
+      {h:"Client", f:r => r.client_flagged_at ? chip_("crit","raised a dispute") : r.client_confirmed_at ? chip_("ok","confirmed") : mute_(r.report_status === "issued" ? "not reviewed yet" : "")},
+    ],
+    actions:[
+      { label:"Open the report", cls:"",
+        says:r => `Opens the report for ${r.id} in the app, as it reads, with its state on top. Nothing changes.`,
+        nav:r => window.open(CR_APP + "/portal/jobs/" + encodeURIComponent(r.id) + "/completion", "_blank", "noopener") },
+      { label:"Start it now", cls:"",
+        when:r => r.report_status === "not_started",
+        says:r => `The report for ${r.id} did not start on its own. This does what the job completing should have done: drafts care notes and opens the report for ${r.worker_name || "the worker"}, who is sent the link. If the drafter is down it opens with no care notes and the worker writes their own.`,
+        read: r => crFlow_(r, "start") },
+      { label:"Release it unchanged", cls:"",
+        when:r => r.report_status === "held",
+        rpc:"release_completion_report",
+        ask:[{ k:"name", label:"Your name, for Yaadly's own record (never shown to the client or the worker)", from:() => crName_() }],
+        args:(r, v) => { crRemember_(v.name); return { p_job:r.id, p_name:v.name }; },
+        says:r => `Held for: ${r.hold_reason || "not recorded"}. Read the report first (Open the report). Releasing sends it to the client exactly as ${r.worker_signed_name || "the worker"} signed it. The report says "Released by Yaadly"; your name is kept only in Yaadly's own record. If the words need to change, do not release: send it back instead.` },
+      { label:"Send it back to the worker", cls:"",
+        when:r => ["worker_signed","held","issued"].includes(r.report_status),
+        rpc:"return_completion_report",
+        ask:[
+          { k:"reason", label:"What they need to change, in your words. They read this.", type:"long",
+            from:r => r.report_status === "held" ? "Please take the " + (r.hold_reason && /money/.test(r.hold_reason) ? "figure" : "wording") + " out of the report and sign it again: " + (r.hold_reason || "") : "" },
+          { k:"name", label:"Your name, for Yaadly's own record (never shown to the worker)", from:() => crName_() },
+        ],
+        args:(r, v) => { crRemember_(v.name); return { p_job:r.id, p_reason:v.reason, p_name:v.name }; },
+        says:r => `The report goes back to ${r.worker_name || "the worker"} with your reason, from Yaadly, as a new revision with a new link, sent to them automatically. Their signature is cleared${r.report_status === "issued" ? " and the client stops seeing the report until they sign again" : ""}. You do not change a word: they do.` },
+      { label:"Screen it again", cls:"g",
+        when:r => r.report_status === "worker_signed",
+        says:() => "The worker signed but the automatic check has not run, or its answer was lost. This runs it again: clean goes to the client, anything found holds it for you.",
+        read: r => crFlow_(r, "screen") },
+      { label:"Send the worker the link again", cls:"g",
+        when:r => r.report_status === "with_worker",
+        ask:[
+          { k:"how", label:"How", options:[["whatsapp","WhatsApp, from the Yaadly number"],["email","Email, from jobs@"]], from:() => "whatsapp" },
+          { k:"text", label:"Message, sent as typed", type:"long", from:r => crWorkerMsg_(r) },
+        ],
+        says:() => "Only if the automatic message did not reach them. Sends the link with its signing code from Yaadly and records it under your name. WhatsApp only carries it within 24 hours of their last message; otherwise use email or your own phone.",
+        call: (r, v) => crSend_(r.id, "worker", v.how, v.text) },
     ]},
 
   { k:"jobfiles", g:"Documents & money", label:"Job files", icon:"case",
@@ -2397,6 +2466,38 @@ const VIEWS = [
         rpc:"approve_kickoff_pack",
         args:(r) => ({ p_pack:r.id }),
         says:r => `Approves ${r.id} in your name, which is what makes it readable in the client's portal. The database refuses this if the payment stages do not total exactly 100 percent; that refusal is the gate working.` },
+    ]},
+
+  // Extra work on a booked job, 28 Sep 2026 (20260928200000). The client
+  // writes it, the worker accepts, changes or turns it down, both agree the
+  // same version; its invoice is then DRAFTED here on Invoices for you to send.
+  // The one decision on this page is sign-off, and it is yours: once the
+  // add-on's invoice is paid and its photos are in, Sign off raises the
+  // worker's pay (the amount less 5%) and, on "half now, half later" terms,
+  // drafts the second invoice. A job cannot complete while any add-on is
+  // still open or agreed and not signed off.
+  { k:"addons", g:"Documents & money", label:"Add-ons", icon:"doc",
+    title:"Add-ons", table:"job_addons",
+    sub:"Extra work on booked jobs, written by the client and agreed by both sides. Agreeing drafts the add-on's invoice on Invoices; sending it and marking it paid are still yours. Sign off here once it is paid and the photos show the work. A job cannot complete while an add-on is open.",
+    select:"id,job_id,rev,scope,amount_jmd,terms,status,last_edit_side,written_by,agreed_at,signed_off_at,signed_off_by,closed_reason,history,created_at,updated_at",
+    order:"updated_at", search:["job_id","scope","written_by"], hide:["history"],
+    viz:{ want:r => r.status === "agreed", wants:"agreed, waiting on the work and your sign-off" },
+    empty:["No add-ons yet","An add-on appears when a client adds extra work to a booked job from their portal."],
+    detailTop: r => addonStory_(r), foldFields:true, afterOpen: addonAfterOpen_,
+    cols:[
+      {h:"Job", f:r => id_(r.job_id) + sub_("version " + r.rev)},
+      {h:"Extra work", f:r => said_(r.scope)},
+      {h:"Amount", f:r => esc(jmdFmt(r.amount_jmd)) + sub_(r.terms === "in_full" ? "in full" : "half now, half later")},
+      {h:"State", f:r => tone_(r.status)},
+      {h:"Signed off", f:r => r.signed_off_at ? esc(r.signed_off_by || "") + sub_(ago_(r.signed_off_at)) : mute_("not yet")},
+      {h:"Updated", f:r => mute_(ago_(r.updated_at))},
+    ],
+    actions:[
+      { label:"Sign off", cls:"",
+        when:r => r.status === "agreed",
+        rpc:"sign_off_addon",
+        args:(r) => ({ p_addon:r.id }),
+        says:r => `Signs off ${r.job_id}'s add-on in your name, on the photos above. It raises the worker's pay at the agreed amount less 5% (${jmdFmt(r.amount_jmd - Math.round(r.amount_jmd * 0.05))}) for you to pay from Pay workers${r.terms === "in_full" ? "" : ", and drafts the second half of the client's invoice"}. Refused if the add-on's invoice is not marked paid or no photos have been filed.` },
     ]},
 
   { k:"qpd", g:"Documents & money", label:"Quote Pack Drafts", icon:"doc",
@@ -5787,6 +5888,54 @@ const QP_DOCS = [
 ];
 const qpDocsHtml = docs => docsListHtml(QP_DOCS, docs);
 
+// An add-on's drawer: where it stands, what each side gets, its invoices and
+// the photos filed on it, which are what sign-off is judged on.
+function addonStory_(r){
+  const fee = Math.round(r.amount_jmd * 0.15), pay = r.amount_jmd - Math.round(r.amount_jmd * 0.05);
+  const step = { with_worker:1, with_client:1, agreed:2, signed_off:4 }[r.status] || 0;
+  const steps = ["Written by the client", "Agreed by both", "Paid and photographed", "Signed off"];
+  const rail = `<div class="dlvrail">` + steps.map((t, i) => {
+    const n = i + 1, closed = r.status === "declined" || r.status === "withdrawn";
+    const cls = closed && n === 2 ? "stop" : n <= step ? "done" : "";
+    return `<div class="dlvst ${cls}"><i>${cls === "stop" ? "&times;" : n <= step ? "&#10003;" : ""}</i><span>${esc(t)}</span></div>`;
+  }).join("") + `</div>`;
+  const wait = r.status === "with_worker" ? "Waiting on the worker" : r.status === "with_client" ? "Waiting on the client" : "";
+  return `<div class="dlvstory">` + rail
+    + `<div class="dlvgrid">`
+    + `<div><span class="dk">Job</span><div>${id_(r.job_id)} ${sub_("version " + r.rev + (wait ? ", " + wait.toLowerCase() : ""))}</div></div>`
+    + `<div><span class="dk">Money</span><div>Client pays <b>${esc(jmdFmt(r.amount_jmd + fee))}</b> ${sub_(jmdFmt(r.amount_jmd) + " + 15%")}<br>Worker is paid <b>${esc(jmdFmt(pay))}</b> ${sub_("less 5%")}</div></div>`
+    + `</div>`
+    + `<div class="dlvbox"><span class="dk">The extra work</span><p style="white-space:pre-wrap">${esc(r.scope)}</p><p class="mute">${r.terms === "in_full" ? "Paid in full before the work starts." : "Half before the work starts, half once it is signed off."}</p></div>`
+    + `<div class="dlvbox"><span class="dk">Invoices</span><div data-addon-inv>${mute_("Reading…")}</div></div>`
+    + `<div class="dlvbox"><span class="dk">Photos filed on this add-on</span><div data-addon-ev>${mute_("Reading…")}</div></div>`
+    + (r.closed_reason ? `<div class="dlvbox"><span class="dk">Reason given</span><p>${esc(r.closed_reason)}</p></div>` : "")
+    + `</div>`;
+}
+
+async function addonAfterOpen_(r, el){
+  const inv = el.querySelector("[data-addon-inv]"), ev = el.querySelector("[data-addon-ev]");
+  const { data: invs, error: e1 } = await sb.from("invoices").select("id,status,total_pence,payable_to,period_label").eq("addon_id", r.id).order("id");
+  if (inv) inv.innerHTML = e1 ? esc(e1.message) : (invs || []).length
+    ? (invs || []).map(i => `<div>${id_(i.id)} ${esc(i.period_label || "")} &middot; ${esc(jmdFmt(i.total_pence || 0))} ${tone_(i.status)}</div>`).join("")
+    : mute_(r.status === "agreed" || r.status === "signed_off" ? "None found" : "None until both sides agree");
+  const { data: rows, error: e2 } = await sb.from("job_addon_evidence").select("storage_path,label,filed_by,created_at").eq("addon_id", r.id).order("created_at");
+  if (!ev) return;
+  if (e2) { ev.textContent = e2.message; return; }
+  if (!(rows || []).length) { ev.innerHTML = mute_("None yet. Sign-off is refused until there are some."); return; }
+  // Downloaded, then shown from a blob: the desk's Content-Security-Policy
+  // allows img-src 'self' data: blob: only, so a signed URL would be refused.
+  const urls = await Promise.all(rows.map(async x => {
+    const got = await sb.storage.from("evidence").download(x.storage_path);
+    return got.data ? URL.createObjectURL(got.data) : null;
+  }));
+  ev.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">` + rows.map((x, i) => {
+    const u = urls[i];
+    return `<a href="${esc(u || "#")}" target="_blank" rel="noopener" style="display:block;width:120px;font-size:11px;color:var(--mute)">`
+      + (u ? `<img src="${esc(u)}" alt="" style="width:120px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">` : "")
+      + `<div>${esc(x.label || "No label")}</div><div>${esc(ago_(x.created_at))} ago</div></a>`;
+  }).join("") + `</div>`;
+}
+
 function panelKick(rows){ return heldDraftsHtml() + newestPackHtml(rows); }
 
 function newestPackHtml(rows){
@@ -8480,6 +8629,10 @@ function renderInvoice(){
     ${cardHtml}
     ${unpriced ? `<div class="alert crit"><span class="ic">!</span><div><b>${unpriced} line${unpriced > 1 ? "s" : ""} the agent could not price</b><p>It will not guess. Pick a service off your list for each one, or remove it. This invoice cannot be marked as sent until they are gone.</p></div></div>` : ""}
     ${(CURRENT.questions || []).length ? `<div class="qs"><h4>Check these before you send</h4><ul>${CURRENT.questions.map(q => "<li>" + esc(q) + "</li>").join("")}</ul></div>` : ""}
+    ${inv.payable_to === "worker" && inv.worker_labour_jmd != null && inv.worker_fee_jmd != null
+      /* Yaadly's worker fee on a pay invoice (20260928230000): the figures it
+         recorded when raised. Pay raised before 28 Sep 2026 has none. */
+      ? `<p class="conseq">Quoted labour <b>${esc(feeAmt(inv.worker_labour_jmd, "JMD"))}</b>, less Yaadly's worker fee <b>${esc(feeAmt(inv.worker_fee_jmd, "JMD"))}</b>${inv.worker_labour_jmd > 0 ? " (" + Math.round(inv.worker_fee_jmd / inv.worker_labour_jmd * 100) + "%)" : ""}, is the agreed rate of <b>${esc(feeAmt(inv.worker_labour_jmd - inv.worker_fee_jmd, "JMD"))}</b> on this invoice.</p>` : ""}
     ${inv.covering_note ? `<div class="note">${esc(inv.covering_note)}</div>` : ""}
     <div class="brow" style="margin-top:16px">
       ${draft && inv.drafted_by === "ai" ? `<button class="btn g" id="takeOver">Make it mine to price</button>` : ""}
@@ -8985,6 +9138,12 @@ const INV_TABS = [
     hint:"Money in, marked paid by you, newest first, one month at a time." },
   { k:"fees", label:"Agency fees", col:"#2BB3A3", has:() => false,
     hint:"" },
+  // 28 Sep 2026, founder: the 5% from tradespeople is its own section, and so
+  // is every worker's pay, job by job, so where a worker is owed is one look.
+  { k:"wfees", label:"Worker fees", col:"#E0A93B", has:() => false,
+    hint:"" },
+  { k:"wpay", label:"Worker pay", col:"#E07A5F", has:i => i.payable_to === "worker" && i.status !== "void",
+    hint:"Every worker's pay invoice, job by job: what Yaadly owes each tradesperson and what has been paid. Owed ones are at the top. Pay the worker opens Pay workers on that invoice, with the way they asked to be paid." },
   { k:"jobs", label:"Live jobs", col:"#C4AAFF", has:() => false,
     hint:"Every booked job still running, or finished with money still to settle. Click a job to see every invoice on it, paid and not paid." },
   { k:"void", label:"Void", col:"#6b6b80", has:i => i.status === "void",
@@ -9041,13 +9200,14 @@ function invSummary(clientInv){
 
 // The same shape for Agency fees: one row per kind of fee, and when it is
 // taken. The 5% is never invoiced, so it has no "waiting" figure.
-function invFeeSummary(){
+function invFeeSummary(which = "agency"){
   const f = invFees(), m = invMonthName();
-  const rows = [
+  const rows = (which === "worker" ? [
+    { label:"Yaadly's 5% from tradespeople", list:f.worker, cols:[["kept"], null, ["due", "come"]] },
+  ] : [
     { label:"Yaadly's 15% on jobs", list:f.job, cols:[["paid"], ["out"], ["draft", "todo", "check"]] },
     { label:"Services", list:f.svc, cols:[["paid"], ["out"], ["draft"]] },
-    { label:"Yaadly's 5% from tradespeople", list:f.worker, cols:[["kept"], null, ["due", "come"]] },
-  ];
+  ]);
   const heads = [["Taken", "in " + m], ["Waiting for money", "sent, not paid yet"], ["Still to come", "not billed, or job not finished"]];
   const cell = (list, states) => {
     if (!states) return `<td><div class="ivcell static zero"><span class="a">not invoiced</span><span class="c">kept out of their pay</span></div></td>`;
@@ -9199,21 +9359,70 @@ function invFees(){
   return { job, svc, worker };
 }
 
+// Worker pay, job by job (28 Sep 2026). Every non-void pay invoice, grouped
+// under its job with what is owed and what is paid, jobs with money owed
+// first. It reads INV_LIST only; paying is on Pay workers, as before.
+function invWorkerPayGroups(q){
+  const hit = (s) => !q || String(s).toLowerCase().includes(q);
+  const pays = INV_LIST.filter(i => i.payable_to === "worker" && i.status !== "void");
+  const by = new Map();
+  for (const i of pays) (by.get(i.job_id || "") || by.set(i.job_id || "", []).get(i.job_id || "")).push(i);
+  const groups = [...by.entries()].map(([jid, list]) => {
+    const j = INV_JOBS.find(x => x.id === jid) || { id: jid };
+    const qte = INV_QUOTES.get(jid) || {};
+    const owed = list.filter(i => i.status === "sent"), paid = list.filter(i => i.status === "paid"), drafts = list.filter(i => i.status === "draft");
+    // Each pay invoice names its own worker: a job can have had more than one.
+    const nameOf = (i) => (qte.worker_name && String(qte.worker_email || "").toLowerCase() === String(i.worker_email || "").toLowerCase()) ? qte.worker_name : (i.worker_email || "the tradesperson");
+    for (const i of list) i._worker = nameOf(i);
+    return { j, worker: [...new Set(list.map(i => i._worker))].join(", "), list: list.slice().sort((a, b) => (a.stage ?? 99) - (b.stage ?? 99) || String(a.id).localeCompare(String(b.id))), owed, paid, drafts, test: list.some(invIsTest) || !!j.is_test };
+  }).filter(g => hit([g.j.id, g.j.title || "", g.worker, ...g.list.map(i => i.id)].join(" ")));
+  groups.sort((a, b) => (b.owed.length ? 1 : 0) - (a.owed.length ? 1 : 0) || String(a.j.id).localeCompare(String(b.j.id)));
+  return groups;
+}
+function invWorkerPaySummary(){
+  const g = invWorkerPayGroups("").filter(x => !x.test);
+  const owed = g.flatMap(x => x.owed), paid = g.flatMap(x => x.paid).filter(i => invInMonth(i.paid_at)), drafts = g.flatMap(x => x.drafts);
+  const cell = (l, label) => { const t = sumByCur(l), cs = curOrder(Object.keys(t).filter(c => t[c]));
+    return `<td><div class="ivcell static${l.length ? "" : " zero"}"><span class="a">${cs.length ? cs.map(c => esc(curAmt(t[c], c))).join("<br>") : "none"}</span><span class="c">${esc(plural_(l.length, label, label + "s"))}</span></div></td>`; };
+  return `<div class="tw"><table class="ivsum"><thead><tr><th></th><th><b>Owed now</b><span>sent, not paid yet</span></th><th><b>Paid</b><span>in ${esc(invMonthName())}</span></th><th><b>Not sent yet</b><span>drafts</span></th></tr></thead>`
+    + `<tbody><tr><th>Worker pay</th>${cell(owed, "pay invoice")}${cell(paid, "pay invoice")}${cell(drafts, "pay invoice")}</tr></tbody></table></div>`;
+}
+function invWorkerPayRows(q){
+  const out = [];
+  const groups = invWorkerPayGroups(q);
+  const real = groups.filter(g => !g.test), test = groups.filter(g => g.test);
+  const job = (g) => {
+    const t = (l) => curText(sumByCur(l)) || "nothing";
+    return [`<tr class="ivgrp"><td colspan="5">${esc(g.j.id || "no job")}${g.j.title ? " &middot; " + esc(g.j.title) : ""} &middot; ${esc(g.worker)} &middot; ${g.owed.length ? "owed " + esc(t(g.owed)) : "nothing owed"}${g.paid.length ? " &middot; paid " + esc(t(g.paid)) : ""}</td></tr>`]
+      .concat(g.list.map(i => `<tr>
+        <td><a href="#" class="jistagename" data-ivopen="${esc(i.id)}">${esc(i.id)}</a><div class="ivtags">${invSign(i)}</div></td>
+        <td><div>${esc(i._worker)}</div><div class="jicond">${esc(String(i.period_label || "").trim() || (i.stage ? "Stage " + i.stage : "Work completed"))}</div></td>
+        <td class="jistagepct">${i.status === "paid" ? "paid " + esc(day_(i.paid_at)) + (i.paid_method ? ", " + esc(i.paid_method) : "") : i.status === "sent" ? "owed since " + esc(day_(i.sent_at)) + invWaited(i.sent_at) : "drafted " + esc(day_(i.created_at))}</td>
+        <td class="num"><span class="jiamt">${curAmt(i.total_pence, i.currency)}</span></td>
+        <td class="ivact"><button class="btn g" data-ivopen="${esc(i.id)}">Open</button>${i.status === "sent" ? `<button class="btn" data-ivpayworker="${esc(i.id)}">Pay the worker</button>` : ""}</td>
+      </tr>`));
+  };
+  real.forEach(g => out.push(...job(g)));
+  if (test.length) out.push(`<tr class="ivgrp"><td colspan="5">Your own tests &middot; ${test.length} job${test.length === 1 ? "" : "s"} &middot; counted in none of the figures above</td></tr>`, ...test.flatMap(job));
+  return out;
+}
+
 function invFeeTab(t, on){
   const f = invFees();
-  const n = f.job.length + f.svc.length + f.worker.length;
+  const n = t.k === "wfees" ? f.worker.length : f.job.length + f.svc.length;
   const v = "";
   return `<button class="ivtab${on ? " on" : ""}" data-ivtab="${t.k}"><i style="background:${t.col}"></i>${esc(t.label)}<span class="n">${n}</span>${v}</button>`;
 }
 
-function invFeeHint(){
-  return "Everything on this tab is money to Yaadly. The 15% is taken when the client pays the invoice that carries it, which starts the job. Services are the whole price. "
-    + "The 5% is Yaadly's too: it is kept out of what the tradesperson is paid, once the job is finished, so it is never a payment going out and never an invoice. "
-    + "It is worked out from each accepted quote at today's rate, not read from an invoice.";
+function invFeeHint(which = "agency"){
+  if (which === "worker") return "Yaadly's 5% worker fee. It is kept out of what the tradesperson is paid, so it is never a payment going out and never an invoice of its own: the worker's pay invoice is their quoted labour less 5%. "
+    + "Worked out from each accepted quote at today's rate, not read from an invoice. The pay itself is on Worker pay.";
+  return "Everything on this tab is money to Yaadly from clients. The 15% is taken when the client pays the invoice that carries it, which starts the job. Services are the whole price. Yaadly's 5% from tradespeople is on Worker fees.";
 }
 
-function invFeeRows(q){
+function invFeeRows(q, which = "agency"){
   const f = invFees();
+  if (which === "worker") { f.job = []; f.svc = []; } else f.worker = [];
   const hit = (s) => !q || String(s).toLowerCase().includes(q);
   const chip = (st) => `<span class="chip ${FEE_STATE[st][1]}">${esc(FEE_STATE[st][0])}</span>`;
   const when = (i) => i.status === "paid" ? "paid " + day_(i.paid_at) : i.status === "sent" ? "sent " + day_(i.sent_at) + invWaited(i.sent_at) : "drafted " + day_(i.created_at);
@@ -9445,11 +9654,12 @@ function renderInvoiceList(){
   const tab = INV_TABS.find(t => t.k === INV_TAB) || INV_TABS[0];
   const clientInv = INV_LIST.filter(i => i.payable_to !== "worker");
 
-  $("ivSplit").innerHTML = tab.k === "fees" ? invFeeSummary() : invSummary(clientInv);
+  $("ivSplit").innerHTML = tab.k === "fees" ? invFeeSummary() : tab.k === "wfees" ? invFeeSummary("worker") : tab.k === "wpay" ? invWorkerPaySummary() : invSummary(clientInv);
   $("ivSplit").querySelectorAll("[data-ivgo]").forEach(b => b.addEventListener("click", () => { INV_TAB = b.dataset.ivgo; renderInvoiceList(); }));
 
   $("ivTabs").innerHTML = INV_TABS.map(t => {
-    if (t.k === "fees") return invFeeTab(t, t.k === tab.k);
+    if (t.k === "fees" || t.k === "wfees") return invFeeTab(t, t.k === tab.k);
+    if (t.k === "wpay") return `<button class="ivtab${t.k === tab.k ? " on" : ""}" data-ivtab="wpay"><i style="background:${t.col}"></i>${esc(t.label)}<span class="n">${INV_LIST.filter(i => i.payable_to === "worker" && i.status === "sent" && !invIsTest(i)).length}</span></button>`;
     if (t.k === "jobs") return `<button class="ivtab${t.k === tab.k ? " on" : ""}" data-ivtab="jobs"><i style="background:${t.col}"></i>${esc(t.label)}<span class="n">${invLiveJobs().length}</span></button>`;
     const l = INV_LIST.filter(t.has).filter(i => !invIsTest(i));
     const n = l.length + (t.k === "preview" ? INV_DUE.length : 0);
@@ -9463,7 +9673,8 @@ function renderInvoiceList(){
     + (tab.k === "out" && unbilled.length ? ` Job bills split into parts also have ${curText(sumByCur(unbilled))} not billed yet, on ${unbilled.map(i => i.id).join(", ")}.` : "");
 
   if (tab.k === "fees") $("ivHint").textContent = invFeeHint();
-  if (tab.k === "sent" || tab.k === "paid" || tab.k === "fees") $("ivHint").insertAdjacentHTML("afterbegin", invMonthNav());
+  if (tab.k === "wfees") $("ivHint").textContent = invFeeHint("worker");
+  if (tab.k === "sent" || tab.k === "paid" || tab.k === "fees" || tab.k === "wfees" || tab.k === "wpay") $("ivHint").insertAdjacentHTML("afterbegin", invMonthNav());
 
   const due = tab.k === "preview" ? INV_DUE.filter(d => hit(d.job.id + " " + (d.job.title || "") + " " + (d.job.client_email || ""))) : [];
   let rows = INV_LIST.filter(tab.has).filter(i => hit([i.id, i.client_name, i.client_email, i.job_id, i.part_of].join(" ")));
@@ -9488,14 +9699,15 @@ function renderInvoiceList(){
         .concat(testRows.map(invRowHtml))
     : []);
 
-  const all = tab.k === "fees" ? invFeeRows(q) : tab.k === "jobs" ? invJobRows(q) : dueRows.concat(invRows);
+  const all = tab.k === "fees" ? invFeeRows(q) : tab.k === "wfees" ? invFeeRows(q, "worker") : tab.k === "wpay" ? invWorkerPayRows(q) : tab.k === "jobs" ? invJobRows(q) : dueRows.concat(invRows);
   $("ivList").innerHTML = all.length
     ? `<div class="tw"><table class="jitable">
-        <thead>${tab.k === "fees" ? '<tr><th>Fee</th><th>Job or client</th><th>Where it is</th><th class="num">Amount</th><th></th></tr>' : tab.k === "jobs" ? '<tr><th>Job</th><th>Job type and client</th><th>Status</th><th class="num">Client not paid yet</th><th></th></tr>' : '<tr><th>Invoice</th><th>Client</th><th>When</th><th class="num">Amount</th><th></th></tr>'}</thead>
+        <thead>${tab.k === "fees" || tab.k === "wfees" ? '<tr><th>Fee</th><th>Job or client</th><th>Where it is</th><th class="num">Amount</th><th></th></tr>' : tab.k === "jobs" ? '<tr><th>Job</th><th>Job type and client</th><th>Status</th><th class="num">Client not paid yet</th><th></th></tr>' : tab.k === "wpay" ? '<tr><th>Pay invoice</th><th>Worker</th><th>When</th><th class="num">Amount</th><th></th></tr>' : '<tr><th>Invoice</th><th>Client</th><th>When</th><th class="num">Amount</th><th></th></tr>'}</thead>
         <tbody>${all.join("")}</tbody></table></div>`
     : q ? '<div class="empty"><b>Nothing here matches that</b>Clear the search box, or try another group.</div>'
     : tab.k === "jobs" ? '<div class="empty"><b>No live jobs</b>A job shows here once a tradesperson is booked on it, and stays until it is finished and every invoice on it is paid.</div>'
-    : `<div class="empty"><b>Nothing in ${esc(tab.label)}${tab.k === "sent" || tab.k === "paid" || tab.k === "fees" ? " for " + esc(invMonthName()) : ""}</b>${tab.k === "preview" ? "Raise a new invoice from the button above, or from a booked job when its quote is accepted." : tab.k === "sent" || tab.k === "paid" ? "Use the arrows beside the month to look at another one." : ""}</div>`;
+    : tab.k === "wpay" ? '<div class="empty"><b>No worker pay yet</b>A pay invoice is raised the moment a client approves a stage, and shows here under its job.</div>'
+    : `<div class="empty"><b>Nothing in ${esc(tab.label)}${tab.k === "sent" || tab.k === "paid" || tab.k === "fees" || tab.k === "wfees" ? " for " + esc(invMonthName()) : ""}</b>${tab.k === "preview" ? "Raise a new invoice from the button above, or from a booked job when its quote is accepted." : tab.k === "sent" || tab.k === "paid" ? "Use the arrows beside the month to look at another one." : ""}</div>`;
 
   $("ivTabs").querySelectorAll("[data-ivtab]").forEach(b => b.addEventListener("click", () => { INV_TAB = b.dataset.ivtab; renderInvoiceList(); }));
   $("ivHint").querySelectorAll("[data-ivmonth]").forEach(b => b.addEventListener("click", async () => {
@@ -10494,6 +10706,67 @@ let RPT_SOURCE = "";
 
 // The reader's door. Same pause rule as rptFn(): reading a quote is a model
 // call, and the switch in the top bar has to stop it.
+// ---- Completion reports (the "completion" view), 28 Sep 2026.
+//
+// The report runs on its own (yaad-completion-flow). The desk calls the same
+// function with your token only when that did not happen: a report that did
+// not start, or a signed one whose screen never came back.
+const CR_APP = "https://app.yaadly.co.uk";
+const FLOW_FN = SUPABASE_URL + "/functions/v1/yaad-completion-flow";
+
+function crState_(r){
+  const s = r.report_status;
+  if (s === "not_started") return chip_("crit", "did not start") + sub_("start it now");
+  if (s === "with_worker") return chip_("warn", "with the worker") + sub_(r.return_reason ? "sent back" : "to read and sign");
+  if (s === "worker_signed") return chip_("warn", "signed, checking") + sub_("goes out in a moment");
+  if (s === "held") return chip_("crit", "held for you") + sub_(r.hold_reason || "");
+  if (s === "issued") return chip_("ok", "with the client") + sub_(r.issued_name ? "released by " + r.issued_name : "passed the check");
+  return tone_(s);
+}
+
+function crName_(){ try { return localStorage.getItem("yaad-desk-name") || ""; } catch (_) { return ""; } }
+function crRemember_(n){ try { if (n) localStorage.setItem("yaad-desk-name", n); } catch (_) { /* private window */ } }
+
+function crFirst_(name, fallback){ return String(name || "").trim().split(/\s+/)[0] || fallback; }
+
+function crWorkerMsg_(r){
+  const link = CR_APP + "/portal/jobs/" + encodeURIComponent(r.id) + "/completion?code=" + encodeURIComponent(r.sign_code || "");
+  return `Hello ${crFirst_(r.worker_name, "there")}, this is Yaadly. The Completion Report for job ${r.id} is ready for you to read and sign: ${link}\n\nIt is your document. Change the care notes or add your own account of the work if anything is wrong, then sign it.`;
+}
+
+async function crSend_(jobId, to, how, text){
+  if (!String(text || "").trim()) throw new Error("Nothing to send.");
+  const r = await fetch(MSG_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify({ job_id: jobId, to, channel: how || "whatsapp", text: String(text).trim() }),
+  });
+  const j = await r.json().catch(() => ({ error: "the function returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+}
+
+async function crFlow_(r, step){
+  if (step === "start" && AGENTS_PAUSED) throw new Error("Agents are paused. The switch in the top bar turns them back on. Nothing was sent to a model.");
+  const res = await fetch(FLOW_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify({ jobId: r.id, step }),
+  });
+  const j = await res.json().catch(() => ({ error: "the function returned something unreadable" }));
+  if (!res.ok) throw new Error(j.error || ("http " + res.status));
+  await loadTableView("completion");
+  const said = {
+    started: `Started. ${j.care_notes ? j.care_notes + " care note" + (j.care_notes === 1 ? "" : "s") + " drafted" : "No care notes drafted, the worker writes their own"}, and the worker is being sent the link.`,
+    exists: "It had already started. Nothing changed.",
+    not_complete: "The job is not complete, so there is no report yet.",
+    no_worker: "There is no worker on this job to sign it.",
+    issued: "Clean. It has gone to the client.",
+    held: "Held for you: " + ((j.findings || []).map(f => f.text).join("; ") || "see the row"),
+    not_waiting: "It is not waiting on the check. Nothing changed.",
+  }[j.outcome] || ("Done: " + (j.outcome || "no answer"));
+  return `<div class="card" style="margin-top:12px"><b>${esc(said)}</b></div>`;
+}
+
 async function rptReadFn(images){
   if (AGENTS_PAUSED) {
     throw new Error("Agents are paused. The switch in the top bar turns them back on. Nothing was sent to a model.");

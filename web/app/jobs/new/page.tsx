@@ -10,7 +10,7 @@ export const metadata = {
 export default async function NewJob({
   searchParams,
 }: {
-  searchParams: Promise<{ trade?: string; parish?: string; worker?: string }>;
+  searchParams: Promise<{ trade?: string; parish?: string; worker?: string; about?: string }>;
 }) {
   /* ?trade= comes off the one tap trade tiles on the marketing site, so
      somebody who has already said "roof and zinc" is not asked again.
@@ -23,7 +23,11 @@ export default async function NewJob({
      they land in this one flow with that name carried through to the
      enquiry. Resolved to a real active profile here so a hand-typed slug
      cannot put a name on an enquiry that nobody vetted. */
-  const { trade, parish, worker } = await searchParams;
+  /* ?about= comes off "Ask for a quote for this" on a Completion Report, next
+     to a new find the worker recorded outside the job (28 Sep 2026). It only
+     starts the description; the client reads it and says the rest. A new find
+     becomes its own job with its own quote, never an addition to the old one. */
+  const { trade, parish, worker, about } = await searchParams;
   let requestedWorker: string | undefined;
   let requestedWorkerSlug: string | undefined;
   if (worker) {
@@ -52,7 +56,7 @@ export default async function NewJob({
           </span>
         </div>
       )}
-      <PostJob initialTrade={trade} initialParish={parish} requestedWorker={requestedWorker} requestedWorkerSlug={requestedWorkerSlug} />
+      <PostJob initialTrade={trade} initialParish={parish} initialDesc={about ? about.slice(0, 600) : undefined} requestedWorker={requestedWorker} requestedWorkerSlug={requestedWorkerSlug} />
     </div>
   );
 }
