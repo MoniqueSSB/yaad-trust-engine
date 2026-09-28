@@ -63,10 +63,10 @@ export default async function Completion({ params }: { params: Promise<{ id: str
   const nextSection = () => ++sectionNo;
 
   return (
-    <div className="rounded-2xl border border-line bg-panel p-6">
+    <div id="completion-report" className="rounded-2xl border border-line bg-panel p-6">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <Link href={"/portal/jobs/" + encodeURIComponent(id)} className="text-[13px] text-tealb underline-offset-2 hover:underline">&larr; Back to the job</Link>
-        <PrintReport />
+        <PrintReport jobId={job.id} targetId="completion-report" />
       </div>
       <div className="mt-3 border-b-2 border-teal pb-4">
         <h1 className="font-display text-[clamp(22px,3.5vw,30px)] uppercase leading-tight">Completion Report</h1>
