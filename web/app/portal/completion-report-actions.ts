@@ -4,13 +4,14 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { notesFromText } from "@/lib/portal/completion-report";
+import { scrub } from "@/lib/scrub";
 
 /**
  * The worker's signature and the client's review of the Completion Report.
  *
  * Thin on purpose, the same shape as the walkthrough actions: the rules live
  * in Postgres (sign_completion_report, confirm_completion_report,
- * flag_completion_report, 20260928160000), so a bug here is a refusal, never a
+ * flag_completion_report, 20260928200000), so a bug here is a refusal, never a
  * signature nobody gave. Each returns the database's own words when it
  * refuses, so the person reads which rule fired.
  */
@@ -53,7 +54,9 @@ export async function flagCompletionReport(_prev: ReportActionState, formData: F
   const supabase = await createClient();
   const { error } = await supabase.rpc("flag_completion_report", {
     p_job: jobId,
-    p_body: String(formData.get("body") ?? ""),
+    // Scrubbed of contact details before it becomes a dispute the worker
+    // reads, exactly as raiseDispute does for any other dispute.
+    p_body: scrub(String(formData.get("body") ?? "").trim().slice(0, 1900)).clean,
   });
   if (error) return { error: error.message };
   revalidatePath("/portal/jobs/" + jobId + "/completion");

@@ -31,8 +31,8 @@ export function WorkerSign({
         <p className="text-[13.5px] font-bold text-ink">Signed. Thank you.</p>
         <p className="mt-1 text-[12.5px] text-mute">
           {state.changed
-            ? "Your changes go to Yaadly to be read before the report is issued to the owner."
-            : "Yaadly will issue the report to the owner."}
+            ? "Your changes are in, and the report goes to the owner in a moment."
+            : "The report goes to the owner in a moment."}
         </p>
       </div>
     );
@@ -86,10 +86,10 @@ export function ClientReview({ jobId }: { jobId: string }) {
   if (flag.ok) {
     return (
       <div className={box}>
-        <p className="text-[13.5px] font-bold text-ink">Sent to Yaadly.</p>
+        <p className="text-[13.5px] font-bold text-ink">Raised as a dispute.</p>
         <p className="mt-1 text-[12.5px] text-mute">
-          A person reads it and replies. If the report needs to change, it goes back to the worker to sign
-          again, and you receive the new version.
+          The worker hears first and answers on the job. Yaadly has been told too. If the report needs to
+          change, it goes back to the worker to correct and sign again, and you receive the new version.
         </p>
       </div>
     );
@@ -98,8 +98,9 @@ export function ClientReview({ jobId }: { jobId: string }) {
     <div className={box}>
       <h3 className="text-[14px] font-bold text-ink">Is this report right?</h3>
       <p className="mt-1 text-[12.5px] text-mute">
-        The worker has signed it, so it cannot be edited here. If something is wrong or missing, tell us and a
-        person will look at it.
+        It is the worker&apos;s signed report, so it cannot be edited here. If something is wrong or missing,
+        raise it: that opens a dispute on the job, the worker answers first, and Yaadly steps in if it cannot
+        be sorted between you.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <form action={okAction}>
@@ -120,7 +121,7 @@ export function ClientReview({ jobId }: { jobId: string }) {
             placeholder="The mixer in the photographs is not the one I bought." />
           {flag.error && <p className="mt-2 text-[12.5px] text-coral">{flag.error}</p>}
           <button type="submit" disabled={flagPending} className={btn + " mt-2 bg-purple text-white hover:bg-purpleb"}>
-            {flagPending ? "Sending" : "Send to Yaadly"}
+            {flagPending ? "Raising it" : "Raise it"}
           </button>
         </form>
       )}

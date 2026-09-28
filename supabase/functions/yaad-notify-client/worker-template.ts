@@ -39,6 +39,7 @@ const SUMMARY: Record<string, string | null> = {
   materials_sent_worker: "Yaadly has sent you the materials money",
   worker_paid: "Yaadly has sent you a payment",
   walkthrough_requested: "the client has asked for a video walkthrough",
+  completion_report_worker: "your Completion Report is ready for you to read and sign. The link below opens it",
 };
 
 /** Whether a kind has been decided on at all. A new worker kind added to the

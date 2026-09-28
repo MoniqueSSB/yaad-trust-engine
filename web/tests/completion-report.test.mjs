@@ -96,6 +96,16 @@ describe("the rest", () => {
     assert.match(c.trailLabel({ step: "signed", actor_name: "A B", actor_email: null, at: "", detail: { changed: true } }), /with changes/);
   });
 
+  test("an automatic release never reads as a person's review", () => {
+    const l = c.trailLabel({ step: "released", actor_name: "Automatic screen", actor_email: null, at: "", detail: {} });
+    assert.match(l, /automatic screen/i);
+    assert.doesNotMatch(l, /reviewed|approved|checked by/i);
+  });
+
+  test("a report sent back carries the reason the worker was given", () => {
+    assert.match(c.trailLabel({ step: "returned", actor_name: "M S", actor_email: null, at: "", detail: { reason: "Take out the price." } }), /Take out the price\./);
+  });
+
   test("dates print as a person reads them, Jamaica time", () => {
     assert.equal(c.fmtWhen("2026-09-15T13:12:00Z"), "15 Sep 2026, 08:12");
   });

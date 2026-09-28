@@ -6127,38 +6127,44 @@ Desk, **Reports**. Service: Deposit Protection Check. Client name and property a
 3. **Portal, Completion Report.** Download PDF saves `Completion Report <job>.pdf`. If it fails, the page says so and opens the print dialog; choose Save as PDF. The light colours for both come from `html.pdf-render` and `@media print` in `web/app/globals.css`.
 4. **Checking the desk under its real policy.** Serve a copy with the same `Content-Security-Policy` header the desk worker sets (see 31 above), press Preview, and confirm the box shows a PDF, not a web page.
 
-## 33. A Completion Report: getting one from a finished job to the client (28 Sep 2026)
+## 33. A Completion Report: it runs on its own, and when to step in (28 Sep 2026)
 
-The client cannot see the report until you issue it. The worker signs first.
-All of it is on the desk under **Documents & money, Completion reports**.
+It is the worker's document. Nothing on the desk edits it. When a job
+completes, the report opens for the worker with drafted care notes and they
+get a WhatsApp link; when they sign, an automatic check sends it to the client
+or holds it for you. Desk: **Documents & money, Completion reports**. The
+picture at the top counts only the ones that need you.
 
-1. **Draft the care notes.** Opens a draft from yaad-completion. Read them.
-   If the drafter is down, write them yourself with **Edit the words**, one
-   note per line. Nothing has gone anywhere yet.
-2. **Accept and send to the worker.** Your name as it prints. This makes the
-   signing code.
-3. **Send the worker the link.** WhatsApp from the Yaadly number, or email.
-   WhatsApp refuses outside 24 hours of their last message: use email, or
-   copy the message from the box into your own WhatsApp. The link must carry
-   `?code=`; without it the page will not let them sign.
-4. The worker signs. The row goes to **signed, to issue**, and says whether
-   they changed the words.
-5. **Read what they signed and issue it.** If they changed something you do
-   not accept, do NOT issue: use **Edit the words**. That starts a new
-   revision and it goes back to them (step 2 again). Their old link stops
-   working, on purpose.
-6. **Send the client the report.**
+**Red, "did not start".** The job completed but nothing opened. Press **Start
+it now**. Most likely `yaad-completion-flow` was not deployed, or the call from
+the trigger failed; `net._http_response` has the answer.
 
-If the client presses "Something is wrong or missing", it lands in the portal
-messages inbox as "About the Completion Report: ..." and the row shows
-**raised a point**. If it is upheld, **Edit the words** and go round again; the
-client stops seeing the report until you reissue it.
+**Red, "held for you".** The check found money or a banned word in what the
+worker signed; the row says which. Open the report and read it. If it is fine
+as it stands, **Release it unchanged** (your name goes on it as the person who
+released it). If the words need to change, **Send it back to the worker** with
+your reason. They get a new link automatically; the old one stops working.
 
-**"A Completion Report is for a finished job."** The job is not `complete`. A
-job with an unpaid fee invoice sits at `awaiting_payment` (sync_job_status).
+**Amber, "signed, checking" for more than a few minutes.** The check did not
+come back. **Screen it again**.
+
+**Amber, "with the worker" and they say they never got it.** WhatsApp refuses
+outside 24 hours of their last message and falls back to the worker template,
+which carries the signing link. If that failed too, **Send the worker the link
+again** by email or from your own phone. The link must carry `?code=`.
+
+**The client raised a dispute on the report.** It is an ordinary dispute: the
+worker hears first and you are alerted. If the report must change, **Send it
+back to the worker**; the client stops seeing it until the worker signs again
+and it passes the check.
+
+**Deploying.** `yaad-completion-flow` WITH `--no-verify-jwt` (its door is the
+trigger secret or an admin token). `yaad-notify-client` WITH `--no-verify-jwt`,
+as it already runs. Both from disk, after `supabase/functions/sync-shared.sh`.
 
 **Checking the rules still hold:** `supabase/tests/completion_report_guards.sql`,
-19 checks. Run it inside `begin; ... rollback;` with
+22 checks. Run it inside `begin; ... rollback;` with
 `supabase db query --linked --project-ref leffyisvfvjwzilydlwf -f <file>`. It
-switches the jobs triggers off for its own fixture insert, which is why it must
-be inside a transaction.
+switches the user triggers on jobs, completion_reports and disputes off for
+its own run, so nothing is messaged, which is why it must be inside a
+transaction.

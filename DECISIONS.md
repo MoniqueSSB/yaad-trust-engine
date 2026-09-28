@@ -6,6 +6,49 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-28 · The Completion Report is the worker's document, and Yaadly steps in only when it goes wrong
+
+Supersedes the order in the entry below, the same afternoon. Monique, on
+seeing a desk that let her edit the words: "no i dont edit it, it is the
+workers document, not mine to edit", then "i only step in when things go
+wrong and a dispute is raised". Offered three questions, she took each
+recommended answer.
+
+**It runs on its own.** A job completing fires `yaad-completion-flow` (step
+`start`), which drafts care notes and opens the report for the worker; the
+trigger on `completion_reports` then sends them the link through
+`yaad-notify-client`. If the drafter is down, the report opens with no care
+notes and the worker writes their own. When the worker signs, the same
+function (step `screen`) checks their words for money amounts and the banned
+list both runtimes share. Clean, it is issued to the client. Found anything,
+it is held and Monique is alerted by the ordinary desk alert. The client's
+"Something is wrong or missing" is a dispute row, so the worker hears first,
+Monique is alerted, and it can be escalated, exactly like any other dispute.
+
+**Nobody at Yaadly can write a word of it.** `save_completion_report`,
+`accept_completion_report` and `issue_completion_report` are dropped. What
+she has is `release_completion_report` (a held report goes out unchanged,
+under her name) and `return_completion_report` (back to the worker with her
+reason: new revision, new code, signature cleared). The screen, too, can
+only hold.
+
+**Against the governing rule, argued rather than assumed.** A named human
+still confirms the words before any client reads them: the worker, who signs
+them. Issuing a report moves no money, rules on no dispute and changes no
+reputation, and it is not in `HUMAN_ONLY_DECISIONS`. The automatic step can
+refuse to send; it can never write, edit or approve anything. And the report
+does not pretend otherwise: one that passed the screen says it was sent when
+the worker signed and that Yaadly does not edit it, with no name implying a
+review. A person's name appears only when a person released it.
+
+**A new public door.** `yaad-completion-flow` is deployed with
+`--no-verify-jwt`, because the database triggers hold no session. Its door is
+the notify trigger secret or an admin token, the shape `yaad-notify-client`
+already has. The list in CLAUDE.md section 12 is Monique's file and names
+the functions allowed without platform auth; it needs this one added.
+
+---
+
 ## 2026-09-28 · The Completion Report is signed by the worker and issued by a named person
 
 Monique asked for the report to be updated after looking at comparable

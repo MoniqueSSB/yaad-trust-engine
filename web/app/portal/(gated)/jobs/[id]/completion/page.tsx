@@ -25,12 +25,13 @@ export const dynamic = "force-dynamic";
  * appendix.
  *
  * Every fact is read from the record here. The only stored words are the care
- * notes and the worker's own account (completion_reports), and those went
- * through a named person, the worker's signature and a named person again
- * before the client can see them. No money anywhere, by decision.
+ * notes and the worker's own account (completion_reports). The report is the
+ * worker's document (founder, 28 Sep 2026): they change the words and sign,
+ * an automatic screen for money and banned wording can only hold it back,
+ * and Yaadly steps in only when something goes wrong. No money anywhere.
  *
  * Who sees what: the client only once it is issued; the worker from the
- * moment it is sent to them to sign; an admin always, with its state on top.
+ * moment it opens for them; an admin always, with its state on top.
  */
 
 /* The decided text, verbatim. It carries its own "<h5>6 · ...</h5>" from the
@@ -91,7 +92,7 @@ export default async function Completion({
   // Not yet theirs to read. The client waits for issue; the worker waits to be
   // sent it. Said plainly, not as a 404, because the job IS complete.
   const canRead = isAdmin || (isClient && status === "issued") ||
-    (isWorker && ["with_worker", "worker_signed", "issued"].includes(status));
+    (isWorker && ["with_worker", "worker_signed", "held", "issued"].includes(status));
   if (!canRead) {
     return (
       <div className="rounded-2xl border border-line bg-panel p-6">
@@ -99,7 +100,7 @@ export default async function Completion({
         <h1 className="mt-3 font-display text-[clamp(22px,3.5vw,30px)] uppercase leading-tight">Completion Report</h1>
         <p className="mt-3 max-w-[60ch] text-[13.5px] leading-relaxed text-mute">
           {isClient
-            ? "Your report is being prepared. The worker reads and signs it first, then a person at Yaadly checks it and issues it to you. You will get a message when it is ready."
+            ? "Your report is being prepared. The worker who did the job reads it and signs it, then it comes to you. You will get a message when it is ready."
             : "The report for this job is being prepared. You will get a WhatsApp message with a link when it is ready for you to read and sign."}
         </p>
       </div>
@@ -172,15 +173,24 @@ export default async function Completion({
     <div className="grid gap-4">
       {isAdmin && status !== "issued" && (
         <div className="rounded-2xl border border-gold/40 bg-gold/[0.07] px-5 py-3 text-[13px] text-mute print:hidden">
-          <b className="text-goldb">Desk view.</b> This report is <b>{status.replace(/_/g, " ")}</b>. The client cannot see it until it is issued from the desk.
+          <b className="text-goldb">Desk view.</b> This report is <b>{status.replace(/_/g, " ")}</b>
+          {status === "held" && report?.hold_reason ? <> (held for: {report.hold_reason})</> : null}. The client cannot see it until it is issued.
+        </div>
+      )}
+      {isWorker && status === "with_worker" && report?.return_reason && (
+        <div className="rounded-2xl border border-gold/40 bg-gold/[0.07] px-5 py-3 text-[13px] text-mute print:hidden">
+          <b className="text-goldb">Sent back to you{report.returned_name ? " by " + report.returned_name : ""}:</b> &ldquo;{report.return_reason}&rdquo;
         </div>
       )}
       {isWorker && status === "with_worker" && (
         <WorkerSign jobId={job.id} code={code ?? ""} careNotes={careNotes} account={report?.worker_account ?? ""} workerName={job.worker_name ?? ""} />
       )}
-      {isWorker && status === "worker_signed" && (
+      {isWorker && (status === "worker_signed" || status === "held") && (
         <div className="rounded-2xl border border-line bg-bg p-4 text-[13px] text-mute print:hidden">
-          You signed this report {fmtWhen(report?.worker_signed_at)}. Yaadly issues it to the owner next.
+          You signed this report {fmtWhen(report?.worker_signed_at)}.{" "}
+          {status === "held"
+            ? "It has been held before going to the owner, and Yaadly is looking at it. If anything needs changing, it comes back to you with the reason."
+            : "It goes to the owner in a moment."}
         </div>
       )}
 
@@ -452,8 +462,15 @@ export default async function Completion({
           )}
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div className="border-t-2 border-ink pt-1.5 text-[13px] text-ink">
-              <p className={label}>Issued by</p>
-              {report?.issued_at ? <>{report.issued_name}, Yaadly Ltd<br /><span className="text-[11.5px] text-dim">{fmtWhen(report.issued_at)}</span></> : <span className="text-dim">Not issued yet</span>}
+              <p className={label}>Sent to the owner</p>
+              {/* Honest about who read it. A report released from hold carries
+                  the name of the person who released it; one that passed the
+                  automatic screen says so, and never implies a person at
+                  Yaadly reviewed the worker's words. */}
+              {!report?.issued_at ? <span className="text-dim">Not sent yet</span>
+                : report.issued_name
+                  ? <>Released by {report.issued_name}, Yaadly Ltd<br /><span className="text-[11.5px] text-dim">{fmtWhen(report.issued_at)}</span></>
+                  : <>When the worker signed<br /><span className="text-[11.5px] text-dim">{fmtWhen(report.issued_at)}. The report is the worker&apos;s own; Yaadly does not edit it.</span></>}
             </div>
             <div className="border-t-2 border-ink pt-1.5 text-[13px] text-ink">
               <p className={label}>Work approved by the owner</p>

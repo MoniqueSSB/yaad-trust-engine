@@ -136,10 +136,14 @@ export function trailLabel(e: TrailEvent): string {
     case "drafted": return "Care notes drafted (a draft only)";
     case "edited": return (e.detail && e.detail.reopened_from) ? "Edited on the desk, reopened for signing" : "Edited on the desk";
     case "accepted": return "Checked, accepted and sent to the worker";
+    case "sent_to_worker": return "Opened for the worker to read and sign";
+    case "held": return "Held before reaching the owner by the automatic screen";
+    case "released": return e.actor_name === "Automatic screen" ? "Passed the automatic screen, sent to the owner" : "Released unchanged and sent to the owner";
+    case "returned": return "Sent back to the worker" + (e.detail && e.detail.reason ? ": \u201c" + String(e.detail.reason) + "\u201d" : "");
     case "signed": return e.detail && e.detail.changed ? "Reviewed and signed by the worker, with changes" : "Reviewed and signed by the worker, no changes";
     case "issued": return e.detail && e.detail.worker_changed ? "Worker's changes read and accepted, report issued" : "Report issued";
     case "client_confirmed": return "Confirmed by the owner";
-    case "client_flagged": return "Owner raised a point";
+    case "client_flagged": return "Owner raised a dispute";
     default: return e.step;
   }
 }
