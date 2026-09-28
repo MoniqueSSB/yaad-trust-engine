@@ -6281,3 +6281,8 @@ Founder: "you raise this with Yaadly". The portal opens a new dispute already es
 2. **Where it is:** the job page's **Job details** tab, with the portal link and access code, This job, and the job as agreed. None of it is on Overview any more.
 3. **Who:** the client adds or changes it while the job is open; the booked worker reads it; a worker who only quoted never sees it. Each change writes a line to `agent_actions` (who, added or changed), never the old address.
 4. **Nudges:** once a worker is booked and there is no address, the client's list says Add the street address and the worker's says Waiting on the street address.
+
+## 46. Extra work on the Money tab, and the worker cannot start it (28 Sep 2026)
+
+1. **Every piece of extra work** that is live or settled is listed in What this job costs under Additional work, with its work amount, Yaadly's fee and total, its state, and where its money stands. Only agreed or approved work is added into the totals; one still being agreed says so. Turned down or withdrawn work is not listed; cancelled work is listed only if its bill was paid.
+2. **A worker says the extra work is paid but their card still says it is waiting:** `job_addon_bill_state()` (20260929080000) is what tells the worker a bill was paid, because workers cannot read the client's invoices. Check it is present: `select * from job_addon_bill_state('<job>');` as the worker returns one row per add-on.

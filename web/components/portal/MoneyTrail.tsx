@@ -12,7 +12,7 @@
  */
 
 export type TrailBill = { id: string; label: string; total: number | null; paid: boolean; paidAt: string | null };
-export type TrailWorkerPay = { id: string; what: string; labour: number | null; paid: boolean; paidAt: string | null };
+export type TrailWorkerPay = { id: string; addonId?: string | null; what: string; labour: number | null; paid: boolean; paidAt: string | null };
 /** due: money sent, no receipt yet. filed: the worker has uploaded one.
  *  recorded: a person at Yaadly has recorded it against the money. */
 export type TrailMaterials = { released: number; quoted: number; receipt: "due" | "filed" | "recorded" };
