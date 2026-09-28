@@ -6210,3 +6210,10 @@ transaction.
 4. `cp concierge/concierge.html concierge-deploy/public/index.html` if the desk changed, then deploy the desk as usual. The templates travel in `concierge-deploy/public/templates`.
 5. "Could not load the templates" on the desk means `templates/index.json` was not deployed with the desk. Check `concierge-deploy/public/templates` has it, then redeploy.
 6. The Deposit Protection Check template's checklist and payment terms are a copy of `DEPOSIT_CHECKLIST` and `PAYMENT_TERMS` in `yaad-report`. Change one, change the other.
+
+## 38. A quote pack draft: reading it, correcting it, printing it (28 Sep 2026)
+
+1. **Where.** Desk, Documents & money, Quote Pack Drafts. Open a row: the track at the top shows where it stands, and the gold or red timer is how long a job has been unquotable because of it.
+2. **A flagged draft.** Press **Correct the wording**. The flagged words are listed at the top and every box still holding one is outlined in red. Fix those, check the stage total reads 100%, then **Save and check again**. It saves and re-checks; **Approve** is still a separate press.
+3. **The PDF.** **Open the pack as a PDF** opens a new tab. Press Print, then choose Save as PDF. If nothing opens, allow pop-ups for `concierge.yaadly.co.uk` once.
+

@@ -6,6 +6,34 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-28 · A quote pack draft opens as a picture, prints as a PDF, and is corrected section by section
+
+Monique, looking at a quote pack draft on the desk: "this should be a pdf", the top of the drawer "should be a dashboard, visual one, not just date lines", and "correct the wording needs to be better as it is just a long file". She approved a clickable demo with invented data before the live file was touched.
+
+**The drawer.** It opens on a four-step track: drafted, checked for prices and banned words, your review, workers can see it. Below it are:
+
+- how long the draft has waited, using the same 24 and 72 hour thresholds as the Overview;
+- what the two word checks found;
+- how many of the five sections are written;
+- the payment stages as one bar split by percentage, with a warning if they do not total 100.
+
+The raw columns are folded underneath, not removed.
+
+**The PDF.** "Open the pack as a PDF" uses the same route as reports: a printable page in a new tab, then Print and Save as PDF. No PDF library, and nothing leaves the browser.
+
+Every pack carries fixed wording on work outside the scope, the add-on flow Monique set the same day. It is standard text, not model output, so it cannot drift job to job, and the guardrail never needs to read it.
+
+**Correct the wording.** The action is now a form:
+
+- a box for the scope and a box for the timeline;
+- one row per bullet under Included and Not included;
+- one card per payment stage, with a live total;
+- the flagged words named at the top, and outlined in any box that still holds one.
+
+It saves through the same `deskRescanPack`, so the rule is unchanged: saving re-runs the word check, approves nothing and sends nothing. `runAction` gained a `form` branch for an action that draws its own fields. The generic ask form can only hold single boxes.
+
+---
+
 ## 2026-09-28 · A pay invoice records the labour and the worker fee it was worked out from
 
 Monique asked for Yaadly's worker fee to show on the worker's pay invoice.
