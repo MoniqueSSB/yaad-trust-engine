@@ -2484,11 +2484,12 @@ const VIEWS = [
     viz:{ want:r => r.status === "agreed", wants:"agreed, waiting on the work and your sign-off" },
     empty:["No add-ons yet","An add-on appears when a client adds extra work to a booked job from their portal."],
     detailTop: r => addonStory_(r), foldFields:true, afterOpen: addonAfterOpen_,
+    titleOf: r => "Add-on on " + r.job_id,
     cols:[
       {h:"Job", f:r => id_(r.job_id) + sub_("version " + r.rev)},
       {h:"Extra work", f:r => said_(r.scope)},
       {h:"Amount", f:r => esc(jmdFmt(r.amount_jmd)) + sub_(r.terms === "in_full" ? "in full" : "half now, half later")},
-      {h:"State", f:r => tone_(r.status)},
+      {h:"State", f:r => chip_(TONE[r.status] || "mute", ADDON_STATE[r.status] || r.status)},
       {h:"Signed off", f:r => r.signed_off_at ? esc(r.signed_off_by || "") + sub_(ago_(r.signed_off_at)) : mute_("not yet")},
       {h:"Updated", f:r => mute_(ago_(r.updated_at))},
     ],
@@ -5888,6 +5889,8 @@ const QP_DOCS = [
 ];
 const qpDocsHtml = docs => docsListHtml(QP_DOCS, docs);
 
+const ADDON_STATE = { with_worker:"waiting on the worker", with_client:"waiting on the client", agreed:"agreed", signed_off:"signed off", declined:"turned down", withdrawn:"withdrawn" };
+
 // An add-on's drawer: where it stands, what each side gets, its invoices and
 // the photos filed on it, which are what sign-off is judged on.
 function addonStory_(r){
@@ -5897,7 +5900,7 @@ function addonStory_(r){
   const rail = `<div class="dlvrail">` + steps.map((t, i) => {
     const n = i + 1, closed = r.status === "declined" || r.status === "withdrawn";
     const cls = closed && n === 2 ? "stop" : n <= step ? "done" : "";
-    return `<div class="dlvst ${cls}"><i>${cls === "stop" ? "&times;" : n <= step ? "&#10003;" : ""}</i><span>${esc(t)}</span></div>`;
+    return `<div class="dlvst ${cls}" data-addon-step="${n}"><i>${cls === "stop" ? "&times;" : n <= step ? "&#10003;" : ""}</i><span>${esc(t)}</span></div>`;
   }).join("") + `</div>`;
   const wait = r.status === "with_worker" ? "Waiting on the worker" : r.status === "with_client" ? "Waiting on the client" : "";
   return `<div class="dlvstory">` + rail
@@ -5922,6 +5925,10 @@ async function addonAfterOpen_(r, el){
   if (!ev) return;
   if (e2) { ev.textContent = e2.message; return; }
   if (!(rows || []).length) { ev.innerHTML = mute_("None yet. Sign-off is refused until there are some."); return; }
+  // Step 3 of the rail is a fact about other tables, so it is ticked here.
+  const paid = (invs || []).some(i => i.payable_to !== "worker" && i.status === "paid");
+  const s3 = el.querySelector('[data-addon-step="3"]');
+  if (paid && s3 && r.status === "agreed") { s3.classList.add("done"); s3.querySelector("i").innerHTML = "&#10003;"; }
   // Downloaded, then shown from a blob: the desk's Content-Security-Policy
   // allows img-src 'self' data: blob: only, so a signed URL would be refused.
   const urls = await Promise.all(rows.map(async x => {
