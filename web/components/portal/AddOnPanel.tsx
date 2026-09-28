@@ -165,9 +165,12 @@ export function AddonApprove({ jobId, addonId, amountLabel, otherName }: { jobId
 }
 
 function AddonCard({
-  a, me, otherName, jobId, invoices, evidenceCount, photos,
+  a, me, otherName, jobId, invoices, evidenceCount, photos, billState,
 }: {
   a: AddonRow; me: Side; otherName: string; jobId: string; invoices: AddonInvoice[]; evidenceCount: number; photos: AddonPhoto[];
+  /** From job_addon_bill_state (20260929080000): the worker cannot read the
+      client's invoices, so this is how their card learns it was paid. */
+  billState?: "none" | "sent" | "paid";
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<"view" | "edit" | "decline">("view");
@@ -181,7 +184,7 @@ function AddonCard({
   const open = turn !== null;
   const bill = addonClientBill(a.amount_jmd, a.terms);
   const clientInv = invoices.filter((i) => i.payable_to !== "worker");
-  const paid = clientInv.some((i) => i.status === "paid");
+  const paid = billState === "paid" || clientInv.some((i) => i.status === "paid");
 
   async function run(p: Promise<{ ok: boolean; error?: string }>) {
     setBusy(true); setError("");
@@ -286,8 +289,8 @@ function AddonCard({
 
       {a.status === "agreed" && (
         <div className="mt-3 rounded-xl border border-line bg-panel2 p-3.5 text-[12.5px] leading-relaxed text-mute">
-          {clientInv.length === 0 && <p>Yaadly is preparing the invoice for this add-on.</p>}
-          {clientInv.length > 0 && !paid && (
+          {!paid && clientInv.length === 0 && billState !== "sent" && <p>Yaadly is preparing the invoice for this add-on.</p>}
+          {!paid && (clientInv.length > 0 || billState === "sent") && (
             me === "client"
               ? <p>Its invoice is on the <a href="?tab=money" className="font-bold text-tealb underline-offset-2 hover:underline">Money</a> tab once Yaadly sends it. The extra work starts once it is paid.</p>
               : <p>The extra work starts once the client has paid its invoice. You will see it here.</p>
@@ -356,8 +359,9 @@ function AddonCard({
 }
 
 export function AddOnPanel({
-  jobId, me, otherName, canPropose, closedReason, addons, invoices, evidenceCounts, photos = {},
+  jobId, me, otherName, canPropose, closedReason, addons, invoices, evidenceCounts, photos = {}, billState = {},
 }: {
+  billState?: Record<string, "none" | "sent" | "paid">;
   photos?: Record<string, AddonPhoto[]>;
   jobId: string;
   me: Side;
@@ -429,7 +433,7 @@ export function AddOnPanel({
         })
         .map((a) => (
         <AddonCard key={a.id} a={a} me={me} otherName={otherName} jobId={jobId}
-          invoices={invoices.filter((i) => i.addon_id === a.id)} evidenceCount={evidenceCounts[a.id] ?? 0} photos={photos[a.id] ?? []} />
+          invoices={invoices.filter((i) => i.addon_id === a.id)} evidenceCount={evidenceCounts[a.id] ?? 0} photos={photos[a.id] ?? []} billState={billState[a.id]} />
       ))}
     </section>
   );

@@ -26,7 +26,7 @@ import { materialsReceipt } from "@/lib/portal/materials-receipt";
 import { DocStrip, type Doc } from "@/components/portal/DocStrip";
 import { TabBar, TABS, type TabKey } from "@/components/portal/TabBar";
 import { AddOnPanel, AddonApprove, type AddonInvoice, type AddonPhoto, type AddonRow } from "@/components/portal/AddOnPanel";
-import { addonClientBill, addonWorkerPay, waitingOn } from "@/lib/jobs/addon";
+import { addonClientBill, addonStateLine, addonWorkerPay, waitingOn } from "@/lib/jobs/addon";
 import { MoneyTrail, type TrailWorkerPay } from "@/components/portal/MoneyTrail";
 import { JobAddress } from "@/components/portal/JobAddress";
 import { EvidenceLedger } from "@/components/portal/EvidenceLedger";
@@ -418,8 +418,22 @@ export default async function JobRoom({
      not exist, and the tab then shows nothing paid rather than breaking. */
   const { data: payRows } = await supabase.rpc("job_worker_payments", { p_job: id });
   const workerPays: TrailWorkerPay[] = ((payRows ?? []) as {
-    invoice_id: string; what: string; labour_jmd: number | null; status: string; paid_at: string | null;
-  }[]).map((r) => ({ id: r.invoice_id, what: r.what, labour: r.labour_jmd, paid: r.status === "paid", paidAt: r.paid_at }));
+    invoice_id: string; addon_id: string | null; what: string; labour_jmd: number | null; status: string; paid_at: string | null;
+  }[]).map((r) => ({ id: r.invoice_id, addonId: r.addon_id, what: r.what, labour: r.labour_jmd, paid: r.status === "paid", paidAt: r.paid_at }));
+
+  /* Whether each piece of extra work has been paid for (20260929080000).
+     The worker cannot read the client's invoices, so without this their
+     card never said the work could start and never offered the photo
+     upload. Falls back to the client's own invoices when the function is
+     not there yet. */
+  const { data: billRows } = await supabase.rpc("job_addon_bill_state", { p_job: id });
+  const addonBill: Record<string, "none" | "sent" | "paid"> = {};
+  for (const r of (billRows ?? []) as { addon_id: string; bill_state: "none" | "sent" | "paid" }[]) addonBill[r.addon_id] = r.bill_state;
+  for (const i of addonInvoices) {
+    if (i.payable_to === "worker" || !i.addon_id) continue;
+    if (i.status === "paid") addonBill[i.addon_id] = "paid";
+    else if (i.status === "sent" && addonBill[i.addon_id] !== "paid") addonBill[i.addon_id] = "sent";
+  }
 
   /* Extra work waiting on the client's approval: agreed, its invoice paid,
      and at least one photo filed. The same gates approve_addon_as_me() uses,
@@ -1970,12 +1984,35 @@ export default async function JobRoom({
           money={money}
           materialsReleased={materialsReleasedJmd}
           check={role === "client" ? checkLine : null}
-          extraWork={addons.filter((a) => ["with_worker", "with_client", "agreed", "signed_off"].includes(a.status)).map((a) => {
+          extraWork={addons
+            /* Every piece of extra work that is live or settled, founder 28
+               Sep 2026. Turned down or withdrawn ones never had money, so they
+               stay on the Extra work tab only; a cancelled one is listed only
+               if its bill was paid, because then there is money to account for. */
+            .filter((a) => a.status !== "declined" && a.status !== "withdrawn" && (a.status !== "cancelled" || addonBill[a.id] === "paid"))
+            .map((a) => {
             const c = addonClientBill(a.amount_jmd, a.terms);
             const pay = addonWorkerPay(a.amount_jmd);
-            return role === "client"
+            const counted = a.status === "agreed" || a.status === "signed_off";
+            const bill = addonBill[a.id] ?? "none";
+            const workerPay = workerPays.find((p) => p.addonId === a.id);
+            const other = role === "client" ? (won?.worker_name ?? job.worker_name ?? "the tradesperson") : "the client";
+            const billWords = role === "client"
+              ? (bill === "paid" ? "Its invoice is paid." : bill === "sent" ? "Its invoice is sent, not paid yet." : counted ? "Its invoice is being prepared." : "")
+              : (bill === "paid" ? "The client has paid for it, so the work can start." : counted ? "Waiting on the client's payment before the work starts." : "");
+            const payWords = workerPay
+              ? (workerPay.paid ? (role === "client" ? " The tradesperson has been paid for it." : " Paid to you.") : (role === "client" ? " Approved; the tradesperson is not paid yet." : " Approved; owed to you, not paid yet."))
+              : "";
+            const cancelledWords = a.status === "cancelled" ? " Cancelled after it was paid for: Yaadly settles this with you." : "";
+            const line = role === "client"
               ? { id: a.id, scope: a.scope, work: c.amount, fee: c.fee, total: c.total, status: a.status }
               : { id: a.id, scope: a.scope, work: a.amount_jmd, fee: a.amount_jmd - pay, total: pay, status: a.status };
+            return {
+              ...line,
+              counted,
+              stateLabel: addonStateLine(a.status, role === "client" ? "client" : "worker", other),
+              moneyNote: (billWords + payWords + cancelledWords).trim() || null,
+            };
           })}
         />
         </>
@@ -2263,6 +2300,7 @@ export default async function JobRoom({
           invoices={addonInvoices}
           evidenceCounts={addonEvidenceCounts}
           photos={addonPhotos}
+          billState={addonBill}
         />
       )}
 

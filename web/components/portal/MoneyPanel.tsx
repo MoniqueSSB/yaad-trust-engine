@@ -53,6 +53,14 @@ export type ExtraWorkLine = {
   /** client: what they pay for it. worker: what they are paid for it. */
   total: number;
   status: string;
+  /** Agreed or approved: counted in the totals. False for one still being
+      agreed, or closed, which is listed so both sides see it and never
+      added up (founder, 28 Sep 2026: all extra work on the money side). */
+  counted?: boolean;
+  /** Where its money stands, in words: bill paid or not, worker paid or not. */
+  moneyNote?: string | null;
+  /** Plain-English state for this reader, e.g. "Waiting on you". */
+  stateLabel?: string;
 };
 
 /** The independent check, once a client has added one, as a line in the job
@@ -142,8 +150,10 @@ export function MoneyPanel({
   const showCheck = side === "client" && check != null;
   const hasExtra = !!extraWork && extraWork.length > 0;
   /* An add-on still being agreed is shown, so it is never invisible, and
-     never counted: nobody owes money on it until both sides agree. */
-  const counts = (x: ExtraWorkLine) => x.status === "agreed" || x.status === "signed_off";
+     never counted: nobody owes money on it until both sides agree. A line
+     can also say so itself (counted: false), e.g. a cancelled one listed
+     only because its bill was paid. */
+  const counts = (x: ExtraWorkLine) => x.counted ?? (x.status === "agreed" || x.status === "signed_off");
   const extraTotal = (extraWork ?? []).filter(counts).reduce((t, x) => t + x.total, 0);
   const mainTotal = side === "client" ? allIn : takeHome;
 
@@ -258,9 +268,13 @@ export function MoneyPanel({
                       <div className="flex items-baseline justify-between gap-3">
                         <b className="min-w-0 truncate text-[13px] font-semibold text-ink" title={x.scope}>{x.scope}</b>
                         <span className={"flex-none text-[10.5px] font-bold uppercase tracking-wide " + (counts(x) ? "text-dim" : "text-mango")}>
-                          {x.status === "signed_off" ? "Done and approved" : x.status === "agreed" ? "Agreed" : "Being agreed, not counted"}
+                          {x.stateLabel ?? (x.status === "signed_off" ? "Done and approved" : x.status === "agreed" ? "Agreed" : "Being agreed, not counted")}
                         </span>
                       </div>
+                      {!counts(x) && x.status !== "cancelled" && (
+                        <p className="mt-1 text-[11.5px] text-mango">Not agreed by both sides yet, so not in the totals below.</p>
+                      )}
+                      {x.moneyNote && <p className="mt-1 text-[11.5px] text-dim">{x.moneyNote}</p>}
                       <div className="mt-2 grid gap-1 text-[12.5px]">
                         <div className="flex justify-between gap-3"><span className="text-dim">The work</span><span className="font-mono-app">{money(x.work)}</span></div>
                         <div className="flex justify-between gap-3">
