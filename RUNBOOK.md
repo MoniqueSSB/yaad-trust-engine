@@ -6087,4 +6087,8 @@ Desk, **Reports**. Service: Deposit Protection Check. Client name and property a
 
 **A finding reads "[figure removed]".** The agent repeated a sum out of the notes and the scrubber took it out. The finding still reads; if the number belongs in the document, put it in the verdict, which is yours.
 
-**The document has no logo.** It loads `https://yaadly.co.uk/logo-v1.png` from the marketing site. If the site is down or the file is renamed, the wordmark still prints and the logo does not. Renaming the logo means changing `RPT_LOGO` in `concierge.html`.
+**The document has no logo.** The logo is embedded in the desk as a small data URI (`RPT_LOGO` in `concierge.html`), made with `sips -Z 160 brand/yaadly-logo-master.png`. It was a link to the marketing site until 28 September 2026 and never once displayed, because the desk's Content-Security-Policy allows images from the desk itself, `data:` and `blob:` only. Anything the desk or the document loads from another host must be on the list in `concierge-deploy/src/index.ts` or it is refused silently.
+
+**The desk looks the same after a deploy.** A tab opened before the deploy keeps running the old page. Reload it. You are on the current desk if Reports shows a file chooser labelled "The quote, receipts, messages and photographs".
+
+**Testing the desk under its real policy.** Access answers every outside request, so the policy cannot be observed from the internet, and a plain local preview does not apply it. Serve a copy of `concierge.html` locally with the same `Content-Security-Policy` header the worker sets and test there. On 28 September that showed the photo path and the PDF path both working under the policy and the logo link blocked.
