@@ -1195,7 +1195,7 @@ export default async function JobRoom({
             ? "Signed, immutable, version " + legal.WG_VERSION
             : "A newer version is waiting for your signature",
           state: workerSigned ? "ready" : "not_completed",
-          href: "/portal/guidelines",
+          href: workerSigned ? "/portal/guidelines/worker" : "/portal/guidelines",
         }
       : {
           icon: "\u2713",
@@ -1204,7 +1204,7 @@ export default async function JobRoom({
             ? "Signed, immutable, version " + legal.CG_VERSION
             : "Sign these and the job can go to workers",
           state: signed ? "ready" : "not_completed",
-          href: "/portal/guidelines",
+          href: signed ? "/portal/guidelines/client" : "/portal/guidelines",
         },
     {
       icon: confirmedQuote ? "\ud83d\udcc4" : "\u25cb",

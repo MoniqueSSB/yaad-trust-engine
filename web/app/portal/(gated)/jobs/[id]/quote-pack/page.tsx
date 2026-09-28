@@ -3,6 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { jmdOrBlank as jmd } from "@/lib/money";
+import { clientBill } from "@/lib/jobs/client-bill";
+import { WORKER_FEE_RATE } from "@/lib/jobs/addon";
+import { DocLogo } from "@/components/portal/DocLogo";
+import { PrintReport } from "@/components/portal/PrintReport";
 
 export const dynamic = "force-dynamic";
 
@@ -91,7 +95,13 @@ export default async function QuotePackPage({
     .eq("quote_id", quoteRow.id);
   const clientAgreed = (agreements ?? []).find((a) => a.side === "client");
   const workerAgreed = (agreements ?? []).find((a) => a.side === "worker");
-  const total = (quoteRow.labour_jmd ?? 0) + (quoteRow.materials_jmd ?? 0);
+  /* What each side actually gets. Until 28 Sep 2026 this page showed the
+     client a "Total" of labour plus materials, without Yaadly's 15%, so a
+     client quoted J$100,000 read J$100,000 here and was invoiced J$115,000.
+     The client's figures are clientBill(), the invoice's own arithmetic; the
+     worker's are their labour less 5%, as raise_job_worker_payable pays. */
+  const bill = clientBill(quoteRow.labour_jmd, quoteRow.materials_jmd);
+  const workerFee = Math.round(bill.labour * WORKER_FEE_RATE);
 
   // The richer, job-level document a worker was shown before they quoted
   // (yaad-quote-pack): fuller scope, structured included/excluded lists,
@@ -116,9 +126,13 @@ export default async function QuotePackPage({
   } | null;
 
   return (
-    <div className="rounded-2xl border border-line bg-panel p-6">
-      <Link href={"/portal/jobs/" + encodeURIComponent(id)} className="text-[13px] text-tealb underline-offset-2 hover:underline">&larr; Back to the job</Link>
+    <div id="quote-pack" className="rounded-2xl border border-line bg-panel p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <Link href={"/portal/jobs/" + encodeURIComponent(id)} className="text-[13px] text-tealb underline-offset-2 hover:underline">&larr; Back to the job</Link>
+        <PrintReport jobId={id} targetId="quote-pack" name="Quote Pack" />
+      </div>
       <div className="mt-3 border-b-2 border-teal pb-4">
+        <div className="mb-3"><DocLogo /></div>
         <h1 className="font-display text-[clamp(22px,3.5vw,30px)] uppercase leading-tight">Quote Pack</h1>
         <p className="mt-1 text-[12px] text-dim">
           {head.title} · {quoteRow.worker_name}
@@ -134,13 +148,24 @@ export default async function QuotePackPage({
             <span className="text-mute">Labour</span>
             <span className="font-mono">{jmd(quoteRow.labour_jmd)}</span>
           </div>
+          {role === "client" ? (
+            <div className="flex justify-between gap-4">
+              <span className="text-mute">Yaadly Guarantee &amp; Support, 15% of the labour</span>
+              <span className="font-mono">{jmd(bill.fee)}</span>
+            </div>
+          ) : (
+            <div className="flex justify-between gap-4">
+              <span className="text-mute">Less Yaadly&rsquo;s 5% of the labour</span>
+              <span className="font-mono">&minus;{jmd(workerFee)}</span>
+            </div>
+          )}
           <div className="flex justify-between gap-4">
-            <span className="text-mute">Materials{quoteRow.materials_at_cost ? ", at cost" : ""}</span>
+            <span className="text-mute">Materials{quoteRow.materials_at_cost ? ", at cost, nothing added" : ""}</span>
             <span className="font-mono">{jmd(quoteRow.materials_jmd)}</span>
           </div>
           <div className="mt-1 flex justify-between gap-4 border-t border-line pt-2 font-bold">
-            <span>Total</span>
-            <span className="font-mono">{jmd(total)}</span>
+            <span>{role === "client" ? "You pay Yaadly" : "Yaadly pays you"}</span>
+            <span className="font-mono">{jmd(role === "client" ? bill.total : bill.labour - workerFee + bill.materials)}</span>
           </div>
         </div>
         {(quoteRow.earliest_start || quoteRow.days_estimate) && (
@@ -231,6 +256,24 @@ export default async function QuotePackPage({
           <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-mute">{quoteRow.note}</p>
         </section>
       )}
+
+      {/* The same standing wording the desk's quote pack PDF carries: the
+          add-on rules the founder set on 28 Sep 2026 (20260928235000). Fixed
+          text, never drafted, so it cannot drift from job to job. */}
+      <section className="mt-4 rounded-xl border border-line2 bg-panel2 p-4">
+        <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Work outside this scope</h2>
+        <p className="text-[13px] leading-relaxed text-mute">
+          If something turns up that is not in this pack, the tradesperson stops before doing it and tells Yaadly,
+          with photos, so the client can decide whether to add it on. Extra work is only paid once it has been
+          agreed as an add-on:
+        </p>
+        <ol className="ml-5 mt-2 list-decimal text-[13px] leading-relaxed text-mute">
+          <li>The client writes it: what the extra work is, the amount they offer, and how it is paid. Unless they say otherwise it is paid in full before the extra work starts.</li>
+          <li>The tradesperson accepts it, changes it or turns it down. A change goes back to the client. Nothing is booked until both have agreed the same version.</li>
+          <li>Once agreed, it is billed as its own invoice on the job, with the usual fees.</li>
+          <li>The agreed scope and payment stages above do not change. The job is not finished until any agreed add-on is done and signed off by a named person at Yaadly.</li>
+        </ol>
+      </section>
 
       <section className="mt-5 rounded-xl border border-line2 bg-panel2 p-4">
         <h2 className="mb-2 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Confirmation</h2>
