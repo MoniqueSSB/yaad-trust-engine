@@ -56,6 +56,34 @@ Known limit: a client outside WhatsApp's 24-hour window gets the email (with the
 
 ---
 
+## 2026-09-28 · A quote pack draft opens as a picture, prints as a PDF, and is corrected section by section
+
+Monique, looking at a quote pack draft on the desk: "this should be a pdf", the top of the drawer "should be a dashboard, visual one, not just date lines", and "correct the wording needs to be better as it is just a long file". She approved a clickable demo with invented data before the live file was touched.
+
+**The drawer.** It opens on a four-step track: drafted, checked for prices and banned words, your review, workers can see it. Below it are:
+
+- how long the draft has waited, using the same 24 and 72 hour thresholds as the Overview;
+- what the two word checks found;
+- how many of the five sections are written;
+- the payment stages as one bar split by percentage, with a warning if they do not total 100.
+
+The raw columns are folded underneath, not removed.
+
+**The PDF.** "Open the pack as a PDF" uses the same route as reports: a printable page in a new tab, then Print and Save as PDF. No PDF library, and nothing leaves the browser.
+
+Every pack carries fixed wording on work outside the scope, the add-on flow Monique set the same day. It is standard text, not model output, so it cannot drift job to job, and the guardrail never needs to read it.
+
+**Correct the wording.** The action is now a form:
+
+- a box for the scope and a box for the timeline;
+- one row per bullet under Included and Not included;
+- one card per payment stage, with a live total;
+- the flagged words named at the top, and outlined in any box that still holds one.
+
+It saves through the same `deskRescanPack`, so the rule is unchanged: saving re-runs the word check, approves nothing and sends nothing. `runAction` gained a `form` branch for an action that draws its own fields. The generic ask form can only hold single boxes.
+
+---
+
 ## 2026-09-28 · A pay invoice records the labour and the worker fee it was worked out from
 
 Monique asked for Yaadly's worker fee to show on the worker's pay invoice.
@@ -72,6 +100,37 @@ with the two columns added to their insert; the amounts are computed exactly
 as before. The HTML invoice, the PDF, the desk and the worker's portal all
 read those two columns. Pay raised earlier is not backfilled and shows no
 breakdown: no figure is better than a guessed one.
+
+---
+
+## 2026-09-28 · Before signing, the worker can change their words or raise an issue, by button, on WhatsApp or from the link
+
+Monique signed the test report from her own phone and then: "the only issue
+is there is no way to edit", "or raise and issue", "on whatsapp or portal",
+"fix that", "it should be a button". Offered a WhatsApp route or a link that
+opens without logging in, she chose both.
+
+**WhatsApp.** The worker's message is followed by three buttons (template
+`yaadly_sign_completion_report_v2`): Sign the report (payload: the job code),
+Change my words (`EDIT <code>`) and Raise an issue (`ISSUE <code>`). A tap on
+either of the last two is remembered for that phone in
+`completion_report_whatsapp_pending`, and the next message they type is taken
+as their account of the work (saved unsigned: they still press Sign) or as
+the issue. That lane runs ahead of every other worker lane in `yaad-inbound`,
+so their words are never filed as a work update. No "reply 1": buttons only.
+
+**The link, no login** (`/report/[id]?code=`). The code in the WhatsApp link
+is the key, the pattern `/jobs/[id]/quotes` already uses. Three buttons: Sign,
+Save my changes, Raise an issue. Ten wrong codes on a job lock the link until
+Yaadly sends the report back with a new one. The wrong-code count is kept by
+returning a refusal instead of raising an error, because a raised error rolls
+the count back with everything else. The page shows the words and a plain
+summary of the record, never an address, contact details or money.
+
+**Raising an issue stops the report** (`worker_raised`) and alerts Monique.
+It is unsigned, so release now requires a signature: the only answer is to
+send it back with her reply, which is the "something went wrong" she steps in
+on. The worker then signs when it is right.
 
 ---
 

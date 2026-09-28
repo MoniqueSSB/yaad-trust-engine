@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import legal from "@/lib/legal-copy.json";
 import { PrintReport } from "@/components/portal/PrintReport";
 import { WorkerSign, ClientReview } from "@/components/portal/CompletionReview";
+import { ContactYaadly } from "@/components/portal/ContactYaadly";
 import { phaseBadge } from "@/lib/portal/evidence-sections";
 import {
   aftercareEnds, fmtDay, fmtWhen, outcomeLine, phaseCounts, trailLabel, trailWho, type TrailEvent,
@@ -92,7 +93,7 @@ export default async function Completion({
   // Not yet theirs to read. The client waits for issue; the worker waits to be
   // sent it. Said plainly, not as a 404, because the job IS complete.
   const canRead = isAdmin || (isClient && status === "issued") ||
-    (isWorker && ["with_worker", "worker_signed", "held", "issued"].includes(status));
+    (isWorker && ["with_worker", "worker_signed", "held", "worker_raised", "issued"].includes(status));
   if (!canRead) {
     return (
       <div className="rounded-2xl border border-line bg-panel p-6">
@@ -174,7 +175,8 @@ export default async function Completion({
       {isAdmin && status !== "issued" && (
         <div className="rounded-2xl border border-gold/40 bg-gold/[0.07] px-5 py-3 text-[13px] text-mute print:hidden">
           <b className="text-goldb">Desk view.</b> This report is <b>{status.replace(/_/g, " ")}</b>
-          {status === "held" && report?.hold_reason ? <> (held for: {report.hold_reason})</> : null}. The client cannot see it until it is issued.
+          {status === "held" && report?.hold_reason ? <> (held for: {report.hold_reason})</> : null}
+          {status === "worker_raised" && report?.worker_issue ? <> (the worker raised: {report.worker_issue})</> : null}. The client cannot see it until it is issued.
         </div>
       )}
       {isWorker && status === "with_worker" && report?.return_reason && (
@@ -185,12 +187,26 @@ export default async function Completion({
       {isWorker && status === "with_worker" && (
         <WorkerSign jobId={job.id} code={code ?? ""} careNotes={careNotes} account={report?.worker_account ?? ""} workerName={job.worker_name ?? ""} />
       )}
+      {isWorker && status === "worker_raised" && (
+        <div className="rounded-2xl border border-line bg-bg p-4 text-[13px] text-mute print:hidden">
+          You raised an issue: &ldquo;{report?.worker_issue}&rdquo;. The report is waiting and has not gone to the owner. Yaadly will come back to you.
+        </div>
+      )}
       {isWorker && (status === "worker_signed" || status === "held") && (
         <div className="rounded-2xl border border-line bg-bg p-4 text-[13px] text-mute print:hidden">
           You signed this report {fmtWhen(report?.worker_signed_at)}.{" "}
           {status === "held"
             ? "It has been held before going to the owner, and Yaadly is looking at it. If anything needs changing, it comes back to you with the reason."
             : "It goes to the owner in a moment."}
+        </div>
+      )}
+      {/* A question about the report, answered on the portal as well as by
+          replying on WhatsApp. Founder, 28 Sep 2026: "there needs to be a way
+          to respond on the portal also". The same box as the job page: it
+          writes to portal_contacts, whose trigger reaches Monique. */}
+      {isWorker && (
+        <div className="-mt-6 print:hidden">
+          <ContactYaadly jobId={job.id} otherSide="the owner" />
         </div>
       )}
 
@@ -522,6 +538,11 @@ export default async function Completion({
       )}
       {isClient && report?.client_flagged_at && !report?.client_confirmed_at && (
         <p className="text-[12.5px] text-dim print:hidden">You raised a point on {fmtDay(report.client_flagged_at)}. A person at Yaadly is looking at it.</p>
+      )}
+      {isClient && (
+        <div className="-mt-6 print:hidden">
+          <ContactYaadly jobId={job.id} otherSide="the worker" />
+        </div>
       )}
     </div>
   );

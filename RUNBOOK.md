@@ -6155,10 +6155,18 @@ your reason. They get a new link automatically; the old one stops working.
 **Amber, "signed, checking" for more than a few minutes.** The check did not
 come back. **Screen it again**.
 
-**How the worker signs.** A button, on WhatsApp (Sign the report, under the
-message with the link) or in the portal (Sign the report, at the top of the
-report). WhatsApp signs the words as they stand; to change them they use the
-portal. Typing the job code on WhatsApp does the same as the button. If the
+**Red, "worker raised an issue".** The worker pressed Raise an issue instead of
+signing; the row shows what they said. It is not signed, so it cannot be
+released. **Send it back to the worker** with your answer as the reason. If
+the worker cannot open the link, it may be locked after ten wrong tries:
+sending it back makes a new link and unlocks it.
+
+**How the worker signs, changes or raises.** Buttons. On WhatsApp: Sign the
+report, Change my words (their next message becomes their account, unsigned),
+Raise an issue (their next message is the issue). From the link
+`app.yaadly.co.uk/report/<job>?code=<code>`, no login: Sign, Save my changes,
+Raise an issue. The template is `yaadly_sign_completion_report_v2`, made by
+`yaad-twilio-setup` action `create-sign-report`. If the
 button never appears, the template is not recorded: run `yaad-twilio-setup`
 with action `create-sign-report` (admin token or cron secret), which writes
 `app_settings.twilio_content_sid_sign_report`. Outside 24 hours of their last
@@ -6182,7 +6190,7 @@ WITH `--no-verify-jwt`, as each runs; `yaad-twilio-setup` WITHOUT it. All from
 disk, after `supabase/functions/sync-shared.sh`.
 
 **Checking the rules still hold:** `supabase/tests/completion_report_guards.sql`,
-23 checks. Run it inside `begin; ... rollback;` with
+35 checks. Run it inside `begin; ... rollback;` with
 `supabase db query --linked --project-ref leffyisvfvjwzilydlwf -f <file>`. It
 switches the user triggers on jobs, completion_reports and disputes off for
 its own run, so nothing is messaged, which is why it must be inside a
@@ -6203,7 +6211,13 @@ transaction.
 5. "Could not load the templates" on the desk means `templates/index.json` was not deployed with the desk. Check `concierge-deploy/public/templates` has it, then redeploy.
 6. The Deposit Protection Check template's checklist and payment terms are a copy of `DEPOSIT_CHECKLIST` and `PAYMENT_TERMS` in `yaad-report`. Change one, change the other.
 
-## 37. Extra work on a booked job: add-ons (28 Sep 2026)
+## 37. A quote pack draft: reading it, correcting it, printing it (28 Sep 2026)
+
+1. **Where.** Desk, Documents & money, Quote Pack Drafts. Open a row: the track at the top shows where it stands, and the gold or red timer is how long a job has been unquotable because of it.
+2. **A flagged draft.** Press **Correct the wording**. The flagged words are listed at the top and every box still holding one is outlined in red. Fix those, check the stage total reads 100%, then **Save and check again**. It saves and re-checks; **Approve** is still a separate press.
+3. **The PDF.** **Open the pack as a PDF** opens a new tab. Press Print, then choose Save as PDF. If nothing opens, allow pop-ups for `concierge.yaadly.co.uk` once.
+
+## 38. Extra work on a booked job: add-ons (28 Sep 2026)
 
 1. **Deploy order matters.** Apply migration `20260928235000_add_on_work_on_a_booked_job.sql` first, then deploy the app, then the desk. The job page reads the add-on tables on their own, so an app deployed first shows an empty Extra work tab rather than breaking, but nothing works until the migration is in. Afterwards run `supabase/tests/job_addons_guards.sql`; every line should read PASS.
 2. **Where it lives.** The client and the booked worker use the **Extra work** tab on the job page. The desk uses **Add-ons** under Documents & money. The add-on's invoices appear on **Invoices** like any other, labelled "Add-on" (or "Add-on, first half" / "second half").
