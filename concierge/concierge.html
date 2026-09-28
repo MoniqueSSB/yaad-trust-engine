@@ -11960,7 +11960,7 @@ function rptDoc(rep, findings, o){
   const dateOf = (s) => s ? new Date(s).toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" }) : "";
   const byLine = o.company
     ? `<b>Issued by Yaadly Ltd</b>, England and Wales no. 17358077. A named person at Yaadly signs every record and approves every payment to a trade. This is a project record between Yaadly and the client, not a certificate issued under any law, building code or professional scheme.`
-    : `<b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS.<br>${o.coverNote}`;
+    : `<b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader.<br>${o.coverNote}`;
   return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8">
 <title>${esc(service)}${rep.number ? ", " + esc(rep.number) : ", draft"}</title>
 <style>${RPT_DOC_CSS}${RPT_DEP_CSS}</style></head><body>
@@ -11990,7 +11990,7 @@ ${practice ? `<div class="draftbar"><b>Practice document.</b> Invented client an
 <ol class="toc">${o.toc.map(([l, t, d]) => `<li><span class="l">${l}</span>${esc(t)}<span class="d">${esc(d)}</span></li>`).join("")}</ol>
 ${o.body}
 <footer>
-  ${o.company ? "Yaadly Ltd, registered in England and Wales, company number 17358077." : "Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077."}<br>
+  ${o.company ? "Yaadly Ltd, registered in England and Wales, company number 17358077." : "Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077."}<br>
   Drafted by the Yaadly report agent${rep.model ? ` (${esc(rep.model)}, EU)` : ""} from the notes of the people named in this document, then screened for language, measurements and figures. ${o.footNote}
 </footer>
 </td></tr></tbody></table>
@@ -12321,7 +12321,7 @@ ${RPT_DOC_CSS}</style></head><body>
     <div><span class="stamp${issued ? " issued" : ""}">${issued ? "Issued" : "Draft, not issued"}</span></div>
   </div>
   <div class="bottom">
-    <b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS.<br>
+    <b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader.<br>
     Every finding in this report is rated, and the verdict written, by her and nobody else. What it does not do: value the property, confirm title, give a structural opinion, or estimate what the work should cost.
   </div>
 </div>
@@ -12392,7 +12392,7 @@ ${(rep.omitted || []).length ? `<h2>What this review could not establish</h2><ul
 </div>
 
 <footer>
-  Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077.<br>
+  Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077.<br>
   Findings drafted by the Yaadly report agent${rep.model ? ` (${esc(rep.model)}, EU)` : ""} from the reviewer's notes, then screened for language, measurements and figures. Every finding is rated, and the verdict written, by a named person before the report is issued.
 </footer>
 </td></tr></tbody></table>
@@ -12540,7 +12540,7 @@ function reportDocumentDeposit(rep, findings){
     <div><span class="stamp${issued ? " issued" : ""}">${issued ? "Issued" : "Draft, not issued"}</span></div>
   </div>
   <div class="bottom">
-    <b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS.<br>
+    <b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader.<br>
     Every finding in this report is rated, and the verdict written, by her and nobody else. What it does not do: value the property, confirm title, give a structural opinion, or estimate what the work should cost.
   </div>
 </div>
@@ -12664,7 +12664,7 @@ ${rep.source_text ? `<p class="lead">As the documents were read, word for word, 
 <div class="apx">${esc(rep.source_text)}</div>` : `<div class="blank"><div class="lbl">No transcript on this report</div><p>The documents are reproduced here when they were read with Read the files before drafting.</p></div>`}
 
 <footer>
-  Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077.<br>
+  Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077.<br>
   Findings drafted by the Yaadly report agent${rep.model ? ` (${esc(rep.model)}, EU)` : ""} from the documents received and the reviewer's notes, then screened for language, measurements and figures. Every finding is rated, and the verdict written, by a named person before the report is issued.
 </footer>
 </td></tr></tbody></table>
