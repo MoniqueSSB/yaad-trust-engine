@@ -285,7 +285,9 @@ export function MoneyPanel({
                           <span className="text-mute">
                             {counts(x)
                               ? side === "client" ? "You pay for this" : "Paid to you for this"
-                              : side === "client" ? "You would pay, once agreed" : "You would be paid, once agreed"}
+                              : x.status === "cancelled"
+                                ? side === "client" ? "You paid for this, then it was cancelled" : "Cancelled, not due to you"
+                                : side === "client" ? "You would pay, once agreed" : "You would be paid, once agreed"}
                           </span>
                           <span className="font-mono-app text-ink">{money(x.total)}</span>
                         </div>

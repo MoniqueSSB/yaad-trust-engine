@@ -1990,6 +1990,13 @@ export default async function JobRoom({
                stay on the Extra work tab only; a cancelled one is listed only
                if its bill was paid, because then there is money to account for. */
             .filter((a) => a.status !== "declined" && a.status !== "withdrawn" && (a.status !== "cancelled" || addonBill[a.id] === "paid"))
+            /* Being agreed first, then agreed, then approved, closed last:
+               the same order as the Extra work tab. */
+            .sort((x, y) => {
+              const r = (a: AddonRow) =>
+                a.status === "with_worker" || a.status === "with_client" ? 0 : a.status === "agreed" ? 1 : a.status === "signed_off" ? 2 : 3;
+              return r(x) - r(y) || (y.created_at ?? "").localeCompare(x.created_at ?? "");
+            })
             .map((a) => {
             const c = addonClientBill(a.amount_jmd, a.terms);
             const pay = addonWorkerPay(a.amount_jmd);
