@@ -6239,3 +6239,11 @@ transaction.
 3. A job posted while signed in, with the same email typed on the form, joins that portal on Send (`claim_my_posted_job`, 20260929000000). The enquiry says "signed in: it is already in their portal" when it did.
 4. If it did not join although they were signed in: a different email was typed on the form, the account's email is not confirmed, or the code attempt limit tripped (five failures in fifteen minutes, `portal_code_attempts`). The link still works once the limit clears.
 
+## 40. A report on the new services: will not draft, will not issue, or will not rate (28 Sep 2026)
+
+1. **"kind must be one of"** from the drafter: `yaad-report` on the server is older than `kinds.ts`. Deploy it from disk: `supabase functions deploy yaad-report --project-ref leffyisvfvjwzilydlwf` (it keeps the platform check; no `--no-verify-jwt`).
+2. **"violates check constraint reports_kind_check"**: migration `20260929001000` is not applied. It is Monique's call to apply it.
+3. **A Visual Check or Property Care visit refuses a rating.** That is the rule: they are records. Write the summary as the verdict and issue it.
+4. **"This report has no result"** or **"no overall status"**: use Type the result, or Rate the month, on the report row. Nothing drafts either.
+5. **"Results, status and money on a report are typed at the desk"**: something tried to write `reports.human` directly. Only Type the result, Rate the month and Type the money write it, through `set_report_human()`.
+6. Check the rules with `supabase/tests/report_kind_guards.sql` (seven tests) after applying the migration.

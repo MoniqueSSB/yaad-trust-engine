@@ -4,6 +4,7 @@ import { pickTextProvider, providerAttrs, chatWithFailover, answerText, firstJso
 import * as guardrails from "./guardrails.ts";
 import { measurementRegExp } from "./measurements.ts";
 import { figureRegExp } from "./figures.ts";
+import { BRIEFS_EXTRA, EXTRA_KINDS, NOTES_LABEL_EXTRA, sectionsFor } from "./kinds.ts";
 
 // yaad-report
 //
@@ -42,7 +43,7 @@ import { figureRegExp } from "./figures.ts";
 // NO SERVICE-ROLE KEY. Every database call goes out under the caller's own
 // token, so RLS is the access control, same as yaad-invoice.
 
-const SYSTEM = `You are the Report Drafting Agent for Yaadly Ltd, a UK company providing construction project management, procurement review and independent oversight for property work in Jamaica. You turn the raw notes behind one of Yaadly's priced services, and any photograph captions with them, into the findings of a draft report, in Yaadly's house structure, for a named person to rate and sign. Not all four services are a site visit. The SERVICE BRIEF below tells you which one this is and what its findings are about, and it is as binding as the rules.
+const SYSTEM = `You are the Report Drafting Agent for Yaadly Ltd, a UK company providing construction project management, procurement review and independent oversight for property work in Jamaica. You turn the raw notes behind one of Yaadly's priced services, and any photograph captions with them, into the findings of a draft report, in Yaadly's house structure, for a named person to rate and sign. Not every service is a site visit. The SERVICE BRIEF below tells you which one this is and what its findings are about, and it is as binding as the rules.
 
 Return STRICT JSON only, no markdown fences, exactly this shape:
 {"findings":[{"heading":"","body":"","why":"","action":""}],"omitted":[],"questions":[]}
@@ -169,6 +170,12 @@ This is a short visual attendance, often on a job the client arranged themselves
 Your findings are about what was visible on the day and nothing beyond it. This is the thinnest of the four services and the draft should stay thin: a small number of findings, each plainly what was seen. Do not pad it out to look like a bigger report.`,
 };
 
+// Since 28 September 2026 the other six services draft into the layout of
+// their blank templates, and their briefs live in kinds.ts beside the code
+// that screens their sections. The three short briefs above are replaced by
+// those; the Deposit Protection Check is untouched.
+Object.assign(BRIEFS, BRIEFS_EXTRA);
+
 // The rules first, the brief second, and a loud failure rather than a quiet
 // generic draft if a kind ever arrives without one. KINDS and BRIEFS are
 // checked against each other at the bottom of this file.
@@ -248,7 +255,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["deposit_check", "condition", "technical_signoff", "visual_check"] as const;
+const KINDS = ["deposit_check", "condition", "technical_signoff", "visual_check", ...EXTRA_KINDS] as const;
 
 // The house checklist for a Deposit Protection Check. The model supplies a
 // state and a note against each line; the line itself, and the one line on
@@ -414,7 +421,8 @@ Deno.serve(async (req: Request) => {
       deposit_check: "REVIEWER'S NOTES ON THE CONTRACTOR, THE QUOTE AND WHAT THE CLIENT WAS TOLD",
       condition: "INSPECTOR'S NOTES FROM THE VISIT",
       technical_signoff: "INSPECTOR'S NOTES FROM THE ATTENDANCE",
-      visual_check: "INSPECTOR'S NOTES FROM THE VISIT",
+      visual_check: "CHECKER'S NOTES FROM THE VISIT",
+      ...NOTES_LABEL_EXTRA,
     };
 
     // The quote, numbered, from the notes as corrected at the desk first and
@@ -562,6 +570,20 @@ Deno.serve(async (req: Request) => {
         payment_stages: stages,
         ask_the_builder: clean(sx.ask_the_builder, "message to the builder").slice(0, 6000),
         checklist,
+      };
+    } else {
+      sections = sectionsFor(kind, parsed, findings, clean);
+    }
+    // Who attended and who reviewed, typed at the desk rather than read out
+    // of the notes, because while Monique is in London the person on site and
+    // the person writing the report are often two people and the report has
+    // to say which. Screened like everything else.
+    if (kind !== "deposit_check") {
+      const w = (body.who && typeof body.who === "object") ? body.who as Record<string, unknown> : {};
+      sections.who = {
+        attended: clean(w.attended, "who attended"),
+        capacity: clean(w.capacity, "their capacity"),
+        mode: w.mode === "remote" ? "remote" : "in_person",
       };
     }
     const sectionsText = JSON.stringify(sections);
