@@ -39,7 +39,7 @@ export const ACCEPTED_MIMES: Record<string, string> = {
 };
 
 /** Under the bucket's 26214400 (25 MiB) and the Server Action body limit. */
-export const MAX_FILE_BYTES = 25_000_000;
+export const MAX_FILE_BYTES = 100_000_000;
 
 export function acceptAttr(): string {
   return Object.keys(ACCEPTED_MIMES).join(",");

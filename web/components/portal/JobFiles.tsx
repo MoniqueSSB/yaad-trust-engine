@@ -1,5 +1,6 @@
 "use client";
 
+import { directUpload } from "@/lib/portal/direct-upload";
 import { useState } from "react";
 import { addJobFile, removeJobFile } from "@/app/portal/job-file-actions";
 import {
@@ -122,6 +123,14 @@ export function JobFiles({
           action={async (fd) => {
             setState("busy");
             try {
+              /* Straight to Storage first (28 Sep 2026: 25MB was not enough). */
+              const chosen = fd.get("file");
+              if (chosen instanceof File && chosen.size > 0) {
+                const up = await directUpload(chosen, "job_file", jobId);
+                if (!up.ok) { setState("error"); setMsg(up.message); return; }
+                fd.delete("file");
+                fd.set("uploadedPath", up.path);
+              }
               await addJobFile(fd);
               setState("done");
               setMsg("Sent. Only you, the other side of this job and Yaadly can see it.");
@@ -160,7 +169,7 @@ export function JobFiles({
               {state === "busy" ? "Sending" : "Add to the job"}
             </button>
           </div>
-          <p className="mt-2 text-[11.5px] text-dim">PDF, JPEG, PNG, WebP or Word, up to 25MB. You can take your own file back until the job is complete.</p>
+          <p className="mt-2 text-[11.5px] text-dim">PDF, JPEG, PNG, WebP or Word, up to 100MB. You can take your own file back until the job is complete.</p>
           {state !== "idle" && state !== "busy" && (
             <p
               role="status"

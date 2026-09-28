@@ -1,5 +1,6 @@
 "use client";
 
+import { directUpload } from "@/lib/portal/direct-upload";
 import { useState } from "react";
 import { uploadEvidence } from "@/app/portal/evidence-actions";
 import { EVIDENCE_PHASES, PHASE_OPTION } from "@/lib/portal/evidence-sections";
@@ -50,6 +51,17 @@ export function EvidenceUpload({
         try {
           /* The action returns its refusal as a sentence rather than throwing,
              because in production a thrown message never reaches this page. */
+          /* Straight to Storage first (28 Sep 2026: 25MB was not enough),
+             then the action verifies and fingerprints what arrived. The
+             photo itself no longer rides in the form. */
+          const photo = fd.get("photo");
+          if (photo instanceof File && photo.size > 0) {
+            const up = await directUpload(photo, "evidence_photo", jobId);
+            if (!up.ok) { setState("error"); setMsg(up.message); return; }
+            fd.delete("photo");
+            fd.set("uploadedPath", up.path);
+            if (up.capturedAt) fd.set("capturedAt", up.capturedAt);
+          }
           const r = await uploadEvidence(fd);
           if (r.ok) {
             setState("done");
