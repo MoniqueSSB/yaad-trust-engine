@@ -6258,7 +6258,7 @@ On their own item, on the stage still being worked, the worker presses **Correct
 3. **"Only the worker who filed this can correct it"**: the item was filed by somebody else (the client, or you from the desk).
 4. **What was changed:** `select * from evidence_corrections where job_id = '<job>' order by at;` shows every correction with the wording and part before and after. The client sees "Corrected by the worker" on the card and the first wording in the stage record.
 
-## 39. A document will not download as a PDF (28 Sep 2026)
+## 40. A document will not download as a PDF (28 Sep 2026)
 
 1. Every completed document in "Your documents" (Guidelines, Quote Pack, Kickoff Pack, Completion Report) has **Download PDF** at the top. The Kickoff Pack's front page also links "The whole pack on one page", which downloads as one file.
 2. If the button says the PDF could not be made, it opens the print dialog instead: choose Save as PDF. Same page, light colours.
