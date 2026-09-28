@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import legal from "@/lib/legal-copy.json";
 import { PrintReport } from "@/components/portal/PrintReport";
 import { WorkerSign, ClientReview } from "@/components/portal/CompletionReview";
+import { ContactYaadly } from "@/components/portal/ContactYaadly";
 import { phaseBadge } from "@/lib/portal/evidence-sections";
 import {
   aftercareEnds, fmtDay, fmtWhen, outcomeLine, phaseCounts, trailLabel, trailWho, type TrailEvent,
@@ -197,6 +198,15 @@ export default async function Completion({
           {status === "held"
             ? "It has been held before going to the owner, and Yaadly is looking at it. If anything needs changing, it comes back to you with the reason."
             : "It goes to the owner in a moment."}
+        </div>
+      )}
+      {/* A question about the report, answered on the portal as well as by
+          replying on WhatsApp. Founder, 28 Sep 2026: "there needs to be a way
+          to respond on the portal also". The same box as the job page: it
+          writes to portal_contacts, whose trigger reaches Monique. */}
+      {isWorker && (
+        <div className="-mt-6 print:hidden">
+          <ContactYaadly jobId={job.id} otherSide="the owner" />
         </div>
       )}
 
@@ -528,6 +538,11 @@ export default async function Completion({
       )}
       {isClient && report?.client_flagged_at && !report?.client_confirmed_at && (
         <p className="text-[12.5px] text-dim print:hidden">You raised a point on {fmtDay(report.client_flagged_at)}. A person at Yaadly is looking at it.</p>
+      )}
+      {isClient && (
+        <div className="-mt-6 print:hidden">
+          <ContactYaadly jobId={job.id} otherSide="the worker" />
+        </div>
       )}
     </div>
   );
