@@ -44,7 +44,7 @@ create policy "admin reads report edits" on public.report_edits
 revoke all on public.report_edits from anon;
 
 comment on table public.report_edits is
-  'Every hand correction to a drafted report: what it said, what it says now, who and when. Written only by edit_report(). 20260928160000.';
+  'Every hand correction to a drafted report: what it said, what it says now, who and when. Written only by edit_report(). 20260928190000.';
 
 -- p_part names the part of the report; p_index is the 1 based item in a list
 -- (the finding number for a finding); p_field names the field of that item.
@@ -238,4 +238,4 @@ revoke execute on function public.edit_report(uuid, text, integer, text, text) f
 grant  execute on function public.edit_report(uuid, text, integer, text, text) to authenticated;
 
 comment on function public.edit_report(uuid, text, integer, text, text) is
-  'Hand correction of one line of a drafted, unissued report, by a signed-in admin. Refuses sums of money and measurements; banned language is screened by yaad-report before the desk calls this. Logs before and after to report_edits. 20260928160000.';
+  'Hand correction of one line of a drafted, unissued report, by a signed-in admin. Refuses sums of money and measurements; banned language is screened by yaad-report before the desk calls this. Logs before and after to report_edits. 20260928190000.';
