@@ -10134,27 +10134,50 @@ async function loadWorkerPay(keepMsg){
   // and Pay with Stripe still quotes before it sends and sends only on a
   // second confirm. Hiding a button that the database would refuse anyway is
   // not a decision being taken away from anybody.
-  const payCell = (i) => {
+  // How this worker asked to be paid, from what they gave (28 Sep 2026):
+  // a Stripe payout account they set up themselves, bank details they put
+  // into Wise from the portal, or nothing yet, in which case the details are
+  // taken by phone and paid through Wise. Only the matching way is offered.
+  const methodOf = (i) => {
+    const w = workerByEmail.get(String(i.worker_email || "").toLowerCase()) || {};
+    const stripe = stripeReady(i), wise = !!w.wise_recipient_set_at;
+    if (stripe && wise) return { stripe: true, wise: true, text: "Set up Stripe and gave bank details in Wise, so either works." };
+    if (stripe) return { stripe: true, wise: false, text: "Set up a Stripe payout account, so this is paid through Stripe." };
+    if (wise) return { stripe: false, wise: true, text: "Gave bank details in Wise on " + String(w.wise_recipient_set_at).slice(0, 10) + ", so this is paid by Wise to that recipient." };
+    return { stripe: false, wise: true, text: "Has not given payment details through the portal. Take them by phone, add them in Wise, then pay by Wise." };
+  };
+  // inCard: drawn in the Pay card at the top, which already names the method
+  // and is where the links would lead back from, so neither is repeated.
+  const payCell = (i, inCard = false) => {
     const why = blockedBy.get(i.id);
+    // The button goes to the bill that is holding this up, where it can be
+    // sent or marked paid. It used to open the job's invoice list, whose
+    // Pay the worker came straight back here: a loop with no way out.
+    const bill = (String(why || "").match(/INV-\d{4}-\d{4}/) || [])[0];
     if (why) return `<b>Waiting on the client</b>${sub_(shortWhy(i))}
-      <div class="brow" style="margin-top:6px"><button class="btn g" data-wp-jobinv="${esc(i.job_id)}" title="${esc(why)}">Open the client's bill</button></div>
-      ${linksRow(i)}`;
-    const canStripe = stripeReady(i);
+      <div class="brow" style="margin-top:6px">${bill
+        ? `<button class="btn g" data-wp-bill="${esc(bill)}" title="${esc(why)}">Open ${esc(bill)}</button>`
+        : `<button class="btn g" data-wp-jobinv="${esc(i.job_id)}" title="${esc(why)}">Open the client's bills</button>`}</div>
+      ${inCard ? "" : linksRow(i)}`;
+    const m = methodOf(i);
     return `<div class="brow">
-        ${canStripe ? `<button class="btn" data-wp-stripe="${esc(i.id)}" data-wp-who="${esc(who(i))}" title="Shows Stripe's fee and rate first, and sends only when you confirm">Pay with Stripe</button>` : ""}
-        <a class="btn" href="https://wise.com/home" target="_blank" rel="noopener" data-wp-wise="${esc(i.id)}" title="Opens Wise in a new tab. Pay the recipient saved there, then confirm it here">Pay by Wise</a>
+        ${m.stripe ? `<button class="btn" data-wp-stripe="${esc(i.id)}" data-wp-who="${esc(who(i))}" title="Shows Stripe's fee and rate first, and sends only when you confirm">Pay with Stripe</button>` : ""}
+        ${m.wise ? `<a class="btn" href="https://wise.com/home" target="_blank" rel="noopener" data-wp-wise="${esc(i.id)}" title="Opens Wise in a new tab. Pay the recipient saved there, then confirm it here">Pay by Wise</a>` : ""}
       </div>
-      ${canStripe
-        ? sub_("Stripe asks you to confirm its fee and rate before it sends. Wise you pay yourself, then confirm it here.")
-        : sub_("Stripe is not set up for this worker. Pay in Wise, then confirm it here.")}
-      <div data-wp-wisepanel="${esc(i.id)}" style="display:none;margin-top:8px">
+      ${sub_((inCard ? "" : m.text + " ") + (m.stripe ? "Stripe asks you to confirm its fee and rate before it sends." : "") + (m.stripe && m.wise ? " " : "") + (m.wise ? "Pay in Wise, then confirm it here." : ""))}
+      ${m.wise ? `<div data-wp-wisepanel="${esc(i.id)}" style="display:none;margin-top:8px">
         ${sub_("Paid them in the Wise tab? Record it here.")}
         <input type="text" placeholder="Wise reference, optional" data-wp-ref="${esc(i.id)}" style="width:100%;max-width:200px;margin:4px 0">
         <button class="btn" data-wp-sent="${esc(i.id)}" data-wp-amt="${esc(feeAmt(i.total_pence, i.currency))}" data-wp-who="${esc(who(i))}">Confirm the Wise transfer</button>
-      </div>
-      ${linksRow(i)}`;
+      </div>` : ""}
+      ${inCard ? "" : linksRow(i)}`;
   };
-  const owed = list.filter((i) => i.status === "sent");
+  // Arrived from "Pay the worker" on one invoice: that invoice gets a card of
+  // its own at the top with the one way to pay it, and leaves the table.
+  const focusId = WP_FOCUS; WP_FOCUS = null;
+  const owedAll = list.filter((i) => i.status === "sent");
+  const focus = owedAll.find((i) => i.id === focusId) || null;
+  const owed = owedAll.filter((i) => i !== focus);
   const paid = list.filter((i) => i.status === "paid").sort((a, b) => String(b.paid_at || "").localeCompare(String(a.paid_at || ""))).slice(0, 30);
   const drafts = list.filter((i) => i.status === "draft");
 
@@ -10222,12 +10245,27 @@ async function loadWorkerPay(keepMsg){
       <div class="tw"><table><thead><tr><th>Worker</th><th>Phone on file</th><th>Details</th><th></th></tr></thead><tbody>${checkRows}</tbody></table></div>
     </div>` : "";
 
+  const focusCard = focus ? (() => {
+    const w = workerByEmail.get(String(focus.worker_email || "").toLowerCase());
+    const blocked = blockedBy.get(focus.id);
+    const cb = w && w.bank_callback_at
+      ? `<p class="conseq">Bank details checked by phone on ${esc(String(w.bank_callback_at).slice(0, 10))}${w.bank_callback_by ? " by " + esc(w.bank_callback_by) : ""}.</p>`
+      : `<div class="alert warn"><span class="ic">!</span><div><b>Call ${esc(who(focus))} back first</b><p>Phone them on ${esc((w && w.phone) || "the number on file")} and read back their bank details. Until then it cannot be paid.</p>${w ? `<div class="brow" style="margin-top:8px"><button class="btn" data-wp-callback="${esc(w.worker_email)}" data-wp-cbname="${esc(who(focus))}">Call-back done</button></div>` : ""}</div></div>`;
+    return `<div class="card" style="border-color:rgba(20,184,166,.45)">
+      <div class="chd"><h3>Pay ${esc(who(focus))} ${esc(feeAmt(focus.total_pence, focus.currency))}</h3></div>
+      <p class="vsub">${esc(focus.id)}, ${esc(String(focus.period_label || "").trim() || (focus.stage ? "Stage " + focus.stage : "Work completed"))}, ${jobCell(focus)}</p>
+      ${blocked ? "" : `<p><b>How they asked to be paid:</b> ${esc(methodOf(focus).text)}</p>`}
+      ${blocked ? "" : cb}
+      <div style="margin-top:10px">${payCell(focus, true)}</div>
+    </div>`;
+  })() : "";
   const head = `<thead><tr><th>Worker</th><th>Job</th><th>For</th><th class="num">Amount</th><th>Client paid?</th><th>Waiting</th><th></th></tr></thead>`;
-  host.innerHTML = checkCard + `
+  host.innerHTML = focusCard + checkCard + `
     <div class="card">
-      <div class="chd"><h3>Owed now${owed.length ? ": " + owed.length + ", " + totals(owed) : ""}</h3></div>
-      ${owed.length ? `<p class="vsub">${owed.filter((i) => !blockedBy.get(i.id)).length} you can pay now${owed.some((i) => blockedBy.get(i.id)) ? ", " + owed.filter((i) => blockedBy.get(i.id)).length + " waiting on the client to pay their bill first" : ""}.</p>` : ""}
+      <div class="chd"><h3>Owed now${owedAll.length ? ": " + owedAll.length + ", " + totals(owedAll) : ""}${focus ? " (one above)" : ""}</h3></div>
+      ${owedAll.length ? `<p class="vsub">${owedAll.filter((i) => !blockedBy.get(i.id)).length} you can pay now${owedAll.some((i) => blockedBy.get(i.id)) ? ", " + owedAll.filter((i) => blockedBy.get(i.id)).length + " waiting on the client to pay their bill first" : ""}.</p>` : ""}
       ${owed.length ? `<div class="tw"><table>${head}<tbody>${owedRows}</tbody></table></div>`
+        : focus ? `<div class="empty"><b>Only the one above</b></div>`
         : `<div class="empty"><b>Nobody is owed anything right now</b>A pay invoice lands here the moment a stage is approved.</div>`}
     </div>
     <div class="card">
@@ -10237,17 +10275,7 @@ async function loadWorkerPay(keepMsg){
     </div>
     ${drafts.length ? `<p class="vsub">${drafts.length} worker pay invoice${drafts.length > 1 ? "s are" : " is"} still a draft, not yet owed: ${drafts.map((d) => esc(d.id)).join(", ")}.</p>` : ""}`;
 
-  // Arrived from "Pay the worker" on one invoice: that row, in view and lit.
-  if (WP_FOCUS) {
-    const row = host.querySelector(`[data-wp-row="${CSS.escape(WP_FOCUS)}"]`);
-    WP_FOCUS = null;
-    if (row) {
-      row.scrollIntoView({ behavior: "smooth", block: "center" });
-      row.style.transition = "background 1.5s";
-      row.style.background = "rgba(20,184,166,.16)";
-      setTimeout(() => { row.style.background = ""; }, 2500);
-    }
-  }
+  host.querySelectorAll("[data-wp-bill]").forEach((b) => b.addEventListener("click", () => openInvoice(b.dataset.wpBill)));
 
   // Links: open the pay invoice, the job's invoices, or the job's record.
   host.querySelectorAll("[data-wp-open]").forEach((b) => b.addEventListener("click", () => openInvoice(b.dataset.wpOpen)));
