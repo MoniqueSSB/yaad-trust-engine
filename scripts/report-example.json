@@ -3,9 +3,9 @@
  "report": {
   "id": "00000000-0000-4000-8000-0000000000e1",
   "kind": "deposit_check",
-  "number": null,
-  "client_name": "PRACTICE, Miss A. Brown (invented)",
-  "property": "PRACTICE, Portmore, St Catherine",
+  "number": "TEST-DPC-0001",
+  "client_name": "PRACTICE, TEST CLIENT, not a real person",
+  "property": "PRACTICE, TEST PROPERTY, Portmore",
   "visited_on": null,
   "status": "draft",
   "drafted_at": "2026-09-28T10:00:00Z",
@@ -24,7 +24,7 @@
    "Local authority: whether the wall work needs the municipal corporation to be told, or any approval, before it starts.",
    "Attorney: whether an agreement made by WhatsApp messages is enough on a job of this size."
   ],
-  "source_text": "DOCUMENT 1 (quote), quote.jpg:\nD. Campbell, Building and Tiling\nTo Miss Brown, Portmore. 20/9/26\nTake out old bathroom suite and tiles. Supply and fit new toilet, basin, shower and tiles.\nFix back wall, block and render.\nMaterials J$520,000\nLabour J$380,000. Total J$900,000\n70% to start, balance when finish\nStart soon\nThanks, Dave\nWhatsApp 876 555 0142\nLayout: handwritten, no letterhead, dated, no TRN, no address.\n\nDOCUMENT 2 (message), whatsapp.png:\n16 Sep, 10:02 Client: Hi Dave, my aunt gave me your number for the bathroom and the back wall.\n18 Sep, 21:14 Dave: Send the 70% to my cousin Marlon account and I can buy everything Monday.\n22 Sep, 19:30 Dave: Miss you ready? Price going up next week on the tiles.\n\nPHOTOGRAPH 3, wall.jpg:\nThe rear wall from the yard, block with a render finish, a crack running from the window corner.",
+  "source_text": "DOCUMENT 1 (quote), quote.jpg:\nTEST BUILDER, Building and Tiling\nTo TEST CLIENT, Portmore. 20/9/26\nTake out old bathroom suite and tiles. Supply and fit new toilet, basin, shower and tiles.\nFix back wall, block and render.\nMaterials J$111,111 (TEST FIGURE)\nLabour J$222,222 (TEST FIGURE). Total J$333,333 (TEST FIGURE)\n70% to start, balance when finish\nStart soon\nThanks, Test Builder\nWhatsApp 876 000 0000 (TEST NUMBER)\nLayout: handwritten, no letterhead, dated, no TRN, no address.\n\nDOCUMENT 2 (message), whatsapp.png:\n16 Sep, 10:02 Client: Hi Test Builder, my aunt gave me your number for the bathroom and the back wall.\n18 Sep, 21:14 Test Builder: Send the 70% to my cousin account and I can buy everything Monday.\n22 Sep, 19:30 Test Builder: Miss you ready? Price going up next week on the tiles.\n\nPHOTOGRAPH 3, wall.jpg:\nThe rear wall from the yard, block with a render finish, a crack running from the window corner.",
   "sections": {
    "finding_refs": [
     {
@@ -70,7 +70,7 @@
    },
    "documents": [
     {
-     "what": "Quote from D. Campbell, handwritten, one page",
+     "what": "Quote from TEST BUILDER, handwritten, one page",
      "dated": "20 Sep 2026",
      "form": "1 photograph"
     },
@@ -254,7 +254,7 @@
      "evidence": "A snag list signed by you and the builder, every item marked done"
     }
    ],
-   "ask_the_builder": "Hi Dave, thank you for the quote. Before we go ahead, could you send me the following in writing, please:\n\n1. Your full name or business name, your TRN and a physical address.\n2. The bank account you would like to be paid into, in your own name.\n3. An itemised list of the materials, with the supplier for each, and the invoices made out in my name.\n4. A start date, how many working days the job will take, and a completion date.\n5. What happens if the job runs late, and what happens if I need to stop the work.\n6. Whether you hold any insurance, and whether anyone else will be working with you.\n7. Whether you give any guarantee on the work once it is finished.\n\nOn payment, I would rather not pay up front. I would like to pay in stages as the work goes, each stage paid promptly once I have the photos or receipts for it, by bank transfer to your own account. I will send you the stages so we can agree the amount for each one together before anything starts.\n\nIf anything changes once you are on site, please stop at that point and write down what changed, and what it does to the time and the price, so we can agree it before carrying on.\n\nThank you, I look forward to hearing from you.",
+   "ask_the_builder": "Hi Test Builder, thank you for the quote. Before we go ahead, could you send me the following in writing, please:\n\n1. Your full name or business name, your TRN and a physical address.\n2. The bank account you would like to be paid into, in your own name.\n3. An itemised list of the materials, with the supplier for each, and the invoices made out in my name.\n4. A start date, how many working days the job will take, and a completion date.\n5. What happens if the job runs late, and what happens if I need to stop the work.\n6. Whether you hold any insurance, and whether anyone else will be working with you.\n7. Whether you give any guarantee on the work once it is finished.\n\nOn payment, I would rather not pay up front. I would like to pay in stages as the work goes, each stage paid promptly once I have the photos or receipts for it, by bank transfer to your own account. I will send you the stages so we can agree the amount for each one together before anything starts.\n\nIf anything changes once you are on site, please stop at that point and write down what changed, and what it does to the time and the price, so we can agree it before carrying on.\n\nThank you, I look forward to hearing from you.",
    "checklist": [
     {
      "item": "Contractor named on the quote",
@@ -435,16 +435,16 @@
    "quote": {
     "doc": 1,
     "lines": [
-     "D. Campbell, Building and Tiling",
-     "To Miss Brown, Portmore. 20/9/26",
+     "TEST BUILDER, Building and Tiling",
+     "To TEST CLIENT, Portmore. 20/9/26",
      "Take out old bathroom suite and tiles. Supply and fit new toilet, basin, shower and tiles.",
      "Fix back wall, block and render.",
-     "Materials J$520,000",
-     "Labour J$380,000. Total J$900,000",
+     "Materials J$111,111 (TEST FIGURE)",
+     "Labour J$222,222 (TEST FIGURE). Total J$333,333 (TEST FIGURE)",
      "70% to start, balance when finish",
      "Start soon",
-     "Thanks, Dave",
-     "WhatsApp 876 555 0142"
+     "Thanks, Test Builder",
+     "WhatsApp 876 000 0000 (TEST NUMBER)"
     ]
    }
   }
