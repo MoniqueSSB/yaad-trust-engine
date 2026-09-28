@@ -1945,7 +1945,13 @@ export default async function JobRoom({
             .filter((i) => i.payable_to !== "worker" && (i.currency ?? "JMD").toUpperCase() === "JMD" && !i.part_of)
             .map((i) => ({ id: i.id, label: i.period_label ?? i.id, total: i.total_pence, paid: i.status === "paid", paidAt: i.paid_at }))}
           workerPays={workerPays}
-          materials={won ? { released: materialsReleasedJmd, quoted: materialsQuoted, receiptFiled: receipt.state === "filed" } : null}
+          materials={won ? {
+            released: materialsReleasedJmd,
+            quoted: materialsQuoted,
+            /* "none" with money sent means every release has its receipt
+               recorded at the desk; it read "still to come" until 28 Sep. */
+            receipt: receipt.state === "due" ? "due" : receipt.state === "filed" ? "filed" : "recorded",
+          } : null}
           money={money}
           day={whenDate}
           workerName={won?.worker_name ?? job.worker_name ?? "the tradesperson"}

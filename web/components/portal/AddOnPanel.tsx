@@ -401,7 +401,16 @@ export function AddOnPanel({
           {me === "client" ? "No extra work on this job." : "No extra work on this job. If you find something outside the scope, stop, and tell Yaadly with photos so the client can add it on."}
         </p>
       )}
-      {addons.map((a) => (
+      {/* Founder, 28 Sep 2026: what still needs doing at the top, anything
+          settled (approved, turned down, withdrawn, cancelled) at the bottom,
+          newest first within each. */}
+      {[...addons]
+        .sort((x, y) => {
+          const rank = (a: AddonRow) =>
+            a.status === "with_worker" || a.status === "with_client" ? 0 : a.status === "agreed" ? 1 : 2;
+          return rank(x) - rank(y) || (y.created_at ?? "").localeCompare(x.created_at ?? "");
+        })
+        .map((a) => (
         <AddonCard key={a.id} a={a} me={me} otherName={otherName} jobId={jobId}
           invoices={invoices.filter((i) => i.addon_id === a.id)} evidenceCount={evidenceCounts[a.id] ?? 0} photos={photos[a.id] ?? []} />
       ))}

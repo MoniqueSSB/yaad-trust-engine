@@ -13,7 +13,9 @@
 
 export type TrailBill = { id: string; label: string; total: number | null; paid: boolean; paidAt: string | null };
 export type TrailWorkerPay = { id: string; what: string; labour: number | null; paid: boolean; paidAt: string | null };
-export type TrailMaterials = { released: number; quoted: number; receiptFiled: boolean };
+/** due: money sent, no receipt yet. filed: the worker has uploaded one.
+ *  recorded: a person at Yaadly has recorded it against the money. */
+export type TrailMaterials = { released: number; quoted: number; receipt: "due" | "filed" | "recorded" };
 
 function Row({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
@@ -89,7 +91,15 @@ export function MoneyTrail({
             <Row
               label="Materials money sent"
               value={(money(materials.released) ?? "J$0") + " of " + (money(materials.quoted) ?? "")}
-              note={materials.released > 0 ? (materials.receiptFiled ? "Receipt filed" : "Receipt still to come") : undefined}
+              note={
+                materials.released > 0
+                  ? materials.receipt === "recorded"
+                    ? "Receipt recorded by Yaadly"
+                    : materials.receipt === "filed"
+                      ? "Receipt filed, being checked"
+                      : "Receipt still to come"
+                  : undefined
+              }
             />
           )}
           {side === "worker" && (
