@@ -1274,7 +1274,13 @@ export default async function JobRoom({
      fixed UTC-5, no daylight saving to chase. */
   const jamaicaToday = new Date(new Date().getTime() - 5 * 3600_000).toISOString().slice(0, 10);
   const arrivalRows = arrivals ?? [];
-  const checkedInToday = arrivalRows.some((a) => a.arrived_on === jamaicaToday);
+  /* Today AND this stage, the same pair log_arrival() is unique on. It was
+     today alone until 28 Sep 2026, so a stage 1 check-in told the client
+     "checked in today for stage 2" once stage 1 was approved, and hid the
+     worker's stage 2 button for the rest of the day. */
+  const checkedInToday = arrivalRows.some(
+    (a) => a.arrived_on === jamaicaToday && a.stage === Math.max(job.stage ?? 0, 1),
+  );
   const recentArrivals = arrivalRows.map((a) => ({
     stage: a.stage as number,
     arrivedAt: whenDateTime(a.arrived_at) ?? "",
@@ -1806,6 +1812,7 @@ export default async function JobRoom({
           side={role === "worker" ? "worker" : "client"}
           jobBase={jobBase}
           source={packSource}
+          paidInFull={!!won && billingModeOf(won.billing_mode) === "in_full"}
         />
         {/* Back from Stripe's payment page. Said plainly either way: a
             cancelled payment charged nothing, and a completed one is not
