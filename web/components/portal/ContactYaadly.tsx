@@ -23,9 +23,12 @@ export function ContactYaadly({ jobId, otherSide }: { jobId: string; otherSide: 
   if (sent)
     return (
       <div className="mt-6 rounded-2xl border border-tealb/30 bg-tealb/5 p-4 text-[13px] leading-relaxed text-mute">
-        <b className="text-tealb">Sent. Monique has it.</b>{" "}
-        It went to her WhatsApp and her email with this job attached. She
-        answers on WhatsApp or by email, whichever you use with Yaadly.
+        {/* Named the founder until 28 Sep 2026. Standing rule: client and
+            worker screens say Yaadly, never her name. */}
+        <b className="text-tealb">Sent. Yaadly has it.</b>{" "}
+        It went to a person at Yaadly on WhatsApp and by email, with this job
+        attached. The answer comes on WhatsApp or by email, whichever you use
+        with Yaadly.
         <button onClick={() => { setSent(false); setBody(""); }} className="ml-2 underline hover:text-ink">
           Send another
         </button>
@@ -37,8 +40,8 @@ export function ContactYaadly({ jobId, otherSide }: { jobId: string; otherSide: 
       <b className="text-[14px] text-ink">Message Yaadly directly</b>
       <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
         For anything you would rather not raise with {otherSide}, or anything
-        this page cannot sort. It goes straight to Monique, on WhatsApp and by
-        email, with this job attached. Patois or English.
+        this page cannot sort. It goes straight to a person at Yaadly, on
+        WhatsApp and by email, with this job attached. Patois or English.
       </p>
       <textarea value={body} onChange={(e) => { setBody(e.target.value); setErr(""); }} rows={3} maxLength={2000}
         placeholder="What is the problem?"

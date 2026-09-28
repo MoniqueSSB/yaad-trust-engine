@@ -207,12 +207,22 @@ export function MoneyPanel({
             </div>
             <div className="mt-4 flex items-baseline justify-between border-t border-line2 pt-3.5">
               <span className="text-[13px] font-semibold text-ink">
-                {side === "client" ? "All in, everything you pay" : "You take home"}
+                {side === "client" ? "All in, everything you pay" : "Paid to you in total"}
               </span>
               <span className="font-mono-app text-[22px] font-semibold text-ink">
                 {money(side === "client" ? allIn : takeHome) ?? "—"}
               </span>
             </div>
+            {/* Said "You take home" over labour plus materials until 28 Sep
+                2026. The materials money is spent on the materials, so a
+                worker reading J$119,250 as what they keep was reading the
+                wrong number. */}
+            {side === "worker" && takeHome != null && materials != null && materials > 0 && (
+              <p className="mt-1 text-right text-[12px] text-dim">
+                {money(materials)} of that buys the materials. You keep{" "}
+                <b className="text-mute">{money(takeHome - materials)}</b>.
+              </p>
+            )}
           </>
         )}
       </section>

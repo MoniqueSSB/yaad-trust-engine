@@ -53,7 +53,7 @@ export function EvidenceUpload({
           const r = await uploadEvidence(fd);
           if (r.ok) {
             setState("done");
-            setMsg("Filed under " + stageTitle + ", timestamped and fingerprinted. It cannot be edited now.");
+            setMsg("Filed under " + stageTitle + ", timestamped and fingerprinted. The photo stays as filed; you can correct its words or part with \"Correct this\" until the stage is signed off.");
           } else {
             setState("error");
             setMsg(r.message);

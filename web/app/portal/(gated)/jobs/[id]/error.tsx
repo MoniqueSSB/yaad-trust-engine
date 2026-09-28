@@ -24,8 +24,19 @@ export default function JobRoomError({
         This job couldn&apos;t load.
       </h1>
       <p className="mt-3 text-[13.5px] leading-relaxed text-mute">
-        Nothing on your end, and nothing about this job has changed. Give it
-        another try, or go back to your jobs list.
+        Nothing about this job has changed. Give it another try, or go back
+        to your jobs list.
+      </p>
+      {/* The commonest cause, found 28 Sep 2026: a button pressed after the
+          session had ended. Every portal action refuses a signed-out caller
+          by throwing, and production strips the reason, so this screen is
+          where that lands. Said as a possibility, never as a diagnosis. */}
+      <p className="mt-2 text-[13px] leading-relaxed text-mute">
+        If you have been signed out,{" "}
+        <Link href="/portal/sign-in" className="font-bold text-tealb underline-offset-2 hover:underline">
+          sign in again
+        </Link>{" "}
+        and press the button once more.
       </p>
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         <button

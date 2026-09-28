@@ -36,7 +36,6 @@ export function MaterialsStore({
   role,
   storeType,
   store,
-  setBy,
   setAt,
 }: {
   jobId: string;
@@ -73,7 +72,10 @@ export function MaterialsStore({
             <p className="mt-1 text-[14px] leading-relaxed text-mute">{store}</p>
           )}
           <p className="mt-2 text-[12px] text-dim">
-            {setBy ? "Named by " + setBy : "Named on this job"}
+            {/* Printed the setter's email until 28 Sep 2026, which put the
+                client's address in front of the worker. The job form
+                promises contact details stay hidden from workers. */}
+            Named on this job
             {setAt ? " on " + (whenDate(setAt) ?? setAt) : ""}
           </p>
           <p className="mt-3 max-w-[62ch] text-[13px] leading-relaxed text-mute">
