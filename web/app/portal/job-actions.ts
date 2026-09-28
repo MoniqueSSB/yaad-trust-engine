@@ -238,3 +238,21 @@ export async function moveDispute(
   if (error) throw new Error("refused");
   revalidatePath("/portal/jobs/" + jobId);
 }
+
+/** The client adds or corrects the street address (20260929070000). Returned,
+ *  never thrown, so the database's own sentence reaches them. */
+export async function setJobAddress(jobId: string, addr: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_job_address_as_me", { p_job: jobId, p_addr: addr.trim().slice(0, 300) });
+  if (error) {
+    return {
+      ok: false,
+      error: /could not find the function|does not exist/i.test(error.message)
+        ? "Adding the address here is not switched on yet. Send it to Yaadly with Message Yaadly on the Help tab."
+        : error.message,
+    };
+  }
+  revalidatePath("/portal/jobs/" + jobId);
+  return { ok: true };
+}

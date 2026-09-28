@@ -22,6 +22,7 @@ import Link from "next/link";
 
 export type TabKey =
   | "overview"
+  | "details"
   | "scope"
   | "evidence"
   | "materials"
@@ -33,6 +34,9 @@ export type TabKey =
 
 export const TABS: { key: TabKey; label: string }[] = [
   { key: "overview", label: "Overview" },
+  /* Founder, 28 Sep 2026: the portal link, the job's facts, where it is and
+     the job as agreed live in their own section, not the overview. */
+  { key: "details", label: "Job details" },
   { key: "scope", label: "Scope and quote" },
   { key: "evidence", label: "Progress evidence" },
   { key: "materials", label: "Materials" },
