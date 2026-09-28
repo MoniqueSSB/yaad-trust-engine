@@ -43,6 +43,7 @@ export function JobRail({
   jobBase,
   moneyHref,
   check = null,
+  extra = 0,
   active,
 }: {
   side: "client" | "worker";
@@ -62,8 +63,14 @@ export function JobRail({
   check?: { label: string; jmd: number } | null;
   /** The tab the page is showing, so its row is marked rather than linked. */
   active: TabKey;
+  /** Agreed additional work, priced for this side (client: with 15% on top;
+   *  worker: less 5%). Not inside allIn or takeHome. Added to the headline
+   *  and shown as its own line, so the rail and "What this job costs" end on
+   *  the same figure for both sides (28 Sep 2026). */
+  extra?: number;
 }) {
-  const headline = side === "client" ? allIn : takeHome;
+  const main = side === "client" ? allIn : takeHome;
+  const headline = main == null ? null : main + (extra > 0 ? extra : 0);
   const initials = (workerName ?? "")
     .split(" ")
     .map((x) => x[0])
@@ -114,6 +121,18 @@ export function JobRail({
                 <span className="text-mute">{check.label}</span>
                 <span className="font-mono-app text-[11.5px] text-ink">{money(check.jmd)}</span>
               </div>
+            )}
+            {extra > 0 && (
+              <>
+                <div className="flex justify-between border-t border-gold/15 pt-1.5 text-[12px]">
+                  <span className="text-mute">Main work</span>
+                  <span className="font-mono-app text-[11.5px] text-ink">{money(main)}</span>
+                </div>
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-mute">{side === "client" ? "Additional work, with 15%" : "Additional work, less 5%"}</span>
+                  <span className="font-mono-app text-[11.5px] text-ink">{money(extra)}</span>
+                </div>
+              </>
             )}
           </div>
         )}

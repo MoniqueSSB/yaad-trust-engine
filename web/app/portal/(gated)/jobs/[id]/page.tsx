@@ -2367,6 +2367,7 @@ export default async function JobRoom({
           fee={role === "worker" ? workerFeeJmd : feeJmd}
           materials={won?.materials_jmd ?? null}
           check={role === "client" ? checkLine : null}
+          extra={countedAddons.reduce((t, a) => t + (role === "client" ? addonClientBill(a.amount_jmd, a.terms).total : addonWorkerPay(a.amount_jmd)), 0)}
           heldNote={
             labour == null
               ? role === "worker"
