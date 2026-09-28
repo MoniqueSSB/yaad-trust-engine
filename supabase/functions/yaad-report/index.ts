@@ -372,6 +372,17 @@ Deno.serve(async (req: Request) => {
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch (_) { return fail("Send JSON.", 400); }
 
+    // Screen mode, 28 September 2026. When a line of a drafted report is
+    // corrected by hand at the desk, the wording is checked here against the
+    // same banned-language list the draft was, before edit_report() writes it.
+    // No model, no database, nothing saved: one list, read by both paths.
+    // edit_report() itself refuses figures and measurements, so a correction
+    // meets every screen a draft meets.
+    if (body.mode === "screen") {
+      const hits = guardrails.scan(String(body.text ?? ""));
+      return json({ ok: hits.length === 0, banned: hits.map((b) => ({ term: b.term, guidance: b.guidance })) });
+    }
+
     const kind = String(body.kind ?? "");
     const notes = String(body.notes ?? "").trim();
     const captions = Array.isArray(body.captions) ? (body.captions as unknown[]).map(String) : [];

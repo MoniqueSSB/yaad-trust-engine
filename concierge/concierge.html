@@ -923,6 +923,11 @@ ul.rpl{margin:0;padding-left:18px;font-size:12.5px;line-height:1.55} ul.rpl li{m
 .rpd{margin-top:14px;border:1px solid var(--line);border-radius:var(--r);padding:10px 14px}
 .rpd summary{cursor:pointer;font-size:12.5px;color:var(--mute)}
 .rpd pre.rpcopy,.rpd ul{margin-top:10px}
+/* Hand corrections, 28 Sep 2026. A small link, not a button per line: forty
+   buttons on one page is the grid of boxes she found overwhelming. */
+.rped{background:none;border:0;padding:0 0 0 8px;font:600 10.5px var(--mono);letter-spacing:.04em;color:var(--tealb);cursor:pointer;text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
+.rped:hover{color:var(--ink)} .rped.add{padding:6px 0 0 0;display:inline-block}
+.rpedn{font:600 9.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--mango);margin-left:6px}
 
 /* ---------- job invoices ---------- */
 .jicard{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden;margin-bottom:20px}
@@ -1752,7 +1757,7 @@ const VIEWS = [
 
   { k:"reports", g:"Documents & money", label:"Reports", icon:"case",
     title:"Reports", table:"v_reports_open",
-    pre: preReports, page: reportPage,
+    pre: preReports, page: reportPage, afterOpen: wireReportEdits,
     titleOf: r => (RPT_SERVICE[r.kind] || r.kind || "Report") + (r.number ? ", " + r.number : ", draft"),
     hide: ["_verdict","_verdict_line","_sections","_omitted","_questions","_scrubbedList","_source","_model","_provider","_issued_by","_findingRows"],
     sub:"The priced reports: Deposit Protection Checks, Condition Reports, Technical Sign-offs and Visual Checks. yaad-report drafts the findings. It cannot rate one and it cannot write the verdict, because that is the judgment the client actually paid for. A report will not issue while a single finding is unrated, while the verdict is empty, or while any sentence in it states a measurement. Each of those refusals is the gate working, not a bug.",
@@ -10481,10 +10486,15 @@ async function rptImagesFrom(files){
 async function preReports(rows){
   const ids = (rows || []).map(r => r.id).filter(Boolean);
   if (!ids.length) return rows;
-  const [{ data: reps }, { data: fs }] = await Promise.all([
+  const [{ data: reps }, { data: fs }, { data: eds }] = await Promise.all([
     sb.from("reports").select("id,verdict,verdict_line,sections,omitted,questions,scrubbed,source_text,model,provider,issued_by,issued_at").in("id", ids),
     sb.from("report_findings").select("report_id,ord,heading,body,why,action,severity,rated_by,rated_at").in("report_id", ids).order("ord"),
+    // Hand corrections (20260928160000). A desk older than the migration
+    // simply gets an error here and shows no log, rather than no page.
+    sb.from("report_edits").select("report_id,target,before,after,edited_by,edited_at").in("report_id", ids).order("edited_at"),
   ]);
+  const eBy = {};
+  for (const e of (eds || [])) (eBy[e.report_id] = eBy[e.report_id] || []).push(e);
   const byId = Object.fromEntries((reps || []).map(r => [r.id, r]));
   const fBy = {};
   for (const f of (fs || [])) (fBy[f.report_id] = fBy[f.report_id] || []).push(f);
@@ -10496,12 +10506,19 @@ async function preReports(rows){
     r._scrubbedList = x.scrubbed || []; r._source = x.source_text || "";
     r._model = x.model || ""; r._provider = x.provider || "";
     r._issued_by = x.issued_by || ""; r._findingRows = fBy[r.id] || [];
+    r._edits = eBy[r.id] || [];
   }
   return rows;
 }
 
 function reportPage(r){
   const sx = r._sections || {};
+  // An edit link, or nothing once the report is issued: what the client holds
+  // is what was issued, and edit_report() refuses it anyway.
+  const open = r.status !== "issued";
+  const ed = (part, idx, label) => open ? `<button class="rped" data-edit="${esc(part)}" data-idx="${idx == null ? "" : esc(idx)}">${esc(label || "Edit")}</button>` : "";
+  const add = (part, label) => open ? `<button class="rped add" data-edit="${esc(part)}" data-idx="">${esc(label)}</button>` : "";
+  const handN = (r._edits || []).length;
   const service = RPT_SERVICE[r.kind] || r.kind;
   const fs = r._findingRows || [];
   const unrated = fs.filter(f => !f.severity).length;
@@ -10517,7 +10534,7 @@ function reportPage(r){
   const srcOf = Object.fromEntries((sx.finding_refs || []).map(x => [x.ord, x.source]));
   const findings = fs.length ? fs.map(f => `
     <div class="rpf">
-      <div class="rpfh"><span class="n">${esc(f.ord)}</span><b>${esc(f.heading)}</b><span class="rpfs">${sevChip(f)}</span></div>
+      <div class="rpfh"><span class="n">${esc(f.ord)}</span><b>${esc(f.heading)}</b><span class="rpfs">${sevChip(f)}${ed("finding", f.ord)}</span></div>
       <p>${esc(f.body)}</p>
       ${f.why ? `<div class="rpfw"><span>Why it matters</span>${esc(f.why)}</div>` : ""}
       ${f.action ? `<div class="rpfa"><span>What to do</span>${esc(f.action)}</div>` : ""}
@@ -10551,36 +10568,48 @@ function reportPage(r){
       </div>
     </div>
 
+    ${r.kind === "deposit_check" ? `<h5 class="rph">Page one and about this review <span>drafted, all correctable</span></h5>
+    <div class="jpgrid two">
+      <div class="jpc"><h6>At a glance</h6>
+        <div class="jpv"><span>As the builder proposed</span><div class="jpvv">${esc((sx.glance || {}).proposed || "")}${sub_((sx.glance || {}).proposed_detail || "")}${ed("glance", null)}</div></div>
+        <div class="jpv"><span>As this report proposes</span><div class="jpvv">${esc((sx.glance || {}).ours || "")}${sub_((sx.glance || {}).ours_detail || "")}</div></div>
+        <div class="jpv"><span>Next payment asked for</span><div class="jpvv">${esc(sx.next_payment || "Not recorded")}${ed("next_payment", null)}</div></div>
+        <div class="jpv"><span>Checked independently</span><div class="jpvv">${esc(sx.checked || "Nothing recorded")}${ed("checked", null)}</div></div>
+      </div>
+      <div class="jpc"><h6>Documents received</h6><ul class="rpl">${(sx.documents || []).map((d, i) => `<li>${esc(d.what)}${ed("documents", i + 1)}<span class="rpnote">${esc([d.dated, d.form].filter(Boolean).join(", "))}</span></li>`).join("")}</ul>${add("documents", "Add a document")}
+        <h6 style="margin-top:12px">To get before paying</h6><ul class="rpl">${(sx.get_before_paying || []).map((d, i) => `<li>${esc(d.document)}${ed("get_before_paying", i + 1)}${d.finding ? `<span class="rpnote">for red flag ${esc(d.finding)}</span>` : ""}</li>`).join("")}</ul>${add("get_before_paying", "Add a document")}</div>
+    </div>` : ""}
+
     <h5 class="rph">${r.kind === "deposit_check" ? "The red flags" : "Findings"} <span>drafted by the agent, rated by you</span></h5>
     ${findings}
 
     ${(sx.next_steps || []).length ? `<h5 class="rph">What to do now <span>drafted, the client's plan</span></h5>
     <table class="rpt"><tr><th>Step</th><th>Who, when</th></tr>
-    ${sx.next_steps.map(s => `<tr><td>${esc(s.step)}</td><td>${esc([s.who, s.when].filter(Boolean).join(", "))}</td></tr>`).join("")}</table>` : ""}
+    ${sx.next_steps.map((s, i) => `<tr><td>${esc(s.step)}</td><td>${esc([s.who, s.when].filter(Boolean).join(", "))}${ed("next_steps", i + 1)}</td></tr>`).join("")}</table>${add("next_steps", "Add a step")}` : ""}
 
     ${(sx.payment_terms || []).length ? `<h5 class="rph">Payment terms <span>left column drafted from the documents, right column Yaadly's standard</span></h5>
     <table class="rpt"><tr><th>Term</th><th>As the builder proposed</th><th>What to agree instead</th></tr>
-    ${sx.payment_terms.map(t => `<tr><td><b>${esc(t.term)}</b></td><td>${esc(t.proposed)}${t.source ? sub_(t.source) : ""}</td><td>${esc(t.instead)}</td></tr>`).join("")}</table>` : ""}
+    ${sx.payment_terms.map((t, i) => `<tr><td><b>${esc(t.term)}</b></td><td>${esc(t.proposed)}${t.source ? sub_(t.source) : ""}</td><td>${esc(t.instead)}${ed("payment_terms", i + 1)}</td></tr>`).join("")}</table>` : ""}
 
     ${stages.length ? `<h5 class="rph">Payment schedule to put in its place <span>order and evidence drafted, shares yours</span></h5>
     <table class="rpt"><tr><th>Stage</th><th>Paid when</th><th>Evidence before it moves</th></tr>
-    ${stages.map(s => `<tr><td><b>${esc(s.stage)}</b></td><td>${esc(s.when)}</td><td>${esc(s.evidence)}</td></tr>`).join("")}</table>` : ""}
+    ${stages.map((s, i) => `<tr><td><b>${esc(s.stage)}</b></td><td>${esc(s.when)}</td><td>${esc(s.evidence)}${ed("payment_stages", i + 1)}</td></tr>`).join("")}</table>${add("payment_stages", "Add a stage")}` : ""}
 
-    ${sx.ask_the_builder ? `<h5 class="rph">The message to the builder <span>drafted, for the client to copy</span></h5>
+    ${sx.ask_the_builder ? `<h5 class="rph">The message to the builder <span>drafted, for the client to copy</span>${ed("ask_the_builder", null)}</h5>
     <pre class="rpcopy">${esc(sx.ask_the_builder)}</pre>` : ""}
 
     ${groups.length ? `<h5 class="rph">What was checked <span>${check.length} fixed lines, states drafted from the notes</span></h5>
-    <div class="rpck">${groups.map(g => `<div class="rpg">${esc(g.name)}</div>${g.rows.map(c => { const [t, w] = st(c.state); return `<div class="rpc"><div>${esc(c.item)}${c.note ? `<span class="rpnote">${esc(c.note)}</span>` : ""}</div><div>${chip_(t, w)}</div></div>`; }).join("")}`).join("")}</div>` : ""}
+    <div class="rpck">${groups.map(g => `<div class="rpg">${esc(g.name)}</div>${g.rows.map(c => { const [t, w] = st(c.state); return `<div class="rpc"><div>${esc(c.item)}${c.note ? `<span class="rpnote">${esc(c.note)}</span>` : ""}</div><div>${chip_(t, w)}${ed("checklist", check.indexOf(c) + 1)}</div></div>`; }).join("")}`).join("")}</div>` : ""}
 
     ${(sx.scope_included || []).length || (sx.scope_not_stated || []).length ? `<h5 class="rph">Scope, as the quote defines it</h5>
     <div class="jpgrid two">
-      <div class="jpc"><h6>Included</h6><ul class="rpl">${(sx.scope_included || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
-      <div class="jpc"><h6>Not stated, so not agreed</h6><ul class="rpl">${(sx.scope_not_stated || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+      <div class="jpc"><h6>Included</h6><ul class="rpl">${(sx.scope_included || []).map((x, i) => `<li>${esc(x)}${ed("scope_included", i + 1)}</li>`).join("")}</ul>${add("scope_included", "Add a line")}</div>
+      <div class="jpc"><h6>Not stated, so not agreed</h6><ul class="rpl">${(sx.scope_not_stated || []).map((x, i) => `<li>${esc(x)}${ed("scope_not_stated", i + 1)}</li>`).join("")}</ul>${add("scope_not_stated", "Add a line")}</div>
     </div>` : ""}
 
     ${(r._questions.length || r._omitted.length) ? `<div class="jpgrid two">
-      ${r._questions.length ? `<div class="jpc"><h6>Referred to another professional</h6><ul class="rpl">${r._questions.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
-      ${r._omitted.length ? `<div class="jpc"><h6>Could not be established</h6><ul class="rpl">${r._omitted.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
+      ${r._questions.length ? `<div class="jpc"><h6>Referred to another professional</h6><ul class="rpl">${r._questions.map((x, i) => `<li>${esc(x)}${ed("questions", i + 1)}</li>`).join("")}</ul>${add("questions", "Add a referral")}</div>` : ""}
+      ${r._omitted.length ? `<div class="jpc"><h6>Could not be established</h6><ul class="rpl">${r._omitted.map((x, i) => `<li>${esc(x)}${ed("omitted", i + 1)}</li>`).join("")}</ul>${add("omitted", "Add a line")}</div>` : ""}
     </div>` : ""}
 
     ${r._scrubbedList.length ? `<details class="rpd"><summary>${r._scrubbedList.length} thing${r._scrubbedList.length === 1 ? "" : "s"} the screens took out of the draft</summary>
@@ -10590,8 +10619,112 @@ function reportPage(r){
     ${r._source ? `<details class="rpd"><summary>What the reader transcribed, as it went into the notes</summary><pre class="rpcopy">${esc(r._source)}</pre>
       <p class="conseq">Unscreened on purpose: this is the record of what the documents said, not the agent's words. On a Deposit Protection Check it is printed as the appendix of the document, so the client can see nothing was added; on the other services it is never shown to a client.</p></details>` : ""}
 
-    <p class="conseq">Everything above in the drafted sections was written by the agent and screened before it was saved. The ratings, the verdict and the payment shares are the parts a person writes, and they are what the client paid for. Open the document below to see it as it will be handed over.</p>
+    ${handN ? `<details class="rpd"><summary>${handN} change${handN === 1 ? "" : "s"} made by hand, with what the line said before</summary>
+      <table class="rpt" style="margin-top:10px"><tr><th>What</th><th>Before</th><th>After</th><th>Who</th></tr>
+      ${r._edits.map(e => `<tr><td>${esc(e.target)}</td><td>${esc(rptEditText(e.before))}</td><td>${esc(rptEditText(e.after))}</td><td>${esc(String(e.edited_by || "").split("@")[0])}${sub_(ago_(e.edited_at) + " ago")}</td></tr>`).join("")}</table>
+      <p class="conseq">Every correction is checked like a draft (banned language, sums of money, measurements) and logged here. The agent's own wording is the first Before on each line.</p></details>` : ""}
+
+    <p class="conseq">Everything above in the drafted sections was written by the agent and screened before it was saved, or corrected by hand and screened the same way. The ratings, the verdict and the payment shares are the parts a person writes, and they are what the client paid for. Open the document below to see it as it will be handed over.</p>
   </div>`;
+}
+
+// -------------------------------------------------- correcting a report by hand
+//
+// Added 28 September 2026 on Monique's instruction: a drafted report had one
+// fix for a wrong line, which was to draft the whole report again. Each Edit
+// link opens the usual drawer form, prefilled with what the line says now.
+// Saving checks the wording against the banned-language list in yaad-report
+// (screen mode, no model), then writes each changed field through
+// edit_report(), which refuses sums of money and measurements, refuses an
+// issued report, and logs before and after. Emptying the first field of a
+// list item removes the item. The rating and the verdict keep their own
+// buttons at the foot; nothing here touches either.
+const RPT_EDIT = {
+  finding:          { title: "Red flag", fields: [["heading","Heading"],["body","What was found","long"],["why","Why it matters","long"],["action","What to do","long"],["source","Where it came from"]] },
+  next_steps:       { title: "Next step", fields: [["step","The step","long"],["who","Who"],["when","When"]] },
+  payment_terms:    { title: "Payment term", fields: [["proposed","As the builder proposed"],["instead","What to agree instead","long"],["why","Why","long"]] },
+  payment_stages:   { title: "Payment stage", fields: [["stage","Stage"],["when","Paid when","long"],["evidence","Evidence before it moves","long"]] },
+  checklist:        { title: "Checklist line", fields: [["state","State",null,[["provided","Provided"],["confirmed","Confirmed"],["not_provided","Not provided"],["not_found","Not found"],["referred","Referred on"],["not_applicable","Not applicable"]]],["note","Note, if any"]] },
+  documents:        { title: "Document received", fields: [["what","What it is"],["dated","Dated"],["form","Form"]] },
+  get_before_paying:{ title: "Document to get", fields: [["document","The document"]] },
+  glance:           { title: "Page one summary", fields: [["proposed","As the builder proposed"],["proposed_detail","One sentence more","long"],["ours","As this report proposes"],["ours_detail","One sentence more","long"]] },
+  scope_included:   { title: "Scope, included", fields: [[null,"The line"]] },
+  scope_not_stated: { title: "Scope, not stated", fields: [[null,"The line"]] },
+  questions:        { title: "Referral", fields: [[null,"Profession: the question","long"]] },
+  omitted:          { title: "Could not be established", fields: [[null,"The line","long"]] },
+  ask_the_builder:  { title: "Message to the builder", fields: [[null,"The whole message","long"]] },
+  next_payment:     { title: "Next payment asked for", fields: [[null,"When, as recorded"]] },
+  checked:          { title: "Checked independently", fields: [[null,"What you checked","long"]] },
+};
+
+function rptEditText(v){
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  return Object.entries(v).filter(([k, x]) => x && !["lines","ord","item","group","term"].includes(k)).map(([, x]) => String(x)).join(" / ");
+}
+
+// What a part of the report says now, as the drawer form's starting values.
+function rptEditCurrent(r, part, idx){
+  const sx = r._sections || {};
+  if (part === "finding") {
+    const f = (r._findingRows || []).find(x => x.ord === idx) || {};
+    const ref = (sx.finding_refs || []).find(x => x.ord === idx) || {};
+    return { heading: f.heading, body: f.body, why: f.why, action: f.action, source: ref.source };
+  }
+  if (part === "glance") return sx.glance || {};
+  if (["ask_the_builder","next_payment","checked"].includes(part)) return { null: sx[part] || "" };
+  const list = part === "questions" ? r._questions : part === "omitted" ? r._omitted : (sx[part] || []);
+  if (idx == null) return {};
+  const it = list[idx - 1];
+  return typeof it === "string" ? { null: it } : (it || {});
+}
+
+async function rptScreen(text){
+  const res = await fetch(RPT_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify({ mode: "screen", text }),
+  });
+  const j = await res.json().catch(() => null);
+  if (!res.ok || !j) throw new Error("The wording could not be checked, so nothing was saved. Try again in a moment.");
+  if (!j.ok) throw new Error("Yaadly does not use that wording: " + j.banned.map(b => `"${b.term}" (${b.guidance})`).join("; ") + ". Nothing was saved.");
+}
+
+function wireReportEdits(row, el){
+  el.querySelectorAll("[data-edit]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const part = btn.dataset.edit, idx = btn.dataset.idx === "" ? null : Number(btn.dataset.idx);
+      const spec = RPT_EDIT[part]; if (!spec) return;
+      const adding = idx == null && !["glance","ask_the_builder","next_payment","checked"].includes(part);
+      const cur = adding ? {} : rptEditCurrent(row, part, idx);
+      const listPart = !["finding","glance","ask_the_builder","next_payment","checked","payment_terms","checklist"].includes(part);
+      const a = {
+        label: adding ? "Add it" : "Save the change",
+        says: () => (adding ? `Adds a new line to ${spec.title.toLowerCase()}.` : `Corrects ${spec.title.toLowerCase()}${idx != null ? " " + idx : ""} in your name.`)
+          + " Checked for banned language, sums of money and measurements before it is saved, and logged with what it said before."
+          + (listPart && !adding ? " Empty the first box to remove this line altogether." : ""),
+        ask: spec.fields.map(([k, label, type, options]) => ({ k: k || "text", label, type: type || undefined, options, from: () => String(cur[k === null ? "null" : k] ?? "") })),
+        call: async (r, vals) => {
+          const changed = spec.fields.map(([k]) => k).filter((k) => adding ? (vals[k || "text"] || "") !== "" : String(vals[k || "text"] ?? "") !== String(cur[k === null ? "null" : k] ?? ""));
+          if (!changed.length) throw new Error("Nothing was changed.");
+          await rptScreen(changed.map((k) => vals[k || "text"]).join("\n"));
+          const first = spec.fields[0][0];
+          let at = idx;
+          const order = adding ? [first, ...changed.filter((k) => k !== first)] : changed;
+          for (const k of order) {
+            const { data, error } = await sb.rpc("edit_report", { p_report: r.id, p_part: part, p_index: at, p_field: k, p_text: vals[k || "text"] || "" });
+            if (error) throw new Error(error.message);
+            if (at == null && typeof data === "number" && listPart) at = data;
+            // Emptying the first field removed the item: nothing left to write.
+            if (!adding && listPart && k === first && !(vals[k || "text"] || "")) break;
+          }
+        },
+      };
+      drawAsk("reports", a, row, btn);
+      const m = $("drwMsg"); if (m && m.scrollIntoView) m.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  });
 }
 
 // -------------------------------------------------- the report as a document
