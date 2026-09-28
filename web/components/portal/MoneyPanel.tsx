@@ -141,7 +141,10 @@ export function MoneyPanel({
   const agreed = labour != null;
   const showCheck = side === "client" && check != null;
   const hasExtra = !!extraWork && extraWork.length > 0;
-  const extraTotal = (extraWork ?? []).reduce((t, x) => t + x.total, 0);
+  /* An add-on still being agreed is shown, so it is never invisible, and
+     never counted: nobody owes money on it until both sides agree. */
+  const counts = (x: ExtraWorkLine) => x.status === "agreed" || x.status === "signed_off";
+  const extraTotal = (extraWork ?? []).filter(counts).reduce((t, x) => t + x.total, 0);
   const mainTotal = side === "client" ? allIn : takeHome;
 
   return (
@@ -254,8 +257,8 @@ export function MoneyPanel({
                     <div key={x.id} className="rounded-xl border border-line bg-bg/40 px-3.5 py-3">
                       <div className="flex items-baseline justify-between gap-3">
                         <b className="min-w-0 truncate text-[13px] font-semibold text-ink" title={x.scope}>{x.scope}</b>
-                        <span className="flex-none text-[10.5px] font-bold uppercase tracking-wide text-dim">
-                          {x.status === "signed_off" ? "Done and approved" : "Agreed"}
+                        <span className={"flex-none text-[10.5px] font-bold uppercase tracking-wide " + (counts(x) ? "text-dim" : "text-mango")}>
+                          {x.status === "signed_off" ? "Done and approved" : x.status === "agreed" ? "Agreed" : "Being agreed, not counted"}
                         </span>
                       </div>
                       <div className="mt-2 grid gap-1 text-[12.5px]">
@@ -265,7 +268,11 @@ export function MoneyPanel({
                           <span className="font-mono-app">{side === "client" ? "" : "−"}{money(x.fee)}</span>
                         </div>
                         <div className="flex justify-between gap-3 border-t border-line pt-1 font-semibold">
-                          <span className="text-mute">{side === "client" ? "You pay for this" : "Paid to you for this"}</span>
+                          <span className="text-mute">
+                            {counts(x)
+                              ? side === "client" ? "You pay for this" : "Paid to you for this"
+                              : side === "client" ? "You would pay, once agreed" : "You would be paid, once agreed"}
+                          </span>
                           <span className="font-mono-app text-ink">{money(x.total)}</span>
                         </div>
                       </div>

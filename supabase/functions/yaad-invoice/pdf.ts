@@ -40,6 +40,14 @@ export function workerFeeBreakdown(inv: Row) {
   return { labour, fee, rate: labour - fee, pct };
 }
 
+/** The whole job's money on a client invoice that has add-ons beside it
+ *  (founder, 28 Sep 2026: "the PDF invoice should also show the add-on
+ *  breakdown", main work and additional work kept apart). Built in index.ts
+ *  from the job's own invoices, passed in as inv._jobWork, drawn by both
+ *  renderInvoice() and invoicePdf(). Null when the job has no add-on. */
+export type JobWorkRow = { id: string; kind: "main" | "addon"; label: string; work: number | null; fee: number | null; total: number; status: string; current: boolean };
+export type JobWork = { rows: JobWorkRow[]; total: number; currency: string };
+
 const dt = (d: string) =>
   new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
@@ -206,6 +214,41 @@ export async function invoicePdf(
   y -= 20;
   text("Total", tx, y, 15, bold); right(money(inv.total_pence, inv.currency), cAmt, y, 15, bold);
   y -= 28;
+
+  // ------------------------------------------- main and additional work
+  const jw = inv._jobWork as JobWork | null | undefined;
+  if (jw && jw.rows.length) {
+    need(60 + jw.rows.length * 30);
+    text("THIS JOB: MAIN WORK AND ADDITIONAL WORK", M, y, 7.5, bold, MUTE); y -= 12;
+    const w1 = wrap("Each is billed on its own invoice. The additional work is extra work agreed after the job was booked; it does not change the main work.", 8.5, W);
+    for (const l of w1) { text(l, M, y, 8.5, reg, MUTE); y -= 11; }
+    y -= 6;
+    const section = (title: string, kind: "main" | "addon") => {
+      const rs = jw.rows.filter((r) => r.kind === kind);
+      if (!rs.length) return;
+      text(title, M, y, 9, bold, kind === "addon" ? AMBER : TEAL); y -= 14;
+      for (const r of rs) {
+        need(34);
+        const head = `${r.id}${r.current ? " (this invoice)" : ""} · ${r.label}`;
+        const hl = wrap(head, 9.5, W * 0.7, r.current ? bold : reg);
+        let ly = y;
+        for (const l of hl) { text(l, M, ly, 9.5, r.current ? bold : reg); ly -= 12; }
+        right(money(r.total, jw.currency), cAmt, y, 9.5, r.current ? bold : reg);
+        if (r.work != null && r.fee != null) {
+          text(`The work ${money(r.work, jw.currency)}   Guarantee & Support, 15% ${money(r.fee, jw.currency)}   ${r.status === "paid" ? "Paid" : "Not paid yet"}`, M, ly, 8.5, reg, MUTE); ly -= 11;
+        } else {
+          text(r.status === "paid" ? "Paid" : "Not paid yet", M, ly, 8.5, reg, MUTE); ly -= 11;
+        }
+        y = ly - 5;
+      }
+    };
+    section("Main work", "main");
+    section("Additional work", "addon");
+    page.drawLine({ start: { x: M, y: y + 4 }, end: { x: M + W, y: y + 4 }, thickness: 0.6, color: LINE });
+    y -= 10;
+    text("The job in total, main and additional work", M, y, 10, bold); right(money(jw.total, jw.currency), cAmt, y, 10, bold);
+    y -= 24;
+  }
 
   // ------------------------------------------------------- unpriced warn
   const unpriced = lines.filter((l) => l.price_source === "needs_price").length;

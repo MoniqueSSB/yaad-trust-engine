@@ -1964,7 +1964,7 @@ export default async function JobRoom({
           money={money}
           materialsReleased={materialsReleasedJmd}
           check={role === "client" ? checkLine : null}
-          extraWork={countedAddons.map((a) => {
+          extraWork={addons.filter((a) => ["with_worker", "with_client", "agreed", "signed_off"].includes(a.status)).map((a) => {
             const c = addonClientBill(a.amount_jmd, a.terms);
             const pay = addonWorkerPay(a.amount_jmd);
             return role === "client"

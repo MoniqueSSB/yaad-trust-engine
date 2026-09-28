@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { pickTextProvider, providerAttrs, chatWithFailover, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 import { payLinkToken } from "./stripe.ts";
-import { invoicePdf, workerFeeBreakdown } from "./pdf.ts";
+import { invoicePdf, workerFeeBreakdown, type JobWork } from "./pdf.ts";
 import { LOGO } from "./logo.ts";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 
@@ -77,6 +77,47 @@ async function db(req: Request, path: string, init: RequestInit = {}) {
       ...(init.headers || {}),
     },
   });
+}
+
+/** The job's own invoices, main work and additional work apart, for a client
+ *  invoice on a job that has add-ons (28 Sep 2026). Read under the caller's
+ *  token like everything else here, so a client sees only their own. Drafts
+ *  are left out, except the invoice being drawn itself. Null when the job has
+ *  no add-on invoice, so an ordinary invoice looks exactly as it always has. */
+async function jobWorkFor(req: Request, inv: Record<string, any>): Promise<JobWork | null> {
+  if (!inv?.job_id || inv.payable_to === "worker") return null;
+  try {
+    const r = await db(req, `invoices?select=id,status,total_pence,addon_id,period_label,currency&job_id=eq.${encodeURIComponent(inv.job_id)}&payable_to=eq.yaadly&status=neq.void&order=id`);
+    if (!r.ok) return null;
+    const all = ((await r.json()) as Record<string, any>[]).filter((i) => i.status !== "draft" || i.id === inv.id);
+    const addonInvs = all.filter((i) => i.addon_id);
+    if (!addonInvs.length) return null;
+    const ids = addonInvs.map((i) => i.id).join(",");
+    const addonIds = [...new Set(addonInvs.map((i) => i.addon_id))].join(",");
+    const [lR, aR] = await Promise.all([
+      db(req, `invoice_lines?select=invoice_id,line_total_pence,is_fee&invoice_id=in.(${encodeURIComponent(ids)})`),
+      db(req, `job_addons?select=id,scope&id=in.(${encodeURIComponent(addonIds)})`),
+    ]);
+    const lines = lR.ok ? (await lR.json()) as Record<string, any>[] : [];
+    const scope = new Map(((aR.ok ? await aR.json() : []) as Record<string, any>[]).map((a) => [a.id, String(a.scope ?? "")]));
+    const rows = all.map((i) => {
+      const own = lines.filter((l) => l.invoice_id === i.id);
+      const fee = own.filter((l) => l.is_fee).reduce((t, l) => t + Number(l.line_total_pence || 0), 0);
+      const work = own.filter((l) => !l.is_fee).reduce((t, l) => t + Number(l.line_total_pence || 0), 0);
+      const sc = (scope.get(i.addon_id) ?? "").replace(/\s+/g, " ").trim();
+      return {
+        id: i.id,
+        kind: (i.addon_id ? "addon" : "main") as "main" | "addon",
+        label: i.addon_id ? (sc.length > 70 ? sc.slice(0, 70) + "…" : sc) || "Additional work" : (!i.period_label || i.period_label === "Job" ? "Job bill" : String(i.period_label)),
+        work: i.addon_id ? work : null,
+        fee: i.addon_id ? fee : null,
+        total: Number(i.total_pence || 0),
+        status: String(i.status),
+        current: i.id === inv.id,
+      };
+    });
+    return { rows, total: rows.reduce((t, x) => t + x.total, 0), currency: String(inv.currency || "JMD") };
+  } catch (_) { return null; }
 }
 
 async function isAdmin(req: Request): Promise<boolean> {
@@ -173,6 +214,14 @@ function renderInvoice(inv: Record<string, any>, lines: Record<string, any>[], s
   .wfee h2{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--mute);margin:0 0 6px}
   .wfee div{display:flex;justify-content:space-between;padding:3px 0}
   .wfee .r{font-weight:700;border-top:1px solid var(--line);margin-top:4px;padding-top:7px}
+  .jobwork{margin-top:26px;border-top:1px solid var(--line);padding-top:14px}
+  .jobwork h2{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:0 0 4px}
+  .jobwork p{font-size:12px;color:var(--mute);margin:0 0 10px}
+  .jobwork h3{font-size:12px;margin:12px 0 4px}
+  .jobwork .jw{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .jobwork .jw small{display:block;color:var(--mute);font-size:11.5px;margin-top:2px}
+  .jobwork .cur{font-weight:600}
+  .jobwork .jwt{display:flex;justify-content:space-between;padding-top:10px;font-weight:700}
   .totals{margin-top:18px;margin-left:auto;width:min(300px,100%)}
   .totals div{display:flex;justify-content:space-between;padding:7px 0}
   .totals .grand{border-top:2px solid var(--deep);margin-top:6px;padding-top:12px;
@@ -239,6 +288,25 @@ ${esc(inv.client_email)}${inv.client_address ? "\n" + esc(inv.client_address) : 
     <div><span>VAT</span><span>${esc(settings.invoice_vat_status)}</span></div>
     <div class="grand"><span>Total</span><span>${money(inv.total_pence, inv.currency)}</span></div>
   </div>
+
+  ${(() => {
+    /* The job's main work and additional work, apart (28 Sep 2026). The PDF
+       draws the same rows (pdf.ts, inv._jobWork). */
+    const jw = inv._jobWork as JobWork | null | undefined;
+    if (!jw || !jw.rows.length) return "";
+    const rowHtml = (r: JobWork["rows"][number]) =>
+      `<div class="jw${r.current ? " cur" : ""}"><span><b>${esc(r.id)}</b>${r.current ? " (this invoice)" : ""} · ${esc(r.label)}` +
+      (r.work != null && r.fee != null ? `<small>The work ${money(r.work, jw.currency)} · Guarantee &amp; Support, 15% ${money(r.fee, jw.currency)} · ${r.status === "paid" ? "Paid" : "Not paid yet"}</small>` : `<small>${r.status === "paid" ? "Paid" : "Not paid yet"}</small>`) +
+      `</span><span>${money(r.total, jw.currency)}</span></div>`;
+    const part = (title: string, kind: "main" | "addon") => {
+      const rs = jw.rows.filter((r) => r.kind === kind);
+      return rs.length ? `<h3>${title}</h3>${rs.map(rowHtml).join("")}` : "";
+    };
+    return `<div class="jobwork"><h2>This job: main work and additional work</h2>
+      <p>Each is billed on its own invoice. The additional work is extra work agreed after the job was booked; it does not change the main work.</p>
+      ${part("Main work", "main")}${part("Additional work", "addon")}
+      <div class="jwt"><span>The job in total, main and additional work</span><span>${money(jw.total, jw.currency)}</span></div></div>`;
+  })()}
 
   ${unpriced.length ? `<div class="warn"><strong>Not ready to send.</strong> ${unpriced.length} line${unpriced.length > 1 ? "s have" : " has"} no price. The agent will not guess one. Price ${unpriced.length > 1 ? "them" : "it"} or remove ${unpriced.length > 1 ? "them" : "it"} first.</div>` : ""}
 
@@ -329,7 +397,7 @@ Deno.serve(async (req) => {
         if (sR.ok) for (const r of await sR.json()) settings[r.key] = r.value;
       }
       const payUrl = inv.status === "sent" && inv.payable_to !== "worker" ? await payLinkUrlFor(inv.id) : "";
-      const pdf = await invoicePdf({ ...inv, _payUrl: payUrl }, lines, settings, money);
+      const pdf = await invoicePdf({ ...inv, _payUrl: payUrl, _jobWork: await jobWorkFor(req, inv) }, lines, settings, money);
       return done(JSON.stringify({ filename: `${inv.id}.pdf`, pdf: encodeBase64(pdf) }), 200);
     }
 
@@ -397,7 +465,7 @@ Deno.serve(async (req) => {
       // Found on INV-2026-0021, 14 Sep 2026. If the email fails, the row
       // below is never updated and stays a draft, as before.
       const payUrl = inv.payable_to === "worker" ? "" : await payLinkUrlFor(inv.id);
-      const html = renderInvoice({ ...inv, status: "sent", _payUrl: payUrl }, lines, settings);
+      const html = renderInvoice({ ...inv, status: "sent", _payUrl: payUrl, _jobWork: await jobWorkFor(req, inv) }, lines, settings);
 
       // The same invoice as a PDF, attached (28 Sep 2026). Drawn here from
       // the same rows, stamped sent like the email. If it cannot be made,
@@ -406,7 +474,7 @@ Deno.serve(async (req) => {
       // worse than one that is held back with the reason on the desk.
       let pdf: Uint8Array;
       try {
-        pdf = await invoicePdf({ ...inv, status: "sent", _payUrl: payUrl }, lines, settings, money);
+        pdf = await invoicePdf({ ...inv, status: "sent", _payUrl: payUrl, _jobWork: await jobWorkFor(req, inv) }, lines, settings, money);
       } catch (e) {
         root.recordError(`invoice pdf: ${String(e).slice(0, 200)}`);
         return fail(`The PDF of ${id} could not be made, so nothing was emailed and it is still a draft: ${String(e).slice(0, 200)}`, 500);
@@ -468,12 +536,12 @@ Deno.serve(async (req) => {
       if (sR.ok) for (const r of await sR.json()) settings[r.key] = r.value;
 
       const payUrl = inv.status === "sent" && inv.payable_to !== "worker" ? await payLinkUrlFor(inv.id) : "";
-      const html = renderInvoice({ ...inv, _payUrl: payUrl }, lines, settings);
+      const html = renderInvoice({ ...inv, _payUrl: payUrl, _jobWork: await jobWorkFor(req, inv) }, lines, settings);
       // pdf: true adds the PDF, base64, for the desk's Preview. It is the
       // same function as the email attachment, so what the desk shows for a
       // whole invoice is the file the client gets (the email stamps it sent).
       if (body.pdf === true && body.as === "json") {
-        const pdf = await invoicePdf({ ...inv, _payUrl: payUrl }, lines, settings, money);
+        const pdf = await invoicePdf({ ...inv, _payUrl: payUrl, _jobWork: await jobWorkFor(req, inv) }, lines, settings, money);
         return done(JSON.stringify({ invoice: inv, lines, html, pdf: encodeBase64(pdf) }), 200);
       }
       return body.as === "json"
