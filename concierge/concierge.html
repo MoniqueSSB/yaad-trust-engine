@@ -8659,6 +8659,10 @@ function renderInvoice(){
     ${cardHtml}
     ${unpriced ? `<div class="alert crit"><span class="ic">!</span><div><b>${unpriced} line${unpriced > 1 ? "s" : ""} the agent could not price</b><p>It will not guess. Pick a service off your list for each one, or remove it. This invoice cannot be marked as sent until they are gone.</p></div></div>` : ""}
     ${(CURRENT.questions || []).length ? `<div class="qs"><h4>Check these before you send</h4><ul>${CURRENT.questions.map(q => "<li>" + esc(q) + "</li>").join("")}</ul></div>` : ""}
+    ${inv.payable_to === "worker" && inv.worker_labour_jmd != null && inv.worker_fee_jmd != null
+      /* Yaadly's worker fee on a pay invoice (20260928230000): the figures it
+         recorded when raised. Pay raised before 28 Sep 2026 has none. */
+      ? `<p class="conseq">Quoted labour <b>${esc(feeAmt(inv.worker_labour_jmd, "JMD"))}</b>, less Yaadly's worker fee <b>${esc(feeAmt(inv.worker_fee_jmd, "JMD"))}</b>${inv.worker_labour_jmd > 0 ? " (" + Math.round(inv.worker_fee_jmd / inv.worker_labour_jmd * 100) + "%)" : ""}, is the agreed rate of <b>${esc(feeAmt(inv.worker_labour_jmd - inv.worker_fee_jmd, "JMD"))}</b> on this invoice.</p>` : ""}
     ${inv.covering_note ? `<div class="note">${esc(inv.covering_note)}</div>` : ""}
     <div class="brow" style="margin-top:16px">
       ${draft && inv.drafted_by === "ai" ? `<button class="btn g" id="takeOver">Make it mine to price</button>` : ""}

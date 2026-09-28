@@ -32,6 +32,11 @@ export type WorkerInvoiceJob = {
     paidAt: string | null;
     paidMethod: string | null;
     paidRef: string | null;
+    /** The quoted labour and Yaadly's worker fee this pay was worked out
+     *  from, recorded when it was raised (20260928230000). Null on pay
+     *  raised before 28 Sep 2026, which then shows no breakdown. */
+    labourJmd?: number | null;
+    feeJmd?: number | null;
   }[];
 };
 
@@ -115,6 +120,12 @@ export function WorkerInvoices({ jobs }: { jobs: WorkerInvoiceJob[] }) {
                   </span>
                   <span className="font-mono text-[10px] text-dim">{inv.id}</span>
                   </span>
+                  {inv.labourJmd != null && inv.feeJmd != null && (
+                    <span className="col-span-full text-[11.5px] leading-relaxed text-dim">
+                      Your quoted labour {jmd(inv.labourJmd)}, less Yaadly&apos;s worker fee {jmd(inv.feeJmd)}
+                      {inv.labourJmd > 0 ? ` (${Math.round((inv.feeJmd / inv.labourJmd) * 100)}%)` : ""}, is your agreed rate of {jmd(inv.labourJmd - inv.feeJmd)}.
+                    </span>
+                  )}
                   {inv.status === "paid" && (
                     <span className="col-span-full text-[11.5px] leading-relaxed text-dim">
                       Sent to you{inv.paidMethod === "bank_transfer" ? " by bank transfer" : inv.paidMethod === "stripe" ? " by bank transfer through Stripe" : ""}

@@ -6,6 +6,25 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-28 · A pay invoice records the labour and the worker fee it was worked out from
+
+Monique asked for Yaadly's worker fee to show on the worker's pay invoice.
+Both functions that raise pay (`raise_job_worker_payable`,
+`raise_job_stage_worker_payable`) already computed the quoted labour and the
+5% and then kept only the difference. Working the fee back from that
+difference can be a dollar out, and before 9 Sep 2026 the fee was 12%, so a
+figure derived on screen would sometimes be wrong on the one document a
+worker reads to check their pay. Instead each pay invoice now stores
+`worker_labour_jmd` and `worker_fee_jmd` as it is raised (20260928230000),
+with a check that they only appear on worker pay and that the fee is never
+more than the labour. The functions are the live definitions of that day
+with the two columns added to their insert; the amounts are computed exactly
+as before. The HTML invoice, the PDF, the desk and the worker's portal all
+read those two columns. Pay raised earlier is not backfilled and shows no
+breakdown: no figure is better than a guessed one.
+
+---
+
 ## 2026-09-28 · The worker signs with a button, first, and no Yaadly person's name is ever on the report
 
 Monique, the same evening, while this was being deployed: "the worker always
