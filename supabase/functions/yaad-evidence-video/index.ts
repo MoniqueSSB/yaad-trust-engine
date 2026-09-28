@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { crypto as stdCrypto } from "jsr:@std/crypto@1";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 
 // Worker video evidence, Stage 5.5. Two calls, same shape as
@@ -47,10 +48,14 @@ const BUCKET = "evidence";
 // Bounded well under the bucket's own 500MB ceiling. The finish step has to
 // hold the whole file in memory to hash it, the same way yaad-vetting-upload
 // already does for its 50MB video cap, and this runs on the same free-plan
-// edge runtime. 80MB is a few minutes of ordinary phone video at a
+// edge runtime. (Historical: 80MB was a few minutes of ordinary phone video at a
 // reasonable bitrate, which is what a stage walkthrough needs, and it leaves
 // headroom for the runtime itself rather than chasing the bucket's limit.
-const MAX_VIDEO_BYTES = 80_000_000;
+// Raised from 80MB to 500MB on 28 Sep 2026 (founder: 25MB and the like are not
+// enough). The bucket's own ceiling is 500MB (524288000). What made 80MB the
+// limit was the finish step holding the whole file in memory to hash it; it
+// now streams the object and hashes as it reads, so memory no longer sets it.
+const MAX_VIDEO_BYTES = 500_000_000;
 
 const MIME_OK = ["video/mp4", "video/webm", "video/quicktime"];
 const EXT: Record<string, string> = {
@@ -66,11 +71,6 @@ const CORS = {
 };
 
 const s = (v: unknown) => String(v ?? "").trim();
-
-async function sha256(buf: ArrayBuffer): Promise<string> {
-  const d = await crypto.subtle.digest("SHA-256", buf);
-  return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -155,20 +155,31 @@ Deno.serve(async (req: Request) => {
       }
       if (!label) return json({ error: "A label is needed." }, 400);
 
-      const { data: file, error: dlErr } = await asUser.storage.from(BUCKET).download(path);
-      if (dlErr || !file) {
+      // Streamed, as the caller, so RLS still decides who may read it and
+      // the whole video is never held in memory.
+      const objUrl = `${SUPABASE_URL}/storage/v1/object/authenticated/${BUCKET}/${path.split("/").map(encodeURIComponent).join("/")}`;
+      const res = await fetch(objUrl, { headers: { Authorization: authHeader, apikey: ANON_KEY } });
+      if (!res.ok || !res.body) {
         root.setAttributes({ "yaadly.evidence_video.outcome": "not_uploaded" });
         return json({ error: "That video did not arrive. Try again." }, 409);
       }
-
-      const buf = await file.arrayBuffer();
-      if (buf.byteLength === 0 || buf.byteLength > MAX_VIDEO_BYTES) {
+      let size = 0;
+      let tooBig = false;
+      const counted = res.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, ctl) {
+          size += chunk.byteLength;
+          if (size > MAX_VIDEO_BYTES) { tooBig = true; ctl.terminate(); return; }
+          ctl.enqueue(chunk);
+        },
+      }));
+      const digest = await stdCrypto.subtle.digest("SHA-256", counted as unknown as AsyncIterable<BufferSource>);
+      if (tooBig || size === 0) {
         await asUser.storage.from(BUCKET).remove([path]);
         return json({ error: "That video was empty or too large." }, 400);
       }
-
-      const hash = await sha256(buf);
-      const mime = file.type || "application/octet-stream";
+      const hash = Array.from(new Uint8Array(digest)).map((x) => x.toString(16).padStart(2, "0")).join("");
+      const mime = (res.headers.get("content-type") ?? "application/octet-stream").split(";")[0];
+      const buf = { byteLength: size };
 
       const { data: userRes } = await asUser.auth.getUser();
       const uploadedBy = (userRes?.user?.email ?? "").toLowerCase();

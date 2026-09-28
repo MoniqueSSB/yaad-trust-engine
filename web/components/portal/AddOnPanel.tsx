@@ -20,6 +20,7 @@ import {
   TERMS_LABEL, addonClientBill, addonStateLine, addonWorkerPay, waitingOn,
   type AddonStatus, type AddonTerms, type Side,
 } from "@/lib/jobs/addon";
+import { directUpload } from "@/lib/portal/direct-upload";
 import { agreeAddon, approveAddon, declineAddon, editAddon, proposeAddon, uploadAddonEvidence } from "@/app/portal/addon-actions";
 
 export type AddonRow = {
@@ -197,6 +198,14 @@ function AddonCard({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     fd.set("jobId", jobId); fd.set("addonId", a.id); fd.set("label", label);
+    const photo = fd.get("photo");
+    if (photo instanceof File && photo.size > 0) {
+      setBusy(true); setError("");
+      const up = await directUpload(photo, "addon_photo", jobId, a.id);
+      if (!up.ok) { setError(up.message); setBusy(false); return; }
+      fd.delete("photo");
+      fd.set("uploadedPath", up.path);
+    }
     await run(uploadAddonEvidence(fd));
     setLabel("");
     (e.target as HTMLFormElement).reset();

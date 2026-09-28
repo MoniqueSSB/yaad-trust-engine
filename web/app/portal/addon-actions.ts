@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { scrub } from "@/lib/scrub";
 import { stripApp1 } from "@/lib/exif";
+import { LIMITS, isOurPath, verifyStored } from "@/lib/portal/stored-object";
 
 /**
  * Add-on work on a booked job (20260928235000). Every decision is made in
@@ -128,6 +129,26 @@ export async function uploadAddonEvidence(formData: FormData): Promise<AddonResu
   const file = formData.get("photo");
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(jobId)) return { ok: false, error: "That job reference is not valid." };
   if (!/^[0-9a-f-]{36}$/i.test(addonId)) return { ok: false, error: "This form lost track of the add-on. Reload the page." };
+
+  /* Sent straight to Storage by the browser (28 Sep 2026, large files):
+     verify and fingerprint what arrived, then record it. */
+  const uploadedPath = String(formData.get("uploadedPath") ?? "");
+  if (uploadedPath) {
+    if (!isOurPath(uploadedPath, `${jobId}/addon-${addonId}/`)) return { ok: false, error: "That upload does not belong to this add-on." };
+    const v = await verifyStored("evidence", uploadedPath, LIMITS.addon_photo);
+    if (!v.ok) return { ok: false, error: v.message };
+    const sb = await createClient();
+    const { error } = await sb.rpc("file_addon_evidence_as_me", {
+      p_addon: addonId, p_path: uploadedPath, p_sha256: v.sha256, p_label: label || null,
+    });
+    if (error) {
+      await sb.storage.from("evidence").remove([uploadedPath]);
+      return { ok: false, error: error.message };
+    }
+    done(jobId);
+    return { ok: true };
+  }
+
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Choose a photograph first." };
   const ext = EXT[file.type.toLowerCase()];
   if (!ext) return { ok: false, error: "Send a JPEG, PNG or WebP photograph." };

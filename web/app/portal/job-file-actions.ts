@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { stripApp1 } from "@/lib/exif";
 import { extFor, fileProblem, isFileKind } from "@/lib/portal/job-files";
+import { LIMITS, isOurPath, verifyStored } from "@/lib/portal/stored-object";
 
 /**
  * Files on a job, from either side: receipts, quotes, permits, plans,
@@ -54,6 +55,29 @@ export async function addJobFile(formData: FormData): Promise<void> {
   const label = String(formData.get("label") ?? "").trim().slice(0, 140);
 
   if (!JOB_ID.test(jobId) || !email) throw new Error("refused");
+
+  /* Sent straight to Storage by the browser (28 Sep 2026, large files). */
+  const uploadedPath = String(formData.get("uploadedPath") ?? "");
+  if (uploadedPath) {
+    const side = await mySide(jobId, email);
+    if (!side) throw new Error("refused");
+    if (!isOurPath(uploadedPath, `${side}/${jobId}/`)) throw new Error("That upload does not belong to this job.");
+    const v = await verifyStored(BUCKET, uploadedPath, LIMITS.job_file);
+    if (!v.ok) throw new Error(v.message);
+    const kind = isFileKind(kindRaw) ? kindRaw : "other";
+    const supabase = await createClient();
+    const { error } = await supabase.from("job_files").insert({
+      job_id: jobId, side, uploaded_by: email, kind, label,
+      storage_path: uploadedPath, mime: v.mime, bytes: v.bytes, sha256: v.sha256,
+    });
+    if (error) {
+      await supabase.storage.from(BUCKET).remove([uploadedPath]);
+      throw new Error(error.message.includes("policy") ? "refused" : error.message);
+    }
+    revalidatePath("/portal/jobs/" + jobId);
+    return;
+  }
+
   if (!(file instanceof File)) throw new Error("no file chosen");
   const problem = fileProblem(file.type, file.size);
   if (problem) throw new Error(problem);
