@@ -10,6 +10,7 @@
 // Pure: rows in, bytes out. No network, no database, no clock except the
 // dates it is given, so the test can run it with invented rows.
 
+import { LOGO } from "./logo.ts";
 import { PDFDocument, PDFString, rgb, StandardFonts, type PDFFont, type PDFPage } from "npm:pdf-lib@1.17.1";
 
 type Row = Record<string, any>;
@@ -107,8 +108,11 @@ export async function invoicePdf(
   const need = (h: number) => { if (y - h < M + 20) newPage(); };
 
   // ------------------------------------------------------------ header
-  text("YAADLY", M, y - 26, 26, bold);
-  text(".", M + bold.widthOfTextAtSize("YAADLY", 26), y - 26, 26, bold, TEAL);
+  // The logo on every document (founder, 28 Sep 2026), then the wordmark.
+  const logo = await doc.embedPng(Uint8Array.from(atob(LOGO.split(",")[1]), (c) => c.charCodeAt(0)));
+  page.drawImage(logo, { x: M, y: y - 32, width: 34, height: 34 });
+  text("YAADLY", M + 42, y - 26, 26, bold);
+  text(".", M + 42 + bold.widthOfTextAtSize("YAADLY", 26), y - 26, 26, bold, TEAL);
   right("INVOICE", M + W, y - 22, 22, bold);
   right(String(inv.id ?? ""), M + W, y - 42, 13, bold);
   right(String(inv.status ?? "").toUpperCase(), M + W, y - 58, 9, bold, inv.status === "draft" ? AMBER : TEAL);

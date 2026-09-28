@@ -6,6 +6,7 @@ import legal from "@/lib/legal-copy.json";
 import { PrintReport } from "@/components/portal/PrintReport";
 import { WorkerSign, ClientReview } from "@/components/portal/CompletionReview";
 import { ContactYaadly } from "@/components/portal/ContactYaadly";
+import { DocLogo } from "@/components/portal/DocLogo";
 import { phaseBadge } from "@/lib/portal/evidence-sections";
 import {
   aftercareEnds, fmtDay, fmtWhen, outcomeLine, phaseCounts, trailLabel, trailWho, type TrailEvent,
@@ -217,6 +218,7 @@ export default async function Completion({
         </div>
 
         <div className="mt-3 border-b-2 border-teal pb-4">
+          <div className="mb-3"><DocLogo /></div>
           <p className={label}>Completion Report · {job.id}{report?.issued_at ? " · issued " + fmtDay(report.issued_at) : ""}</p>
           <h1 className="mt-1 font-display text-[clamp(22px,3.5vw,30px)] uppercase leading-tight">Completion Report</h1>
           <p className="mt-1 text-[14px] text-mute">{job.title}{job.parish ? ", " + job.parish : ""}</p>

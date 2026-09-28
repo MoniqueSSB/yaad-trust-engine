@@ -11553,6 +11553,11 @@ async function preReports(rows){
 
 const RPT_RESULT = { released:"Released", released_with_conditions:"Released with conditions", not_released:"Not released", complete:"Complete", complete_with_items:"Complete with items", not_complete:"Not complete" };
 const RPT_STATUS = { on_track:["ok","On track"], at_risk:["warn","At risk"], off_track:["crit","Off track"] };
+// The stored codes, in words. A document never prints a code.
+const RPT_SINCE = { new:"New", same:"Same", worse:"Worse", resolved:"Resolved" };
+const RPT_CHANGE = { asked:"Asked for", priced:"Priced", agreed:"Agreed", turned_down:"Turned down", withdrawn:"Withdrawn" };
+const RPT_ACTION = { done:"Done", open:"Open", blocked:"Blocked", dropped:"Dropped" };
+const RPT_RESULT_TONE = { released:"ok", complete:"ok", released_with_conditions:"warn", complete_with_items:"warn", not_released:"crit", not_complete:"crit" };
 function rptMoneyText(cur, n){ return n == null || n === "" ? "Not known" : (cur || "GBP") + " " + Number(n).toLocaleString("en-GB", { maximumFractionDigits: 2 }); }
 
 // What only a person decides on this service, shown with who is to type it.
@@ -11914,7 +11919,8 @@ table.ck{width:100%;border-collapse:collapse;font-size:9.8pt}table.ck tr{break-i
 table.ck td{border-bottom:1pt solid var(--line);padding:6px 4px;vertical-align:top}
 table.ck td.g{font:600 7.2pt/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--mute);padding-top:13px;border:none}table.ck td.s{width:29mm;text-align:right;white-space:nowrap}
 .tag{font:600 7.2pt/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;border-radius:99px;padding:4px 8px;display:inline-block}
-.t-ok{color:#fff;background:var(--teal)}.t-gap{color:#fff;background:var(--coral)}.t-ref{color:var(--ink);background:#eceef4;border:1pt solid var(--line)}.t-na{color:var(--mute);border:1pt solid var(--line)}
+.t-ok{color:#fff;background:var(--teal)}.t-warn{color:#fff;background:var(--mango)}
+.result{font-family:var(--disp);font-size:20pt;font-weight:600;line-height:1.2;margin:6px 0 12px;padding:4px 0 4px 12px;border-left:5pt solid var(--teal)}.result.warn{border-color:var(--mango)}.result.crit{border-color:var(--coral)}.t-gap{color:#fff;background:var(--coral)}.t-ref{color:var(--ink);background:#eceef4;border:1pt solid var(--line)}.t-na{color:var(--mute);border:1pt solid var(--line)}
 .note{display:block;color:var(--mute);font-size:8.8pt;margin-top:2px}
 ul.q{margin:0;padding-left:17px}ul.q li{margin-bottom:6px}
 .scope{background:var(--wash);border:1pt solid var(--line);border-radius:2pt;padding:12px 15px;font-size:9.4pt}.scope p{margin:0 0 6px}.scope p:last-child{margin:0}
@@ -11954,7 +11960,7 @@ function rptDoc(rep, findings, o){
   const dateOf = (s) => s ? new Date(s).toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" }) : "";
   const byLine = o.company
     ? `<b>Issued by Yaadly Ltd</b>, England and Wales no. 17358077. A named person at Yaadly signs every record and approves every payment to a trade. This is a project record between Yaadly and the client, not a certificate issued under any law, building code or professional scheme.`
-    : `<b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS.<br>${o.coverNote}`;
+    : `<b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader.<br>${o.coverNote}`;
   return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8">
 <title>${esc(service)}${rep.number ? ", " + esc(rep.number) : ", draft"}</title>
 <style>${RPT_DOC_CSS}${RPT_DEP_CSS}</style></head><body>
@@ -11984,7 +11990,7 @@ ${practice ? `<div class="draftbar"><b>Practice document.</b> Invented client an
 <ol class="toc">${o.toc.map(([l, t, d]) => `<li><span class="l">${l}</span>${esc(t)}<span class="d">${esc(d)}</span></li>`).join("")}</ol>
 ${o.body}
 <footer>
-  ${o.company ? "Yaadly Ltd, registered in England and Wales, company number 17358077." : "Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077."}<br>
+  ${o.company ? "Yaadly Ltd, registered in England and Wales, company number 17358077." : "Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077."}<br>
   Drafted by the Yaadly report agent${rep.model ? ` (${esc(rep.model)}, EU)` : ""} from the notes of the people named in this document, then screened for language, measurements and figures. ${o.footNote}
 </footer>
 </td></tr></tbody></table>
@@ -12086,7 +12092,7 @@ function reportDocumentTechnical(rep, findings){
   const body = `
 <h2 class="brk">A. The result</h2>
 <div class="meta"><div><dt>Stage</dt><dd>${esc(st.stage || "Not recorded")}</dd></div><div><dt>Trade</dt><dd>${esc(st.trade || "Not recorded")}</dd></div><div><dt>Work carried out by</dt><dd>${esc(st.work_by || "Not recorded")}</dd></div></div>
-${res ? `<p class="vline">${esc(RPT_RESULT[res] || res)}</p>` : `<div class="blank"><div class="lbl">Result not typed yet</div><p>Released, released with conditions, or not released: the trade inspector's judgement, typed at the desk. The report cannot issue without it.</p></div>`}
+${res ? `<p class="result ${RPT_RESULT_TONE[res] || ""}">${esc(RPT_RESULT[res] || res)}</p>` : `<div class="blank"><div class="lbl">Result not typed yet</div><p>Released, released with conditions, or not released: the trade inspector's judgement, typed at the desk. The report cannot issue without it.</p></div>`}
 ${rptVerdict(rep, "The explanation")}
 <h2 class="brk">B. How to read this report</h2>
 <p class="lead">This stage is a hold point: the next stage should not start, and this work should not be covered up, until it is released in writing.</p>
@@ -12158,7 +12164,7 @@ ${findings.length ? findings.map(f => rptFinding(f, { noRating: true, actionLabe
 <h2>D. Readings</h2>
 ${rptArr(sx.readings).length ? `<table class="gl"><tr><th>Reading</th><th style="width:40%">This visit</th></tr>${sx.readings.map(r => `<tr><td>${esc(r.reading)}</td><td>${esc(r.value)}</td></tr>`).join("")}</table>` : `<p class="lead">No readings were recorded.</p>`}
 <h2 class="brk">E. The checklist</h2>
-${groups.length ? `<table class="ck">${groups.map(g => `<tr><td class="g" colspan="3">${esc(g.name)}</td></tr>${g.rows.map(c => { const s = S[c.state] || S.not_recorded; return `<tr><td>${esc(c.item)}${c.note ? `<span class="note">${esc(c.note)}</span>` : ""}</td><td class="w">${esc(c.since ? "Since last visit: " + c.since : "")}</td><td class="s"><span class="tag t-${s[0]}">${s[1]}</span></td></tr>`; }).join("")}`).join("")}</table>` : rptBlank("The checklist.")}
+${groups.length ? `<table class="ck">${groups.map(g => `<tr><td class="g" colspan="3">${esc(g.name)}</td></tr>${g.rows.map(c => { const s = S[c.state] || S.not_recorded; return `<tr><td>${esc(c.item)}${c.note ? `<span class="note">${esc(c.note)}</span>` : ""}</td><td class="w">${esc(c.since ? "Since last visit: " + (RPT_SINCE[c.since] || c.since) : "")}</td><td class="s"><span class="tag t-${s[0]}">${s[1]}</span></td></tr>`; }).join("")}`).join("")}</table>` : rptBlank("The checklist.")}
 <h2>F. If somebody lives here</h2>
 ${res.seen || res.spoke || res.passed_on ? `<div class="meta"><div><dt>Seen</dt><dd>${esc(res.seen || "")}</dd></div><div><dt>Spoke with them</dt><dd>${esc(res.spoke || "")}</dd></div></div>${res.passed_on ? `<p><b>What they asked us to pass on.</b> ${esc(res.passed_on)}</p>` : ""}` : `<p class="lead">Nobody living at the property was recorded.</p>`}
 <p class="lead">The visitor notes what they see and passes messages on. They do not give personal care, medication, medical opinion or advice, handle money, or accept gifts.</p>
@@ -12173,16 +12179,20 @@ ${rptArr(sx.carried_forward).length ? `<table class="gl"><tr><th>Item</th><th st
 function reportDocumentOversight(rep, findings){
   const sx = rep.sections || {}, hm = rep.human || {}, st = hm.status || {}, m = hm.money || {};
   const S = RPT_STATUS;
-  const chip = (x) => S[x] ? `<span class="tag t-${S[x][0] === "crit" ? "gap" : S[x][0] === "warn" ? "ref" : "ok"}">${S[x][1]}</span>` : `<span class="tag t-na">Not rated</span>`;
+  const chip = (x) => S[x] ? `<span class="tag t-${S[x][0] === "crit" ? "gap" : S[x][0] === "warn" ? "warn" : "ok"}">${S[x][1]}</span>` : `<span class="tag t-na">Not rated</span>`;
+  const hasLast = ["overall","time","money","quality","safety","scope"].some(a => st["last_" + a]);
+  const hasLastMoney = Object.keys(m).some(k => k.startsWith("last_") && m[k] != null);
   const n = (k) => m[k] == null ? null : Number(m[k]);
   const total = n("agreed_price") != null ? (n("agreed_price") + (n("agreed_changes") || 0)) : null;
   const left = total != null && n("paid_to_date") != null ? total - n("paid_to_date") - (n("requested_unpaid") || 0) : null;
+  const lastTotal = n("last_agreed_price") != null ? (n("last_agreed_price") + (n("last_agreed_changes") || 0)) : null;
+  const lastLeft = lastTotal != null && n("last_paid_to_date") != null ? lastTotal - n("last_paid_to_date") - (n("last_requested_unpaid") || 0) : null;
   const money = (x) => rptMoneyText(m.currency, x);
   const toc = [["A","This month in one page","status, the verdict"],["B","How the status is set","the rule behind each rating"],["C","Site attendance","every visit this month"],["D","Progress","done this month, planned next"],["E","Programme","each milestone against the agreed date"],["F","Money","against what was agreed"],["G","Changes to the work","every change, and who agreed it"],["H","Quality and safety","what was seen"],["I","Issues and risks","rated by the author"],["J","Decisions for you","with the date needed"],["K","Escalations","the WhatsApp line"],["L","The monthly call","points agreed and actions"],["M","What this report is and is not","and the declaration"]];
   const rows = (a, cols) => rptArr(a).length ? `<table class="gl"><tr>${cols.map(c => `<th>${esc(c[1])}</th>`).join("")}</tr>${a.map(r => `<tr>${cols.map(c => `<td>${esc(r[c[0]] || "")}</td>`).join("")}</tr>`).join("")}</table>` : `<p class="lead">None recorded this month.</p>`;
   const body = `
 <h2 class="brk">A. This month in one page</h2>
-<table class="gl"><tr><th>Area</th><th style="width:30mm">This month</th></tr>${["overall","time","money","quality","safety","scope"].map(a => `<tr><td>${a.charAt(0).toUpperCase() + a.slice(1)}</td><td>${chip(st[a])}</td></tr>`).join("")}</table>
+<table class="gl" style="margin-bottom:14px"><tr><th>Area</th>${hasLast ? `<th style="width:30mm">Last month</th>` : ""}<th style="width:30mm">This month</th></tr>${["overall","time","money","quality","safety","scope"].map(a => `<tr><td>${a.charAt(0).toUpperCase() + a.slice(1)}</td>${hasLast ? `<td>${chip(st["last_" + a])}</td>` : ""}<td>${chip(st[a])}</td></tr>`).join("")}</table>
 ${rptVerdict(rep, "The month in a paragraph")}
 <h2 class="brk">B. How the status is set</h2>
 <table class="gl"><tr><th>Area</th><th>On track</th><th>At risk</th><th>Off track</th></tr>
@@ -12201,17 +12211,17 @@ ${rptWho(rep, "Site attendance, on the dates above")}
 ${rows(sx.milestones, [["milestone","Milestone"],["agreed","Agreed date"],["forecast","Forecast or actual"]])}
 <h2 class="brk">F. Money</h2>
 <p class="lead">Typed by the author, never drafted. Figures from the builder are marked as the builder's. This tracks spending against what was agreed; it does not estimate what the work should cost.</p>
-${m.currency ? `<table class="gl"><tr><th>Line</th><th style="width:40mm">This month</th></tr>
-<tr><td>1 Agreed price for the work</td><td>${money(n("agreed_price"))}</td></tr>
-<tr><td>2 Agreed changes</td><td>${money(n("agreed_changes"))}</td></tr>
-<tr><td><b>3 Agreed total (1 + 2)</b></td><td><b>${money(total)}</b></td></tr>
-<tr><td>4 Paid to date</td><td>${money(n("paid_to_date"))}</td></tr>
-<tr><td>5 Asked for, not yet paid</td><td>${money(n("requested_unpaid"))}</td></tr>
-<tr><td><b>6 Left to pay on the agreed total (3 minus 4 minus 5)</b></td><td><b>${money(left)}</b></td></tr>
-<tr><td>7 Changes asked for, not yet agreed (builder's figure)</td><td>${money(n("changes_pending"))}</td></tr>
-<tr><td>8 Builder's own forecast of the final total</td><td>${money(n("builder_forecast"))}</td></tr></table>${m.reason ? `<p><b>What moved, and why.</b> ${esc(m.reason)}</p>` : ""}` : `<div class="blank"><div class="lbl">Money not typed yet</div><p>Typed at the desk by the author, line by line. Never drafted.</p></div>`}
+${m.currency ? `<table class="gl"><tr><th>Line</th>${hasLastMoney ? `<th style="width:34mm">Last month</th>` : ""}<th style="width:40mm">This month</th></tr>
+<tr><td>1 Agreed price for the work</td>${hasLastMoney ? `<td>${money(n("last_agreed_price"))}</td>` : ""}<td>${money(n("agreed_price"))}</td></tr>
+<tr><td>2 Agreed changes</td>${hasLastMoney ? `<td>${money(n("last_agreed_changes"))}</td>` : ""}<td>${money(n("agreed_changes"))}</td></tr>
+<tr><td><b>3 Agreed total (1 + 2)</b></td>${hasLastMoney ? `<td><b>${money(lastTotal)}</b></td>` : ""}<td><b>${money(total)}</b></td></tr>
+<tr><td>4 Paid to date</td>${hasLastMoney ? `<td>${money(n("last_paid_to_date"))}</td>` : ""}<td>${money(n("paid_to_date"))}</td></tr>
+<tr><td>5 Asked for, not yet paid</td>${hasLastMoney ? `<td>${money(n("last_requested_unpaid"))}</td>` : ""}<td>${money(n("requested_unpaid"))}</td></tr>
+<tr><td><b>6 Left to pay on the agreed total (3 minus 4 minus 5)</b></td>${hasLastMoney ? `<td><b>${money(lastLeft)}</b></td>` : ""}<td><b>${money(left)}</b></td></tr>
+<tr><td>7 Changes asked for, not yet agreed (builder's figure)</td>${hasLastMoney ? `<td>${money(n("last_changes_pending"))}</td>` : ""}<td>${money(n("changes_pending"))}</td></tr>
+<tr><td>8 Builder's own forecast of the final total</td>${hasLastMoney ? `<td>${money(n("last_builder_forecast"))}</td>` : ""}<td>${money(n("builder_forecast"))}</td></tr></table>${m.reason ? `<p><b>What moved, and why.</b> ${esc(m.reason)}</p>` : ""}` : `<div class="blank"><div class="lbl">Money not typed yet</div><p>Typed at the desk by the author, line by line. Never drafted.</p></div>`}
 <h2>G. Changes to the work</h2>
-${rptArr(sx.changes).length ? `<table class="gl"><tr><th>Change</th><th>Asked for by</th><th>Time effect</th><th>Status</th></tr>${sx.changes.map(c => `<tr><td>${esc(c.change)}</td><td>${esc(c.asked_by || "")}</td><td>${esc(c.time_effect || "")}</td><td>${esc((c.state || "").replace(/_/g, " "))}</td></tr>`).join("")}</table>` : `<p class="lead">No changes this month.</p>`}
+${rptArr(sx.changes).length ? `<table class="gl"><tr><th>Change</th><th>Asked for by</th><th>Time effect</th><th>Status</th></tr>${sx.changes.map(c => `<tr><td>${esc(c.change)}</td><td>${esc(c.asked_by || "")}</td><td>${esc(c.time_effect || "")}</td><td>${esc(RPT_CHANGE[c.state] || c.state || "")}</td></tr>`).join("")}</table>` : `<p class="lead">No changes this month.</p>`}
 <h2>H. Quality and safety</h2>
 ${rows(sx.quality, [["seen","What was seen"],["where","Where"],["raised_with","Raised with"],["on","On"]])}
 <p><b>Builder's insurance seen:</b> ${esc({ yes: "Yes", no: "No" }[sx.insurance_seen] || "Not recorded")}</p>
@@ -12224,7 +12234,7 @@ ${rows(sx.decisions, [["decision","Decision needed"],["options","Options"],["nee
 ${rows(sx.escalations, [["when","When"],["raised_by","Raised by"],["what","About"],["done","What was done"]])}
 <h2>L. The monthly call</h2>
 ${(sx.call || {}).date ? `<div class="meta"><div><dt>Date</dt><dd>${esc(sx.call.date)}</dd></div><div><dt>On the call</dt><dd>${esc(sx.call.attendees || "")}</dd></div></div>${rptArr(sx.call.points).length ? `<ul class="q">${sx.call.points.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}` : `<p class="lead">No call recorded.</p>`}
-${rows(sx.actions, [["action","Action"],["owner","Owner"],["due","Due"],["state","Status"]])}
+${rows(rptArr(sx.actions).map(a => ({ ...a, state: RPT_ACTION[a.state] || a.state })), [["action","Action"],["owner","Owner"],["due","Due"],["state","Status"]])}
 <h2 class="brk">M. What this report is and is not</h2>
 <div class="scope"><p>This report records what was seen on the site visits in section C and what the builder and you said in writing. The author observes and reports on your behalf, and does not design the work, instruct the builder, certify the work, supervise day to day, or estimate what the work should cost, and nothing in it makes the author responsible for the builder's work, programme or price.</p></div>
 <div class="decl"><b>Declaration</b><br>I compiled this report from the site visits in section C, made by the people named there, from the photographs and notes they returned, and from what the builder and you said in writing. It is a true record of that, to the best of my knowledge and belief.
@@ -12243,7 +12253,7 @@ function reportDocumentStage(rep, findings){
   const body = `
 <h2 class="brk">A. The result</h2>
 <div class="meta"><div><dt>Stage</dt><dd>${esc(st.stage || "Not recorded")}</dd></div><div><dt>Trade</dt><dd>${esc(st.trade || "Not recorded")}</dd></div></div>
-${hm.result ? `<p class="vline">${esc(RPT_RESULT[hm.result] || hm.result)}</p>` : `<div class="blank"><div class="lbl">Result not typed yet</div><p>Complete, complete with items, or not complete. Typed at the desk by a named person.</p></div>`}
+${hm.result ? `<p class="result ${RPT_RESULT_TONE[hm.result] || ""}">${esc(RPT_RESULT[hm.result] || hm.result)}</p>` : `<div class="blank"><div class="lbl">Result not typed yet</div><p>Complete, complete with items, or not complete. Typed at the desk by a named person.</p></div>`}
 ${rptVerdict(rep, "The explanation")}
 <h2>B. What these records are</h2>
 <div class="scope"><p>A record of what was checked, what was agreed and who signed, kept between Yaadly and you. It is not a certificate issued under any law, building code or professional scheme. Inspections and approvals by the municipal corporation, and any certificate a regulator issues, are separate.</p></div>
@@ -12311,7 +12321,7 @@ ${RPT_DOC_CSS}</style></head><body>
     <div><span class="stamp${issued ? " issued" : ""}">${issued ? "Issued" : "Draft, not issued"}</span></div>
   </div>
   <div class="bottom">
-    <b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS.<br>
+    <b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader.<br>
     Every finding in this report is rated, and the verdict written, by her and nobody else. What it does not do: value the property, confirm title, give a structural opinion, or estimate what the work should cost.
   </div>
 </div>
@@ -12382,7 +12392,7 @@ ${(rep.omitted || []).length ? `<h2>What this review could not establish</h2><ul
 </div>
 
 <footer>
-  Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077.<br>
+  Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077.<br>
   Findings drafted by the Yaadly report agent${rep.model ? ` (${esc(rep.model)}, EU)` : ""} from the reviewer's notes, then screened for language, measurements and figures. Every finding is rated, and the verdict written, by a named person before the report is issued.
 </footer>
 </td></tr></tbody></table>
@@ -12530,7 +12540,7 @@ function reportDocumentDeposit(rep, findings){
     <div><span class="stamp${issued ? " issued" : ""}">${issued ? "Issued" : "Draft, not issued"}</span></div>
   </div>
   <div class="bottom">
-    <b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS.<br>
+    <b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader.<br>
     Every finding in this report is rated, and the verdict written, by her and nobody else. What it does not do: value the property, confirm title, give a structural opinion, or estimate what the work should cost.
   </div>
 </div>
@@ -12654,7 +12664,7 @@ ${rep.source_text ? `<p class="lead">As the documents were read, word for word, 
 <div class="apx">${esc(rep.source_text)}</div>` : `<div class="blank"><div class="lbl">No transcript on this report</div><p>The documents are reproduced here when they were read with Read the files before drafting.</p></div>`}
 
 <footer>
-  Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077.<br>
+  Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077.<br>
   Findings drafted by the Yaadly report agent${rep.model ? ` (${esc(rep.model)}, EU)` : ""} from the documents received and the reviewer's notes, then screened for language, measurements and figures. Every finding is rated, and the verdict written, by a named person before the report is issued.
 </footer>
 </td></tr></tbody></table>

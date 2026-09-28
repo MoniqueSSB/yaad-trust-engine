@@ -1,9 +1,9 @@
 // Pieces every template carries, written once.
-const SOLE = "Supplied by Monique Sewell-Bennett, sole trader, 55 Remington Road, London N15 6SS";
+const SOLE = "Supplied by Monique Sewell-Bennett, sole trader";
 const LTD = "Yaadly Ltd, England and Wales no. 17358077";
 
 const preparedBy = (extra) =>
-  `**Prepared by Monique Sewell-Bennett**, seven years of UK construction and IoT project management, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS. ${extra}`;
+  `**Prepared by Monique Sewell-Bennett**, seven years of UK construction and IoT project management, supplying professional services as a sole trader. ${extra}`;
 
 // What she is, said plainly, so no report reads as the work of a profession
 // she does not hold. Set 28 September 2026 on her instruction: the templates
