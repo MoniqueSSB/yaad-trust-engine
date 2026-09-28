@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DocLogo } from "@/components/portal/DocLogo";
 import { notFound, redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -54,6 +55,7 @@ export default async function PackDoc({
       </Link>
 
       <div className="mt-3 border-b-2 border-teal pb-4">
+        <div className="mb-3"><DocLogo /></div>
         <span className="font-mono text-[10.5px] uppercase tracking-[.15em] text-dim">
           Kickoff Pack · document {idx + 1} of {PACK_DOC_ORDER.length}
         </span>

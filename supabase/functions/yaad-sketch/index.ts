@@ -320,6 +320,11 @@ async function osmMap(address: string, trace: Trace): Promise<string | null> {
 }
 
 function renderPack(p: Record<string, any>, stamp: string): string {
+  // visit_date is a date column ("2026-09-24"). Printed as words, and read as
+  // written, never through a timezone that could move it a day.
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const plain = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(p.visit_date || ""));
+  const visitDay = plain ? `${Number(plain[3])} ${MONTHS[Number(plain[2]) - 1]} ${plain[1]}` : (p.visit_date ? String(p.visit_date) : "");
   const rooms: Room[] = p.rooms || [];
   const frames: any[] = p.frames || [];
   const sev = (s: string) => ({ high: "#B42318", medium: "#8A5A00", low: "#4A5F5A" }[s] || "#4A5F5A");
@@ -452,7 +457,7 @@ ul.notes li{margin-bottom:4px}
 
 <dl class="detail">
   <dt>Report number</dt><dd>${esc(p.id)}${p.rev > 1 ? `, revision ${esc(p.rev)}` : ""}</dd>
-  <dt>Date of visit</dt><dd>${esc(p.visit_date || "Not stated")}</dd>
+  <dt>Date of visit</dt><dd>${esc(visitDay || "Not stated")}</dd>
   <dt>Property</dt><dd>${esc(p.property_label)}</dd>
   ${p.address ? `<dt>Site address</dt><dd>${esc(p.address)}${p.parish ? `, ${esc(p.parish)}` : ""}</dd>` : p.parish ? `<dt>Parish</dt><dd>${esc(p.parish)}</dd>` : ""}
   <dt>Prepared for</dt><dd>${esc(p.client_name || "Not stated")}</dd>
@@ -495,7 +500,7 @@ ${(p.gaps || []).length ? `<h2 class="sec">What this pack does not cover</h2>
 <h2 class="sec">Signed off</h2>
 <table class="sign">
   <tr>
-    <td><b>Visit conducted by</b><span class="who">${esc(p.captured_by || "Not stated")}</span><span class="when">${p.visit_date ? `On site ${esc(p.visit_date)}` : "Date not stated"}</span></td>
+    <td><b>Visit conducted by</b><span class="who">${esc(p.captured_by || "Not stated")}</span><span class="when">${visitDay ? `On site ${esc(visitDay)}` : "Date not stated"}</span></td>
     <td><b>Checked and approved by</b>${p.approved_by
       ? `<span class="who">${esc(p.approved_by)}</span><span class="when">${esc(String(p.approved_at || "").slice(0, 16).replace("T", " "))}${p.issued_at ? `, issued ${esc(String(p.issued_at).slice(0, 10))}` : ""}</span>`
       : `<span class="who unsigned">Not yet approved</span><span class="when">This is a draft. Nobody has checked it.</span>`}</td>
