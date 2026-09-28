@@ -59,7 +59,8 @@ const EXT: Record<string, string> = {
 // The database's own refusals that are written for the person reading them:
 // the materials gate (20260828c), the pairing checks (20260906020400) and
 // the stage lock (20260914095005). Anything else is a message for the logs.
-const SAYS_WHY = /materials store|answer a before|same job|does not exist|answer itself|Stage \d+ (is|has)/i;
+// "Stage N starts once its bill is paid" (20260929100000) is one of them.
+const SAYS_WHY = /materials store|answer a before|same job|does not exist|answer itself|Stage \d+ (is|has|starts once)/i;
 
 export async function uploadEvidence(formData: FormData): Promise<UploadResult> {
   const user = await requireUser();
