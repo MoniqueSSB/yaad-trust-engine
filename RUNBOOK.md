@@ -4453,6 +4453,24 @@ names the pack it refused rather than failing the set anonymously.
 Voiding deletes nothing. The row stays, marked void, and a void pack can be set
 back to draft later.
 
+## Printing a sketch pack, or saving it as a PDF
+
+On the desk, Sketch packs: press **PDF** on the pack's row in the list, or open
+the pack and press **Open as PDF**. The document opens in a new tab with a Print
+button in the top corner. Press it, then choose Save as PDF as the destination.
+The button does not appear on the printout.
+
+If nothing opens, the browser blocked the tab: allow pop-ups for
+`concierge.yaadly.co.uk` and press it again. A draft prints with "Not yet
+approved" in the sign-off box, on purpose; approve it first if that copy is
+going to anybody.
+
+The page is built by the `render` action of `yaad-sketch`, which only reads. A
+change to its layout means redeploying that one function from disk, keeping
+its platform check (no `--no-verify-jwt`), and then the desk if the desk
+changed too. To see a layout change without the desk, feed an invented pack
+through `renderPack` and print it with headless Chrome (`--print-to-pdf`).
+
 ## A sketch pack or a report was refused for a measurement, and the sentence looks innocent
 
 The rule is in one place now: `supabase/functions/_shared/measurements.ts`.
