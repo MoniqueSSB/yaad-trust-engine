@@ -8016,7 +8016,16 @@ async function loadOverview(){
     countOf("job_quotes",  q => q.eq("status", "sent")),
     countOf("calls",       q => q.eq("status", "requested")),
     countOf("disputes",    q => q.neq("state", "resolved")),
-    countOf("sketch_packs",q => q.eq("status", "draft")),
+    // Unread drafts only (28 Sep 2026). The outstanding line says "unread", and
+    // it counted every draft, so opening one never cleared it. Founder: "when
+    // I click on the draft it should remove from outstanding". Opening a pack
+    // marks it read in this browser (skMarkRead); approved packs waiting to be
+    // issued are still counted below, because they still need you.
+    (async () => {
+      const { data } = await sb.from("sketch_packs").select("id").eq("status", "draft").limit(500);
+      const read = skReadSet();
+      return (data || []).filter(r => !read.has(r.id)).length;
+    })(),
     countOf("sketch_packs",q => q.eq("status", "approved")),
     countOf("jobs",        q => q.eq("open", true)),
     countOf("waitlist",    null),
@@ -8587,8 +8596,16 @@ async function loadOverview(){
       + `</button>`;
   };
 
-  const quiet3 = JOBS.filter(j => j.status !== "complete" && dq(j.updated_at) >= 3).length;
-  $("ovJobsC").textContent = plural(JOBS.length, "open", "open") + ", " + quiet3 + " quiet 3 days or more";
+  // "Stalled" means work that has stopped: a booked job being worked (in
+  // progress, or evidence waiting on the client) with nothing for 3 days or
+  // more, the same thing the daily stall check looks for. Until 28 Sep 2026
+  // this counted every open job untouched for 3 days, including ones still
+  // waiting for quotes that nobody is working on yet, and test jobs, so the
+  // badge read 1 while the Stalled jobs page said nothing was stalled.
+  // Founder: "this needs to be on zero".
+  const quiet3 = JOBS.filter(j => (j.status === "in_progress" || j.status === "evidence")
+    && !INV_TESTJOBS.has(j.id) && dq(j.updated_at) >= 3).length;
+  $("ovJobsC").textContent = plural(JOBS.length, "open", "open") + ", " + quiet3 + " being worked and quiet 3 days or more";
   $("ovStages").innerHTML = COLS.map((c, i) => {
     const rows = buckets[i];
     const anyQuiet = rows.some(j => dq(j.updated_at) >= 3);
@@ -8766,7 +8783,7 @@ async function loadOverview(){
   setCount("qpd", held.length, false, "quote pack held, and a held pack is a job stopped|quote packs held, and a held pack is a job stopped");
   setCount("asks", asksNew, false, "question waiting to be published|questions waiting to be published");
   setCount("owed", waitingNow.length, false, "person handed to you, waiting|people handed to you, waiting");
-  setCount("stalled", quiet3, false, "live job quiet for 3 days or more|live jobs quiet for 3 days or more");
+  setCount("stalled", quiet3, false, "job being worked and quiet for 3 days or more|jobs being worked and quiet for 3 days or more");
   // Deliberately no count on Jobs. It used to carry the open-dispute total,
   // which put a coral badge on a link that does not go to disputes. On this
   // desk a colour is a claim about the thing it sits on, so a badge that means
@@ -12721,6 +12738,19 @@ let SK_DESCRIBED = [];  // what the vision model said
 let SK_SELECTED = new Set(); // still numbers the person has clicked, for naming a room
 let SK_PACK = null;
 
+// Which draft sketch packs have been opened on this desk. Local to the browser
+// because only the founder reads the desk; nothing else depends on it, and
+// opening a pack is reading it, never approving it.
+const SK_READ_KEY = "yaadly-desk-sketch-read";
+function skReadSet(){
+  try { const a = JSON.parse(localStorage.getItem(SK_READ_KEY) || "[]"); return new Set(Array.isArray(a) ? a : []); }
+  catch { return new Set(); }
+}
+function skMarkRead(id){
+  if (!id) return;
+  try { const s = skReadSet(); if (s.has(id)) return; s.add(id); localStorage.setItem(SK_READ_KEY, JSON.stringify([...s].slice(-500))); } catch {}
+}
+
 async function skFn(payload){
   // Same rule as fn(): pausing agents has to stop the sketch describer too, or
   // the switch only covers half of what it says it covers.
@@ -13176,6 +13206,7 @@ function skEditor(p){
 }
 
 function skRenderPack(extra){
+  if (SK_PACK && SK_PACK.id) skMarkRead(SK_PACK.id);
   const p = SK_PACK;
   if (!p) return show("skPackCard", false);
   const rooms = p.rooms || [];
