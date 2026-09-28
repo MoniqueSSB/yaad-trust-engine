@@ -6,6 +6,63 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-28 · The Completion Report is signed by the worker and issued by a named person
+
+Monique asked for the report to be updated after looking at comparable
+documents. A research pass read twenty two (the JCT and NEC completion
+certificates, the RICS Level 3 survey, new build snagging reports, the IET
+minor works certificate, Checkatrade, TrustMark and NHBC guarantee documents,
+Jobber, Housecall Pro, Fixflo, AppFolio and home watch reports). Nearly all
+open with a one line outcome and the dates that matter, keep what was found
+outside the scope apart from the work done, and end on a named person
+signing. Ours did none of those, and it appeared on its own the moment a job
+completed although PORTAL-SPEC.md says "No auto-published Completion Report".
+She approved a clickable preview and then decided the rest.
+
+**The order is hers: worker first, then the desk, then the client.** The agent
+(yaad-completion, built in August and never called until now) drafts care
+notes; a named person edits and accepts; the worker reads the whole report,
+may change the words and signs with their typed name and a code; a named
+person reads what was signed and issues it; the client can then read it and
+either confirm it or say something is wrong. A worker's change never reaches
+the client unread, because issuing is always a person. A desk edit after the
+worker has signed starts a new revision and sends it back to them, the same
+rule the Kickoff Pack keeps: a changed text is a new claim.
+
+**Only words are stored, and only words can change.** `completion_reports`
+holds the care notes and the worker's own account. Every fact on the report
+(dates, arrivals, approvals, photographs, fingerprints, what was agreed) is
+read from the record by the page at render time, so there is nothing for the
+worker, or the desk, to edit. That is what makes the signature worth
+anything. The outcome line at the top is built by rules in
+`web/lib/portal/completion-report.ts`, never by a model, and its tests assert
+that a new find, an arrival away from the site and a dispute are never left
+out of it.
+
+**A deliberate exception to CLAUDE.md section 9.** The worker changes the words
+and signs on one portal page, `/portal/jobs/[id]/completion?code=`. Section 9
+keeps the worker's web side to sign-up and file upload, and on 1 September
+Monique herself moved the Kickoff Pack confirmation to a WhatsApp reply for
+that reason. Asked on 28 September, with the WhatsApp route offered and
+recommended, she chose the page. It is one page, reached from a WhatsApp link,
+editing two fields. Do not grow it into a worker dashboard, and do not
+"correct" it back to WhatsApp without asking her.
+
+**What else she decided.** No money on the report, materials amounts included,
+so it can be forwarded to family or a buyer. A new find stays on the report as
+a permanent record and also carries "Ask for a quote for this", which opens
+`/jobs/new` with the find described (`?about=`): its own job, its own quote,
+never an addition to this one. Evidence comments are left off the report:
+they are a conversation between the two sides, not a checked record, and can
+carry money talk into a document people forward.
+
+**The legal text.** `completion_section6` carries its own `<h5>6 · ...</h5>`
+from the Kickoff Pack. The page now draws its own numbered heading and drops
+that one when rendering; the words are unchanged. It had been printing a
+second heading, with the wrong number whenever the sections moved.
+
+---
+
 ## 2026-09-28 · Invoices and the Completion Report are real PDFs, made in the browser
 
 Monique: "all invoices should be in pdf when showing preview", then "in the

@@ -1623,6 +1623,9 @@ const TONE = {
   sent:"ok", no_email:"mute", throttled:"warn",
   // disputes
   raised:"crit", answered:"warn", resolved:"ok",
+  // completion reports, 28 Sep 2026: waiting on the worker is amber, and so
+  // is a signed report, because it is waiting on you to read and issue it.
+  not_drafted:"warn", with_worker:"warn", worker_signed:"warn",
 };
 const tone_ = (s) => chip_(TONE[String(s || "").toLowerCase()] || "mute", s || "none");
 
@@ -1824,6 +1827,83 @@ const VIEWS = [
         rpc:"issue_report",
         args:(r) => ({ p_report:r.id }),
         says:r => `Mints the number and records that you issued it, which is what makes it readable in the client's portal. Refused while any finding is unrated, while the verdict is empty, or while a sentence states a measurement.` },
+    ]},
+
+  // The Completion Report's sign-off chain, 28 Sep 2026. Worker first, then
+  // you, then the client (20260928120000). Every rule is in the database:
+  // this is only the form in front of it. The agent drafts care notes and
+  // nothing else; the facts on the report are read from the record by the
+  // page and cannot be edited here or anywhere.
+  { k:"completion", g:"Documents & money", label:"Completion reports", icon:"doc",
+    title:"Completion reports", table:"v_completion_reports",
+    sub:"Every finished job and where its Completion Report is. The order is fixed: the agent drafts the care notes, you edit and accept them, the worker reads the report, may change the words and signs it, then you read what they signed and issue it. The client sees nothing until you issue. Dates, arrivals, approvals, photographs and fingerprints come from the record and cannot be edited, by anybody. Editing after the worker has signed starts a new revision and it goes back to them.",
+    select:"*",
+    order:"job_updated_at",
+    search:["id","title","client_name","worker_name","parish"],
+    titleOf: r => "Completion Report, " + r.id,
+    viz:{ date:"job_updated_at", state:"report_status", want:r => !r.is_test && r.report_status !== "issued", wants:"real, not issued yet" },
+    hide:["sign_code","is_test"],
+    empty:["No finished jobs yet","A job lands here the moment its last stage is approved."],
+    cols:[
+      {h:"Job", f:r => id_(r.id) + sub_((r.title || "") + (r.is_test ? " · test" : ""))},
+      {h:"Client & worker", f:r => esc(r.client_name || "Not named") + sub_(r.worker_name || "No worker")},
+      {h:"Report", f:r => crState_(r)},
+      {h:"Care notes", f:r => (r.care_notes && r.care_notes.length) ? esc(r.care_notes.length + " note" + (r.care_notes.length === 1 ? "" : "s")) : mute_("none yet")},
+      {h:"Worker", f:r => r.worker_signed_at ? esc("Signed " + ago_(r.worker_signed_at)) + sub_(r.worker_changed ? "with changes, read them" : "no changes") : mute_(r.report_status === "with_worker" ? "waiting to sign" : "not yet")},
+      {h:"Client", f:r => r.client_flagged_at ? chip_("crit","raised a point") : r.client_confirmed_at ? chip_("ok","confirmed") : mute_(r.report_status === "issued" ? "not reviewed yet" : "")},
+    ],
+    actions:[
+      { label:"Open the report", cls:"",
+        says:r => `Opens the report for ${r.id} in the app, as it will read, with its state on top. Nothing changes.`,
+        nav:r => window.open(CR_APP + "/portal/jobs/" + encodeURIComponent(r.id) + "/completion", "_blank", "noopener") },
+      { label:"Draft the care notes", cls:"g",
+        when:r => ["not_drafted","draft"].includes(r.report_status),
+        says:r => `Asks yaad-completion for a few "looking after it" notes for ${r.id}, from the job description and the evidence labels. A draft only: it lands as a draft for you to read and edit, and nothing reaches anybody until you accept it. Replaces any care notes already in the draft.`,
+        read: crDraft },
+      { label:"Edit the words", cls:"",
+        when:r => r.report_status !== "not_drafted",
+        rpc:"save_completion_report",
+        ask:[
+          { k:"notes", label:"Looking after it, one note per line", type:"long", from:r => (r.care_notes || []).join("\n") },
+          { k:"account", label:"The worker's own account of the work (optional; the worker can write or change this)", type:"long", from:r => r.worker_account || "" },
+        ],
+        args:(r, v) => ({ p_job:r.id, p_care_notes:crLines_(v.notes), p_worker_account:v.account || null, p_drafted_model:null }),
+        says:r => r.report_status === "draft"
+          ? "Saves the words as the draft. Nobody else sees it yet."
+          : `This report is ${String(r.report_status).replace(/_/g," ")}. Saving an edit starts revision ${Number(r.rev || 1) + 1}: it goes back to draft, the worker's signature${r.report_status === "issued" ? " and the issue are" : " is"} cleared, and it has to be accepted and signed again. ${r.report_status === "issued" ? "The client stops seeing it until you issue it again." : ""}` },
+      { label:"Accept and send to the worker", cls:"",
+        when:r => r.report_status === "draft",
+        rpc:"accept_completion_report",
+        ask:[{ k:"name", label:"Your name, as it prints on the report", from:() => crName_() }],
+        args:(r, v) => { crRemember_(v.name); return { p_job:r.id, p_name:v.name }; },
+        says:r => `Accepts these words in your name and makes a signing code. The report then shows to ${r.worker_name || "the worker"} in their portal. Next, press "Send the worker the link" so they know.` },
+      { label:"Send the worker the link", cls:"",
+        when:r => r.report_status === "with_worker",
+        ask:[
+          { k:"how", label:"How", options:[["whatsapp","WhatsApp, from the Yaadly number"],["email","Email, from jobs@"]], from:() => "whatsapp" },
+          { k:"text", label:"Message, sent as typed", type:"long", from:r => crWorkerMsg_(r) },
+        ],
+        says:() => "Sends the link with its signing code from Yaadly and records it under your name. WhatsApp only carries it within 24 hours of their last message to the Yaadly number; if it is refused, send it by email or from your own phone.",
+        call: (r, v) => crSend_(r.id, "worker", v.how, v.text) },
+      { label:"Read what they signed and issue it", cls:"",
+        when:r => r.report_status === "worker_signed",
+        rpc:"issue_completion_report",
+        ask:[{ k:"name", label:"Your name, as it prints on the report", from:() => crName_() }],
+        args:(r, v) => { crRemember_(v.name); return { p_job:r.id, p_name:v.name }; },
+        says:r => (r.worker_changed
+            ? `${r.worker_signed_name} CHANGED the words before signing. Read them now (Open the report shows the signed version, the review trail at the bottom says what changed). If you do not accept a change, do not issue: edit the words instead, which sends it back to them. `
+            : `${r.worker_signed_name} signed it with no changes. `)
+          + "Issuing puts your name on it and makes it visible to the client. Care notes as signed: "
+          + ((r.care_notes || []).map(n => "\u201c" + n + "\u201d").join(", ") || "none") + "."
+          + (r.worker_account ? " Their account: \u201c" + r.worker_account + "\u201d" : "") },
+      { label:"Send the client the report", cls:"",
+        when:r => r.report_status === "issued",
+        ask:[
+          { k:"how", label:"How", options:[["whatsapp","WhatsApp, from the Yaadly number"],["email","Email, from jobs@"]], from:() => "whatsapp" },
+          { k:"text", label:"Message, sent as typed", type:"long", from:r => crClientMsg_(r) },
+        ],
+        says:() => "Sends the client the link to their report from Yaadly and records it under your name.",
+        call: (r, v) => crSend_(r.id, "client", v.how, v.text) },
     ]},
 
   { k:"jobfiles", g:"Documents & money", label:"Job files", icon:"case",
@@ -10389,6 +10469,99 @@ let RPT_SOURCE = "";
 
 // The reader's door. Same pause rule as rptFn(): reading a quote is a model
 // call, and the switch in the top bar has to stop it.
+// ---- Completion reports (the "completion" view), 28 Sep 2026.
+//
+// yaad-completion existed from August and nothing called it. It drafts; this
+// saves ONLY its care_notes, as a draft, through save_completion_report(),
+// which is admin only. The overview and narrative it also returns are not
+// used: the report's facts are read from the record by the page, and a model
+// paragraph about what was done would be a second, unsigned account of it.
+const CR_APP = "https://app.yaadly.co.uk";
+const COMPLETION_FN = SUPABASE_URL + "/functions/v1/yaad-completion";
+
+function crState_(r){
+  const s = r.report_status;
+  if (s === "not_drafted") return chip_("mute", "not drafted") + sub_("draft the care notes");
+  if (s === "draft") return chip_("warn", "draft") + sub_("yours to accept");
+  if (s === "with_worker") return chip_("warn", "with the worker") + sub_(r.accepted_name ? "accepted by " + r.accepted_name : "");
+  if (s === "worker_signed") return chip_(r.worker_changed ? "crit" : "warn", "signed, to issue") + sub_(r.worker_changed ? "they changed the words" : "no changes");
+  if (s === "issued") return chip_("ok", "issued") + sub_(r.issued_name ? "by " + r.issued_name : "");
+  return tone_(s);
+}
+
+function crLines_(text){
+  return String(text || "").split(/\r?\n/).map(x => x.replace(/^\s*[-*•]\s*/, "").trim()).filter(Boolean);
+}
+
+function crName_(){ try { return localStorage.getItem("yaad-desk-name") || ""; } catch (_) { return ""; } }
+function crRemember_(n){ try { if (n) localStorage.setItem("yaad-desk-name", n); } catch (_) { /* private window */ } }
+
+function crFirst_(name, fallback){ return String(name || "").trim().split(/\s+/)[0] || fallback; }
+
+function crWorkerMsg_(r){
+  const link = CR_APP + "/portal/jobs/" + encodeURIComponent(r.id) + "/completion?code=" + encodeURIComponent(r.sign_code || "");
+  return `Hello ${crFirst_(r.worker_name, "there")}, this is Monique at Yaadly. The Completion Report for job ${r.id} is ready for you to read and sign: ${link}\n\nYou can change the care notes and your own account of the work before you sign. The dates and photographs come from the record. Thank you for the work.`;
+}
+
+function crClientMsg_(r){
+  const link = CR_APP + "/portal/jobs/" + encodeURIComponent(r.id) + "/completion";
+  return `Hello ${crFirst_(r.client_name, "there")}, this is Monique at Yaadly. Your Completion Report for job ${r.id} is ready: ${link}\n\nIt is signed by ${r.worker_signed_name || "the worker"}. Keep it with the house papers. If anything in it is wrong or missing, there is a button at the bottom to tell us.`;
+}
+
+async function crSend_(jobId, to, how, text){
+  if (!String(text || "").trim()) throw new Error("Nothing to send.");
+  const r = await fetch(MSG_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify({ job_id: jobId, to, channel: how || "whatsapp", text: String(text).trim() }),
+  });
+  const j = await r.json().catch(() => ({ error: "the function returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+}
+
+async function crDraft(r){
+  if (AGENTS_PAUSED) throw new Error("Agents are paused. The switch in the top bar turns them back on. Nothing was sent to a model.");
+  const [{ data: job, error: e1 }, { data: ev, error: e2 }] = await Promise.all([
+    sb.from("jobs").select("id,title,parish,client_name,worker_name,trade,descr").eq("id", r.id).single(),
+    sb.from("evidence").select("label,phase,kind").eq("job_id", r.id).order("created_at").limit(40),
+  ]);
+  if (e1 || e2) throw new Error((e1 || e2).message);
+  if (!job) throw new Error("Could not read job " + r.id + ".");
+  if (!String(job.descr || "").trim()) throw new Error("This job has no description, and the draft is built from it. Write the care notes yourself with Edit the words.");
+  // Only facts, no contact details and no money: the same shape the function
+  // has always asked for.
+  const res = await fetch(COMPLETION_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify({ job: {
+      title: job.title, parish: job.parish, client: crFirst_(job.client_name, ""),
+      workerName: job.worker_name, workerTrade: job.trade, desc: job.descr,
+      evidence: (ev || []).map(e => ({ label: e.label, meta: e.kind === "materials" ? "materials receipt" : (e.phase || "") })),
+    } }),
+  });
+  const j = await res.json().catch(() => ({ error: "the function returned something unreadable" }));
+  if (!res.ok) throw new Error(j.error || ("http " + res.status));
+  const notes = (Array.isArray(j.narrative && j.narrative.care_notes) ? j.narrative.care_notes : [])
+    .map(x => String(x || "").trim()).filter(Boolean).slice(0, 8);
+  if (!notes.length) throw new Error("The draft came back with no care notes. Try again, or write them yourself with Edit the words.");
+  const { error } = await sb.rpc("save_completion_report", {
+    p_job: r.id, p_care_notes: notes, p_worker_account: r.worker_account || null, p_drafted_model: j.model || "unknown",
+  });
+  if (error) throw new Error(error.message);
+  await loadTableView("completion");
+  const g = j.guardrail || {};
+  const flags = [
+    g.money_language_detected ? `<b style="color:var(--coral)">${esc(g.note)}</b>` : "",
+    g.banned_language_detected ? `<b style="color:var(--coral)">${esc(g.banned_note)}</b>` : "",
+  ].filter(Boolean).join("<br>");
+  return `<div class="card" style="margin-top:12px">
+      <b>Drafted ${notes.length} care note${notes.length === 1 ? "" : "s"}, saved as a draft.</b>
+      <ul style="margin:8px 0 8px 18px;padding:0">${notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>
+      ${flags ? `<p>${flags}</p>` : ""}
+      <p class="mute" style="margin:0">Read them against the job. Change anything with Edit the words, then Accept and send to the worker. Nothing has gone to anybody.</p>
+    </div>`;
+}
+
 async function rptReadFn(images){
   if (AGENTS_PAUSED) {
     throw new Error("Agents are paused. The switch in the top bar turns them back on. Nothing was sent to a model.");
