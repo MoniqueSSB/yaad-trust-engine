@@ -6,6 +6,42 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-28 · Extra work on a booked job is an add-on, agreed by both sides and billed on its own
+
+Until today a booked job could not take extra work at all. `request_quote_change_as_me()` refuses a booked job and tells the client to message Yaadly, and nothing recorded what happened next, so hidden defects found once a job opened up were either done off the books or stopped the job. Monique set the rules on 28 September 2026:
+
+- **The client writes it:** a short scope, the amount they offer, and how it is paid. The default is paid in full, before the extra work starts. The one alternative is half now, half on sign-off.
+- **The worker accepts it, changes it, or turns it down.** A change goes back to the client, who can accept it, change it again, or withdraw. Nothing is booked until both sides have agreed the same revision. The revision number does the kickoff pack's confirmation-code job: an accept against a version the other side has since changed is refused.
+- **Fees are the same as the main job.** The client pays the agreed amount plus 15% on top, and the worker is paid the amount less 5%.
+- **It is billed as its own numbered invoice on the same job.** The job's own bill is never touched, sent or not.
+- **Nothing closes while extra work is open.** The job cannot complete while any add-on is still being agreed, or is agreed and not yet signed off.
+
+**Why not an extra stage.** The accepted quote's stages must total exactly 100% (`parse_payment_stages`), and `job_final_stage_count()` decides completion. A bolted-on stage breaks one or the other, so an add-on is its own record (`job_addons`) with its own agreements, evidence, invoices and sign-off.
+
+**What is automatic and what is a person.** Agreeing drafts the add-on's client invoice; drafting is paperwork. Everything with consequence stays a named human's click:
+
+- sending the invoice;
+- marking it paid;
+- signing off the add-on on its photos (`sign_off_addon`, admin only, stamped with the admin's email);
+- paying the worker (`mark_worker_paid`, which waits on every client invoice for that add-on).
+
+No model touches any of it and no price is suggested: the amount is what the two parties wrote (CLAUDE.md §5).
+
+**What had to change in five live functions, and only that.** An invoice with `addon_id` set is kept out of the job's own money:
+
+- `invoice_starts_job_default`: an add-on invoice never starts the job. Without this, a new stage-less invoice would have been taken for the Guarantee & Support bill.
+- `raise_job_client_invoice` and `raise_job_worker_payable`: an add-on invoice is never "the job's bill" or "the job's payable". Without this, an add-on payable raised before completion would have blocked the job's own payable for good.
+- `worker_pay_client_unpaid`: an add-on payable waits on its own client invoices, and the job's payable ignores them.
+- `sync_job_status`: carries the completion gate.
+
+Each body was read live with `pg_get_functiondef` and matched the repository before being restated. Add-on photos live in `job_addon_evidence`, not `evidence`, because the stage rules would otherwise count them as evidence for a stage. An add-on invoice cannot be split into parts (trigger), because its fee line would then be taken for the job's.
+
+**How it was tested.** No local database exists on this machine, so the migration ran in PGlite, an in-memory Postgres, with stand-ins for the tables that predate the migrations (`supabase/tests/pglite/`). All 61 checks pass. That proves the logic, not production's wiring. `supabase/tests/job_addons_guards.sql` checks the live wiring once the migration is applied.
+
+**Not built yet: telling people.** Nobody is messaged when an add-on is written, changed or agreed. For now each side sees it on the job's Extra work tab and the desk sees it on Add-ons. New WhatsApp message kinds in `yaad-notify-client` are the next piece. Messages outside WhatsApp's 24-hour window need approved templates.
+
+---
+
 ## 2026-09-28 · The invoice email carries the invoice as a PDF, drawn by yaad-invoice
 
 Monique asked for the PDF on the client's email too, and chose option A of

@@ -1614,6 +1614,8 @@ const TONE = {
   sent:"warn", accepted:"ok", rejected:"mute", withdrawn:"mute",
   // invoices / packs
   draft:"warn", paid:"ok", void:"mute", issued:"ok", failed:"crit", ready:"ok", approved:"ok",
+  // add-ons on a booked job (20260928200000)
+  with_worker:"warn", with_client:"warn", agreed:"warn", signed_off:"ok",
   // calls / waitlist
   // reports. reviewed is amber, not grey: it has been read and still is not
   // with the client, so it is outstanding rather than finished.
@@ -2397,6 +2399,38 @@ const VIEWS = [
         rpc:"approve_kickoff_pack",
         args:(r) => ({ p_pack:r.id }),
         says:r => `Approves ${r.id} in your name, which is what makes it readable in the client's portal. The database refuses this if the payment stages do not total exactly 100 percent; that refusal is the gate working.` },
+    ]},
+
+  // Extra work on a booked job, 28 Sep 2026 (20260928200000). The client
+  // writes it, the worker accepts, changes or turns it down, both agree the
+  // same version; its invoice is then DRAFTED here on Invoices for you to send.
+  // The one decision on this page is sign-off, and it is yours: once the
+  // add-on's invoice is paid and its photos are in, Sign off raises the
+  // worker's pay (the amount less 5%) and, on "half now, half later" terms,
+  // drafts the second invoice. A job cannot complete while any add-on is
+  // still open or agreed and not signed off.
+  { k:"addons", g:"Documents & money", label:"Add-ons", icon:"doc",
+    title:"Add-ons", table:"job_addons",
+    sub:"Extra work on booked jobs, written by the client and agreed by both sides. Agreeing drafts the add-on's invoice on Invoices; sending it and marking it paid are still yours. Sign off here once it is paid and the photos show the work. A job cannot complete while an add-on is open.",
+    select:"id,job_id,rev,scope,amount_jmd,terms,status,last_edit_side,written_by,agreed_at,signed_off_at,signed_off_by,closed_reason,history,created_at,updated_at",
+    order:"updated_at", search:["job_id","scope","written_by"], hide:["history"],
+    viz:{ want:r => r.status === "agreed", wants:"agreed, waiting on the work and your sign-off" },
+    empty:["No add-ons yet","An add-on appears when a client adds extra work to a booked job from their portal."],
+    detailTop: r => addonStory_(r), foldFields:true, afterOpen: addonAfterOpen_,
+    cols:[
+      {h:"Job", f:r => id_(r.job_id) + sub_("version " + r.rev)},
+      {h:"Extra work", f:r => said_(r.scope)},
+      {h:"Amount", f:r => esc(jmdFmt(r.amount_jmd)) + sub_(r.terms === "in_full" ? "in full" : "half now, half later")},
+      {h:"State", f:r => tone_(r.status)},
+      {h:"Signed off", f:r => r.signed_off_at ? esc(r.signed_off_by || "") + sub_(ago_(r.signed_off_at)) : mute_("not yet")},
+      {h:"Updated", f:r => mute_(ago_(r.updated_at))},
+    ],
+    actions:[
+      { label:"Sign off", cls:"",
+        when:r => r.status === "agreed",
+        rpc:"sign_off_addon",
+        args:(r) => ({ p_addon:r.id }),
+        says:r => `Signs off ${r.job_id}'s add-on in your name, on the photos above. It raises the worker's pay at the agreed amount less 5% (${jmdFmt(r.amount_jmd - Math.round(r.amount_jmd * 0.05))}) for you to pay from Pay workers${r.terms === "in_full" ? "" : ", and drafts the second half of the client's invoice"}. Refused if the add-on's invoice is not marked paid or no photos have been filed.` },
     ]},
 
   { k:"qpd", g:"Documents & money", label:"Quote Pack Drafts", icon:"doc",
@@ -5786,6 +5820,54 @@ const QP_DOCS = [
   ["rough_timeline","Rough timeline"], ["payment_stages","Payment stages"],
 ];
 const qpDocsHtml = docs => docsListHtml(QP_DOCS, docs);
+
+// An add-on's drawer: where it stands, what each side gets, its invoices and
+// the photos filed on it, which are what sign-off is judged on.
+function addonStory_(r){
+  const fee = Math.round(r.amount_jmd * 0.15), pay = r.amount_jmd - Math.round(r.amount_jmd * 0.05);
+  const step = { with_worker:1, with_client:1, agreed:2, signed_off:4 }[r.status] || 0;
+  const steps = ["Written by the client", "Agreed by both", "Paid and photographed", "Signed off"];
+  const rail = `<div class="dlvrail">` + steps.map((t, i) => {
+    const n = i + 1, closed = r.status === "declined" || r.status === "withdrawn";
+    const cls = closed && n === 2 ? "stop" : n <= step ? "done" : "";
+    return `<div class="dlvst ${cls}"><i>${cls === "stop" ? "&times;" : n <= step ? "&#10003;" : ""}</i><span>${esc(t)}</span></div>`;
+  }).join("") + `</div>`;
+  const wait = r.status === "with_worker" ? "Waiting on the worker" : r.status === "with_client" ? "Waiting on the client" : "";
+  return `<div class="dlvstory">` + rail
+    + `<div class="dlvgrid">`
+    + `<div><span class="dk">Job</span><div>${id_(r.job_id)} ${sub_("version " + r.rev + (wait ? ", " + wait.toLowerCase() : ""))}</div></div>`
+    + `<div><span class="dk">Money</span><div>Client pays <b>${esc(jmdFmt(r.amount_jmd + fee))}</b> ${sub_(jmdFmt(r.amount_jmd) + " + 15%")}<br>Worker is paid <b>${esc(jmdFmt(pay))}</b> ${sub_("less 5%")}</div></div>`
+    + `</div>`
+    + `<div class="dlvbox"><span class="dk">The extra work</span><p style="white-space:pre-wrap">${esc(r.scope)}</p><p class="mute">${r.terms === "in_full" ? "Paid in full before the work starts." : "Half before the work starts, half once it is signed off."}</p></div>`
+    + `<div class="dlvbox"><span class="dk">Invoices</span><div data-addon-inv>${mute_("Reading…")}</div></div>`
+    + `<div class="dlvbox"><span class="dk">Photos filed on this add-on</span><div data-addon-ev>${mute_("Reading…")}</div></div>`
+    + (r.closed_reason ? `<div class="dlvbox"><span class="dk">Reason given</span><p>${esc(r.closed_reason)}</p></div>` : "")
+    + `</div>`;
+}
+
+async function addonAfterOpen_(r, el){
+  const inv = el.querySelector("[data-addon-inv]"), ev = el.querySelector("[data-addon-ev]");
+  const { data: invs, error: e1 } = await sb.from("invoices").select("id,status,total_pence,payable_to,period_label").eq("addon_id", r.id).order("id");
+  if (inv) inv.innerHTML = e1 ? esc(e1.message) : (invs || []).length
+    ? (invs || []).map(i => `<div>${id_(i.id)} ${esc(i.period_label || "")} &middot; ${esc(jmdFmt(i.total_pence || 0))} ${tone_(i.status)}</div>`).join("")
+    : mute_(r.status === "agreed" || r.status === "signed_off" ? "None found" : "None until both sides agree");
+  const { data: rows, error: e2 } = await sb.from("job_addon_evidence").select("storage_path,label,filed_by,created_at").eq("addon_id", r.id).order("created_at");
+  if (!ev) return;
+  if (e2) { ev.textContent = e2.message; return; }
+  if (!(rows || []).length) { ev.innerHTML = mute_("None yet. Sign-off is refused until there are some."); return; }
+  // Downloaded, then shown from a blob: the desk's Content-Security-Policy
+  // allows img-src 'self' data: blob: only, so a signed URL would be refused.
+  const urls = await Promise.all(rows.map(async x => {
+    const got = await sb.storage.from("evidence").download(x.storage_path);
+    return got.data ? URL.createObjectURL(got.data) : null;
+  }));
+  ev.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">` + rows.map((x, i) => {
+    const u = urls[i];
+    return `<a href="${esc(u || "#")}" target="_blank" rel="noopener" style="display:block;width:120px;font-size:11px;color:var(--mute)">`
+      + (u ? `<img src="${esc(u)}" alt="" style="width:120px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">` : "")
+      + `<div>${esc(x.label || "No label")}</div><div>${esc(ago_(x.created_at))} ago</div></a>`;
+  }).join("") + `</div>`;
+}
 
 function panelKick(rows){ return heldDraftsHtml() + newestPackHtml(rows); }
 
