@@ -6194,7 +6194,16 @@ transaction.
 2. **Invoices, Worker fees.** Yaadly's 5% from each tradesperson, job by job. It is kept out of their pay, so it is never an invoice of its own. The figure is worked out from the accepted quote at today's rate, not read from an invoice. **Agency fees** now holds only the client side: the 15% and services.
 3. **The fee on a pay invoice.** Since 28 Sep 2026 each pay invoice records the quoted labour and Yaadly's worker fee as it is raised (`worker_labour_jmd`, `worker_fee_jmd`, migration 20260928230000), and the invoice, its PDF, the desk and the worker's portal show: quoted labour, less the fee, is the agreed rate. Pay raised before that has no figures and shows no breakdown, on purpose: the fee cannot be worked back exactly from the rate, and before 9 Sep 2026 it was 12%.
 
-## 36. Extra work on a booked job: add-ons (28 Sep 2026)
+## 36. The blank report templates: changing one, or the desk cannot load them (28 Sep 2026)
+
+1. Change the wording in `scripts/report-templates/services/<service>.js`. Never edit the PDF or Word file itself; the next build overwrites it.
+2. `cd scripts/report-templates && npm ci && node build.js` (add `--hub "<the YaadlyHub Report Templates folder>"` to refresh Monique's copies). It needs Google Chrome for the PDFs.
+3. If it stops with a list of problems, the gate is working: a template stated a measurement, used banned language or carried a dash. Reword it. Do not loosen `gate.js`.
+4. `cp concierge/concierge.html concierge-deploy/public/index.html` if the desk changed, then deploy the desk as usual. The templates travel in `concierge-deploy/public/templates`.
+5. "Could not load the templates" on the desk means `templates/index.json` was not deployed with the desk. Check `concierge-deploy/public/templates` has it, then redeploy.
+6. The Deposit Protection Check template's checklist and payment terms are a copy of `DEPOSIT_CHECKLIST` and `PAYMENT_TERMS` in `yaad-report`. Change one, change the other.
+
+## 37. Extra work on a booked job: add-ons (28 Sep 2026)
 
 1. **Deploy order matters.** Apply migration `20260928235000_add_on_work_on_a_booked_job.sql` first, then deploy the app, then the desk. The job page reads the add-on tables on their own, so an app deployed first shows an empty Extra work tab rather than breaking, but nothing works until the migration is in. Afterwards run `supabase/tests/job_addons_guards.sql`; every line should read PASS.
 2. **Where it lives.** The client and the booked worker use the **Extra work** tab on the job page. The desk uses **Add-ons** under Documents & money. The add-on's invoices appear on **Invoices** like any other, labelled "Add-on" (or "Add-on, first half" / "second half").
