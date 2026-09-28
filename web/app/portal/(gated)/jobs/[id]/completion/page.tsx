@@ -179,7 +179,7 @@ export default async function Completion({
       )}
       {isWorker && status === "with_worker" && report?.return_reason && (
         <div className="rounded-2xl border border-gold/40 bg-gold/[0.07] px-5 py-3 text-[13px] text-mute print:hidden">
-          <b className="text-goldb">Sent back to you{report.returned_name ? " by " + report.returned_name : ""}:</b> &ldquo;{report.return_reason}&rdquo;
+          <b className="text-goldb">Sent back to you by Yaadly:</b> &ldquo;{report.return_reason}&rdquo;
         </div>
       )}
       {isWorker && status === "with_worker" && (
@@ -463,13 +463,13 @@ export default async function Completion({
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div className="border-t-2 border-ink pt-1.5 text-[13px] text-ink">
               <p className={label}>Sent to the owner</p>
-              {/* Honest about who read it. A report released from hold carries
-                  the name of the person who released it; one that passed the
-                  automatic screen says so, and never implies a person at
-                  Yaadly reviewed the worker's words. */}
+              {/* Honest about who read it, and never a Yaadly person's name:
+                  founder, 28 Sep 2026, "it should never be my name". The name
+                  typed on the desk is kept in the database as the internal
+                  record of who acted, and is never printed here. */}
               {!report?.issued_at ? <span className="text-dim">Not sent yet</span>
                 : report.issued_name
-                  ? <>Released by {report.issued_name}, Yaadly Ltd<br /><span className="text-[11.5px] text-dim">{fmtWhen(report.issued_at)}</span></>
+                  ? <>Released by Yaadly<br /><span className="text-[11.5px] text-dim">{fmtWhen(report.issued_at)}. The worker&apos;s words, unchanged.</span></>
                   : <>When the worker signed<br /><span className="text-[11.5px] text-dim">{fmtWhen(report.issued_at)}. The report is the worker&apos;s own; Yaadly does not edit it.</span></>}
             </div>
             <div className="border-t-2 border-ink pt-1.5 text-[13px] text-ink">

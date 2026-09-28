@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { recordAccepted, withStatusCallback } from "./twilio-status.ts";
-import { SECTION_MENU_APPROVAL, SECTION_MENU_NAME, sectionMenuContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
+import { SECTION_MENU_APPROVAL, SECTION_MENU_NAME, sectionMenuContent, SIGN_REPORT_NAME, signReportContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
 
 // A one-shot helper for creating Yaadly's WhatsApp content templates in
 // Twilio, 15 September 2026.
@@ -349,6 +349,26 @@ Deno.serve(async (req: Request) => {
       switchedOn = true;
     }
     return json({ sid, status, rejection_reason: wa.rejection_reason ?? null, switchedOn });
+  }
+
+  // The worker's Sign button on the Completion Report. Created, or found, and
+  // recorded in app_settings, where yaad-notify-client reads it. Used in
+  // session only, so nothing is submitted to Meta.
+  if (action === "create-sign-report") {
+    const existing = (await listAll()).find((c) => c.friendly_name === SIGN_REPORT_NAME);
+    let sid = existing?.sid ?? "";
+    if (!sid) {
+      const r = await call("/Content", { method: "POST", body: JSON.stringify(signReportContent()) });
+      if (!r.ok) return json({ error: "Twilio refused the template.", twilio: r }, 502);
+      sid = String((r.body as { sid?: string })?.sid ?? "");
+    }
+    if (!/^HX[0-9a-f]{32}$/i.test(sid)) return json({ error: "No ContentSid came back." }, 502);
+    const { error } = await admin.from("app_settings").upsert(
+      { key: "twilio_content_sid_sign_report", value: JSON.stringify(sid) },
+      { onConflict: "key" },
+    );
+    if (error) return json({ error: `Template ${sid} exists but app_settings would not take it: ${error.message}` }, 500);
+    return json({ ok: true, sid, reused: Boolean(existing) });
   }
 
   return json({ error: "Unknown action." }, 400);

@@ -6,6 +6,34 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-28 · The worker signs with a button, first, and no Yaadly person's name is ever on the report
+
+Monique, the same evening, while this was being deployed: "the worker always
+needs to sign off first", "it has to be a button the work presses", "through
+whatsapp or the portal", and "it shund never be my name".
+
+**A button, two doors, one core** (`20260928220000`). The portal form's typed
+name is gone: one Sign the report button, the name taken from the worker's
+Yaadly profile. On WhatsApp the worker's message is followed by a Sign the
+report quick-reply button (`yaadly_sign_completion_report_v1`, created by
+`yaad-twilio-setup` action `create-sign-report`, used in session so no Meta
+approval). Its payload is the job's own code, so a tap reaches `yaad-inbound`
+the way the client's Approve button does, and signs through
+`sign_completion_report_via_whatsapp()`, with the phone on the worker's profile
+as the credential. A WhatsApp tap signs the words as they stand; changing them
+is the portal's job. Both doors share `_do_sign_completion_report()`, and the
+trail records which one was used. Nothing moves towards a client without that
+signature: the screen reads only a signed report, and release reads only a
+held one, which exists only after a signature.
+
+**Never her name.** The report, the worker's messages and the review trail say
+"Yaadly" for anything done from the desk. The name typed on the desk is kept
+in the database as the internal record of who acted and is never printed to a
+client or a worker. The worker's and the owner's own steps keep their own
+names, because those are theirs.
+
+---
+
 ## 2026-09-28 · The Completion Report is the worker's document, and Yaadly steps in only when it goes wrong
 
 Supersedes the order in the entry below, the same afternoon. Monique, on

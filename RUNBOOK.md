@@ -6155,6 +6155,18 @@ your reason. They get a new link automatically; the old one stops working.
 **Amber, "signed, checking" for more than a few minutes.** The check did not
 come back. **Screen it again**.
 
+**How the worker signs.** A button, on WhatsApp (Sign the report, under the
+message with the link) or in the portal (Sign the report, at the top of the
+report). WhatsApp signs the words as they stand; to change them they use the
+portal. Typing the job code on WhatsApp does the same as the button. If the
+button never appears, the template is not recorded: run `yaad-twilio-setup`
+with action `create-sign-report` (admin token or cron secret), which writes
+`app_settings.twilio_content_sid_sign_report`. Outside 24 hours of their last
+message WhatsApp drops the button; the link still works.
+
+**Nothing on the report or in the worker's messages carries a staff name.**
+The desk asks for your name for Yaadly's own record; it prints as "Yaadly".
+
 **Amber, "with the worker" and they say they never got it.** WhatsApp refuses
 outside 24 hours of their last message and falls back to the worker template,
 which carries the signing link. If that failed too, **Send the worker the link
@@ -6165,16 +6177,22 @@ worker hears first and you are alerted. If the report must change, **Send it
 back to the worker**; the client stops seeing it until the worker signs again
 and it passes the check.
 
-**Deploying.** `yaad-completion-flow` WITH `--no-verify-jwt` (its door is the
-trigger secret or an admin token). `yaad-notify-client` WITH `--no-verify-jwt`,
-as it already runs. Both from disk, after `supabase/functions/sync-shared.sh`.
+**Deploying.** `yaad-completion-flow`, `yaad-notify-client` and `yaad-inbound`
+WITH `--no-verify-jwt`, as each runs; `yaad-twilio-setup` WITHOUT it. All from
+disk, after `supabase/functions/sync-shared.sh`.
 
 **Checking the rules still hold:** `supabase/tests/completion_report_guards.sql`,
-22 checks. Run it inside `begin; ... rollback;` with
+23 checks. Run it inside `begin; ... rollback;` with
 `supabase db query --linked --project-ref leffyisvfvjwzilydlwf -f <file>`. It
 switches the user triggers on jobs, completion_reports and disputes off for
 its own run, so nothing is messaged, which is why it must be inside a
 transaction.
+
+## 34. Finding what a worker is owed, and Yaadly's 5% (28 Sep 2026)
+
+1. **Invoices, Worker pay.** Every worker's pay invoice, grouped under its job, with what is owed and what is paid on that job. Jobs with money owed come first. The summary at the top counts real jobs only; your own tests are listed underneath and counted in none of the figures. **Pay the worker** on a row opens Pay workers on that invoice, with the way the worker asked to be paid.
+2. **Invoices, Worker fees.** Yaadly's 5% from each tradesperson, job by job. It is kept out of their pay, so it is never an invoice of its own. The figure is worked out from the accepted quote at today's rate, not read from an invoice. **Agency fees** now holds only the client side: the 15% and services.
+
 ## 35. The blank report templates: changing one, or the desk cannot load them (28 Sep 2026)
 
 1. Change the wording in `scripts/report-templates/services/<service>.js`. Never edit the PDF or Word file itself; the next build overwrites it.
