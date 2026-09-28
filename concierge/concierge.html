@@ -1313,11 +1313,6 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
     <div id="skPackBody"></div>
   </div>
 
-  <div class="card hidden" id="skPreviewCard">
-    <div class="chd"><h3>What the client reads</h3><span class="sp"><button class="btn g" id="skPrint">Print or save as PDF</button></span></div>
-    <iframe id="skPreview" title="Pack preview"></iframe>
-  </div>
-
 </section>
 
 <!-- ============================================ MATERIALS TRANCHES -->
@@ -10956,7 +10951,7 @@ $("skPull").addEventListener("click", async () => {
     SK_FRAMES = [...SK_FRAMES, ...added];
     SK_SELECTED.clear(); $("skApplied").textContent = "";
     SK_PACK = null;
-    show("skFramesCard", true); show("skPackCard", false); show("skPreviewCard", false);
+    show("skFramesCard", true); show("skPackCard", false);
     $("skProgress").textContent = "";
     $("skAssemble").disabled = true;
     $("skVideo").value = "";
@@ -10973,7 +10968,7 @@ $("skClear").addEventListener("click", () => {
   if (SK_FRAMES.length && !confirm("Remove every still on the page and start again?")) return;
   SK_FRAMES = []; SK_DESCRIBED = []; SK_SELECTED.clear(); SK_PACK = null;
   $("skVideo").value = ""; $("skApplied").textContent = ""; $("skProgress").textContent = "";
-  show("skFramesCard", false); show("skPackCard", false); show("skPreviewCard", false);
+  show("skFramesCard", false); show("skPackCard", false);
   say("skMsg","ok","Cleared. Pick the files for the next report.");
 });
 
@@ -11266,7 +11261,7 @@ function skRenderPack(extra){
     ${(extra?.scrubbed || []).length ? `<div class="alert warn"><span class="ic">!</span><div><b>${extra.scrubbed.length} measurement phrase${extra.scrubbed.length > 1 ? "s" : ""} removed before this was saved</b><p>What the model tried to say: ${esc(extra.scrubbed.slice(0,3).join(" · "))}</p></div></div>` : ""}
     ${(extra?.gaps || []).length ? `<div class="qs"><h4>What this pack does not cover</h4><ul>${extra.gaps.map(g => "<li>" + esc(g) + "</li>").join("")}</ul></div>` : ""}
     <div class="brow" style="margin-top:16px">
-      <button class="btn g" id="skPreviewBtn">Preview</button>
+      <button class="btn g" id="skPdfBtn">Open as PDF</button>
       ${draft ? `<button class="btn" id="skApprove">Approve it</button>` : ""}
       ${p.status === "approved" ? `<button class="btn" id="skIssue">Issue to the client</button>` : ""}
       ${p.status === "approved" ? `<button class="btn g" id="skReopen">Reopen for edits</button>` : ""}
@@ -11380,15 +11375,9 @@ function skRenderPack(extra){
     }
   });
 
-  $("skPreviewBtn").addEventListener("click", async () => {
-    try {
-      const { html } = await skFn({ action:"render", pack_id: p.id, as:"json",
-        property_summary: extra?.pack?.property_summary || "", gaps: extra?.gaps || [] });
-      $("skPreview").srcdoc = html;
-      show("skPreviewCard", true);
-      $("skPreviewCard").scrollIntoView({ behavior:"smooth" });
-    } catch (e) { say("skPackMsg","err", e.message); }
-  });
+  $("skPdfBtn").addEventListener("click", () =>
+    skOpenDocument(p.id, { property_summary: extra?.pack?.property_summary || "", gaps: extra?.gaps || [] })
+      .catch(e => say("skPackMsg","err", e.message)));
 
   // Attaching a job to a draft. The one repair for every pack made before the
   // capture form had a picker, all of which have job_id null. Written straight
@@ -11435,7 +11424,21 @@ async function skReload(id){
   await loadSketchPacks();
 }
 
-$("skPrint").addEventListener("click", () => $("skPreview").contentWindow.print());
+// The pack as the document a client is handed, in a tab of its own, laid out
+// for A4 with a Print button that the print hides. Same pattern as
+// openReportDocument: the tab is opened on the click itself, before anything
+// is awaited, because a browser blocks a tab opened after a network call.
+// It reads and changes nothing; the render action is a read.
+async function skOpenDocument(id, extra){
+  const w = window.open("", "_blank");
+  if (!w) throw new Error("The browser blocked the new tab. Allow pop-ups for the desk and try again.");
+  w.document.write("<p style='font:15px sans-serif;padding:24px'>Building the document.</p>");
+  try {
+    const { html } = await skFn({ action:"render", pack_id: id, as:"json",
+      property_summary: extra?.property_summary || "", gaps: extra?.gaps || [] });
+    w.document.open(); w.document.write(html); w.document.close();
+  } catch (e) { w.close(); throw e; }
+}
 
 let SK_LIST = [];
 
@@ -11473,7 +11476,7 @@ function renderSkList(){
       <div style="flex:1"><a href="#" data-skopen="${esc(p.id)}">${esc(p.id)}</a> ${chipFor(SK_CHIP, p.status)}
         ${orphan ? '<span class="chip mute">no job attached</span>' : ""}
         <div style="color:var(--dim);font-size:11.5px;margin-top:3px">${esc(p.property_label)}${p.client_name ? " &middot; " + esc(p.client_name) : ""}</div></div>
-      <div style="flex:none;white-space:nowrap;color:var(--dim);font-size:11.5px">${esc(String(p.created_at).slice(0,10))}</div>
+      <div style="flex:none;white-space:nowrap;color:var(--dim);font-size:11.5px"><a href="#" data-skpdf="${esc(p.id)}" title="Open ${esc(p.id)} as a document to print or save as PDF">PDF</a> &middot; ${esc(String(p.created_at).slice(0,10))}</div>
     </div>`; }).join("")
     || (q ? '<div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div>'
           : '<div class="empty"><b>No packs yet</b>Pull the stills from a walkthrough below.</div>');
@@ -11482,6 +11485,11 @@ function renderSkList(){
     e.preventDefault();
     await skReload(e.target.dataset.skopen);
     $("skPackCard").scrollIntoView({ behavior:"smooth" });
+  }));
+
+  $("skList").querySelectorAll("[data-skpdf]").forEach(a => a.addEventListener("click", (e) => {
+    e.preventDefault();
+    skOpenDocument(e.target.dataset.skpdf).catch(err => say("skListMsg","err", err.message));
   }));
 
   $("skList").querySelectorAll("[data-skpick]").forEach(c => c.addEventListener("change", (e) => {
