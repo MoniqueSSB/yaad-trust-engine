@@ -144,6 +144,8 @@ export function trailLabel(e: TrailEvent): string {
     case "issued": return e.detail && e.detail.worker_changed ? "Worker's changes read and accepted, report issued" : "Report issued";
     case "client_confirmed": return "Confirmed by the owner";
     case "client_flagged": return "Owner raised a dispute";
+    case "worker_edited": return "The worker changed their words";
+    case "worker_raised": return "The worker raised an issue";
     default: return e.step;
   }
 }

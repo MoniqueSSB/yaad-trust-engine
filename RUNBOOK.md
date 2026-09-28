@@ -6155,10 +6155,18 @@ your reason. They get a new link automatically; the old one stops working.
 **Amber, "signed, checking" for more than a few minutes.** The check did not
 come back. **Screen it again**.
 
-**How the worker signs.** A button, on WhatsApp (Sign the report, under the
-message with the link) or in the portal (Sign the report, at the top of the
-report). WhatsApp signs the words as they stand; to change them they use the
-portal. Typing the job code on WhatsApp does the same as the button. If the
+**Red, "worker raised an issue".** The worker pressed Raise an issue instead of
+signing; the row shows what they said. It is not signed, so it cannot be
+released. **Send it back to the worker** with your answer as the reason. If
+the worker cannot open the link, it may be locked after ten wrong tries:
+sending it back makes a new link and unlocks it.
+
+**How the worker signs, changes or raises.** Buttons. On WhatsApp: Sign the
+report, Change my words (their next message becomes their account, unsigned),
+Raise an issue (their next message is the issue). From the link
+`app.yaadly.co.uk/report/<job>?code=<code>`, no login: Sign, Save my changes,
+Raise an issue. The template is `yaadly_sign_completion_report_v2`, made by
+`yaad-twilio-setup` action `create-sign-report`. If the
 button never appears, the template is not recorded: run `yaad-twilio-setup`
 with action `create-sign-report` (admin token or cron secret), which writes
 `app_settings.twilio_content_sid_sign_report`. Outside 24 hours of their last
@@ -6182,7 +6190,7 @@ WITH `--no-verify-jwt`, as each runs; `yaad-twilio-setup` WITHOUT it. All from
 disk, after `supabase/functions/sync-shared.sh`.
 
 **Checking the rules still hold:** `supabase/tests/completion_report_guards.sql`,
-23 checks. Run it inside `begin; ... rollback;` with
+35 checks. Run it inside `begin; ... rollback;` with
 `supabase db query --linked --project-ref leffyisvfvjwzilydlwf -f <file>`. It
 switches the user triggers on jobs, completion_reports and disputes off for
 its own run, so nothing is messaged, which is why it must be inside a

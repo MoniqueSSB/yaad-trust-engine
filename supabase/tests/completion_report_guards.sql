@@ -19,6 +19,7 @@ declare
   v_old   text;
   v_out   text;
   cnt     int;
+  i       int;
 begin
   create temp table t(n int generated always as identity, name text, result text) on commit drop;
 
@@ -37,7 +38,8 @@ begin
 
   insert into public.jobs (id, title, parish, client_name, client_email, descr, status, worker_name, worker_email, stage, is_test)
   values ('TEST-CR-1','Shower wall, test fixture','St Catherine','Test Client','test-cr-client@example.invalid','fixture','complete','Test Worker','test-cr-worker@example.invalid',2,true),
-         ('TEST-CR-2','Unfinished, test fixture','St Catherine','Test Client','test-cr-client@example.invalid','fixture','evidence','Test Worker','test-cr-worker@example.invalid',1,true);
+         ('TEST-CR-2','Unfinished, test fixture','St Catherine','Test Client','test-cr-client@example.invalid','fixture','evidence','Test Worker','test-cr-worker@example.invalid',1,true),
+         ('TEST-CR-3','Change or raise, test fixture','St Catherine','Test Client','test-cr-client@example.invalid','fixture','complete','Test Worker','test-cr-worker@example.invalid',2,true);
 
   insert into t(name,result) values ('1. no signed-in person can start or screen a report',
     case when not has_function_privilege('authenticated','public._start_completion_report(text,text[],text)','execute')
@@ -164,6 +166,66 @@ begin
   select count(*) into cnt from public.completion_report_events where job_id='TEST-CR-1';
   -- drafted, sent_to_worker, signed, held, returned, signed, released, client_flagged
   insert into t(name,result) values ('22. every step is on the trail', case when cnt = 8 then 'PASS' else 'FAIL, '||cnt||' events' end);
+
+  -- ── change the words, or raise an issue (20260928233000) ──
+  perform set_config('request.jwt.claims', '{}', true);
+  perform public._start_completion_report('TEST-CR-3', array['Keep it dry'], 'test-model');
+  select sign_code into v_code from public.completion_reports where job_id='TEST-CR-3';
+
+  select count(*) into cnt from public.completion_reports r
+   where r.job_id='TEST-CR-3' and (public.completion_report_for_code('TEST-CR-3','ZZZZZZ')->>'error') is not null and r.job_id is not null;
+  select code_failures into cnt from public.completion_reports where job_id='TEST-CR-3';
+  insert into t(name,result) values ('23. a wrong link code is refused and counted', case when cnt = 1 then 'PASS' else 'FAIL, '||cnt end);
+
+  for i in 1..9 loop perform public.completion_report_for_code('TEST-CR-3','ZZZZZZ'); end loop;
+  insert into t(name,result) values ('24. ten wrong codes lock the link, even for the right code',
+    case when (public.completion_report_for_code('TEST-CR-3', v_code)->>'error') like '%locked%' then 'PASS' else 'FAIL, not locked' end);
+  update public.completion_reports set code_failures = 0 where job_id='TEST-CR-3';
+
+  insert into t(name,result) values ('25. the right code opens the report without a login',
+    case when (public.completion_report_for_code('TEST-CR-3', v_code)->'report'->>'status') = 'with_worker' then 'PASS' else 'FAIL' end);
+
+  perform public.edit_completion_report_by_code('TEST-CR-3', v_code, array['Keep it dry','Check the seal'], 'Fitted the seal.');
+  select count(*) into cnt from public.completion_reports
+   where job_id='TEST-CR-3' and status='with_worker' and worker_account='Fitted the seal.' and array_length(care_notes,1)=2 and worker_signed_at is null;
+  insert into t(name,result) values ('26. the link changes the words and leaves it unsigned', case when cnt = 1 then 'PASS' else 'FAIL' end);
+
+  begin
+    perform public.edit_completion_account_via_whatsapp('TEST-CR-3', '+447700900999', 'Somebody else');
+    insert into t(name,result) values ('27. Change my words from another number is refused','FAIL, it changed');
+  exception when others then
+    insert into t(name,result) values ('27. Change my words from another number is refused', case when SQLERRM like '%from this number%' then 'PASS' else 'FAIL, '||SQLERRM end);
+  end;
+  perform public.edit_completion_account_via_whatsapp('TEST-CR-3', '+18765700900777', 'Fitted the seal and tested it.');
+  select count(*) into cnt from public.completion_reports where job_id='TEST-CR-3' and worker_account='Fitted the seal and tested it.' and status='with_worker';
+  insert into t(name,result) values ('28. Change my words from the worker''s phone', case when cnt = 1 then 'PASS' else 'FAIL' end);
+
+  perform public.raise_completion_issue_via_whatsapp('TEST-CR-3', '+18765700900777', 'The client asked for extra work that is not on here.');
+  select count(*) into cnt from public.completion_reports where job_id='TEST-CR-3' and status='worker_raised' and worker_issue like 'The client asked%';
+  insert into t(name,result) values ('29. Raise an issue stops the report', case when cnt = 1 then 'PASS' else 'FAIL' end);
+
+  perform set_config('request.jwt.claims', json_build_object('email','test-cr-client@example.invalid','role','authenticated')::text, true);
+  insert into t(name,result) values ('30. the client cannot see a report the worker raised an issue on',
+    case when not public._completion_report_visible('TEST-CR-3') then 'PASS' else 'FAIL, visible' end);
+
+  perform set_config('request.jwt.claims', json_build_object('email', v_admin, 'role', 'authenticated')::text, true);
+  begin
+    perform public.release_completion_report('TEST-CR-3', 'Test Admin');
+    insert into t(name,result) values ('31. an unsigned report can never be released','FAIL, released');
+  exception when others then
+    insert into t(name,result) values ('31. an unsigned report can never be released', case when SQLERRM like '%worker has signed%' then 'PASS' else 'FAIL, '||SQLERRM end);
+  end;
+  v_old := v_code;
+  select public.return_completion_report('TEST-CR-3', 'The extra work is a separate job; leave it off this report.', 'Test Admin') into v_code;
+  select count(*) into cnt from public.completion_reports where job_id='TEST-CR-3' and status='with_worker' and rev=2 and code_failures=0;
+  insert into t(name,result) values ('32. Yaadly answers the issue by sending it back', case when cnt = 1 and v_code <> v_old then 'PASS' else 'FAIL' end);
+
+  perform set_config('request.jwt.claims', '{}', true);
+  insert into t(name,result) values ('33. the old link no longer works after it is sent back',
+    case when (public.sign_completion_report_by_code('TEST-CR-3', v_old, array['x'], null)->>'error') is not null then 'PASS' else 'FAIL, it signed' end);
+  perform public.sign_completion_report_by_code('TEST-CR-3', v_code, array['Keep it dry'], 'Fitted the seal and tested it.');
+  select count(*) into cnt from public.completion_report_events where job_id='TEST-CR-3' and step='signed' and detail->>'via'='link';
+  insert into t(name,result) values ('34. the link signs without a login', case when cnt = 1 then 'PASS' else 'FAIL, '||cnt end);
 
   perform set_config('request.jwt.claims', '{}', true);
 
