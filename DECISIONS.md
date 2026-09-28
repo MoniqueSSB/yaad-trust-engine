@@ -6,6 +6,23 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-29 · On a job billed by stage, each stage is paid before it starts; the 15% is paid in full first
+
+Monique, 28 Sep 2026: "can't move on without each stage being paid by the client first", "if the client pays the full bill, fine", and "the 15 is always paid before a job starts, in full, never split through a job".
+
+A quote could already say `by_stage`, but nothing followed from it. That was "piece 3" of 14 Sep, never built. `20260929090000` builds it, for by-stage jobs only; a job billed in full is unchanged.
+
+- **The start bill:** `raise_job_client_invoice` drafts it instead of the whole-job bill. It is Yaadly's 15% on all the labour, never split, plus materials at cost. It carries the fee line, so paying it starts the job as before.
+- **Stage 1's bill:** stage 1's share of the labour, drafted at the same time.
+- **Each next bill:** drafted when the client approves the stage before it (trigger on `stage_approvals`). Every bill is only drafted; a named person sends it and marks it paid.
+- **The gate:** a stage cannot be worked until its bill is paid. `evidence_on_the_working_stage` refuses work evidence with "Stage N starts once its bill is paid". Materials evidence is let through, because materials were paid on the start bill.
+- **Each stage's share:** the one the worker's stage pay already uses, from the approved Kickoff Pack's schedule, else the quote pack's, `round(labour × percent / 100)`. So the client's stage bill and the worker's stage pay are cut from the same figure, and `worker_pay_client_unpaid` already waits for that stage's bill.
+- **No schedule:** a by-stage job with no approved schedule is refused rather than guessed.
+
+**Tested:** 19 checks in PGlite (`supabase/tests/pglite/stages_run.mjs`). No live job was billed by stage when this was written.
+
+---
+
 ## 2026-09-28 · Invoices show the job's main and additional work apart; pending add-ons are shown but not counted
 
 Monique: "the PDF invoice should also show the add-on breakdown", and "the extra work should feed into the money section because it is the price of the overall job".
