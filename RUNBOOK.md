@@ -6248,3 +6248,12 @@ transaction.
 4. **"This report has no result"** or **"no overall status"**: use Type the result, or Rate the month, on the report row. Nothing drafts either.
 5. **"Results, status and money on a report are typed at the desk"**: something tried to write `reports.human` directly. Only Type the result, Rate the month and Type the money write it, through `set_report_human()`.
 6. Check the rules with `supabase/tests/report_kind_guards.sql` (seven tests) after applying the migration.
+
+## 41. A worker wants to correct evidence they filed (28 Sep 2026)
+
+On their own item, on the stage still being worked, the worker presses **Correct this** under the photo in Progress evidence. They can change the words and which part of the job it shows. The photo, its fingerprint, its stage and whether it is a materials item cannot change, by anybody.
+
+1. **"Correcting evidence is not switched on yet"**: migration `20260929040000_a_worker_can_correct_their_own_evidence.sql` is not applied. Apply it in the SQL editor.
+2. **"This stage has been signed off"**: correct. Approved evidence is fixed as approved. The worker adds a new item, or you handle it from the desk.
+3. **"Only the worker who filed this can correct it"**: the item was filed by somebody else (the client, or you from the desk).
+4. **What was changed:** `select * from evidence_corrections where job_id = '<job>' order by at;` shows every correction with the wording and part before and after. The client sees "Corrected by the worker" on the card and the first wording in the stage record.
