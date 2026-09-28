@@ -1871,19 +1871,19 @@ const VIEWS = [
       { label:"Release it unchanged", cls:"",
         when:r => r.report_status === "held",
         rpc:"release_completion_report",
-        ask:[{ k:"name", label:"Your name, as it prints on the report", from:() => crName_() }],
+        ask:[{ k:"name", label:"Your name, for Yaadly's own record (never shown to the client or the worker)", from:() => crName_() }],
         args:(r, v) => { crRemember_(v.name); return { p_job:r.id, p_name:v.name }; },
-        says:r => `Held for: ${r.hold_reason || "not recorded"}. Read the report first (Open the report). Releasing sends it to the client exactly as ${r.worker_signed_name || "the worker"} signed it, with your name as the person who released it. If the words need to change, do not release: send it back instead.` },
+        says:r => `Held for: ${r.hold_reason || "not recorded"}. Read the report first (Open the report). Releasing sends it to the client exactly as ${r.worker_signed_name || "the worker"} signed it. The report says "Released by Yaadly"; your name is kept only in Yaadly's own record. If the words need to change, do not release: send it back instead.` },
       { label:"Send it back to the worker", cls:"",
         when:r => ["worker_signed","held","issued"].includes(r.report_status),
         rpc:"return_completion_report",
         ask:[
           { k:"reason", label:"What they need to change, in your words. They read this.", type:"long",
             from:r => r.report_status === "held" ? "Please take the " + (r.hold_reason && /money/.test(r.hold_reason) ? "figure" : "wording") + " out of the report and sign it again: " + (r.hold_reason || "") : "" },
-          { k:"name", label:"Your name", from:() => crName_() },
+          { k:"name", label:"Your name, for Yaadly's own record (never shown to the worker)", from:() => crName_() },
         ],
         args:(r, v) => { crRemember_(v.name); return { p_job:r.id, p_reason:v.reason, p_name:v.name }; },
-        says:r => `The report goes back to ${r.worker_name || "the worker"} with your reason, as a new revision with a new link, sent to them automatically. Their signature is cleared${r.report_status === "issued" ? " and the client stops seeing the report until they sign again" : ""}. You do not change a word: they do.` },
+        says:r => `The report goes back to ${r.worker_name || "the worker"} with your reason, from Yaadly, as a new revision with a new link, sent to them automatically. Their signature is cleared${r.report_status === "issued" ? " and the client stops seeing the report until they sign again" : ""}. You do not change a word: they do.` },
       { label:"Screen it again", cls:"g",
         when:r => r.report_status === "worker_signed",
         says:() => "The worker signed but the automatic check has not run, or its answer was lost. This runs it again: clean goes to the client, anything found holds it for you.",
@@ -10572,7 +10572,7 @@ const FLOW_FN = SUPABASE_URL + "/functions/v1/yaad-completion-flow";
 function crState_(r){
   const s = r.report_status;
   if (s === "not_started") return chip_("crit", "did not start") + sub_("start it now");
-  if (s === "with_worker") return chip_("warn", "with the worker") + sub_(r.return_reason ? "sent back by " + (r.returned_name || "you") : "to read and sign");
+  if (s === "with_worker") return chip_("warn", "with the worker") + sub_(r.return_reason ? "sent back" : "to read and sign");
   if (s === "worker_signed") return chip_("warn", "signed, checking") + sub_("goes out in a moment");
   if (s === "held") return chip_("crit", "held for you") + sub_(r.hold_reason || "");
   if (s === "issued") return chip_("ok", "with the client") + sub_(r.issued_name ? "released by " + r.issued_name : "passed the check");
@@ -10586,7 +10586,7 @@ function crFirst_(name, fallback){ return String(name || "").trim().split(/\s+/)
 
 function crWorkerMsg_(r){
   const link = CR_APP + "/portal/jobs/" + encodeURIComponent(r.id) + "/completion?code=" + encodeURIComponent(r.sign_code || "");
-  return `Hello ${crFirst_(r.worker_name, "there")}, this is Monique at Yaadly. The Completion Report for job ${r.id} is ready for you to read and sign: ${link}\n\nIt is your document. Change the care notes or add your own account of the work if anything is wrong, then sign it.`;
+  return `Hello ${crFirst_(r.worker_name, "there")}, this is Yaadly. The Completion Report for job ${r.id} is ready for you to read and sign: ${link}\n\nIt is your document. Change the care notes or add your own account of the work if anything is wrong, then sign it.`;
 }
 
 async function crSend_(jobId, to, how, text){

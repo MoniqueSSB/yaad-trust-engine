@@ -6155,6 +6155,18 @@ your reason. They get a new link automatically; the old one stops working.
 **Amber, "signed, checking" for more than a few minutes.** The check did not
 come back. **Screen it again**.
 
+**How the worker signs.** A button, on WhatsApp (Sign the report, under the
+message with the link) or in the portal (Sign the report, at the top of the
+report). WhatsApp signs the words as they stand; to change them they use the
+portal. Typing the job code on WhatsApp does the same as the button. If the
+button never appears, the template is not recorded: run `yaad-twilio-setup`
+with action `create-sign-report` (admin token or cron secret), which writes
+`app_settings.twilio_content_sid_sign_report`. Outside 24 hours of their last
+message WhatsApp drops the button; the link still works.
+
+**Nothing on the report or in the worker's messages carries a staff name.**
+The desk asks for your name for Yaadly's own record; it prints as "Yaadly".
+
 **Amber, "with the worker" and they say they never got it.** WhatsApp refuses
 outside 24 hours of their last message and falls back to the worker template,
 which carries the signing link. If that failed too, **Send the worker the link
@@ -6165,12 +6177,12 @@ worker hears first and you are alerted. If the report must change, **Send it
 back to the worker**; the client stops seeing it until the worker signs again
 and it passes the check.
 
-**Deploying.** `yaad-completion-flow` WITH `--no-verify-jwt` (its door is the
-trigger secret or an admin token). `yaad-notify-client` WITH `--no-verify-jwt`,
-as it already runs. Both from disk, after `supabase/functions/sync-shared.sh`.
+**Deploying.** `yaad-completion-flow`, `yaad-notify-client` and `yaad-inbound`
+WITH `--no-verify-jwt`, as each runs; `yaad-twilio-setup` WITHOUT it. All from
+disk, after `supabase/functions/sync-shared.sh`.
 
 **Checking the rules still hold:** `supabase/tests/completion_report_guards.sql`,
-22 checks. Run it inside `begin; ... rollback;` with
+23 checks. Run it inside `begin; ... rollback;` with
 `supabase db query --linked --project-ref leffyisvfvjwzilydlwf -f <file>`. It
 switches the user triggers on jobs, completion_reports and disputes off for
 its own run, so nothing is messaged, which is why it must be inside a

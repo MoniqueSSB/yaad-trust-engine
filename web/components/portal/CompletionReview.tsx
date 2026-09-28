@@ -12,9 +12,13 @@ import {
  *
  * The worker's form is the one worker web page in the product beyond sign-up
  * and file upload. That is a deliberate exception to CLAUDE.md section 9,
- * chosen by the founder on 28 Sep 2026 over a WhatsApp reply. It edits words
- * only: the care notes and the worker's own account of the work. Everything
- * else on the report is read from the record and is not in this form.
+ * chosen by the founder on 28 Sep 2026. It edits words only: the care notes
+ * and the worker's own account of the work. Everything else on the report is
+ * read from the record and is not in this form.
+ *
+ * Signing is one button (founder: "it has to be a button the work presses").
+ * No typed name: the signature is the name on their Yaadly profile. The same
+ * button is on WhatsApp, where a tap signs the words as they stand.
  */
 
 const box = "rounded-2xl border border-line bg-bg p-4 print:hidden";
@@ -59,10 +63,6 @@ export function WorkerSign({
         I carried out the work described in this report. The account of what was done is accurate, and the
         photographs and video were taken by me on this property on the dates shown.
       </div>
-      <label className="mt-3 block text-[12px] font-bold text-dim">
-        Type your full name to sign
-        <input name="name" required autoComplete="name" defaultValue="" placeholder={workerName || "First and last name"} className={input} />
-      </label>
       {!code && (
         <p className="mt-2 text-[12px] text-coral">
           This page was opened without its code. Open the link from your WhatsApp message to sign.
@@ -72,6 +72,10 @@ export function WorkerSign({
       <button type="submit" disabled={pending || !code} className={btn + " mt-3 bg-teal text-white hover:bg-tealb"}>
         {pending ? "Signing" : "Sign the report"}
       </button>
+      <p className="mt-2 text-[11.5px] text-dim">
+        You sign as {workerName || "the name on your Yaadly profile"}. The Sign button on WhatsApp does the same,
+        with the words as they stand.
+      </p>
     </form>
   );
 }

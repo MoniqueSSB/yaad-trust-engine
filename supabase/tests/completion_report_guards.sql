@@ -3,7 +3,7 @@
 --   begin; <this file>; rollback;
 -- It switches the user triggers on jobs, completion_reports and disputes off
 -- for its own run, so nothing is messaged, and switches them back on.
--- Creates TEST-CR- rows and removes them again.
+-- Creates TEST-CR- rows (and a test-cr- worker profile) and removes them again.
 --
 -- WHAT IS BEING PROVED (20260928200000, 20260928210000). The report starts on
 -- its own and goes to the worker. Only the worker writes and signs the words.
@@ -30,6 +30,10 @@ begin
   delete from public.completion_report_events where job_id like 'TEST-CR-%';
   delete from public.completion_reports where job_id like 'TEST-CR-%';
   delete from public.jobs where id like 'TEST-CR-%';
+  delete from public.worker_profiles where worker_email like 'test-cr-%';
+
+  insert into public.worker_profiles (worker_email, name, phone, active)
+  values ('test-cr-worker@example.invalid', 'Test Worker', '+18765700900777', true);
 
   insert into public.jobs (id, title, parish, client_name, client_email, descr, status, worker_name, worker_email, stage, is_test)
   values ('TEST-CR-1','Shower wall, test fixture','St Catherine','Test Client','test-cr-client@example.invalid','fixture','complete','Test Worker','test-cr-worker@example.invalid',2,true),
@@ -62,7 +66,7 @@ begin
   insert into t(name,result) values ('6. the client cannot see it while it is with the worker',
     case when not public._completion_report_visible('TEST-CR-1') then 'PASS' else 'FAIL, visible' end);
   begin
-    perform public.sign_completion_report('TEST-CR-1', v_code, 'Test Client', array['x'], null);
+    perform public.sign_completion_report('TEST-CR-1', v_code, array['x'], null);
     insert into t(name,result) values ('7. only the worker can sign','FAIL, it signed');
   exception when others then
     insert into t(name,result) values ('7. only the worker can sign', case when SQLERRM like '%Only the worker%' then 'PASS' else 'FAIL, '||SQLERRM end);
@@ -70,21 +74,24 @@ begin
 
   perform set_config('request.jwt.claims', json_build_object('email','test-cr-worker@example.invalid','role','authenticated')::text, true);
   begin
-    perform public.sign_completion_report('TEST-CR-1', 'ZZZZZZ', 'Test Worker', array['x'], null);
+    perform public.sign_completion_report('TEST-CR-1', 'ZZZZZZ', array['x'], null);
     insert into t(name,result) values ('8. a wrong code cannot sign','FAIL, it signed');
   exception when others then
-    insert into t(name,result) values ('8. a wrong code cannot sign', case when SQLERRM like '%does not match%' then 'PASS' else 'FAIL, '||SQLERRM end);
+    insert into t(name,result) values ('8. a wrong code cannot sign', case when SQLERRM like '%out of date%' then 'PASS' else 'FAIL, '||SQLERRM end);
   end;
+  perform set_config('request.jwt.claims', '{}', true);
   begin
-    perform public.sign_completion_report('TEST-CR-1', v_code, 'TW', array['x'], null);
-    insert into t(name,result) values ('9. a signature needs a full name','FAIL, it signed');
+    perform public.sign_completion_report_via_whatsapp('TEST-CR-1', '+447700900999');
+    insert into t(name,result) values ('9. the WhatsApp button from another number cannot sign','FAIL, it signed');
   exception when others then
-    insert into t(name,result) values ('9. a signature needs a full name', case when SQLERRM like '%full name%' then 'PASS' else 'FAIL, '||SQLERRM end);
+    insert into t(name,result) values ('9. the WhatsApp button from another number cannot sign', case when SQLERRM like '%from this number%' then 'PASS' else 'FAIL, '||SQLERRM end);
   end;
-  perform public.sign_completion_report('TEST-CR-1', v_code, 'Test Worker',
+  perform set_config('request.jwt.claims', json_build_object('email','test-cr-worker@example.invalid','role','authenticated')::text, true);
+  perform public.sign_completion_report('TEST-CR-1', v_code,
     array['Leave the shower unused for 72 hours'], 'Retiled the wall. Materials cost J$45,000.');
-  select count(*) into cnt from public.completion_reports where job_id='TEST-CR-1' and status='worker_signed' and worker_changed;
-  insert into t(name,result) values ('10. the worker changes their words and signs', case when cnt = 1 then 'PASS' else 'FAIL' end);
+  select count(*) into cnt from public.completion_reports
+   where job_id='TEST-CR-1' and status='worker_signed' and worker_changed and worker_signed_name='Test Worker';
+  insert into t(name,result) values ('10. the portal button signs, with the name on their profile', case when cnt = 1 then 'PASS' else 'FAIL' end);
 
   perform set_config('request.jwt.claims', '{}', true);
   select public._screen_completion_report('TEST-CR-1', 99, '[]'::jsonb) into v_out;
@@ -122,12 +129,17 @@ begin
 
   perform set_config('request.jwt.claims', json_build_object('email','test-cr-worker@example.invalid','role','authenticated')::text, true);
   begin
-    perform public.sign_completion_report('TEST-CR-1', v_old, 'Test Worker', array['x'], null);
+    perform public.sign_completion_report('TEST-CR-1', v_old, array['x'], null);
     insert into t(name,result) values ('17. the old link cannot sign the new revision','FAIL, it signed');
   exception when others then
-    insert into t(name,result) values ('17. the old link cannot sign the new revision', case when SQLERRM like '%does not match%' then 'PASS' else 'FAIL, '||SQLERRM end);
+    insert into t(name,result) values ('17. the old link cannot sign the new revision', case when SQLERRM like '%out of date%' then 'PASS' else 'FAIL, '||SQLERRM end);
   end;
-  perform public.sign_completion_report('TEST-CR-1', v_code, 'Test Worker', array['Leave the shower unused for 72 hours'], 'Retiled the wall and fitted the mixer.');
+  -- The worker corrects their words in the portal, then taps Sign on WhatsApp.
+  update public.completion_reports set worker_account = 'Retiled the wall and fitted the mixer.' where job_id = 'TEST-CR-1';
+  perform set_config('request.jwt.claims', '{}', true);
+  perform public.sign_completion_report_via_whatsapp('TEST-CR-1', '+18765700900777');
+  select count(*) into cnt from public.completion_report_events where job_id='TEST-CR-1' and step='signed' and detail->>'via'='whatsapp';
+  insert into t(name,result) values ('17b. the WhatsApp button signs from the worker''s own number', case when cnt = 1 then 'PASS' else 'FAIL, '||cnt end);
 
   perform set_config('request.jwt.claims', '{}', true);
   select public._screen_completion_report('TEST-CR-1', 2, '[]'::jsonb) into v_out;
@@ -163,6 +175,7 @@ begin
   delete from public.completion_report_events where job_id like 'TEST-CR-%';
   delete from public.completion_reports where job_id like 'TEST-CR-%';
   delete from public.jobs where id like 'TEST-CR-%';
+  delete from public.worker_profiles where worker_email like 'test-cr-%';
 
   alter table public.jobs enable trigger user;
   alter table public.completion_reports enable trigger user;

@@ -148,8 +148,16 @@ export function trailLabel(e: TrailEvent): string {
   }
 }
 
-/** Who, as printed. A draft is the agent's, never a person's. */
+/**
+ * Who, as printed. A draft is the agent's, never a person's. Anything done
+ * from the desk prints as Yaadly, never a staff member's name (founder, 28 Sep
+ * 2026: "it should never be my name"); the name is kept in the database as
+ * the internal record only. The worker's and the owner's own steps carry
+ * their own names, because those are theirs.
+ */
 export function trailWho(e: TrailEvent): string {
   if (e.step === "drafted") return "Drafting agent";
-  return e.actor_name || e.actor_email || "";
+  if (e.step === "held" || (e.step === "released" && e.actor_name === "Automatic screen")) return "Automatic screen";
+  if (["accepted", "edited", "released", "returned", "issued", "sent_to_worker"].includes(e.step)) return "Yaadly";
+  return e.actor_name || "";
 }

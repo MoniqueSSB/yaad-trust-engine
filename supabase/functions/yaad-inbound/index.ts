@@ -3480,6 +3480,38 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // A worker signing their Completion Report, 28 Sep 2026
+      // (20260928220000). Founder: "it has to be a button the work presses,
+      // through whatsapp or the portal". The Sign button's payload is the job's
+      // own code, so a tap arrives here as that code, exactly like the client's
+      // Approve button; typing the code does the same. The phone on the
+      // worker's profile is the credential, checked again inside
+      // sign_completion_report_via_whatsapp(). It signs the words as they
+      // stand: changing them is the portal's job. Only matches a job whose
+      // report is waiting on THIS worker, so it cannot catch any other reply.
+      if (!msg.media.length && msg.text.trim()) {
+        const { data: waiting } = await supabase.from("completion_reports")
+          .select("job_id").eq("status", "with_worker");
+        const ids = ((waiting ?? []) as { job_id: string }[]).map((r) => r.job_id);
+        if (ids.length) {
+          const { data: jobsWaiting } = await supabase.from("jobs")
+            .select("id, title, stage, worker_email").in("id", ids);
+          const emails = [...new Set(((jobsWaiting ?? []) as any[]).map((j) => String(j.worker_email ?? "").toLowerCase()).filter(Boolean))];
+          const { data: profs } = emails.length
+            ? await supabase.from("worker_profiles").select("worker_email, phone").in("worker_email", emails)
+            : { data: [] };
+          const mineEmails = new Set(((profs ?? []) as any[]).filter((w) => samePhone(w.phone, msg.from)).map((w) => String(w.worker_email).toLowerCase()));
+          const mineToSign = ((jobsWaiting ?? []) as any[]).filter((j) => mineEmails.has(String(j.worker_email ?? "").toLowerCase()));
+          const signTarget = matchApprovingJob(msg.text, mineToSign);
+          if (signTarget) {
+            const { error } = await supabase.rpc("sign_completion_report_via_whatsapp", { p_job: signTarget.id, p_phone: msg.from });
+            root.setAttributes({ "yaadly.whatsapp_report_sign.job": signTarget.id, "yaadly.whatsapp_report_sign.outcome": error ? "refused" : "signed" });
+            if (error) return twiml(`That did not go through: ${error.message}`);
+            return twiml(`Signed. Your Completion Report for ${signTarget.title} goes to the owner in a moment. Thank you for the work.`);
+          }
+        }
+      }
+
       // Stage 6: confirming a Kickoff Pack by replying with the job's own
       // code. Founder's own correction, 1 Sep 2026, live: a worker's whole
       // surface is WhatsApp by design (CLAUDE.md §9 - "the worker web

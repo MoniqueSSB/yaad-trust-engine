@@ -92,6 +92,13 @@ describe("the rest", () => {
     assert.equal(c.trailWho({ step: "drafted", actor_name: "Somebody", actor_email: "x@y", at: "", detail: {} }), "Drafting agent");
   });
 
+  test("a Yaadly person's name is never printed", () => {
+    for (const step of ["released", "returned", "issued", "accepted"]) {
+      assert.equal(c.trailWho({ step, actor_name: "Monique Sewell-Bennett", actor_email: "m@yaadly.co.uk", at: "", detail: {} }), "Yaadly");
+    }
+    assert.equal(c.trailWho({ step: "signed", actor_name: "Devon Clarke", actor_email: null, at: "", detail: {} }), "Devon Clarke");
+  });
+
   test("a signature with changes says so", () => {
     assert.match(c.trailLabel({ step: "signed", actor_name: "A B", actor_email: null, at: "", detail: { changed: true } }), /with changes/);
   });
