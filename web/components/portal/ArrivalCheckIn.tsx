@@ -75,10 +75,16 @@ export function ArrivalCheckIn({
                   fd.set("accuracy", String(loc.accuracy));
                 }
                 try {
-                  await logArrival(fd);
-                } catch (e) {
+                  const r = await logArrival(fd);
+                  if (!r.ok) {
+                    setState("error");
+                    setMsg(r.message);
+                  } else {
+                    setState("idle");
+                  }
+                } catch {
                   setState("error");
-                  setMsg(e instanceof Error ? e.message : "That did not go through.");
+                  setMsg("That did not go through. Check your connection, reload the page and press it once more.");
                 }
               }}
               className="mt-2.5"
