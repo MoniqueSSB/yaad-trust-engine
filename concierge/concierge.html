@@ -10510,7 +10510,7 @@ async function preReports(rows){
   const [{ data: reps }, { data: fs }, { data: eds }] = await Promise.all([
     sb.from("reports").select("id,verdict,verdict_line,sections,omitted,questions,scrubbed,source_text,model,provider,issued_by,issued_at").in("id", ids),
     sb.from("report_findings").select("report_id,ord,heading,body,why,action,severity,rated_by,rated_at").in("report_id", ids).order("ord"),
-    // Hand corrections (20260928160000). A desk older than the migration
+    // Hand corrections (20260928190000). A desk older than the migration
     // simply gets an error here and shows no log, rather than no page.
     sb.from("report_edits").select("report_id,target,before,after,edited_by,edited_at").in("report_id", ids).order("edited_at"),
   ]);
