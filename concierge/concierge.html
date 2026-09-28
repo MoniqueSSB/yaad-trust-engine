@@ -6302,20 +6302,31 @@ async function loadReportTemplates(){
     if (!r.ok) throw new Error("templates/index.json answered " + r.status);
     const list = await r.json();
     box.classList.remove("mute");
-    box.innerHTML = `<table class="tbl"><tbody>${list.map(t => `<tr>
-      <td><b>${esc(t.service)}</b>${sub_(t.title + ", " + t.pages + " pages")}</td>
-      <td><div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center">
-        <a class="btn" href="templates/${esc(t.slug)}.pdf" target="_blank" rel="noopener">PDF</a>
-        <a class="btn" href="templates/${esc(t.slug)}.docx" download>Word</a>
+    box.innerHTML = `<div class="fgroup" style="max-width:560px">
+      <label class="fl" for="rptTplPick">Which template</label>
+      <select id="rptTplPick" class="inp">${list.map((t, i) => `<option value="${i}">${esc(t.service)}</option>`).join("")}</select>
+      <p class="mute" id="rptTplWhat" style="margin:8px 0 10px"></p>
+      <div id="rptTplBtns" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"></div>
+    </div>`;
+    const pick = $("rptTplPick");
+    const show = () => {
+      const t = list[Number(pick.value)] || list[0];
+      $("rptTplWhat").textContent = t.title + ", " + t.pages + " pages" + (t.kind ? "" : ". Used by hand, separate from the agent.");
+      $("rptTplBtns").innerHTML = `
+        <a class="btn" href="templates/${esc(t.slug)}.pdf" target="_blank" rel="noopener">Open the PDF</a>
+        <a class="btn" href="templates/${esc(t.slug)}.docx" download>Download Word</a>
         ${t.kind && RPT_DRAFTABLE.has(t.kind)
-          ? `<button class="btn g" data-rpt-use="${esc(t.kind)}">Draft with the agent</button>`
-          : `<span class="mute">${t.kind ? "Agent drafting to come" : "By hand only"}</span>`}
-      </div></td></tr>`).join("")}</tbody></table>`;
-    box.querySelectorAll("[data-rpt-use]").forEach(b => b.addEventListener("click", () => {
-      const sel = $("rptKind"); if (sel) sel.value = b.dataset.rptUse;
-      const d = $("rptDrafter"); if (d) d.scrollIntoView({ behavior: "smooth", block: "start" });
-      const c = $("rptClient"); if (c) setTimeout(() => c.focus(), 400);
-    }));
+          ? `<button class="btn g" id="rptTplUse">Draft with the agent</button>`
+          : `<span class="mute">${t.kind ? "Agent drafting to come" : ""}</span>`}`;
+      const use = $("rptTplUse");
+      if (use) use.addEventListener("click", () => {
+        const sel = $("rptKind"); if (sel) sel.value = t.kind;
+        const d = $("rptDrafter"); if (d) d.scrollIntoView({ behavior: "smooth", block: "start" });
+        const c = $("rptClient"); if (c) setTimeout(() => c.focus(), 400);
+      });
+    };
+    pick.addEventListener("change", show);
+    show();
   } catch (e) {
     box.innerHTML = '<span style="color:var(--coral)">Could not load the templates: ' + esc(String(e.message || e)) + ". They are built by scripts/report-templates and deployed with the desk.</span>";
   }
