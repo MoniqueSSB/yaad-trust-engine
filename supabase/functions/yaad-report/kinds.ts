@@ -12,7 +12,7 @@
 //   * The Visual Check and Property Care are records. The agent writes no
 //     "why" and, on the Visual Check, no "action" either: services.html says
 //     "They record. They do not rate or advise." A rating on either is refused
-//     by the database (20260928230000).
+//     by the database (20260928235000).
 //   * A result (released, complete) and a status (on track, at risk) are
 //     judgements. They are typed at the desk into reports.human, never here.
 //   * Money appears in no brief. On the oversight report and the stage record

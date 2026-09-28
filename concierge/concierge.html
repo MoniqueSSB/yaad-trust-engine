@@ -1829,7 +1829,7 @@ const VIEWS = [
         args:(r, v) => ({ p_report:r.id, p_ord:Number(v.ord), p_severity:v.severity }),
         says:r => `Rates one of the ${r.findings} findings on this report in your name, stamped with your email and the time. Nothing drafts this and nothing ever will: it is the professional judgment the client paid for.` },
       // The three decisions a model never drafts, typed into reports.human by
-      // set_report_human() (20260928230000): a result, the month's status,
+      // set_report_human() (20260928235000): a result, the month's status,
       // and money. Only on the services that carry each.
       { label:"Type the result", cls:"",
         when:r => r.status !== "issued" && (r.kind === "technical_signoff" || r.kind === "pm_stage"),
@@ -6334,6 +6334,78 @@ function renderTableView(k){
 // template whose kind the drafter takes gets a button that sets the drafter
 // up for it; the rest are for use by hand.
 const RPT_DRAFTABLE = new Set(["deposit_check", "condition", "technical_signoff", "visual_check", "property_care", "oversight", "pm_stage"]);
+// What has to be in hand to fill each template in properly, shown highlighted
+// the moment a template is picked. Founder instruction, 28 Sep 2026: "it
+// should showcase exactly what is needed to fill out the template adequately".
+// need: before you start, marked Required where the report cannot be done
+// without it. yours: what only a person types afterwards, never drafted.
+const RPT_NEEDS = {
+  "deposit-protection-check": {
+    need: [["The builder's written quote, a photograph or a PDF", 1], ["The WhatsApp messages between the client and the builder", 1],
+      ["The builder's full name and business name, TRN, address, and a number other than WhatsApp", 1],
+      ["What has already been paid, to whom, and any receipts", 1], ["When the builder wants the next payment", 0],
+      ["What the client has been told about dates, materials and insurance", 0], ["Your own search for the builder: Facebook, Google, a registered business", 0]],
+    yours: ["A rating on every red flag", "The verdict for page one"],
+  },
+  "visual-check": {
+    need: [["The checklist agreed with the client, before the visit", 1], ["The items the client named, to capture first", 1],
+      ["A checker booked, with their name and role", 1], ["Access arranged: keys, a key holder, or somebody to let them in", 1],
+      ["A phone with its date and time set right, checked on arrival", 1], ["Every photograph numbered in the order taken, with the time", 1],
+      ["What could not be reached, and why", 0]],
+    yours: ["The summary of the visit. Nothing is rated: the checker records and does not advise"],
+  },
+  "condition-report": {
+    need: [["The person attending, by name and capacity", 1], ["Access to every room, the yard and the roof line", 1],
+      ["A photograph of each of the eight parts: roof, structure, water, electrics, drainage, termites, security, outside", 1],
+      ["A short walk round video", 0], ["What the property is: type, storeys, water supply, waste, power", 1],
+      ["Weather on the day and in the days before", 0], ["A torch, and a moisture meter if you have one", 0],
+      ["What could not be seen or reached, and why", 1], ["No tape measure: size is described in words", 0]],
+    yours: ["A rating on every finding: severe, moderate or low", "The verdict for page one"],
+  },
+  "technical-sign-off": {
+    need: [["A qualified trade inspector for that trade, named, with their qualification and where to check it", 1],
+      ["Their confirmation that they did not do the work and have no link to whoever did", 1],
+      ["The agreed scope, drawings or manufacturer's instructions for the stage, before the visit", 1],
+      ["The pass mark for each check, written down before the visit, in words", 1], ["Who carried out the work", 1],
+      ["Photographs against each check", 1], ["Notice given to the trade, so the stage is not covered up first", 0]],
+    yours: ["The result: released, released with conditions, or not released", "A rating on every put right item", "The explanation for page one"],
+  },
+  "property-care": {
+    need: [["The plan and the home size: monthly, fortnightly or weekly; standard, large or villa", 1], ["The visitor, by name", 1],
+      ["Keys and the alarm code", 1], ["The last visit's record, so what changed can be marked", 1],
+      ["Where the meters and the water tank are", 0], ["If somebody lives there: their emergency contact and doctor on file", 1],
+      ["Photographs of every room from the doorway, from the same spot each visit", 1]],
+    yours: ["The summary of the visit for the owner. Nothing is rated"],
+  },
+  "oversight-retainer": {
+    need: [["The agreed price, the agreed changes, and every payment made and asked for, with receipts", 1],
+      ["The programme with its agreed dates, and the builder's current forecast", 1], ["Notes and photographs from every site visit this month", 1],
+      ["Every change to the work this month, and whether the client agreed it in writing", 1], ["The WhatsApp messages on the escalation line", 0],
+      ["Notes from the monthly call: who, points agreed, actions with owner and date", 1], ["Whether the builder's insurance was seen", 0]],
+    yours: ["The month's status: overall, time, money, quality, safety, scope", "Every sum of money", "A rating on each issue", "The month in a paragraph"],
+  },
+  "full-project-management": {
+    need: [["The signed agreement and the stage plan with the value of each stage", 1], ["The agreed scope for this stage, with its pass marks in words", 1],
+      ["An inspector for the stage who is not the trade who did it", 1], ["Photographs against each scope item", 1],
+      ["What the trade has asked to be paid for this stage", 1], ["Values of the stages already signed off", 1]],
+    yours: ["The result: complete, complete with items, or not complete", "The value lines", "A rating on each open item", "The explanation for page one"],
+  },
+  "site-sketchpad": {
+    need: [["The sketchpad printed, and a pencil", 1], ["A phone for photographs, with the photo numbers written on the sketch", 1],
+      ["A compass or phone compass, for north", 0], ["No tape measure: not to scale, and size in words only", 1]],
+    yours: [],
+  },
+};
+function rptNeedsHtml(slug){
+  const n = RPT_NEEDS[slug]; if (!n) return "";
+  return `<div style="margin-top:14px;border:1px solid var(--mango);background:rgba(245,158,11,0.07);border-radius:var(--r);padding:14px 16px">
+    <b style="color:var(--sand)">What you need to fill this in</b>
+    <ul style="margin:8px 0 0;padding-left:18px">${n.need.map(([x, req]) => `<li style="margin:4px 0">${esc(x)}${req ? ` <span class="chip warn" style="margin-left:4px">Required</span>` : ""}</li>`).join("")}</ul>
+    ${n.yours.length ? `<b style="display:block;margin-top:12px">Typed by you afterwards, never drafted</b>
+    <ul style="margin:6px 0 0;padding-left:18px">${n.yours.map(x => `<li style="margin:4px 0">${esc(x)}</li>`).join("")}</ul>` : ""}
+  </div>`;
+}
+
 async function loadReportTemplates(){
   const box = $("rptTemplateList"); if (!box) return;
   try {
@@ -6346,11 +6418,13 @@ async function loadReportTemplates(){
       <select id="rptTplPick" class="inp">${list.map((t, i) => `<option value="${i}">${esc(t.service)}</option>`).join("")}</select>
       <p class="mute" id="rptTplWhat" style="margin:8px 0 10px"></p>
       <div id="rptTplBtns" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"></div>
-    </div>`;
+    </div>
+    <div id="rptTplNeeds"></div>`;
     const pick = $("rptTplPick");
     const show = () => {
       const t = list[Number(pick.value)] || list[0];
       $("rptTplWhat").textContent = t.title + ", " + t.pages + " pages" + (t.kind ? "" : ". Used by hand, separate from the agent.");
+      $("rptTplNeeds").innerHTML = rptNeedsHtml(t.slug);
       $("rptTplBtns").innerHTML = `
         <a class="btn" href="templates/${esc(t.slug)}.pdf" target="_blank" rel="noopener">Open the PDF</a>
         <a class="btn" href="templates/${esc(t.slug)}.docx" download>Download Word</a>
@@ -11115,7 +11189,7 @@ function rptHumanCard(r){
 }
 
 // The two record only services are never rated: "They record. They do not
-// rate or advise." The database refuses a rating on them (20260928230000).
+// rate or advise." The database refuses a rating on them (20260928235000).
 function rptRated(kind){ return kind !== "visual_check" && kind !== "property_care"; }
 
 // The money lines a person types, per service. Keys must match the list in
