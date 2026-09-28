@@ -124,13 +124,13 @@ This is a routine visit to an empty, rented or elder occupied home, run against 
 Each finding is something the notes record as needing the owner's decision: "heading" names it, "body" says what was seen and where, and "action" may suggest the next step in one sentence (watch it next visit, a closer look, a trade to quote) because the owner decides. Leave "why" empty.
 
 IN ADDITION, return a top-level "sections" object beside "findings", exactly this shape:
-{"sections":{"visit":{"plan":"","home":"","visit_number":"","time_in":"","time_out":"","weather":"","access":"","alarm_in":"","alarm_out":""},"readings":[{"reading":"","value":""}],"checklist":[{"state":"","since":"","note":""}],"resident":{"seen":"","spoke":"","passed_on":""},"carried_forward":[{"item":"","first_noted":"","status":""}],"next_visit":""}}
+{"sections":{"visit":{"plan":"","home":"","visit_number":"","time_in":"","time_out":"","weather":"","access":"","alarm_in":"","alarm_out":""},"readings":[{"reading":"","value":""}],"checklist":[{"state":"","since":"","note":""}],"resident":{"seen":"","spoke":"","passed_on":""},"carried_forward":[{"item":"","first_noted":"","today":""}],"next_visit":""}}
 
 - "readings": meter readings, the tank level and similar, exactly as the notes give them. Write a meter reading as plain digits with no commas.
 - "checklist": exactly ${PROPERTY_CARE_CHECKLIST.length} entries, in this order, one per line below. "state" is exactly one of: ${PC_STATE.join(", ")}. Use called_on_site only when the notes record that the owner was called or messaged during the visit, and not_recorded when the notes say nothing about the line. "since" is exactly one of: new, same, worse, resolved, or empty, only where the notes compare with the last visit. Do not repeat the line text; the order is the key.
 ${numbered(PROPERTY_CARE_CHECKLIST)}
 - "resident": only if somebody lives there. What was seen and said, and what they asked to be passed on in their own words. Never a remark about their health.
-- "carried_forward": items the notes say are still open from an earlier visit.`,
+- "carried_forward": items the notes say are still open from an earlier visit, with when each was first noted and how it looked today.`,
 
   oversight: `SERVICE BRIEF: Oversight Retainer, the monthly report.
 
@@ -235,7 +235,7 @@ export function sectionsFor(
         return { item: row.item, group: row.group, state: pick(st.state, PC_STATE, "not_recorded"), since: pick(st.since, PC_SINCE, ""), note: clean(st.note, `checklist ${i + 1} note`) || null };
       }),
       resident: one(sx.resident, ["seen", "spoke", "passed_on"], "resident"),
-      carried_forward: rows(sx.carried_forward, 12, ["item", "first_noted", "status"], "carried forward"),
+      carried_forward: rows(sx.carried_forward, 12, ["item", "first_noted", "today"], "carried forward"),
       next_visit: clean(sx.next_visit, "next visit"),
     };
   }

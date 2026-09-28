@@ -6202,3 +6202,13 @@ transaction.
 4. `cp concierge/concierge.html concierge-deploy/public/index.html` if the desk changed, then deploy the desk as usual. The templates travel in `concierge-deploy/public/templates`.
 5. "Could not load the templates" on the desk means `templates/index.json` was not deployed with the desk. Check `concierge-deploy/public/templates` has it, then redeploy.
 6. The Deposit Protection Check template's checklist and payment terms are a copy of `DEPOSIT_CHECKLIST` and `PAYMENT_TERMS` in `yaad-report`. Change one, change the other.
+
+## 37. A report on the new services: will not draft, will not issue, or will not rate (28 Sep 2026)
+
+1. **"kind must be one of"** from the drafter: `yaad-report` on the server is older than `kinds.ts`. Deploy it from disk: `supabase functions deploy yaad-report --project-ref leffyisvfvjwzilydlwf` (it keeps the platform check; no `--no-verify-jwt`).
+2. **"violates check constraint reports_kind_check"**: migration `20260928235000` is not applied. It is Monique's call to apply it.
+3. **A Visual Check or Property Care visit refuses a rating.** That is the rule: they are records. Write the summary as the verdict and issue it.
+4. **"This report has no result"** or **"no overall status"**: use Type the result, or Rate the month, on the report row. Nothing drafts either.
+5. **"Results, status and money on a report are typed at the desk"**: something tried to write `reports.human` directly. Only Type the result, Rate the month and Type the money write it, through `set_report_human()`.
+6. Check the rules with `supabase/tests/report_kind_guards.sql` (seven tests) after applying the migration.
+

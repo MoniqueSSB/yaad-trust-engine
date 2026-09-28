@@ -1764,7 +1764,7 @@ const VIEWS = [
     pre: preReports, page: reportPage, afterOpen: wireReportEdits,
     titleOf: r => (RPT_SERVICE[r.kind] || r.kind || "Report") + (r.number ? ", " + r.number : ", draft"),
     hide: ["_verdict","_verdict_line","_sections","_omitted","_questions","_scrubbedList","_source","_model","_provider","_issued_by","_findingRows"],
-    sub:"The priced reports: Deposit Protection Checks, Condition Reports, Technical Sign-offs and Visual Checks. yaad-report drafts the findings. It cannot rate one and it cannot write the verdict, because that is the judgment the client actually paid for. A report will not issue while a single finding is unrated, while the verdict is empty, or while any sentence in it states a measurement. Each of those refusals is the gate working, not a bug.",
+    sub:"Every service's report: Deposit Protection Checks, Condition Reports, Technical Sign-offs, Visual Checks, Property Care visits, monthly Oversight reports and Full PM stage records. Pick the service and the form asks for what that report needs; yaad-report drafts the findings into its template. It never rates, never writes the verdict, never types a result, a status or a sum of money: those are yours, and the report will not issue without them. Visual Checks and Property Care visits are records and are never rated at all. Any sentence that states a measurement also stops it issuing. Each refusal is the gate working, not a bug.",
     select:"*",
     order:"drafted_at",
     search:["number","client_name","property","kind"],
@@ -11673,7 +11673,7 @@ ${rptVerdict(rep, "The verdict")}
 <table class="gl" style="margin-top:12px"><tr><th>Section</th><th style="width:28mm">Worst rating</th><th style="width:18mm">Severe</th><th style="width:20mm">Moderate</th><th style="width:16mm">Low</th></tr>
 ${els.map((e, i) => { const fs = inEl(e), w = worst(fs); return `<tr><td>${L[i]} ${esc(RPT_ELEMENT_NAME[e])}</td><td>${w ? `<span class="sev s-${w}">${w}</span>` : (fs.length ? '<span class="sev blankchip">to rate</span>' : "Nothing found")}</td><td>${fs.filter(f => f.severity === "severe").length}</td><td>${fs.filter(f => f.severity === "moderate").length}</td><td>${fs.filter(f => f.severity === "low").length}</td></tr>`; }).join("")}</table>
 <p class="lead">This page is a summary. It is not the report, and it should not be relied on without the sections behind it.</p>
-${els.map((e, i) => { const fs = inEl(e), lim = (sx.limits || {})[e] || {}; return `<h2 class="brk">${L[i]}. ${esc(RPT_ELEMENT_NAME[e])}</h2>
+${els.map((e, i) => { const fs = inEl(e), lim = (sx.limits || {})[e] || {}; return `<h2${fs.length ? ' class="brk"' : ""}>${L[i]}. ${esc(RPT_ELEMENT_NAME[e])}</h2>
 <div class="meta"><div><dt>How it was seen</dt><dd>${esc(lim.seen || "Not recorded")}</dd></div><div><dt>What could not be seen</dt><dd>${esc(lim.not_seen || "Nothing recorded")}</dd></div></div>
 ${fs.length ? fs.map(f => rptFinding(f, { where: (refs[f.ord] || {}).where })).join("") : `<p class="lead">Nothing was recorded here.</p>`}`; }).join("")}
 <h2 class="brk">M. What to do now</h2>
@@ -11777,7 +11777,7 @@ ${groups.length ? `<table class="ck">${groups.map(g => `<tr><td class="g" colspa
 ${res.seen || res.spoke || res.passed_on ? `<div class="meta"><div><dt>Seen</dt><dd>${esc(res.seen || "")}</dd></div><div><dt>Spoke with them</dt><dd>${esc(res.spoke || "")}</dd></div></div>${res.passed_on ? `<p><b>What they asked us to pass on.</b> ${esc(res.passed_on)}</p>` : ""}` : `<p class="lead">Nobody living at the property was recorded.</p>`}
 <p class="lead">The visitor notes what they see and passes messages on. They do not give personal care, medication, medical opinion or advice, handle money, or accept gifts.</p>
 <h2>G. Carried forward</h2>
-${rptArr(sx.carried_forward).length ? `<table class="gl"><tr><th>Item</th><th style="width:26%">First noted</th><th style="width:26%">Status today</th></tr>${sx.carried_forward.map(c => `<tr><td>${esc(c.item)}</td><td>${esc(c.first_noted || "")}</td><td>${esc(c.status || "")}</td></tr>`).join("")}</table>` : `<p class="lead">Nothing carried forward.</p>`}
+${rptArr(sx.carried_forward).length ? `<table class="gl"><tr><th>Item</th><th style="width:26%">First noted</th><th style="width:26%">Status today</th></tr>${sx.carried_forward.map(c => `<tr><td>${esc(c.item)}</td><td>${esc(c.first_noted || "")}</td><td>${esc(c.today || "")}</td></tr>`).join("")}</table>` : `<p class="lead">Nothing carried forward.</p>`}
 <h2 class="brk">H. What this record is and is not</h2>
 <div class="scope"><p>It is a visual record of what could be seen, on the day, in the areas that could be reached. It is not a survey, a structural opinion, a valuation, a security service, or insurance, and it does not replace the checks your insurer asks for unless your insurer has agreed that it does.</p><p><b>Next visit:</b> ${esc(sx.next_visit || "As the plan sets it")}</p></div>
 <div class="decl"><b>Signed</b>${rptSign(((rep.sections || {}).who || {}).attended || "", "Monique Sewell-Bennett")}</div>`;
