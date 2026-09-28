@@ -75,10 +75,13 @@ export const WORKER_UPDATE_APPROVAL = { name: WORKER_UPDATE_NAME, category: "UTI
  *  that code and signs through sign_completion_report_via_whatsapp(), the
  *  same way the client's Approve button works. It follows the message that
  *  carries the link, inside the 24 hour window, which needs no Meta approval. */
-export const SIGN_REPORT_NAME = "yaadly_sign_completion_report_v1";
+// v2, 28 Sep 2026: three buttons, after the founder found "no way to edit"
+// and asked for "raise an issue" too, as buttons. Content is immutable in
+// Twilio, so a change is a new name; v1 stays in the account unused.
+export const SIGN_REPORT_NAME = "yaadly_sign_completion_report_v2";
 
 export const SIGN_REPORT_BODY =
-  "{{1}}: your Completion Report is ready. Tap Sign the report to sign it as it stands. To change your words first, open the link in the message above.";
+  "{{1}}: your Completion Report is ready. Sign it as it stands, change your words first, or raise an issue if something is wrong.";
 
 export function signReportContent() {
   return {
@@ -88,7 +91,11 @@ export function signReportContent() {
     types: {
       "twilio/quick-reply": {
         body: SIGN_REPORT_BODY,
-        actions: [{ title: "Sign the report", id: "{{2}}" }],
+        actions: [
+          { title: "Sign the report", id: "{{2}}" },
+          { title: "Change my words", id: "EDIT {{2}}" },
+          { title: "Raise an issue", id: "ISSUE {{2}}" },
+        ],
       },
     },
   };

@@ -24,6 +24,8 @@ import { jobGates } from "@/lib/portal/gates";
 import { materialsReceipt } from "@/lib/portal/materials-receipt";
 import { DocStrip, type Doc } from "@/components/portal/DocStrip";
 import { TabBar, TABS, type TabKey } from "@/components/portal/TabBar";
+import { AddOnPanel, type AddonInvoice, type AddonRow } from "@/components/portal/AddOnPanel";
+import { waitingOn } from "@/lib/jobs/addon";
 import { EvidenceLedger } from "@/components/portal/EvidenceLedger";
 import { GoLive, type Gate } from "@/components/portal/GoLive";
 import { Outstanding, type OutItem } from "@/components/portal/Outstanding";
@@ -356,6 +358,30 @@ export default async function JobRoom({
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
     ]);
+
+  /* Extra work on a booked job (20260928235000). Read on its own so a
+     database without the add-on tables yet returns nothing here rather than
+     taking the whole room down with it. RLS returns these to the job's own
+     client and booked worker only. */
+  const [{ data: addonRows }, { data: addonInvRows }, { data: addonEvRows }] = await Promise.all([
+    supabase
+      .from("job_addons")
+      .select("id,rev,scope,amount_jmd,terms,status,last_edit_side,history,closed_reason,signed_off_at,created_at")
+      .eq("job_id", id)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("invoices")
+      .select("id,addon_id,status,total_pence,payable_to,period_label")
+      .eq("job_id", id)
+      .not("addon_id", "is", null),
+    supabase.from("job_addon_evidence").select("addon_id").eq("job_id", id),
+  ]);
+  const addons = (addonRows ?? []) as AddonRow[];
+  const addonInvoices = (addonInvRows ?? []) as AddonInvoice[];
+  const addonEvidenceCounts: Record<string, number> = {};
+  for (const r of (addonEvRows ?? []) as { addon_id: string }[]) {
+    addonEvidenceCounts[r.addon_id] = (addonEvidenceCounts[r.addon_id] ?? 0) + 1;
+  }
 
   const { data: myReview } = await supabase
     .from("reviews")
@@ -1191,6 +1217,7 @@ export default async function JobRoom({
     evidence: ev.length,
     messages: chat.length,
     approvals: (awaitingApproval && isClient ? 1 : 0) + unpaidClientInvoices,
+    extra: addons.filter((a) => waitingOn(a.status) === role).length,
     help: helpOpen,
   };
 
@@ -1998,6 +2025,27 @@ export default async function JobRoom({
         />
       </div>
         </>
+      )}
+
+      {tab === "extra" && (
+        <AddOnPanel
+          jobId={job.id}
+          me={role === "worker" ? "worker" : "client"}
+          otherName={role === "client" ? (won?.worker_name ?? job.worker_name ?? "your tradesperson") : "the client"}
+          canPropose={role === "client" && (job.status === "in_progress" || job.status === "evidence")}
+          closedReason={
+            !job.worker_email
+              ? "Extra work is added once a tradesperson is booked. Until then, ask for a change to their quote."
+              : job.status === "awaiting_payment"
+                ? "Extra work can be added once the job has started."
+                : job.status === "complete"
+                  ? "This job is complete. Post a new job for anything else."
+                  : null
+          }
+          addons={addons}
+          invoices={addonInvoices}
+          evidenceCounts={addonEvidenceCounts}
+        />
       )}
 
       {tab === "evidence" && (

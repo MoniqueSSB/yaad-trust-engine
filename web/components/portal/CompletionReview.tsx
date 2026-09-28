@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import {
-  signCompletionReport, confirmCompletionReport, flagCompletionReport,
+  signCompletionReport, saveCompletionWords, raiseCompletionIssue, confirmCompletionReport, flagCompletionReport,
   type ReportActionState,
 } from "@/app/portal/completion-report-actions";
 
@@ -28,25 +28,37 @@ const btn = "rounded-full px-4 py-2 text-[12.5px] font-bold transition disabled:
 export function WorkerSign({
   jobId, code, careNotes, account, workerName,
 }: { jobId: string; code: string; careNotes: string[]; account: string; workerName: string }) {
-  const [state, action, pending] = useActionState<ReportActionState, FormData>(signCompletionReport, {});
-  if (state.ok) {
+  const [signed, signAction, signing] = useActionState<ReportActionState, FormData>(signCompletionReport, {});
+  const [saved, saveAction, saving] = useActionState<ReportActionState, FormData>(saveCompletionWords, {});
+  const [raised, raiseAction, raising] = useActionState<ReportActionState, FormData>(raiseCompletionIssue, {});
+  const [issueOpen, setIssueOpen] = useState(false);
+  if (signed.ok) {
     return (
       <div className={box}>
         <p className="text-[13.5px] font-bold text-ink">Signed. Thank you.</p>
+        <p className="mt-1 text-[12.5px] text-mute">The report goes to the owner in a moment.</p>
+      </div>
+    );
+  }
+  if (raised.ok) {
+    return (
+      <div className={box}>
+        <p className="text-[13.5px] font-bold text-ink">Sent to Yaadly.</p>
         <p className="mt-1 text-[12.5px] text-mute">
-          {state.changed
-            ? "Your changes are in, and the report goes to the owner in a moment."
-            : "The report goes to the owner in a moment."}
+          The report waits and does not go to the owner. Yaadly will come back to you, and the report comes back
+          to you to sign once it is right.
         </p>
       </div>
     );
   }
+  const err = signed.error || saved.error || raised.error;
   return (
-    <form action={action} className={box}>
-      <h3 className="text-[14px] font-bold text-ink">Read it, change the words if they are wrong, then sign</h3>
+    <form className={box}>
+      <h3 className="text-[14px] font-bold text-ink">Your report. Change the words if they are wrong, then sign</h3>
       <p className="mt-1 text-[12.5px] text-mute">
         You can change the care notes and your own account of the work. The dates, the photographs, the
-        arrivals and the approvals come from the record and cannot be changed by anybody.
+        arrivals and the approvals come from the record and cannot be changed by anybody. If something is
+        wrong that you cannot fix here, raise an issue instead of signing.
       </p>
       <input type="hidden" name="jobId" value={jobId} />
       <input type="hidden" name="code" value={code} />
@@ -65,17 +77,37 @@ export function WorkerSign({
       </div>
       {!code && (
         <p className="mt-2 text-[12px] text-coral">
-          This page was opened without its code. Open the link from your WhatsApp message to sign.
+          This page was opened without its code. Open the link from your WhatsApp message.
         </p>
       )}
-      {state.error && <p className="mt-2 text-[12.5px] text-coral">{state.error}</p>}
-      <button type="submit" disabled={pending || !code} className={btn + " mt-3 bg-teal text-white hover:bg-tealb"}>
-        {pending ? "Signing" : "Sign the report"}
-      </button>
+      {saved.ok && !err && <p className="mt-2 text-[12.5px] text-tealb">Your changes are saved. Sign when it reads right.</p>}
+      {err && <p className="mt-2 text-[12.5px] text-coral">{err}</p>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="submit" formAction={signAction} disabled={signing || !code} className={btn + " bg-teal text-white hover:bg-tealb"}>
+          {signing ? "Signing" : "Sign the report"}
+        </button>
+        <button type="submit" formAction={saveAction} disabled={saving || !code} className={btn + " border border-line2 text-mute hover:border-purple hover:text-purpleb"}>
+          {saving ? "Saving" : "Save my changes"}
+        </button>
+        <button type="button" onClick={() => setIssueOpen((v) => !v)} disabled={!code} className={btn + " border border-coral/60 text-coral"}>
+          Raise an issue
+        </button>
+      </div>
       <p className="mt-2 text-[11.5px] text-dim">
-        You sign as {workerName || "the name on your Yaadly profile"}. The Sign button on WhatsApp does the same,
-        with the words as they stand.
+        You sign as {workerName || "the name on your Yaadly profile"}. Signing sends the words above.
       </p>
+      {issueOpen && (
+        <div className="mt-3">
+          <label className="block text-[12px] font-bold text-dim">
+            What is wrong? It goes to Yaadly, and the report waits.
+            <textarea name="issue" rows={3} maxLength={1500} className={input}
+              placeholder="The client asked for the floor tiles too, and that is not on here." />
+          </label>
+          <button type="submit" formAction={raiseAction} disabled={raising || !code} className={btn + " mt-2 bg-coral text-white"}>
+            {raising ? "Sending" : "Send the issue to Yaadly"}
+          </button>
+        </div>
+      )}
     </form>
   );
 }

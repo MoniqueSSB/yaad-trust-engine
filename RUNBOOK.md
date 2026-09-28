@@ -6157,10 +6157,18 @@ your reason. They get a new link automatically; the old one stops working.
 **Amber, "signed, checking" for more than a few minutes.** The check did not
 come back. **Screen it again**.
 
-**How the worker signs.** A button, on WhatsApp (Sign the report, under the
-message with the link) or in the portal (Sign the report, at the top of the
-report). WhatsApp signs the words as they stand; to change them they use the
-portal. Typing the job code on WhatsApp does the same as the button. If the
+**Red, "worker raised an issue".** The worker pressed Raise an issue instead of
+signing; the row shows what they said. It is not signed, so it cannot be
+released. **Send it back to the worker** with your answer as the reason. If
+the worker cannot open the link, it may be locked after ten wrong tries:
+sending it back makes a new link and unlocks it.
+
+**How the worker signs, changes or raises.** Buttons. On WhatsApp: Sign the
+report, Change my words (their next message becomes their account, unsigned),
+Raise an issue (their next message is the issue). From the link
+`app.yaadly.co.uk/report/<job>?code=<code>`, no login: Sign, Save my changes,
+Raise an issue. The template is `yaadly_sign_completion_report_v2`, made by
+`yaad-twilio-setup` action `create-sign-report`. If the
 button never appears, the template is not recorded: run `yaad-twilio-setup`
 with action `create-sign-report` (admin token or cron secret), which writes
 `app_settings.twilio_content_sid_sign_report`. Outside 24 hours of their last
@@ -6184,7 +6192,7 @@ WITH `--no-verify-jwt`, as each runs; `yaad-twilio-setup` WITHOUT it. All from
 disk, after `supabase/functions/sync-shared.sh`.
 
 **Checking the rules still hold:** `supabase/tests/completion_report_guards.sql`,
-23 checks. Run it inside `begin; ... rollback;` with
+35 checks. Run it inside `begin; ... rollback;` with
 `supabase db query --linked --project-ref leffyisvfvjwzilydlwf -f <file>`. It
 switches the user triggers on jobs, completion_reports and disputes off for
 its own run, so nothing is messaged, which is why it must be inside a
@@ -6195,3 +6203,39 @@ transaction.
 1. **Invoices, Worker pay.** Every worker's pay invoice, grouped under its job, with what is owed and what is paid on that job. Jobs with money owed come first. The summary at the top counts real jobs only; your own tests are listed underneath and counted in none of the figures. **Pay the worker** on a row opens Pay workers on that invoice, with the way the worker asked to be paid.
 2. **Invoices, Worker fees.** Yaadly's 5% from each tradesperson, job by job. It is kept out of their pay, so it is never an invoice of its own. The figure is worked out from the accepted quote at today's rate, not read from an invoice. **Agency fees** now holds only the client side: the 15% and services.
 3. **The fee on a pay invoice.** Since 28 Sep 2026 each pay invoice records the quoted labour and Yaadly's worker fee as it is raised (`worker_labour_jmd`, `worker_fee_jmd`, migration 20260928230000), and the invoice, its PDF, the desk and the worker's portal show: quoted labour, less the fee, is the agreed rate. Pay raised before that has no figures and shows no breakdown, on purpose: the fee cannot be worked back exactly from the rate, and before 9 Sep 2026 it was 12%.
+
+## 36. The blank report templates: changing one, or the desk cannot load them (28 Sep 2026)
+
+1. Change the wording in `scripts/report-templates/services/<service>.js`. Never edit the PDF or Word file itself; the next build overwrites it.
+2. `cd scripts/report-templates && npm ci && node build.js` (add `--hub "<the YaadlyHub Report Templates folder>"` to refresh Monique's copies). It needs Google Chrome for the PDFs.
+3. If it stops with a list of problems, the gate is working: a template stated a measurement, used banned language or carried a dash. Reword it. Do not loosen `gate.js`.
+4. `cp concierge/concierge.html concierge-deploy/public/index.html` if the desk changed, then deploy the desk as usual. The templates travel in `concierge-deploy/public/templates`.
+5. "Could not load the templates" on the desk means `templates/index.json` was not deployed with the desk. Check `concierge-deploy/public/templates` has it, then redeploy.
+6. The Deposit Protection Check template's checklist and payment terms are a copy of `DEPOSIT_CHECKLIST` and `PAYMENT_TERMS` in `yaad-report`. Change one, change the other.
+
+## 37. A quote pack draft: reading it, correcting it, printing it (28 Sep 2026)
+
+1. **Where.** Desk, Documents & money, Quote Pack Drafts. Open a row: the track at the top shows where it stands, and the gold or red timer is how long a job has been unquotable because of it.
+2. **A flagged draft.** Press **Correct the wording**. The flagged words are listed at the top and every box still holding one is outlined in red. Fix those, check the stage total reads 100%, then **Save and check again**. It saves and re-checks; **Approve** is still a separate press.
+3. **The PDF.** **Open the pack as a PDF** opens a new tab. Press Print, then choose Save as PDF. If nothing opens, allow pop-ups for `concierge.yaadly.co.uk` once.
+
+## 38. Extra work on a booked job: add-ons (28 Sep 2026)
+
+1. **Deploy order matters.** Apply migration `20260928235000_add_on_work_on_a_booked_job.sql` first, then deploy the app, then the desk. The job page reads the add-on tables on their own, so an app deployed first shows an empty Extra work tab rather than breaking, but nothing works until the migration is in. Afterwards run `supabase/tests/job_addons_guards.sql`; every line should read PASS.
+2. **Where it lives.** The client and the booked worker use the **Extra work** tab on the job page. The desk uses **Add-ons** under Documents & money. The add-on's invoices appear on **Invoices** like any other, labelled "Add-on" (or "Add-on, first half" / "second half").
+3. **A client says they cannot add work.** The database only allows it while the job is under way (status in progress or evidence). Before the Guarantee & Support bill is paid it says "once the job has started"; on a complete job it says to post a new job. Both are correct.
+4. **Agreed, but no invoice to send.** Agreeing drafts the invoice on Invoices as a draft; look for period label "Add-on". Send it and mark it paid as usual. The worker cannot file photos on the add-on until it is marked paid.
+5. **Sign off is refused.** It needs the add-on's invoice marked paid and at least one photo filed on the add-on. The reason is shown as the database wrote it. Signing off raises the worker's pay (amount less 5%) on Pay workers and, on half-and-half terms, drafts the second invoice.
+6. **A job will not complete.** Open Add-ons and filter by the job. Any add-on waiting on a side, or agreed and not signed off, holds it. The side it waits on can turn it down, the other side can withdraw it, or sign it off once the work is done. Completion then follows on its own.
+7. **Who is told what.** The worker is told when the client writes or changes an add-on, and when its invoice is paid (they may start). The client is told when the worker changes it, with the PDF attached and a CONFIRM code. Both are told when it is agreed; the other side is told when it is turned down or withdrawn. A message that finds the add-on has moved on sends nothing, on purpose.
+8. **"CONFIRM ABC123" did not work.** The reply is refused unless it comes from the client's phone on the job, and the code is the latest one (every change makes a new code). The refusal is sent back to them as the database wrote it. They can always accept on the Extra work tab instead.
+9. **The PDF link says "not valid" or "replaced".** Not valid means the link was altered. Replaced means the add-on was changed after that message; the newer message has the current PDF.
+10. **Deploy.** `yaad-addon-pdf` is public (Twilio fetches the attachment with no session), so it is deployed with `--no-verify-jwt` and belongs on the CLAUDE.md §12 list. `yaad-notify-client` and `yaad-inbound` import the new `_shared/addon-link.ts` (notify) and `addon-confirm.ts` (inbound): run `supabase/functions/sync-shared.sh` first.
+
+## 39. A client posted a job and cannot see it in their portal (29 Sep 2026)
+
+1. Find the job: its reference is in the enquiry the form sent. If `jobs.client_email` is blank, nobody has claimed it yet. That is normal for a job posted by somebody who was not signed in.
+2. They can claim it with the "Set up your portal" link in their receipt email, which carries the job's code.
+3. A job posted while signed in, with the same email typed on the form, joins that portal on Send (`claim_my_posted_job`, 20260929000000). The enquiry says "signed in: it is already in their portal" when it did.
+4. If it did not join although they were signed in: a different email was typed on the form, the account's email is not confirmed, or the code attempt limit tripped (five failures in fifteen minutes, `portal_code_attempts`). The link still works once the limit clears.
+

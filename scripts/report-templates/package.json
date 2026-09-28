@@ -1,0 +1,10 @@
+{
+  "name": "yaadly-report-templates",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "node build.js",
+    "check": "node gate.js"
+  },
+  "dependencies": { "docx": "^9.5.1" }
+}

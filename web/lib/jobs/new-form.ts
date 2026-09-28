@@ -27,6 +27,16 @@
 export const looksLikeEmail = (v: string) => /^[^\s@]+@[^\s@.]+\.[^\s@]{2,}$/.test(v.trim());
 export const looksLikePhone = (v: string) => v.replace(/\D/g, "").length >= 7;
 
+/** Whether the job just posted should join the signed-in portal account
+ *  there and then (claim_my_posted_job, 20260929000000). Only when the email
+ *  typed on the form is the account's own email: somebody signed in as one
+ *  person who types another person's address is not claiming for themselves,
+ *  and the join link is still offered to that other person as before. A phone
+ *  number never matches. The database checks the session, not this. */
+export const joinsSignedInPortal = (sessionEmail: string | null | undefined, contact: string) =>
+  !!sessionEmail && looksLikeEmail(contact) &&
+  sessionEmail.trim().toLowerCase() === contact.trim().toLowerCase();
+
 /** The description floor, as it was: more than ten characters once trimmed.
  *  Low on purpose. "Roof leaking bad" is eleven and is a real job. */
 export const MIN_DESC = 11;
