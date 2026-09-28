@@ -10,7 +10,7 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 Monique, 28 Sep 2026: "can't move on without each stage being paid by the client first", "if the client pays the full bill, fine", and "the 15 is always paid before a job starts, in full, never split through a job".
 
-A quote could already say `by_stage`, but nothing followed from it. That was "piece 3" of 14 Sep, never built. `20260929090000` builds it, for by-stage jobs only; a job billed in full is unchanged.
+A quote could already say `by_stage`, but nothing followed from it. That was "piece 3" of 14 Sep, never built. `20260929100000` builds it, for by-stage jobs only; a job billed in full is unchanged.
 
 - **The start bill:** `raise_job_client_invoice` drafts it instead of the whole-job bill. It is Yaadly's 15% on all the labour, never split, plus materials at cost. It carries the fee line, so paying it starts the job as before.
 - **Stage 1's bill:** stage 1's share of the labour, drafted at the same time.

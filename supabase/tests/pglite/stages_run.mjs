@@ -1,4 +1,4 @@
-// Behaviour test for 20260929090000 (each stage is paid before it starts),
+// Behaviour test for 20260929100000 (each stage is paid before it starts),
 // in PGlite with stand-ins, layered on 20260928235000 whose
 // raise_job_client_invoice it restates. Run like addons_run.mjs:
 //   node stages_run.mjs <add-on migration> <this migration>

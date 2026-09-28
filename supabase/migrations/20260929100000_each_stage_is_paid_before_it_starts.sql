@@ -181,7 +181,7 @@ begin
   v_materials := case when v_mat_already then 0 else round(coalesce(v_quote.materials_jmd, 0)) end;
   v_fee       := round(v_labour * 0.15);
 
-  -- 20260929090000: by stage. The start bill is the 15% on all the labour,
+  -- 20260929100000: by stage. The start bill is the 15% on all the labour,
   -- never split, plus materials at cost; stage 1's labour is its own bill.
   if coalesce(v_quote.billing_mode, 'in_full') = 'by_stage' then
     if (select s.pct from public._stage_share(p_job, 1) s) is null then
@@ -298,7 +298,7 @@ begin
       using errcode = 'check_violation';
   end if;
 
-  -- 20260929090000: on a job billed by stage, a stage is worked only once its
+  -- 20260929100000: on a job billed by stage, a stage is worked only once its
   -- bill is paid. Materials evidence is let through: materials were paid for
   -- on the bill that started the job.
   if coalesce(new.kind, 'work') <> 'materials'
