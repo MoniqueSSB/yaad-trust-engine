@@ -75,4 +75,4 @@ revoke all on function public.cancel_addon(uuid, text) from public, anon;
 grant execute on function public.cancel_addon(uuid, text) to authenticated;
 
 comment on function public.cancel_addon(uuid, text) is
-  'Admin only. Cancels an add-on that nothing has been paid on, voiding its draft invoice; refuses a sent invoice (void it first) and any payment (a refund decision). Records who and why. Sends no message. 20260929010000.';
+  'Admin only. Cancels an add-on that nothing has been paid on, voiding its draft invoice; refuses a sent invoice (void it first) and any payment (a refund decision). Records who and why. Sends no message. 20260929030000.';

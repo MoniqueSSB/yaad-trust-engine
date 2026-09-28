@@ -11,7 +11,7 @@
 //
 // Run, from any scratch folder (nothing is installed into the repository):
 //   npm i @electric-sql/pglite@0.2
-//   cp <repo>/supabase/tests/pglite/addons_run.mjs . && node addons_run.mjs <repo>/supabase/migrations/20260928235000_add_on_work_on_a_booked_job.sql <repo>/supabase/migrations/20260929010000_an_agreed_add_on_can_be_cancelled_by_a_person.sql
+//   cp <repo>/supabase/tests/pglite/addons_run.mjs . && node addons_run.mjs <repo>/supabase/migrations/20260928235000_add_on_work_on_a_booked_job.sql <repo>/supabase/migrations/20260929030000_an_agreed_add_on_can_be_cancelled_by_a_person.sql
 // Every line should read PASS.
 import { PGlite } from "@electric-sql/pglite";
 import fs from "fs";
@@ -267,7 +267,7 @@ r = await as(W, `update job_addons set amount_jmd = 1`);
 ok("direct update refused", !!r.err, r.err);
 
 if (CANCEL) {
-  // Cancelling (20260929010000), on J5
+  // Cancelling (20260929030000), on J5
   await db.exec(`update jobs set stage = 1, status = 'in_progress' where id='J5'`);
   r = await as(C, `select public.propose_addon_as_me('J5','Cancel me',5000) id`);
   const AC = r.rows?.[0]?.id;

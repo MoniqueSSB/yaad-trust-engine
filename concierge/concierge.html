@@ -2574,7 +2574,7 @@ const VIEWS = [
         rpc:"sign_off_addon",
         args:(r) => ({ p_addon:r.id }),
         says:r => `Signs off ${r.job_id}'s add-on in your name, on the photos above. It raises the worker's pay at the agreed amount less 5% (${jmdFmt(r.amount_jmd - Math.round(r.amount_jmd * 0.05))}) for you to pay from Pay workers${r.terms === "in_full" ? "" : ", and drafts the second half of the client's invoice"}. Refused if the add-on's invoice is not marked paid or no photos have been filed.` },
-      // The one way out once both sides have agreed (20260929010000). Voids a
+      // The one way out once both sides have agreed (20260929030000). Voids a
       // draft invoice itself; a sent one must be voided on Invoices first, and
       // anything paid is a refund decision the database will not make here.
       { label:"Cancel add-on", cls:"g",
