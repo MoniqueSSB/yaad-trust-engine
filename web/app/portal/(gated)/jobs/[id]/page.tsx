@@ -1509,10 +1509,15 @@ export default async function JobRoom({
           }
         />
       )}
-      {role === "client" && (movedOn || onBoard) && (
+      {/* Once the job has moved on (someone booked), this strip sits on Job
+          details only. It used to sit above the tabs on every page, so the
+          client's evidence overview carried an "Add a photo" action (founder,
+          28 Sep 2026: evidence is an overview, nothing to act on). While the
+          job is still on the board it stays above the tabs, where it helps. */}
+      {role === "client" && (onBoard || (movedOn && tab === "details")) && (
         <section className="mt-4 rounded-2xl border border-line bg-panel px-4 pb-4 pt-3">
           <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
-            Your listing
+            {onBoard ? "Your listing" : "Photos of the property"}
           </p>
           <JobEditTools
             jobId={job.id}
