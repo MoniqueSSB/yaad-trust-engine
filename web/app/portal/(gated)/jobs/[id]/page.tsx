@@ -1273,6 +1273,7 @@ export default async function JobRoom({
             note: "Scope, milestones and the evidence checklist",
             state: approvedPack.status === "approved" ? "ready" : "in_progress",
             href: jobBase + "/pack",
+            pdfHref: jobBase + "/pack/all",
           } satisfies Doc,
         ]
       : []),

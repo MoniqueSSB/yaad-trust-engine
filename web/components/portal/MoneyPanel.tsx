@@ -1,3 +1,4 @@
+import { InvoicePdfButton } from "./InvoicePdfButton";
 import type { ReactNode } from "react";
 import { amount, gbp } from "@/lib/money";
 import { whenDate } from "@/lib/date";
@@ -311,6 +312,12 @@ export function MoneyPanel({
                       {side === "worker" && inv.paid_at && inv.paid_reference ? ", reference " + inv.paid_reference : ""}
                       {inv.period_label ? " · " + inv.period_label : ""}
                     </div>
+                    {/* The invoice as the PDF it was emailed as (28 Sep 2026). */}
+                    {inv.status !== "draft" && (
+                      <div className="mt-2">
+                        <InvoicePdfButton invoiceId={inv.id} />
+                      </div>
+                    )}
                     {/* Pay by card, phase 1 (14 Sep 2026). Only the client,
                         only Yaadly's own invoices, only once sent and unpaid.
                         Once Stripe reports a payment the button goes, so a

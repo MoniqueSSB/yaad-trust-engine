@@ -298,8 +298,43 @@ Deno.serve(async (req) => {
       root.setAttributes({ "yaadly.auth.outcome": "rejected" });
       return fail("Sign in required.", 401);
     }
-    // Invoicing is the founder's desk. Clients read their own invoices
-    // through the portal and RLS, never through this function.
+    // The one thing a client or worker may ask of this function (28 Sep
+    // 2026, founder: "invoice download as pdf also"): the PDF of an invoice
+    // they can already read in the portal. The invoice and its lines are read
+    // under THEIR token, so row level security decides, exactly as it does on
+    // the portal page: a client gets only their own sent or paid invoices, a
+    // worker only their own pay, and a draft never. The issuer settings (the
+    // company details and bank line printed on every invoice) are admin-only
+    // in RLS, so only those keys are read with the service role. The file is
+    // the same invoicePdf() the email attaches, so it cannot differ from what
+    // was sent. It changes nothing.
+    const peek = await req.clone().json().catch(() => ({}));
+    if (String(peek?.action ?? "") === "pdf") {
+      root.setAttributes({ "yaadly.invoice.action": "pdf" });
+      const id = String(peek.invoice_id || "");
+      if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) return fail("No invoice was chosen.", 400);
+      const [iR, lR] = await Promise.all([
+        db(req, `invoices?select=*&id=eq.${encodeURIComponent(id)}`),
+        db(req, `invoice_lines?select=*&invoice_id=eq.${encodeURIComponent(id)}&order=sort,id`),
+      ]);
+      const inv = iR.ok ? (await iR.json())[0] : null;
+      if (!inv || inv.status === "draft") return fail("That invoice is not one you can open.", 404);
+      const lines = lR.ok ? await lR.json() : [];
+      const settings: Record<string, string> = {};
+      const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+      if (svc) {
+        const sR = await fetch(`${env().url}/rest/v1/app_settings?select=key,value&key=like.invoice_*`, {
+          headers: { apikey: svc, Authorization: `Bearer ${svc}` },
+        });
+        if (sR.ok) for (const r of await sR.json()) settings[r.key] = r.value;
+      }
+      const payUrl = inv.status === "sent" && inv.payable_to !== "worker" ? await payLinkUrlFor(inv.id) : "";
+      const pdf = await invoicePdf({ ...inv, _payUrl: payUrl }, lines, settings, money);
+      return done(JSON.stringify({ filename: `${inv.id}.pdf`, pdf: encodeBase64(pdf) }), 200);
+    }
+
+    // Everything else is the founder's desk. Clients read their own invoices
+    // through the portal and RLS; the PDF above is the one exception.
     if (!(await isAdmin(req))) {
       root.setAttributes({ "yaadly.auth.outcome": "not_admin" });
       return fail("Admin only.", 403);

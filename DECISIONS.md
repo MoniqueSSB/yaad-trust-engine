@@ -6,6 +6,20 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-28 · Invoices download as the emailed PDF, and "Your documents" offers each PDF from the list
+
+**Invoices.** Monique: "invoice download as pdf also". Every non-draft invoice in the portal's money panel has **Download PDF**. It is the same file the invoice email attaches, drawn by `invoicePdf()` in `yaad-invoice`, so it cannot differ from what was sent.
+
+`yaad-invoice` was admin only. It now has exactly one other action, `pdf`, handled before the admin gate:
+
+- **The invoice and its lines:** read under the caller's own token, so row level security decides who gets what, exactly as on the portal page. A client gets their own sent or paid invoices, a worker their own pay, and a draft never.
+- **The issuer settings:** only the `invoice_*` app settings (company details and bank line, printed on every invoice) are read with the service role, because `app_settings` is admin-only in RLS.
+- **Effect:** it changes nothing, and the function keeps its platform JWT check.
+
+**"Your documents".** Each completed row now has its own **PDF** button (Monique: "this needs pdf reviews also"). It opens the document with `?pdf=1`, and that page's Download PDF starts on arrival. The Kickoff Pack's goes to the whole pack on one page.
+
+---
+
 ## 2026-09-28 · Every document in "Your documents" downloads as a PDF
 
 Monique: the quote pack in the client and worker portal "should show as a pdf view also", then "these should all be able to review as a pdf". Each completed document uses the Completion Report's Download PDF button (`PrintReport`, now with a file name of its own). The PDF is made in the browser from the page on screen, so it cannot disagree with what the page says, and nothing is sent anywhere.

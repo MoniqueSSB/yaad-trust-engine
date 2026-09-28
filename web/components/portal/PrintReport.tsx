@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * "Download this report as a PDF."
@@ -76,6 +76,19 @@ export function PrintReport({
       setBusy(false);
     }
   }
+
+  /* Arriving with ?pdf=1 (the PDF button on "Your documents") starts the
+     download once, after the page has drawn. */
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current) return;
+    if (new URLSearchParams(window.location.search).get("pdf") !== "1") return;
+    started.current = true;
+    const t = setTimeout(() => { void download(); }, 600);
+    return () => clearTimeout(t);
+    // download is stable for this render; run once on arrival only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <span className="flex flex-col items-end gap-1 print:hidden">
