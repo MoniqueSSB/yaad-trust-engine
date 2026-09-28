@@ -149,7 +149,12 @@ export function MoneyPanel({
   const agreed = labour != null;
   const showCheck = side === "client" && check != null;
   const hasExtra = !!extraWork && extraWork.length > 0;
-  const extraTotal = (extraWork ?? []).filter((x) => x.counted !== false).reduce((t, x) => t + x.total, 0);
+  /* An add-on still being agreed is shown, so it is never invisible, and
+     never counted: nobody owes money on it until both sides agree. A line
+     can also say so itself (counted: false), e.g. a cancelled one listed
+     only because its bill was paid. */
+  const counts = (x: ExtraWorkLine) => x.counted ?? (x.status === "agreed" || x.status === "signed_off");
+  const extraTotal = (extraWork ?? []).filter(counts).reduce((t, x) => t + x.total, 0);
   const mainTotal = side === "client" ? allIn : takeHome;
 
   return (
@@ -262,12 +267,12 @@ export function MoneyPanel({
                     <div key={x.id} className="rounded-xl border border-line bg-bg/40 px-3.5 py-3">
                       <div className="flex items-baseline justify-between gap-3">
                         <b className="min-w-0 truncate text-[13px] font-semibold text-ink" title={x.scope}>{x.scope}</b>
-                        <span className="flex-none text-[10.5px] font-bold uppercase tracking-wide text-dim">
-                          {x.stateLabel ?? (x.status === "signed_off" ? "Done and approved" : "Agreed")}
+                        <span className={"flex-none text-[10.5px] font-bold uppercase tracking-wide " + (counts(x) ? "text-dim" : "text-mango")}>
+                          {x.stateLabel ?? (x.status === "signed_off" ? "Done and approved" : x.status === "agreed" ? "Agreed" : "Being agreed, not counted")}
                         </span>
                       </div>
-                      {x.counted === false && (
-                        <p className="mt-1 text-[11.5px] text-mango">Not agreed by both sides, so not in the totals below.</p>
+                      {!counts(x) && x.status !== "cancelled" && (
+                        <p className="mt-1 text-[11.5px] text-mango">Not agreed by both sides yet, so not in the totals below.</p>
                       )}
                       {x.moneyNote && <p className="mt-1 text-[11.5px] text-dim">{x.moneyNote}</p>}
                       <div className="mt-2 grid gap-1 text-[12.5px]">
@@ -277,7 +282,11 @@ export function MoneyPanel({
                           <span className="font-mono-app">{side === "client" ? "" : "−"}{money(x.fee)}</span>
                         </div>
                         <div className="flex justify-between gap-3 border-t border-line pt-1 font-semibold">
-                          <span className="text-mute">{side === "client" ? "You pay for this" : "Paid to you for this"}</span>
+                          <span className="text-mute">
+                            {counts(x)
+                              ? side === "client" ? "You pay for this" : "Paid to you for this"
+                              : side === "client" ? "You would pay, once agreed" : "You would be paid, once agreed"}
+                          </span>
                           <span className="font-mono-app text-ink">{money(x.total)}</span>
                         </div>
                       </div>

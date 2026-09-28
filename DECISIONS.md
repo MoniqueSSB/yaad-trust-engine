@@ -6,6 +6,31 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-28 · Invoices show the job's main and additional work apart; pending add-ons are shown but not counted
+
+Monique: "the PDF invoice should also show the add-on breakdown", and "the extra work should feed into the money section because it is the price of the overall job".
+
+**Invoices.** Any client invoice on a job that has add-on invoices now carries "This job: main work and additional work", under its own total, in both the PDF (`pdf.ts`) and the emailed HTML (`renderInvoice`):
+
+- **Main work:** the job's own bills.
+- **Additional work:** each add-on invoice with its work, the 15% and its total.
+- **Marker:** the invoice being read is marked "this invoice".
+- **Total:** the job in total across both.
+
+It is read under the caller's token by `jobWorkFor()`, like everything else in `yaad-invoice`. Drafts are left out except the invoice being drawn. A job with no add-on gets no section, so ordinary invoices are unchanged.
+
+**The Money section.** An add-on still being agreed is now shown under Additional work as "Being agreed, not counted". It is never invisible, and it is never counted, because nobody owes money on it until both sides agree. Once agreed it counts in the overall job total automatically.
+
+**The add-on card**, when it is waiting on the other side, now says why there is only "Withdraw it":
+
+- writing or changing it already counts as your agreement;
+- only the side it waits on can change a version;
+- you will be told when they answer;
+- to change it first, withdraw and write it again;
+- to talk it through, message them, with a link to Messages. On your own turn there is an "Ask a question" link too.
+
+---
+
 ## 2026-09-28 · "What this job costs" has two sections: main work and additional work
 
 Monique: "give extra work its own break down prices... that is added underneath, so there is no confusions", and "this section would now have two sections for the main work and the additional work".

@@ -236,11 +236,28 @@ function AddonCard({
           </button>
           <button type="button" disabled={busy} onClick={() => setMode("edit")} className="rounded-full border border-line2 px-4 py-1.5 text-[12.5px] font-bold text-ink">Change it</button>
           <button type="button" disabled={busy} onClick={() => setMode("decline")} className="text-[12px] font-bold text-mute underline underline-offset-2">Turn it down</button>
+          <a href="?tab=messages" className="text-[12px] font-bold text-tealb underline underline-offset-2">Ask {otherName} a question</a>
         </div>
       )}
+      {/* Waiting on the other side. Founder, 28 Sep 2026: "I just see
+          withdraw", with no word on why, or on how to change it or talk
+          about it. Only the side it waits on can change a version (so two
+          people never edit the same one at once, edit_addon_as_me); this
+          says so, and where to go instead. */}
       {open && !mine && mode === "view" && (
-        <div className="mt-3">
-          <button type="button" disabled={busy} onClick={() => setMode("decline")} className="text-[12px] font-bold text-mute underline underline-offset-2">Withdraw it</button>
+        <div className="mt-3 rounded-xl border border-line bg-panel2 p-3 text-[12.5px] leading-relaxed text-mute">
+          <p>
+            {a.last_edit_side === me
+              ? `You ${a.rev === 1 ? "wrote" : "changed"} this, so it already counts as your agreement to this version. `
+              : ""}
+            It is waiting on {otherName} to accept it, change it or turn it down. You will be told when they answer, and if
+            they change it, it comes back to you to accept.
+          </p>
+          <p className="mt-1.5">
+            To change it before they answer, withdraw it and write it again. To talk it through first,{" "}
+            <a href="?tab=messages" className="font-bold text-tealb underline underline-offset-2">message {otherName}</a>.
+          </p>
+          <button type="button" disabled={busy} onClick={() => setMode("decline")} className="mt-2 text-[12px] font-bold text-mute underline underline-offset-2">Withdraw it</button>
         </div>
       )}
       {mode === "edit" && (
