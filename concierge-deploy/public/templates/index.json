@@ -1,0 +1,58 @@
+[
+  {
+    "slug": "deposit-protection-check",
+    "kind": "deposit_check",
+    "service": "Deposit Protection Check",
+    "title": "Before you send the deposit",
+    "pages": 12
+  },
+  {
+    "slug": "visual-check",
+    "kind": "visual_check",
+    "service": "Visual Check",
+    "title": "Photographic record of condition",
+    "pages": 5
+  },
+  {
+    "slug": "condition-report",
+    "kind": "condition",
+    "service": "Condition Report",
+    "title": "The condition of your property",
+    "pages": 10
+  },
+  {
+    "slug": "technical-sign-off",
+    "kind": "technical_signoff",
+    "service": "Technical Sign-off",
+    "title": "Stage inspection and sign-off",
+    "pages": 6
+  },
+  {
+    "slug": "property-care",
+    "kind": "property_care",
+    "service": "Property Care",
+    "title": "Property care visit record",
+    "pages": 8
+  },
+  {
+    "slug": "oversight-retainer",
+    "kind": "oversight",
+    "service": "Oversight Retainer",
+    "title": "Monthly oversight report",
+    "pages": 8
+  },
+  {
+    "slug": "full-project-management",
+    "kind": "pm_stage",
+    "service": "Full Project Management",
+    "title": "Stage records and handover",
+    "pages": 8
+  },
+  {
+    "slug": "site-sketchpad",
+    "kind": null,
+    "service": "Site Sketchpad",
+    "title": "Site sketch, by hand",
+    "pages": 7
+  }
+]

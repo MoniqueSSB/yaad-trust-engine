@@ -6193,3 +6193,12 @@ transaction.
 1. **Invoices, Worker pay.** Every worker's pay invoice, grouped under its job, with what is owed and what is paid on that job. Jobs with money owed come first. The summary at the top counts real jobs only; your own tests are listed underneath and counted in none of the figures. **Pay the worker** on a row opens Pay workers on that invoice, with the way the worker asked to be paid.
 2. **Invoices, Worker fees.** Yaadly's 5% from each tradesperson, job by job. It is kept out of their pay, so it is never an invoice of its own. The figure is worked out from the accepted quote at today's rate, not read from an invoice. **Agency fees** now holds only the client side: the 15% and services.
 3. **The fee on a pay invoice.** Since 28 Sep 2026 each pay invoice records the quoted labour and Yaadly's worker fee as it is raised (`worker_labour_jmd`, `worker_fee_jmd`, migration 20260928230000), and the invoice, its PDF, the desk and the worker's portal show: quoted labour, less the fee, is the agreed rate. Pay raised before that has no figures and shows no breakdown, on purpose: the fee cannot be worked back exactly from the rate, and before 9 Sep 2026 it was 12%.
+
+## 36. The blank report templates: changing one, or the desk cannot load them (28 Sep 2026)
+
+1. Change the wording in `scripts/report-templates/services/<service>.js`. Never edit the PDF or Word file itself; the next build overwrites it.
+2. `cd scripts/report-templates && npm ci && node build.js` (add `--hub "<the YaadlyHub Report Templates folder>"` to refresh Monique's copies). It needs Google Chrome for the PDFs.
+3. If it stops with a list of problems, the gate is working: a template stated a measurement, used banned language or carried a dash. Reword it. Do not loosen `gate.js`.
+4. `cp concierge/concierge.html concierge-deploy/public/index.html` if the desk changed, then deploy the desk as usual. The templates travel in `concierge-deploy/public/templates`.
+5. "Could not load the templates" on the desk means `templates/index.json` was not deployed with the desk. Check `concierge-deploy/public/templates` has it, then redeploy.
+6. The Deposit Protection Check template's checklist and payment terms are a copy of `DEPOSIT_CHECKLIST` and `PAYMENT_TERMS` in `yaad-report`. Change one, change the other.
