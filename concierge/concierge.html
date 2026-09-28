@@ -2037,8 +2037,12 @@ const VIEWS = [
         when:r => !r.invoice_id || r.invoice_status === "void",
         rpc:"raise_job_check_invoice",
         says:r => "One GBP line, priced by the catalogue trigger, never typed. It lands as a draft; send it from Invoices. It carries no job_id on purpose, so it is never mistaken for the agency fee.",
-        ask:[{ k:"source", label:"Which rate", options:[["catalogue_full","Full rate"],["catalogue_founding","Founding rate"]] }],
-        args:(r, v) => ({ p_job:r.id, p_source:v.source || "catalogue_full" }) },
+        // Founding rate is the default (Monique, 28 Sep 2026): the client's
+        // Approvals tab already quotes the founding price, so the invoice
+        // has to match it unless she deliberately picks Full rate.
+        ask:[{ k:"source", label:"Which rate", from:() => "catalogue_founding",
+               options:[["catalogue_founding","Founding rate"],["catalogue_full","Full rate"]] }],
+        args:(r, v) => ({ p_job:r.id, p_source:v.source || "catalogue_founding" }) },
       { label:"Remove the check", cls:"",
         when:r => !r.invoice_id || r.invoice_status === "void",
         rpc:"clear_job_check",
