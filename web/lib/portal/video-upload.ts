@@ -17,7 +17,7 @@ import type { QueueItem } from "./video-queue";
  * fails fast in the browser with a sentence a worker can act on, the
  * function's own copy is what actually decides.
  */
-export const MAX_VIDEO_BYTES = 80_000_000;
+export const MAX_VIDEO_BYTES = 500_000_000;
 export const VIDEO_MIME_OK = ["video/mp4", "video/webm", "video/quicktime"];
 
 /**

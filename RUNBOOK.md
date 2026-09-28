@@ -6286,3 +6286,14 @@ Founder: "you raise this with Yaadly". The portal opens a new dispute already es
 
 1. **Every piece of extra work** that is live or settled is listed in What this job costs under Additional work, with its work amount, Yaadly's fee and total, its state, and where its money stands. Only agreed or approved work is added into the totals; one still being agreed says so. Turned down or withdrawn work is not listed; cancelled work is listed only if its bill was paid.
 2. **A worker says the extra work is paid but their card still says it is waiting:** `job_addon_bill_state()` (20260929080000) is what tells the worker a bill was paid, because workers cannot read the client's invoices. Check it is present: `select * from job_addon_bill_state('<job>');` as the worker returns one row per add-on.
+
+## 47. Large uploads: limits, and when one fails (28 Sep 2026)
+
+**Limits now:** evidence photos and extra work photos 50MB, files on the job 100MB, evidence videos 500MB. Photos on the public job form are still 12MB (a separate route, `yaad-job-photo`).
+
+**How a file arrives:** the browser asks the app where to put it (`startUpload`), the app picks the path and signs a one-path upload URL as the signed-in user, the file goes from the phone straight to Storage, then the form's own action fingerprints what arrived by streaming it (`lib/portal/stored-object.ts`) and writes the row. Videos do the same through `yaad-evidence-video`, which also streams its fingerprint now.
+
+1. **"The upload could not start"**: Storage refused the signed URL, so this person is not the client or booked worker on the job, or the job is closed.
+2. **"That photo still carried its location data, so it was not kept"**: the browser strips a JPEG's Exif before upload; the server read the stored file's header and found it still there, so it deleted it. An old cached page is the likely cause; a reload fixes it.
+3. **"The file did not finish uploading"**: the connection dropped mid-upload. Nothing was filed; send again. A very large video on a weak signal is the usual case.
+4. **Bucket ceilings:** `evidence` 500MB, `job-files` 100MB (`20260929090000`). The app's caps sit just under them; `web/tests/job-files.test.mjs` holds that for job files.
