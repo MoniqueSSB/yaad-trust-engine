@@ -10,7 +10,7 @@ import { notesFromText } from "@/lib/portal/completion-report";
  *
  * Thin on purpose, the same shape as the walkthrough actions: the rules live
  * in Postgres (sign_completion_report, confirm_completion_report,
- * flag_completion_report, 20260928120000), so a bug here is a refusal, never a
+ * flag_completion_report, 20260928160000), so a bug here is a refusal, never a
  * signature nobody gave. Each returns the database's own words when it
  * refuses, so the person reads which rule fired.
  */

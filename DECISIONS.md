@@ -63,6 +63,37 @@ second heading, with the wrong number whenever the sections moved.
 
 ---
 
+## 2026-09-28 · The invoice email carries the invoice as a PDF, drawn by yaad-invoice
+
+Monique asked for the PDF on the client's email too, and chose option A of
+two: draw the PDF inside `yaad-invoice` (pdf-lib, Helvetica) rather than
+send the invoice page to Cloudflare's browser service to be printed. Option B
+would have looked exactly like the HTML, but every client's name, email and
+invoice would have gone to a new service, which is a data protection
+decision, and it needed a new key. Option A sends nothing anywhere new.
+
+**How it works.** `supabase/functions/yaad-invoice/pdf.ts` draws the invoice
+from the same rows `renderInvoice()` reads, with the same sentences in the
+footer. `send` attaches it to the Resend email as `<invoice>.pdf`, stamped
+sent like the email body. `render` with `pdf: true` returns it to the desk,
+and the desk's Preview of a whole invoice now shows that file, so what the
+founder looks at is what the client receives. A highlighted part is still
+drawn in the browser (entry below), because no client ever receives that.
+
+**If the PDF cannot be made, nothing is emailed.** The invoice stays a draft
+and the desk shows the reason. The alternative, emailing without the
+attachment, sends a client an invoice that is missing what they were told to
+expect, and nobody would know. Helvetica only draws the Windows-1252
+characters, so anything else in a name or description (an emoji, say)
+becomes "?" rather than stopping the send.
+
+**The price.** The PDF is plainer than the HTML: a standard font, not Anton
+and Space Grotesk, and it is drawn rather than printed, so a change to the
+invoice's wording must be made in both `renderInvoice()` and `pdf.ts`. The
+text in it is real text, selectable and searchable.
+
+---
+
 ## 2026-09-28 · Invoices and the Completion Report are real PDFs, made in the browser
 
 Monique: "all invoices should be in pdf when showing preview", then "in the

@@ -1830,7 +1830,7 @@ const VIEWS = [
     ]},
 
   // The Completion Report's sign-off chain, 28 Sep 2026. Worker first, then
-  // you, then the client (20260928120000). Every rule is in the database:
+  // you, then the client (20260928160000). Every rule is in the database:
   // this is only the form in front of it. The agent drafts care notes and
   // nothing else; the facts on the report are read from the record by the
   // page and cannot be edited here or anywhere.
@@ -8612,7 +8612,13 @@ function renderInvoice(){
     const p = picks();
     const doc = new DOMParser().parseFromString(html, "text/html");
     const trs = doc.querySelectorAll("table tbody tr");
-    if (!p.size || trs.length !== lines.length) return showInvoicePdf(html, inv.id);
+    // The whole invoice is the server's PDF, the file the email attaches.
+    // Only a highlighted part, which no client ever receives, is drawn here.
+    if (!p.size || trs.length !== lines.length) {
+      if (CURRENT.previewPdf) return showServerPdf(CURRENT.previewPdf, inv.id,
+        inv.status === "draft" ? "This is the PDF the email attaches. The emailed copy says SENT, and a client invoice carries the pay by card link." : "");
+      return showInvoicePdf(html, inv.id);
+    }
     let sum = 0;
     lines.forEach((l, i) => {
       const tr = trs[i], id = Number(l.id);
@@ -8783,8 +8789,9 @@ function renderInvoice(){
 
   $("previewBtn").addEventListener("click", async () => {
     try {
-      const { html } = await fn({ action: "render", invoice_id: inv.id, as: "json" });
+      const { html, pdf } = await fn({ action: "render", invoice_id: inv.id, as: "json", pdf: true });
       CURRENT.previewHtml = html;
+      CURRENT.previewPdf = pdf || null;
       showPreview();
       show("previewCard", true);
       $("previewCard").scrollIntoView({ behavior: "smooth" });
@@ -8957,6 +8964,20 @@ async function showInvoicePdf(html, name){
     $("preview").srcdoc = html;
     $("previewState").textContent = "The PDF could not be made (" + (e && e.message || e) + "), so this is the web page version. Press Preview again to retry.";
   }
+}
+
+// The whole invoice: the PDF yaad-invoice made (28 Sep 2026), the same
+// function that attaches it to the email, so this is the client's file.
+function showServerPdf(b64, name, note){
+  ++PREVIEW_SEQ;
+  const bin = atob(b64), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  if (PREVIEW_PDF) URL.revokeObjectURL(PREVIEW_PDF.url);
+  PREVIEW_PDF = { url: URL.createObjectURL(new Blob([bytes], { type: "application/pdf" })), name: name + ".pdf" };
+  $("preview").removeAttribute("srcdoc");
+  $("preview").src = PREVIEW_PDF.url;
+  $("previewState").textContent = note || "";
+  $("pdfBtn").disabled = false;
 }
 
 $("pdfBtn").addEventListener("click", () => {

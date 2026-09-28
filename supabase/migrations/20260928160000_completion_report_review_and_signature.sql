@@ -438,6 +438,6 @@ revoke all on public.v_completion_reports from anon;
 grant select on public.v_completion_reports to authenticated;
 
 comment on table public.completion_reports is
-  'The Completion Report''s words and its sign-off chain: drafted, accepted by a named person, signed by the worker, issued by a named person, reviewed by the client. Facts are read from the record by the page, never stored here. See 20260928120000.';
+  'The Completion Report''s words and its sign-off chain: drafted, accepted by a named person, signed by the worker, issued by a named person, reviewed by the client. Facts are read from the record by the page, never stored here. See 20260928160000.';
 comment on table public.completion_report_events is
   'The review trail printed on the Completion Report. Written only by the completion report functions.';

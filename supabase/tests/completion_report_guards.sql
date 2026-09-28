@@ -3,7 +3,7 @@
 -- Creates TEST-CR- rows and removes them again.
 --
 -- WHAT IS BEING PROVED. The order is worker first, then a named person on the
--- desk, then the client (20260928120000). The tests that matter are the ones
+-- desk, then the client (20260928160000). The tests that matter are the ones
 -- that try to skip a step: the client reading before it is issued, somebody
 -- other than the worker signing, a stale link signing a changed wording, and
 -- the desk issuing what the worker never signed.
