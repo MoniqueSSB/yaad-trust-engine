@@ -56,6 +56,7 @@ import { recordAccepted, type SendMeta, withMessagingService, withStatusCallback
 import { hasWorkerTemplateDecision, insideWindow, samePhoneDigits, templateVar, WINDOW_MS, workerTemplateSummary } from "./worker-template.ts";
 import { Image } from "jsr:@matmen/imagescript";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
+import { addonPdfUrl } from "./addon-link.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -70,7 +71,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -913,7 +914,7 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
     }
-    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "completion_report_worker") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
@@ -955,7 +956,7 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "completion_report_worker") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -1715,6 +1716,80 @@ Deno.serve(async (req: Request) => {
       subject = `A delay on your job: ${job.title}`;
       line = `There has been no update on ${job.title} for a few days, so we wanted you to hear it from us rather than notice the silence yourself. ` +
         `We are checking in with the worker directly. Nothing is wrong with the money held on this job, and you can raise anything here: ${roomLink}`;
+    } else if (kind.startsWith("addon_")) {
+      // Extra work on a booked job (20260928235000). The trigger sends only
+      // the add-on id and the revision it fired on; every word below is read
+      // from the row. If the row has moved on since (another edit, another
+      // answer), this message is stale and nothing is sent: the newer change
+      // fires its own. Founder, 28 Sep 2026: the client confirms on WhatsApp,
+      // "edits only done in portal", so the only thing a reply can do is the
+      // CONFIRM line, and every other move points at the Extra work tab.
+      const { data: a } = await admin.from("job_addons")
+        .select("id, rev, scope, amount_jmd, terms, status, last_edit_side, confirm_code, closed_reason")
+        .eq("id", String(meta.addonId ?? "")).eq("job_id", jobId).maybeSingle();
+      const wantStatus: Record<string, string[]> = {
+        addon_for_worker: ["with_worker"], addon_for_client: ["with_client"],
+        addon_agreed: ["agreed"], addon_agreed_worker: ["agreed"], addon_paid_worker: ["agreed"],
+        addon_closed: ["declined", "withdrawn"], addon_closed_worker: ["declined", "withdrawn"],
+      };
+      const revOk = meta.rev == null || Number(meta.rev) === Number(a?.rev);
+      if (!a || !revOk || !(wantStatus[kind] ?? []).includes(a.status)) {
+        root.setAttributes({ "yaadly.notify.outcome": "addon_moved_on" });
+        return json({ ok: true, kind, told: false, reason: "That add-on has changed since this message was triggered." });
+      }
+      const extraLink = `${roomLink}?tab=extra`;
+      const amount = Math.round(Number(a.amount_jmd) || 0);
+      const halves = a.terms === "half_now_half_on_signoff";
+      const first = halves ? Math.floor((amount + 1) / 2) : amount;
+      const second = amount - first;
+      const clientTotal = first + Math.round(first * 0.15) + (second ? second + Math.round(second * 0.15) : 0);
+      const workerPay = amount - Math.round(amount * 0.05);
+      const termsText = halves ? "half before the extra work starts and half once it is signed off" : "paid in full before the extra work starts";
+      const scope = String(a.scope ?? "").slice(0, 700);
+      const title = String(job.title ?? job.id);
+      const reason = a.closed_reason ? `\n\nThe reason given: "${String(a.closed_reason).slice(0, 300)}"` : "";
+
+      if (kind === "addon_for_worker") {
+        subject = `Extra work asked for: ${title}`;
+        line = `On ${title}, the client has ${a.rev === 1 ? "asked for extra work" : "changed the extra work they asked for"} (version ${a.rev}):\n\n"${scope}"\n\n` +
+          `They are offering ${money(amount)} for it, ${termsText}. You would be paid ${money(workerPay)}, after Yaadly's 5%.\n\n` +
+          `Accept it, change it or turn it down on the job's Extra work tab: ${extraLink}\n\nDo not start the extra work until it is agreed and paid.`;
+      } else if (kind === "addon_for_client") {
+        subject = `Your tradesperson changed the extra work: ${title}`;
+        const pdf = await addonPdfUrl(SUPABASE_URL, a.id, Number(a.rev), SERVICE_KEY);
+        attachPhotos = [pdf];
+        line = `On ${title}, your tradesperson has changed the extra work (version ${a.rev}):\n\n"${scope}"\n\n` +
+          `For the work: ${money(amount)}. With Yaadly's 15% Guarantee & Support on top you pay ${money(clientTotal)}, ${termsText}. The PDF with this message shows it in full: ${pdf}\n\n` +
+          `To accept this version, reply:\nCONFIRM ${a.confirm_code}\n\n` +
+          `To change it or turn it down, use the Extra work tab on your job, where all changes are made: ${extraLink}`;
+        html = `<p>On ${escHtml(title)}, your tradesperson has changed the extra work (version ${a.rev}):</p><blockquote>${escHtml(scope)}</blockquote>` +
+          `<p>For the work: ${money(amount)}. With Yaadly's 15% Guarantee &amp; Support on top you pay <b>${money(clientTotal)}</b>, ${termsText}.</p>` +
+          `<p><a href="${pdf}">Open it as a PDF</a></p>` +
+          `<p>To accept this version, reply on WhatsApp: <b>CONFIRM ${escHtml(a.confirm_code)}</b>, or accept it on your job.</p>` +
+          `<p>To change it or turn it down, use the Extra work tab on your job: <a href="${extraLink}">${extraLink}</a></p>`;
+      } else if (kind === "addon_agreed") {
+        subject = `Extra work agreed: ${title}`;
+        line = `On ${title}, you and your tradesperson have agreed the extra work: "${scope.slice(0, 200)}".\n\n` +
+          `Yaadly will send you its invoice for ${money(first + Math.round(first * 0.15))}${halves ? ", the first half" : ""}. Once it is paid the extra work can start. Your original job bill does not change.\n\n${extraLink}`;
+      } else if (kind === "addon_agreed_worker") {
+        subject = `Extra work agreed: ${title}`;
+        line = `On ${title}, the extra work is agreed: "${scope.slice(0, 200)}".\n\n` +
+          `You will be paid ${money(workerPay)} once it is done and signed off. Do not start it until Yaadly tells you it is paid. File photos of it on the Extra work tab: ${extraLink}`;
+      } else if (kind === "addon_paid_worker") {
+        subject = `Extra work paid, you can start: ${title}`;
+        line = `On ${title}, the client has paid for the extra work, so you can start it: "${scope.slice(0, 200)}".\n\n` +
+          `File photos of it on the Extra work tab as you go. Yaadly signs it off on those photos, then pays you ${money(workerPay)}: ${extraLink}`;
+      } else if (kind === "addon_closed") {
+        subject = `Extra work not going ahead: ${title}`;
+        line = a.status === "declined"
+          ? `On ${title}, your tradesperson has turned down the extra work: "${scope.slice(0, 200)}".${reason}\n\nNothing has been booked or charged. You can write it differently on the Extra work tab: ${extraLink}`
+          : `On ${title}, your tradesperson has withdrawn their change to the extra work: "${scope.slice(0, 200)}".${reason}\n\nNothing has been booked or charged. ${extraLink}`;
+      } else {
+        subject = `Extra work not going ahead: ${title}`;
+        line = a.status === "declined"
+          ? `On ${title}, the client has turned down your change to the extra work: "${scope.slice(0, 200)}".${reason}\n\nNothing has been booked. ${extraLink}`
+          : `On ${title}, the client has withdrawn the extra work they asked for: "${scope.slice(0, 200)}".${reason}\n\nNothing has been booked. ${extraLink}`;
+      }
     } else if (kind === "kickoff_pack_ready") {
       // The worker READS the Kickoff Pack via the link, the same page the
       // client already reads (parties_read_approved_packs covers both).

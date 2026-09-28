@@ -6,6 +6,56 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-28 · Extra work on a booked job is an add-on, agreed by both sides and billed on its own
+
+Until today a booked job could not take extra work at all. `request_quote_change_as_me()` refuses a booked job and tells the client to message Yaadly, and nothing recorded what happened next, so hidden defects found once a job opened up were either done off the books or stopped the job. Monique set the rules on 28 September 2026:
+
+- **The client writes it:** a short scope, the amount they offer, and how it is paid. The default is paid in full, before the extra work starts. The one alternative is half now, half on sign-off.
+- **The worker accepts it, changes it, or turns it down.** A change goes back to the client, who can accept it, change it again, or withdraw. Nothing is booked until both sides have agreed the same revision. The revision number does the kickoff pack's confirmation-code job: an accept against a version the other side has since changed is refused.
+- **Fees are the same as the main job.** The client pays the agreed amount plus 15% on top, and the worker is paid the amount less 5%.
+- **It is billed as its own numbered invoice on the same job.** The job's own bill is never touched, sent or not.
+- **Nothing closes while extra work is open.** The job cannot complete while any add-on is still being agreed, or is agreed and not yet signed off.
+
+**Why not an extra stage.** The accepted quote's stages must total exactly 100% (`parse_payment_stages`), and `job_final_stage_count()` decides completion. A bolted-on stage breaks one or the other, so an add-on is its own record (`job_addons`) with its own agreements, evidence, invoices and sign-off.
+
+**What is automatic and what is a person.** Agreeing drafts the add-on's client invoice; drafting is paperwork. Everything with consequence stays a named human's click:
+
+- sending the invoice;
+- marking it paid;
+- signing off the add-on on its photos (`sign_off_addon`, admin only, stamped with the admin's email);
+- paying the worker (`mark_worker_paid`, which waits on every client invoice for that add-on).
+
+No model touches any of it and no price is suggested: the amount is what the two parties wrote (CLAUDE.md §5).
+
+**What had to change in five live functions, and only that.** An invoice with `addon_id` set is kept out of the job's own money:
+
+- `invoice_starts_job_default`: an add-on invoice never starts the job. Without this, a new stage-less invoice would have been taken for the Guarantee & Support bill.
+- `raise_job_client_invoice` and `raise_job_worker_payable`: an add-on invoice is never "the job's bill" or "the job's payable". Without this, an add-on payable raised before completion would have blocked the job's own payable for good.
+- `worker_pay_client_unpaid`: an add-on payable waits on its own client invoices, and the job's payable ignores them.
+- `sync_job_status`: carries the completion gate.
+
+Each body was read live with `pg_get_functiondef` and matched the repository before being restated. Add-on photos live in `job_addon_evidence`, not `evidence`, because the stage rules would otherwise count them as evidence for a stage. An add-on invoice cannot be split into parts (trigger), because its fee line would then be taken for the job's.
+
+**How it was tested.** No local database exists on this machine, so the migration ran in PGlite, an in-memory Postgres, with stand-ins for the tables that predate the migrations (`supabase/tests/pglite/`). All 61 checks pass. That proves the logic, not production's wiring. `supabase/tests/job_addons_guards.sql` checks the live wiring once the migration is applied.
+
+**Telling people, and the client's confirmation on WhatsApp** (the same day, on Monique's "build all"). A trigger on `job_addons` calls `yaad-notify-client` with the add-on id and revision, one message per recipient:
+
+- the worker when the client writes or changes one;
+- the client when the worker changes one;
+- both sides when it is agreed;
+- the other side when it is turned down or withdrawn;
+- the worker when its first invoice is paid, which is when the work may start.
+
+The function reads every word from the row. If the row has moved on since the trigger fired, it sends nothing.
+
+The client's message carries the add-on as a PDF (`yaad-addon-pdf`). That is a public GET, and its token is an HMAC of the add-on id and revision under the service role key, with its own context string so it cannot be swapped for a pay link. Replying `CONFIRM <code>` accepts that revision through `agree_addon_via_whatsapp()`, service role only, with the phone as the credential, as for quotes and the Completion Report. The code is new on every revision, so a reply to an older version finds nothing. It never contains the job id, so it can never be read as a stage approval by the later lanes of `yaad-inbound`.
+
+Monique's rule is "edits only done in portal", so WhatsApp can accept and nothing else. Changing, declining or writing an add-on is the portal.
+
+Known limit: a client outside WhatsApp's 24-hour window gets the email (with the PDF link) and SMS. No approved client template carries a PDF, and the template route cannot carry media at all.
+
+---
+
 ## 2026-09-28 · A quote pack draft opens as a picture, prints as a PDF, and is corrected section by section
 
 Monique, looking at a quote pack draft on the desk: "this should be a pdf", the top of the drawer "should be a dashboard, visual one, not just date lines", and "correct the wording needs to be better as it is just a long file". She approved a clickable demo with invented data before the live file was touched.

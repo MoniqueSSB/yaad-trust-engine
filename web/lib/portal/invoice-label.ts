@@ -21,6 +21,12 @@ export type LabelledInvoice = {
 };
 
 export function invoiceLabel(inv: LabelledInvoice): string {
+  /* Extra work agreed on a booked job (20260928235000) is billed as its own
+     invoice and paid to the worker on its own payable. Read off the period
+     label the database writes, so this works before the page reads addon_id. */
+  if (/^add-on/i.test(inv.period_label ?? "")) {
+    return inv.payable_to === "worker" ? "Worker pay · add-on" : inv.period_label!;
+  }
   if (inv.payable_to === "worker") {
     return "Worker pay" + (inv.stage != null ? " · stage " + inv.stage : "");
   }

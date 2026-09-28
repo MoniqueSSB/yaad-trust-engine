@@ -6211,9 +6211,22 @@ transaction.
 5. "Could not load the templates" on the desk means `templates/index.json` was not deployed with the desk. Check `concierge-deploy/public/templates` has it, then redeploy.
 6. The Deposit Protection Check template's checklist and payment terms are a copy of `DEPOSIT_CHECKLIST` and `PAYMENT_TERMS` in `yaad-report`. Change one, change the other.
 
-## 38. A quote pack draft: reading it, correcting it, printing it (28 Sep 2026)
+## 37. A quote pack draft: reading it, correcting it, printing it (28 Sep 2026)
 
 1. **Where.** Desk, Documents & money, Quote Pack Drafts. Open a row: the track at the top shows where it stands, and the gold or red timer is how long a job has been unquotable because of it.
 2. **A flagged draft.** Press **Correct the wording**. The flagged words are listed at the top and every box still holding one is outlined in red. Fix those, check the stage total reads 100%, then **Save and check again**. It saves and re-checks; **Approve** is still a separate press.
 3. **The PDF.** **Open the pack as a PDF** opens a new tab. Press Print, then choose Save as PDF. If nothing opens, allow pop-ups for `concierge.yaadly.co.uk` once.
+
+## 38. Extra work on a booked job: add-ons (28 Sep 2026)
+
+1. **Deploy order matters.** Apply migration `20260928235000_add_on_work_on_a_booked_job.sql` first, then deploy the app, then the desk. The job page reads the add-on tables on their own, so an app deployed first shows an empty Extra work tab rather than breaking, but nothing works until the migration is in. Afterwards run `supabase/tests/job_addons_guards.sql`; every line should read PASS.
+2. **Where it lives.** The client and the booked worker use the **Extra work** tab on the job page. The desk uses **Add-ons** under Documents & money. The add-on's invoices appear on **Invoices** like any other, labelled "Add-on" (or "Add-on, first half" / "second half").
+3. **A client says they cannot add work.** The database only allows it while the job is under way (status in progress or evidence). Before the Guarantee & Support bill is paid it says "once the job has started"; on a complete job it says to post a new job. Both are correct.
+4. **Agreed, but no invoice to send.** Agreeing drafts the invoice on Invoices as a draft; look for period label "Add-on". Send it and mark it paid as usual. The worker cannot file photos on the add-on until it is marked paid.
+5. **Sign off is refused.** It needs the add-on's invoice marked paid and at least one photo filed on the add-on. The reason is shown as the database wrote it. Signing off raises the worker's pay (amount less 5%) on Pay workers and, on half-and-half terms, drafts the second invoice.
+6. **A job will not complete.** Open Add-ons and filter by the job. Any add-on waiting on a side, or agreed and not signed off, holds it. The side it waits on can turn it down, the other side can withdraw it, or sign it off once the work is done. Completion then follows on its own.
+7. **Who is told what.** The worker is told when the client writes or changes an add-on, and when its invoice is paid (they may start). The client is told when the worker changes it, with the PDF attached and a CONFIRM code. Both are told when it is agreed; the other side is told when it is turned down or withdrawn. A message that finds the add-on has moved on sends nothing, on purpose.
+8. **"CONFIRM ABC123" did not work.** The reply is refused unless it comes from the client's phone on the job, and the code is the latest one (every change makes a new code). The refusal is sent back to them as the database wrote it. They can always accept on the Extra work tab instead.
+9. **The PDF link says "not valid" or "replaced".** Not valid means the link was altered. Replaced means the add-on was changed after that message; the newer message has the current PDF.
+10. **Deploy.** `yaad-addon-pdf` is public (Twilio fetches the attachment with no session), so it is deployed with `--no-verify-jwt` and belongs on the CLAUDE.md §12 list. `yaad-notify-client` and `yaad-inbound` import the new `_shared/addon-link.ts` (notify) and `addon-confirm.ts` (inbound): run `supabase/functions/sync-shared.sh` first.
 

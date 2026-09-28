@@ -26,6 +26,7 @@ import { inboundText, wasTapped } from "./button-tap.ts";
 import { answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith } from "./worker-question.ts";
 import { replyFromCard } from "./reply-from-card.ts";
 import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
+import { parseAddonConfirm } from "./addon-confirm.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -3458,6 +3459,27 @@ Deno.serve(async (req: Request) => {
               ? `Got it, passed on to the client on ${job.id}.`
               : `Got it, on record against ${job.id}. We could not reach the client directly just now, but it is saved.`);
           }
+        }
+      }
+
+      // Accepting an add-on (extra work on a booked job, 20260928235000) by
+      // replying "CONFIRM <code>" to the message that carried it. Founder,
+      // 28 Sep 2026: the client confirms on WhatsApp, "edits only done in
+      // portal". Only the exact shape is claimed (parseAddonConfirm), so a
+      // normal message passes straight on to the lanes below. Must run before
+      // the evidence-comment catch-all further down, which would otherwise
+      // file the reply as a note on the job. The phone is the credential, as
+      // with every other WhatsApp confirmation; agree_addon_via_whatsapp()
+      // checks it is the client's and that the code is the current version.
+      if (!msg.media.length && msg.text.trim()) {
+        const addonCode = parseAddonConfirm(msg.text);
+        if (addonCode) {
+          const { data: done, error } = await supabase.rpc("agree_addon_via_whatsapp", { p_phone: msg.from, p_code: addonCode });
+          root.setAttributes({ "yaadly.addon.confirm": error ? "refused" : "agreed" });
+          if (error) return twiml(`That did not go through: ${error.message}`);
+          const row = Array.isArray(done) ? done[0] : done;
+          return twiml(`Confirmed. The extra work on ${row?.job_id ?? "your job"} is agreed, and your tradesperson has been told. ` +
+            `Yaadly will send you its invoice, and the extra work starts once it is paid. Any change from here is made on your job in the Yaadly portal.`);
         }
       }
 
