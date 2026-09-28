@@ -17,6 +17,11 @@ const TZ = "America/Jamaica";
 /** "15 Sep 2026", on the Jamaica day, which is the day the work happened. */
 export function fmtDay(iso: string | null | undefined): string {
   if (!iso) return "";
+  // A plain date ("2026-09-11", a Postgres date column) is already the day.
+  // Parsed as a time it is midnight UTC, which is the evening before in
+  // Jamaica, so it would print a day early. Read it as written.
+  const plain = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (plain) return Number(plain[3]) + " " + MONTHS[Number(plain[2]) - 1] + " " + plain[1];
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   // Built from parts: en-GB's short month is "Sept" in newer runtimes and

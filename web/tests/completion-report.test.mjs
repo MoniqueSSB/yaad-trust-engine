@@ -117,3 +117,15 @@ describe("the rest", () => {
     assert.equal(c.fmtWhen("2026-09-15T13:12:00Z"), "15 Sep 2026, 08:12");
   });
 });
+
+describe("fmtDay on a plain date", () => {
+  // A date column arrives as "2026-09-11". Read as a time it is midnight UTC,
+  // the evening before in Jamaica, and the report printed the start a day early.
+  test("prints the day as written, not the day before", () => {
+    assert.equal(c.fmtDay("2026-09-11"), "11 Sep 2026");
+    assert.equal(c.fmtDay("2027-01-01"), "1 Jan 2027");
+  });
+  test("a full timestamp is still read on the Jamaica day", () => {
+    assert.equal(c.fmtDay("2026-09-11T03:00:00Z"), "10 Sep 2026");
+  });
+});
