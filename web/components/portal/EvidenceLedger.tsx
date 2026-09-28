@@ -21,6 +21,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { EvidenceItemComment } from "./EvidenceItemComment";
+import { CorrectEvidence } from "./CorrectEvidence";
 import { whenDateTime } from "@/lib/date";
 import { phaseBadge, sectionsOf, stageLock, updatesOf } from "@/lib/portal/evidence-sections";
 
@@ -44,6 +45,12 @@ export type EvidenceItem = {
   item_code?: string | null;
   /** Shared by everything confirmed together in one WhatsApp batch. See 20260917190100. */
   batch_id?: string | null;
+  /** Who filed it, by email. Decides who may correct it. */
+  uploaded_by?: string | null;
+  /** When the worker last corrected its words or part (20260929040000). */
+  corrected_at?: string | null;
+  /** The words as first filed, when they have since been corrected. */
+  first_label?: string | null;
 };
 
 type StageState = "done" | "now" | "todo";
@@ -63,7 +70,14 @@ export function EvidenceLedger({
   jobId,
   upload = null,
   startsWhen = null,
+  me = null,
+  closed = false,
 }: {
+  /** The signed-in worker's email. Their own items on the stage being worked
+      get a "Correct this" control. Null for a client. */
+  me?: string | null;
+  /** A closed job's evidence is fixed. */
+  closed?: boolean;
   /** The upload forms, drawn inside the one stage card that is open. Null
       when nothing may be filed (before stage 1, or once the job is done). */
   upload?: ReactNode;
@@ -303,6 +317,11 @@ export function EvidenceLedger({
                               answeredBy={answered.get(group[0].id)}
                               role={role}
                               jobId={jobId}
+                              canCorrect={
+                                role === "worker" && !closed && !!me && !!jobId &&
+                                (group[0].uploaded_by ?? "").toLowerCase() === me &&
+                                (group[0].stage ?? 0) === currentStage
+                              }
                             />
                           ) : (
                             <EvidenceUpdateCard
@@ -339,13 +358,27 @@ export function EvidenceLedger({
                             ? " · " + phaseBadge(e.phase, e.kind)
                             : ""}
                           {e.created_at ? " · " + stamp(e.created_at) : ""}
+                          {e.first_label && e.first_label !== e.label && (
+                            <span className="mt-0.5 block text-[10.5px]">
+                              first filed as &ldquo;{e.first_label}&rdquo;, corrected by the worker
+                            </span>
+                          )}
                           {e.sha256 ? (
                             <span className="mt-0.5 block break-all font-mono text-[9.5px] leading-relaxed">
                               sha256 · {e.sha256}
                             </span>
-                          ) : (
+                          ) : e.img ? (
                             <span className="mt-0.5 block text-[10.5px] italic">
                               filed before fingerprinting, no hash on record
+                            </span>
+                          ) : (
+                            /* A worker's typed or spoken WhatsApp update is
+                               filed as evidence with no file at all. Until
+                               28 Sep 2026 it read "filed before
+                               fingerprinting", which was untrue of one filed
+                               that morning and made the record look broken. */
+                            <span className="mt-0.5 block text-[10.5px] italic">
+                              a written update, no file to fingerprint
                             </span>
                           )}
                         </li>
@@ -453,7 +486,9 @@ function EvidenceCard({
   answeredBy,
   role,
   jobId,
+  canCorrect = false,
 }: {
+  canCorrect?: boolean;
   e: EvidenceItem;
   /** The before this after answers, if it names one. */
   answers?: EvidenceItem;
@@ -480,7 +515,7 @@ function EvidenceCard({
         />
       ) : (
         <div className="grid h-16 w-full place-items-center bg-panel2 text-[11.5px] text-dim">
-          Filed without an image
+          A written update, no photo
         </div>
       )}
       <div className="p-3">
@@ -517,6 +552,14 @@ function EvidenceCard({
             </span>
           )}
         </div>
+        {e.corrected_at && (
+          <p className="mt-0.5 text-[10.5px] text-mango">
+            Corrected by the worker{" · " + stamp(e.corrected_at)}
+          </p>
+        )}
+        {canCorrect && jobId && (
+          <CorrectEvidence id={e.id} jobId={jobId} label={e.label} phase={e.phase} kind={e.kind} />
+        )}
         {/* The comparison, shown rather than described. An after carries a
             thumbnail of the before it answers, so a client sees the two
             together without leaving the section; a before that has been

@@ -4728,7 +4728,7 @@ All four counts must be zero. They were, on all 8 open jobs, after the fix.
 
 `20260905a` redefines `open_jobs` **without** `board_descr()`. Applying it alone silently reopens the identifier leak above, and `20260907090000` will not re-run to undo it because its name is already in production's migration history.
 
-**So: apply `20260905a`, then immediately re-apply `20260909150000` (which redefines `open_jobs` with `board_descr()` AND the `is_test` clause, and builds the first-refusal clause conditionally so it lands once `20260905a` is in), then run the check query above.** The same warning is on the `open_jobs` comment in the database, where somebody investigating that view will meet it. Before 9 September the instruction here was to re-apply `20260907090000`; that would now bring the identifier leak fix back and drop the test-row filter, so it is superseded.
+**So: apply `20260905a`, then immediately re-apply `20260909150000` (which redefines `open_jobs` with `board_descr()` AND the `is_test` clause, and builds the first-refusal clause conditionally so it lands once `20260905a` is in), then run the check query above.** **From 28 Sep 2026, once `20260929010000` is applied, re-apply it too, straight after `20260909150000`:** that one also redefines `open_jobs` and would otherwise take test jobs away from test workers again. It builds the first-refusal clause conditionally in the same way, so order is 05a, 0909, 0929010000. The same warning is on the `open_jobs` comment in the database, where somebody investigating that view will meet it. Before 9 September the instruction here was to re-apply `20260907090000`; that would now bring the identifier leak fix back and drop the test-row filter, so it is superseded.
 
 **`20260905b` is in the same state.** Found 9 September 2026 while applying `20260909150000`: production has no `worker_showcase` table, no `worker_profiles.showcase_consent` and no `public_worker_showcase` view. The desk's Workers view and `web/app/workers/[slug]` both read those, and fail soft. `20260909150000` skips the showcase view when the table is absent, so it is safe to apply either side of `20260905b`; if `20260905b` is applied later, re-apply `20260909150000` after it for the same reason as above.
 
@@ -4887,6 +4887,8 @@ Applied 9 September 2026 and all of the above checked true. If the migration too
 Since 9 September 2026 (`20260909150000`) the public board at app.yaadly.co.uk/jobs and the worker directory beside it leave out any row a person has marked as a test. The mark is `jobs.is_test` and `worker_profiles.is_test`, false by default, set only by a person from the desk, and every press is written to `agent_actions` with who pressed it. Nothing is deleted and nothing else about the row changes: the conversation, the evidence, the quotes and the money are untouched, and the desk still shows the row with a grey "test" chip.
 
 **To take a test row off the board:** desk, Jobs, open the row, "That was me testing". For a worker: desk, Workers, open the row, same button. It leaves the public page the moment it saves. The automatic Quote Kickoff Pack trigger (`yaad-quote-pack-check`) also stops drafting for a marked job; a pack for a test job is requested from the desk instead.
+
+**Testing the worker side on a test job (from 20260929010000, once applied).** A job marked as a test still shows on the board to one kind of viewer: a signed-in worker whose own profile is marked as a test and is active. So mark the job as a test first, then sign in as a test worker (the seeded ones, such as "Test Worker (Monique, SEED)", all carry the mark) and it is there to quote. Visitors and real workers still never see it. Before that migration a test job reached nobody, so the only way to test quoting was to leave the job unmarked and on the public board. To prove it after applying: run `supabase/tests/test_workers_see_test_jobs.sql` in the SQL editor; it reads 0, 0, 1 and rolls itself back.
 
 **To put a real one back:** same drawer, "This one is real". If the job is open for quotes with no worker chosen it is on the board again straight away; a worker comes back to the directory if they are active.
 
@@ -6229,4 +6231,29 @@ transaction.
 8. **"CONFIRM ABC123" did not work.** The reply is refused unless it comes from the client's phone on the job, and the code is the latest one (every change makes a new code). The refusal is sent back to them as the database wrote it. They can always accept on the Extra work tab instead.
 9. **The PDF link says "not valid" or "replaced".** Not valid means the link was altered. Replaced means the add-on was changed after that message; the newer message has the current PDF.
 10. **Deploy.** `yaad-addon-pdf` is public (Twilio fetches the attachment with no session), so it is deployed with `--no-verify-jwt` and belongs on the CLAUDE.md §12 list. `yaad-notify-client` and `yaad-inbound` import the new `_shared/addon-link.ts` (notify) and `addon-confirm.ts` (inbound): run `supabase/functions/sync-shared.sh` first.
+11. **Cancelling an agreed add-on** (29 Sep 2026). Desk, Add-ons, open it, **Cancel add-on**, give the reason. A draft invoice is voided with it. If its invoice was already sent, void that on Invoices first. If anything was paid, it refuses: that is a refund, decided separately. Nobody is messaged, so tell both sides.
 
+## 39. A client posted a job and cannot see it in their portal (29 Sep 2026)
+
+1. Find the job: its reference is in the enquiry the form sent. If `jobs.client_email` is blank, nobody has claimed it yet. That is normal for a job posted by somebody who was not signed in.
+2. They can claim it with the "Set up your portal" link in their receipt email, which carries the job's code.
+3. A job posted while signed in, with the same email typed on the form, joins that portal on Send (`claim_my_posted_job`, 20260929000000). The enquiry says "signed in: it is already in their portal" when it did.
+4. If it did not join although they were signed in: a different email was typed on the form, the account's email is not confirmed, or the code attempt limit tripped (five failures in fifteen minutes, `portal_code_attempts`). The link still works once the limit clears.
+
+## 40. A report on the new services: will not draft, will not issue, or will not rate (28 Sep 2026)
+
+1. **"kind must be one of"** from the drafter: `yaad-report` on the server is older than `kinds.ts`. Deploy it from disk: `supabase functions deploy yaad-report --project-ref leffyisvfvjwzilydlwf` (it keeps the platform check; no `--no-verify-jwt`).
+2. **"violates check constraint reports_kind_check"**: migration `20260929001000` is not applied. It is Monique's call to apply it.
+3. **A Visual Check or Property Care visit refuses a rating.** That is the rule: they are records. Write the summary as the verdict and issue it.
+4. **"This report has no result"** or **"no overall status"**: use Type the result, or Rate the month, on the report row. Nothing drafts either.
+5. **"Results, status and money on a report are typed at the desk"**: something tried to write `reports.human` directly. Only Type the result, Rate the month and Type the money write it, through `set_report_human()`.
+6. Check the rules with `supabase/tests/report_kind_guards.sql` (seven tests) after applying the migration.
+
+## 41. A worker wants to correct evidence they filed (28 Sep 2026)
+
+On their own item, on the stage still being worked, the worker presses **Correct this** under the photo in Progress evidence. They can change the words and which part of the job it shows. The photo, its fingerprint, its stage and whether it is a materials item cannot change, by anybody.
+
+1. **"Correcting evidence is not switched on yet"**: migration `20260929040000_a_worker_can_correct_their_own_evidence.sql` is not applied. Apply it in the SQL editor.
+2. **"This stage has been signed off"**: correct. Approved evidence is fixed as approved. The worker adds a new item, or you handle it from the desk.
+3. **"Only the worker who filed this can correct it"**: the item was filed by somebody else (the client, or you from the desk).
+4. **What was changed:** `select * from evidence_corrections where job_id = '<job>' order by at;` shows every correction with the wording and part before and after. The client sees "Corrected by the worker" on the card and the first wording in the stage record.

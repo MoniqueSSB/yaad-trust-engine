@@ -1796,7 +1796,7 @@ const VIEWS = [
     pre: preReports, page: reportPage, afterOpen: wireReportEdits,
     titleOf: r => (RPT_SERVICE[r.kind] || r.kind || "Report") + (r.number ? ", " + r.number : ", draft"),
     hide: ["_verdict","_verdict_line","_sections","_omitted","_questions","_scrubbedList","_source","_model","_provider","_issued_by","_findingRows"],
-    sub:"The priced reports: Deposit Protection Checks, Condition Reports, Technical Sign-offs and Visual Checks. yaad-report drafts the findings. It cannot rate one and it cannot write the verdict, because that is the judgment the client actually paid for. A report will not issue while a single finding is unrated, while the verdict is empty, or while any sentence in it states a measurement. Each of those refusals is the gate working, not a bug.",
+    sub:"Every service's report: Deposit Protection Checks, Condition Reports, Technical Sign-offs, Visual Checks, Property Care visits, monthly Oversight reports and Full PM stage records. Pick the service and the form asks for what that report needs; yaad-report drafts the findings into its template. It never rates, never writes the verdict, never types a result, a status or a sum of money: those are yours, and the report will not issue without them. Visual Checks and Property Care visits are records and are never rated at all. Any sentence that states a measurement also stops it issuing. Each refusal is the gate working, not a bug.",
     select:"*",
     order:"drafted_at",
     search:["number","client_name","property","kind"],
@@ -1817,17 +1817,22 @@ const VIEWS = [
             <option value="condition">Condition Report</option>
             <option value="technical_signoff">Technical Sign-off</option>
             <option value="visual_check">Visual Check</option>
+            <option value="property_care">Property Care visit</option>
+            <option value="oversight">Oversight Retainer, monthly report</option>
+            <option value="pm_stage">Full PM, stage completion record</option>
           </select>
+          <p class="mute" id="rptKindWhat" style="margin-top:6px"></p>
           <label class="fl" style="margin-top:10px">Client name</label>
           <input id="rptClient" class="inp" placeholder="As it should read on the report">
           <label class="fl" style="margin-top:10px">Property</label>
           <input id="rptProperty" class="inp" placeholder="Town or parish, and the kind of building">
-          <label class="fl" style="margin-top:10px">The quote, receipts, messages and photographs</label>
+          <div id="rptFields"></div>
+          <label class="fl" style="margin-top:10px" id="rptFilesLbl">The quote, receipts, messages and photographs</label>
           <input id="rptFiles" type="file" class="inp" multiple accept="image/*,application/pdf">
           <button class="btn" id="rptRead" style="margin-top:8px">Read the files</button>
           <p class="mute" id="rptReadOut" style="margin-top:6px">Photographs and PDFs, up to eight pages in one go. The reader transcribes each document word for word and captions each photograph, and drops it into the notes below for you to check. It does not draft anything.</p>
-          <label class="fl" style="margin-top:10px">Your notes, and what the reader transcribed</label>
-          <textarea id="rptNotes" class="inp" rows="12" placeholder="Everything you know, in any order: the client, the property, the contractor and what you could confirm, the quote line by line, the money and when it is due to move, insurance, dates, and anything the client asked that belongs to another professional. The agent adds nothing you did not write down. Correct the reader's transcript here before you draft, especially the figures."></textarea>
+          <label class="fl" style="margin-top:10px">Anything else, and what the reader transcribed</label>
+          <textarea id="rptNotes" class="inp" rows="8" placeholder="Anything that does not fit a box above. The reader's transcript lands here: correct it before you draft, especially the figures. The agent adds nothing you did not write down."></textarea>
           <button class="btn g" id="rptGo" style="margin-top:12px">Draft the findings</button>
           <p class="mute" id="rptOut" style="margin-top:10px"></p>
         </div>
@@ -1846,7 +1851,7 @@ const VIEWS = [
         says:r => `Builds ${r.number || "this draft"} as it will be handed over: cover, header on every page, verdict, the red flags, the payment schedule, the message to the builder, the checklist, scope in and out, the variation rule, the referrals. A Deposit Protection Check also gets its contents page, the key to the ratings, who reviewed what, the page one summary, the next steps, the quote marked up, the payment terms, the declaration and the documents word for word, and any of those the draft does not carry shows as a dashed box rather than disappearing. Blank where a rating or the verdict is not there yet. Opens in a new tab; print it to PDF from there. Reads the rows and changes nothing.`,
         nav:r => openReportDocument(r.id).catch(e => alert(String(e.message || e))) },
       { label:"Rate a finding", cls:"",
-        when:r => r.status !== "issued" && r.unrated > 0,
+        when:r => r.status !== "issued" && r.unrated > 0 && rptRated(r.kind),
         rpc:"rate_finding",
         ask:[
           { k:"ord", label:"Which finding, by its number", placeholder:"1" },
@@ -1855,6 +1860,40 @@ const VIEWS = [
         ],
         args:(r, v) => ({ p_report:r.id, p_ord:Number(v.ord), p_severity:v.severity }),
         says:r => `Rates one of the ${r.findings} findings on this report in your name, stamped with your email and the time. Nothing drafts this and nothing ever will: it is the professional judgment the client paid for.` },
+      // The three decisions a model never drafts, typed into reports.human by
+      // set_report_human() (20260929001000): a result, the month's status,
+      // and money. Only on the services that carry each.
+      { label:"Type the result", cls:"",
+        when:r => r.status !== "issued" && (r.kind === "technical_signoff" || r.kind === "pm_stage"),
+        rpc:"set_report_human",
+        ask:[{ k:"result", label:"The result",
+          from:r => (r._human || {}).result || "",
+          options:[["released","Released"],["released_with_conditions","Released with conditions"],["not_released","Not released"],
+                   ["complete","Complete (stage record)"],["complete_with_items","Complete with items (stage record)"],["not_complete","Not complete (stage record)"]] }],
+        args:(r, v) => ({ p_report:r.id, p_key:"result", p_value:v.result }),
+        says:r => r.kind === "pm_stage"
+          ? "Whether this stage is complete. Your decision, typed in your name and logged. The first three choices belong to a Technical Sign-off and the database refuses them here."
+          : "Whether the stage is released. On a Technical Sign-off this is the trade inspector's judgement, typed by you from their record. The last three choices belong to a stage record and the database refuses them here." },
+      { label:"Rate the month", cls:"",
+        when:r => r.status !== "issued" && r.kind === "oversight",
+        rpc:"set_report_human",
+        ask:["overall","time","money","quality","safety","scope"].map(a => ({ k:a, label:a === "overall" ? "Overall" : a.charAt(0).toUpperCase() + a.slice(1),
+          from:r => ((r._human || {}).status || {})[a] || "",
+          options:[["on_track","On track"],["at_risk","At risk"],["off_track","Off track"]] })),
+        args:(r, v) => {
+          const now = Object.fromEntries(Object.entries(v).filter(([, x]) => x));
+          const was = ((r._human || {}).status) || {};
+          return { p_report:r.id, p_key:"status", p_value:{ ...was, ...now } };
+        },
+        says:() => "The status of the month, area by area, by the rules printed in the report: on track within what was agreed, at risk as an early warning, off track outside it. Yours to set; nothing drafts it." },
+      { label:"Type the money", cls:"",
+        when:r => r.status !== "issued" && (r.kind === "oversight" || r.kind === "pm_stage"),
+        rpc:"set_report_human",
+        ask:r => rptMoneyAsk(r),
+        args:(r, v) => ({ p_report:r.id, p_key:"money", p_value:rptMoneyValue(r, v) }),
+        says:r => r.kind === "pm_stage"
+          ? "The value lines of this stage record, in your name. Numbers only, no commas needed. This records the value on the document; paying the trade still goes through Invoices and its own checks."
+          : "This month's money against what was agreed, in your name. Numbers only. Leave a line empty if you do not know it; the report prints it as not known rather than as zero." },
       { label:"Write the verdict", cls:"",
         when:r => r.status !== "issued",
         rpc:"write_report_verdict",
@@ -1866,10 +1905,10 @@ const VIEWS = [
         args:(r, v) => ({ p_report:r.id, p_line:v.line, p_verdict:v.verdict }),
         says:() => "Writes the verdict on page one. services.html promises the client a written verdict and deliberately puts no timeline on it, and this is the one part of the document nothing here can draft for you. The database refuses a verdict that states a measurement." },
       { label:"Issue it", cls:"",
-        when:r => r.status !== "issued" && r.unrated === 0 && !r.needs_verdict,
+        when:r => r.status !== "issued" && (!rptRated(r.kind) || r.unrated === 0) && !r.needs_verdict && !r.needs_decision,
         rpc:"issue_report",
         args:(r) => ({ p_report:r.id }),
-        says:r => `Mints the number and records that you issued it, which is what makes it readable in the client's portal. Refused while any finding is unrated, while the verdict is empty, or while a sentence states a measurement.` },
+        says:r => `Mints the number and records that you issued it, which is what makes it readable in the client's portal. Refused while ${rptRated(r.kind) ? "any finding is unrated, " : ""}the verdict is empty${r.kind === "oversight" ? ", the month has no overall status" : (r.kind === "technical_signoff" || r.kind === "pm_stage") ? ", the result is not typed" : ""}, or a sentence states a measurement.` },
     ]},
 
   // The Completion Report, 28 Sep 2026 (20260928200000, 20260928210000). It
@@ -2535,6 +2574,15 @@ const VIEWS = [
         rpc:"sign_off_addon",
         args:(r) => ({ p_addon:r.id }),
         says:r => `Signs off ${r.job_id}'s add-on in your name, on the photos above. It raises the worker's pay at the agreed amount less 5% (${jmdFmt(r.amount_jmd - Math.round(r.amount_jmd * 0.05))}) for you to pay from Pay workers${r.terms === "in_full" ? "" : ", and drafts the second half of the client's invoice"}. Refused if the add-on's invoice is not marked paid or no photos have been filed.` },
+      // The one way out once both sides have agreed (20260929030000). Voids a
+      // draft invoice itself; a sent one must be voided on Invoices first, and
+      // anything paid is a refund decision the database will not make here.
+      { label:"Cancel add-on", cls:"g",
+        when:r => r.status === "with_worker" || r.status === "with_client" || r.status === "agreed",
+        ask:[ { k:"reason", label:"Why it is being cancelled (kept on the add-on)", placeholder:"The client no longer wants the benches done" } ],
+        rpc:"cancel_addon",
+        args:(r, v) => ({ p_addon:r.id, p_reason:v.reason }),
+        says:r => `Cancels this add-on on ${r.job_id} in your name, so it stops holding the job open. Its draft invoice is voided with it. Refused if its invoice has been sent (void that on Invoices first) or anything on it has been paid. Nobody is messaged: tell the client and the worker yourself.` },
     ]},
 
   { k:"qpd", g:"Documents & money", label:"Quote Pack Drafts", icon:"doc",
@@ -5919,7 +5967,7 @@ const QP_DOCS = [
 ];
 const qpDocsHtml = docs => docsListHtml(QP_DOCS, docs);
 
-const ADDON_STATE = { with_worker:"waiting on the worker", with_client:"waiting on the client", agreed:"agreed", signed_off:"signed off", declined:"turned down", withdrawn:"withdrawn" };
+const ADDON_STATE = { with_worker:"waiting on the worker", with_client:"waiting on the client", agreed:"agreed", signed_off:"signed off", declined:"turned down", withdrawn:"withdrawn", cancelled:"cancelled by Yaadly" };
 
 // An add-on's drawer: where it stands, what each side gets, its invoices and
 // the photos filed on it, which are what sign-off is judged on.
@@ -6667,7 +6715,79 @@ function renderTableView(k){
 // desk's own origin, so they sit behind the same Access gate as the desk. A
 // template whose kind the drafter takes gets a button that sets the drafter
 // up for it; the rest are for use by hand.
-const RPT_DRAFTABLE = new Set(["deposit_check", "condition", "technical_signoff", "visual_check"]);
+const RPT_DRAFTABLE = new Set(["deposit_check", "condition", "technical_signoff", "visual_check", "property_care", "oversight", "pm_stage"]);
+// What has to be in hand to fill each template in properly, shown highlighted
+// the moment a template is picked. Founder instruction, 28 Sep 2026: "it
+// should showcase exactly what is needed to fill out the template adequately".
+// need: before you start, marked Required where the report cannot be done
+// without it. yours: what only a person types afterwards, never drafted.
+const RPT_NEEDS = {
+  "deposit-protection-check": {
+    need: [["The builder's written quote, a photograph or a PDF", 1], ["The WhatsApp messages between the client and the builder", 1],
+      ["The builder's full name and business name, TRN, address, and a number other than WhatsApp", 1],
+      ["What has already been paid, to whom, and any receipts", 1], ["When the builder wants the next payment", 0],
+      ["What the client has been told about dates, materials and insurance", 0], ["Your own search for the builder: Facebook, Google, a registered business", 0]],
+    yours: ["A rating on every red flag", "The verdict for page one"],
+  },
+  "visual-check": {
+    need: [["The checklist agreed with the client, before the visit", 1], ["The items the client named, to capture first", 1],
+      ["A checker booked, with their name and role", 1], ["Access arranged: keys, a key holder, or somebody to let them in", 1],
+      ["A phone with its date and time set right, checked on arrival", 1], ["Every photograph numbered in the order taken, with the time", 1],
+      ["What could not be reached, and why", 0]],
+    yours: ["The summary of the visit. Nothing is rated: the checker records and does not advise"],
+  },
+  "condition-report": {
+    need: [["The person attending, by name and capacity", 1], ["Access to every room, the yard and the roof line", 1],
+      ["A photograph of each of the eight parts: roof, structure, water, electrics, drainage, termites, security, outside", 1],
+      ["A short walk round video", 0], ["What the property is: type, storeys, water supply, waste, power", 1],
+      ["Weather on the day and in the days before", 0], ["A torch, and a moisture meter if you have one", 0],
+      ["What could not be seen or reached, and why", 1], ["No tape measure: size is described in words", 0]],
+    yours: ["A rating on every finding: severe, moderate or low", "The verdict for page one"],
+  },
+  "technical-sign-off": {
+    need: [["A qualified trade inspector for that trade, named, with their qualification and where to check it", 1],
+      ["Their confirmation that they did not do the work and have no link to whoever did", 1],
+      ["The agreed scope, drawings or manufacturer's instructions for the stage, before the visit", 1],
+      ["The pass mark for each check, written down before the visit, in words", 1], ["Who carried out the work", 1],
+      ["Photographs against each check", 1], ["Notice given to the trade, so the stage is not covered up first", 0]],
+    yours: ["The result: released, released with conditions, or not released", "A rating on every put right item", "The explanation for page one"],
+  },
+  "property-care": {
+    need: [["The plan and the home size: monthly, fortnightly or weekly; standard, large or villa", 1], ["The visitor, by name", 1],
+      ["Keys and the alarm code", 1], ["The last visit's record, so what changed can be marked", 1],
+      ["Where the meters and the water tank are", 0], ["If somebody lives there: their emergency contact and doctor on file", 1],
+      ["Photographs of every room from the doorway, from the same spot each visit", 1]],
+    yours: ["The summary of the visit for the owner. Nothing is rated"],
+  },
+  "oversight-retainer": {
+    need: [["The agreed price, the agreed changes, and every payment made and asked for, with receipts", 1],
+      ["The programme with its agreed dates, and the builder's current forecast", 1], ["Notes and photographs from every site visit this month", 1],
+      ["Every change to the work this month, and whether the client agreed it in writing", 1], ["The WhatsApp messages on the escalation line", 0],
+      ["Notes from the monthly call: who, points agreed, actions with owner and date", 1], ["Whether the builder's insurance was seen", 0]],
+    yours: ["The month's status: overall, time, money, quality, safety, scope", "Every sum of money", "A rating on each issue", "The month in a paragraph"],
+  },
+  "full-project-management": {
+    need: [["The signed agreement and the stage plan with the value of each stage", 1], ["The agreed scope for this stage, with its pass marks in words", 1],
+      ["An inspector for the stage who is not the trade who did it", 1], ["Photographs against each scope item", 1],
+      ["What the trade has asked to be paid for this stage", 1], ["Values of the stages already signed off", 1]],
+    yours: ["The result: complete, complete with items, or not complete", "The value lines", "A rating on each open item", "The explanation for page one"],
+  },
+  "site-sketchpad": {
+    need: [["The sketchpad printed, and a pencil", 1], ["A phone for photographs, with the photo numbers written on the sketch", 1],
+      ["A compass or phone compass, for north", 0], ["No tape measure: not to scale, and size in words only", 1]],
+    yours: [],
+  },
+};
+function rptNeedsHtml(slug){
+  const n = RPT_NEEDS[slug]; if (!n) return "";
+  return `<div style="margin-top:14px;border:1px solid var(--mango);background:rgba(245,158,11,0.07);border-radius:var(--r);padding:14px 16px">
+    <b style="color:var(--sand)">What you need to fill this in</b>
+    <ul style="margin:8px 0 0;padding-left:18px">${n.need.map(([x, req]) => `<li style="margin:4px 0">${esc(x)}${req ? ` <span class="chip warn" style="margin-left:4px">Required</span>` : ""}</li>`).join("")}</ul>
+    ${n.yours.length ? `<b style="display:block;margin-top:12px">Typed by you afterwards, never drafted</b>
+    <ul style="margin:6px 0 0;padding-left:18px">${n.yours.map(x => `<li style="margin:4px 0">${esc(x)}</li>`).join("")}</ul>` : ""}
+  </div>`;
+}
+
 async function loadReportTemplates(){
   const box = $("rptTemplateList"); if (!box) return;
   try {
@@ -6680,11 +6800,13 @@ async function loadReportTemplates(){
       <select id="rptTplPick" class="inp">${list.map((t, i) => `<option value="${i}">${esc(t.service)}</option>`).join("")}</select>
       <p class="mute" id="rptTplWhat" style="margin:8px 0 10px"></p>
       <div id="rptTplBtns" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"></div>
-    </div>`;
+    </div>
+    <div id="rptTplNeeds"></div>`;
     const pick = $("rptTplPick");
     const show = () => {
       const t = list[Number(pick.value)] || list[0];
       $("rptTplWhat").textContent = t.title + ", " + t.pages + " pages" + (t.kind ? "" : ". Used by hand, separate from the agent.");
+      $("rptTplNeeds").innerHTML = rptNeedsHtml(t.slug);
       $("rptTplBtns").innerHTML = `
         <a class="btn" href="templates/${esc(t.slug)}.pdf" target="_blank" rel="noopener">Open the PDF</a>
         <a class="btn" href="templates/${esc(t.slug)}.docx" download>Download Word</a>
@@ -6693,7 +6815,7 @@ async function loadReportTemplates(){
           : `<span class="mute">${t.kind ? "Agent drafting to come" : ""}</span>`}`;
       const use = $("rptTplUse");
       if (use) use.addEventListener("click", () => {
-        const sel = $("rptKind"); if (sel) sel.value = t.kind;
+        const sel = $("rptKind"); if (sel) { rptFormKeep(); sel.value = t.kind; rptFormDraw(); }
         const d = $("rptDrafter"); if (d) d.scrollIntoView({ behavior: "smooth", block: "start" });
         const c = $("rptClient"); if (c) setTimeout(() => c.focus(), 400);
       });
@@ -6708,6 +6830,11 @@ async function loadReportTemplates(){
 function wireReportDrafter(){
   loadReportTemplates();
   const go = $("rptGo"); if (!go) return;
+  const kindSel = $("rptKind");
+  kindSel.addEventListener("focus", rptFormKeep);
+  kindSel.addEventListener("change", () => { rptFormDraw(); });
+  document.addEventListener("input", (e) => { if (e.target && e.target.dataset && e.target.dataset.rptF) rptFormKeep(); });
+  rptFormDraw();
   const read = $("rptRead");
   if (read) read.addEventListener("click", async () => {
     const files = Array.from(($("rptFiles").files) || []);
@@ -6729,8 +6856,14 @@ function wireReportDrafter(){
     } finally { read.disabled = false; }
   });
   go.addEventListener("click", async () => {
-    const notes = ($("rptNotes").value || "").trim();
+    const composed = rptFormNotes();
+    const notes = composed.notes;
     const out = $("rptOut");
+    const formNow = RPT_FORMS[$("rptKind").value] || {};
+    if (formNow.who && !composed.who.attended) {
+      out.innerHTML = '<span style="color:var(--coral)">Say who attended first. The report names the person on site and the person who reviewed it, separately.</span>';
+      return;
+    }
     if (notes.length < 40) {
       out.innerHTML = '<span style="color:var(--coral)">Write a bit more first. Under forty characters is not a visit, and a thin report is worse than none.</span>';
       return;
@@ -6742,6 +6875,8 @@ function wireReportDrafter(){
         client_name: ($("rptClient").value || "").trim() || null,
         property: ($("rptProperty").value || "").trim() || null,
         notes,
+        visited_on: composed.visited_on,
+        who: composed.who,
         source_text: RPT_SOURCE || null,
       });
       const bits = [`Drafted ${j.findings} finding${j.findings === 1 ? "" : "s"}, all unrated, no verdict.`];
@@ -6751,9 +6886,17 @@ function wireReportDrafter(){
       if (j.omitted && j.omitted.length) bits.push(`It could not source: ${j.omitted.map(esc).join("; ")}.`);
       if (j.questions && j.questions.length) bits.push(`For you to answer: ${j.questions.map(esc).join("; ")}.`);
       if (j.sections && j.sections.length) bits.push("Also drafted: " + j.sections.map(x => esc(String(x).replace(/_/g, " "))).join(", ") + ". They are in the document.");
-      bits.push("Now rate every finding and write the verdict. It will not issue until you have. Open the document from the row below to read it all in one place.");
+      const k = $("rptKind").value;
+      bits.push(
+        (k === "visual_check" || k === "property_care") ? "This is a record, so nothing is rated. Write the summary of the visit, then open the document from the row below to read it all in one place."
+        : k === "technical_signoff" ? "Now rate each put right item, type the result (released, with conditions, or not released) and write the verdict. It will not issue until you have."
+        : k === "pm_stage" ? "Now rate each open item, type the result and the value, and write the verdict. It will not issue until you have."
+        : k === "oversight" ? "Now rate each issue, type the month's status and the money, and write the verdict. It will not issue until you have."
+        : "Now rate every finding and write the verdict. It will not issue until you have. Open the document from the row below to read it all in one place.");
       out.innerHTML = bits.join("<br><br>");
       $("rptNotes").value = "";
+      delete RPT_TYPED[$("rptKind").value];
+      rptFormDraw();
       RPT_SOURCE = "";
       if ($("rptFiles")) $("rptFiles").value = "";
       await loadTableView("reports");
@@ -6896,7 +7039,10 @@ function openDetail(k, i){
 // A browser confirm can only ever ask yes or no, and some facts are neither:
 // where the client wants the materials kept is a sentence, and a button
 // cannot hold one.
-function drawAsk(k, a, row, btn){
+function drawAsk(k, a0, row, btn){
+  // An action's questions can depend on the row (the money lines differ by
+  // service), so ask may be a function of it.
+  const a = typeof a0.ask === "function" ? { ...a0, ask: a0.ask(row) } : a0;
   const fields = a.ask.map((f, n) => {
     const cur = f.from ? f.from(row) : "";
     const control = f.options
@@ -11038,6 +11184,182 @@ async function rptFn(payload){
   return j;
 }
 
+// The inputs each service needs, in the order of its template
+// (scripts/report-templates/services). Founder instruction, 28 Sep 2026: the
+// drafter "should change to show the inputs I need for each report" and "not
+// be so general". Each box becomes a labelled heading in the notes the agent
+// reads, so what you wrote about the roof lands in the roof section.
+//
+// who: the person on site and their capacity, and whether the report was
+// reviewed in person or remotely. Typed here, never read out of notes, and
+// stored on the report as sections.who. visited: becomes visited_on.
+const RPT_FORMS = {
+  deposit_check: {
+    what: "A desk review of the builder and the quote, before any money moves. Nobody needs to have visited.",
+    files: "The quote, receipts, messages and photographs",
+    fields: [
+      { id:"builder", label:"The builder", hint:"Their name, business name, TRN, address, numbers, and what you could confirm about them yourself" },
+      { id:"quote", label:"The quote", hint:"Line by line as written, or use Read the files below and correct the transcript" },
+      { id:"paid", label:"Money already paid", hint:"What has been paid, to whom, how, and what proof exists" },
+      { id:"next_payment", label:"When the builder wants the next payment", short:true },
+      { id:"told", label:"What the client has been told, and what they asked", hint:"Dates, materials, insurance, anything promised in messages" },
+      { id:"checked", label:"What you checked independently", hint:"Searches, calls, registrations. Leave empty if nothing" },
+    ],
+  },
+  condition: {
+    what: "The condition of the property, recorded on site and rated by you. Electrics, termites and structure are seen and referred on, never judged.",
+    files: "Photographs and the walk round video stills",
+    who: { attended:"Who attended the property", capacity:"In what capacity" },
+    visited: true,
+    fields: [
+      { id:"weather", label:"Weather on the day, and the days before", short:true },
+      { id:"occupied", label:"Occupied or empty, furnished or not", short:true },
+      { id:"access", label:"How access was gained, and who was present", short:true },
+      { id:"property", label:"The property", hint:"Type, storeys, walls, roof, floors, water supply, waste (mains, septic, pit), power (grid, solar, generator). No age unless known" },
+      { id:"roof", label:"Roof", hint:"Covering, fixings and rust, straps if seen, gutters, stains on ceilings. Size in words only" },
+      { id:"structure", label:"Structure", hint:"Cracks by direction and how fine or wide they look, rust stains, leaning or sagging, sloping ground" },
+      { id:"water", label:"Water", hint:"Supply, tank and its stand, pump, water heater, leaks, damp or dry" },
+      { id:"electrics", label:"Electrics, as seen only", hint:"Board cover, loose cables, scorching, solar or generator connections" },
+      { id:"drainage", label:"Drainage", hint:"Gutters to ground, standing water, septic tank or pit: covers, smell, wet ground" },
+      { id:"termites", label:"Termites and timber", hint:"Mud tubes, pellets, hollow or blistered wood, rot, wood touching soil" },
+      { id:"security", label:"Security provision", hint:"Gates, grilles, whether bedroom grilles open from inside, locks, lights" },
+      { id:"external", label:"External works", hint:"Boundary and retaining walls, yard, paths, trees near the house" },
+      { id:"not_reached", label:"What could not be seen or reached, and why" },
+    ],
+  },
+  technical_signoff: {
+    what: "One stage, judged by a qualified trade inspector who did not do the work. You type the result yourself afterwards.",
+    files: "Photographs of the stage, the scope and any drawings",
+    who: { attended:"Trade inspector who attended", capacity:"Their trade qualification, and who issued it" },
+    visited: true,
+    fields: [
+      { id:"stage", label:"The stage inspected", short:true },
+      { id:"trade", label:"The trade", short:true },
+      { id:"work_by", label:"Who carried out the work", short:true },
+      { id:"standard", label:"What the work was checked against", hint:"The scope of work, drawings, manufacturer's instructions, with dates or versions" },
+      { id:"checks", label:"The checks", hint:"One per line: what was checked, what had to be true, what was actually found. In words, never a size or tolerance", rows:6 },
+      { id:"wrong", label:"What does not match, and where", hint:"Each thing that has to be put right" },
+      { id:"not_reached", label:"What could not be seen, and why" },
+    ],
+  },
+  visual_check: {
+    what: "A photographic record against the agreed checklist. It records what was there and does not rate or advise.",
+    files: "The photographs",
+    who: { attended:"Checker who attended", capacity:"Their role" },
+    visited: true,
+    fields: [
+      { id:"times", label:"Scheduled time, time in, time out", short:true },
+      { id:"weather", label:"Weather and how access was gained", short:true },
+      { id:"client_items", label:"The items the client asked to be captured", hint:"Each one, what the photographs show, and the photo numbers" },
+      { id:"outside", label:"Outside", hint:"What the photographs show, with photo numbers. Plain description, no opinion" },
+      { id:"inside", label:"Inside, room by room" },
+      { id:"services", label:"Water, power and drains, as seen" },
+      { id:"not_reached", label:"What could not be photographed, and why" },
+    ],
+  },
+  property_care: {
+    what: "The routine visit record. The same checklist every time, with what changed since the last visit.",
+    files: "The photographs from the visit",
+    who: { attended:"Visitor who attended", capacity:"Their role" },
+    visited: true,
+    fields: [
+      { id:"plan", label:"Plan and home", short:true, hint:"For example: fortnightly, standard home, visit 3" },
+      { id:"times", label:"Time in and time out, alarm on arrival and on leaving", short:true },
+      { id:"readings", label:"Readings", hint:"Electricity meter, water meter, tank level, fridge. Meter readings as plain digits, no commas" },
+      { id:"outside", label:"Outside", hint:"Gate, walls, yard, roof from the ground, gutters, windows and grilles, doors, lights, post, signs of entry" },
+      { id:"inside", label:"Inside", hint:"Ceilings for stains, walls and floors, windows and locks, smell or damp" },
+      { id:"services", label:"Water, power and drains", hint:"Taps run, toilets flushed, leaks, tank and pump, board, septic cover" },
+      { id:"pests", label:"Pests, damp and storm", hint:"Termite or rodent signs, nests, standing water, loose items" },
+      { id:"since", label:"What changed since the last visit", hint:"New, worse, or put right" },
+      { id:"called", label:"Anything the owner was called or messaged about during the visit, and when" },
+      { id:"resident", label:"If somebody lives there", hint:"Seen, spoke with them, and what they asked to be passed on in their words. Nothing about health" },
+      { id:"carried", label:"Items still open from earlier visits" },
+      { id:"next_visit", label:"Next visit", short:true },
+    ],
+  },
+  oversight: {
+    what: "The month in one report, from the site visits and what was said in writing. You type the status ratings and the money yourself afterwards.",
+    files: "Progress photographs, messages and paperwork from the month",
+    who: { attended:"Who attended site this month", capacity:"Their role" },
+    fields: [
+      { id:"period", label:"The month covered", short:true },
+      { id:"visits", label:"Site visits", hint:"One per line: date, who attended, builder on site or not, how many workers, weather" },
+      { id:"done", label:"Work done this month, as seen on site" },
+      { id:"next", label:"Work planned next month, as the builder stated it" },
+      { id:"milestones", label:"Milestones", hint:"Each one with its agreed date and the builder's current forecast" },
+      { id:"changes", label:"Changes to the work", hint:"What changed, who asked, the effect on time, and whether the client agreed. No prices here, money is typed separately" },
+      { id:"quality", label:"Quality and safety", hint:"What was seen, where, who it was raised with and when. Whether the builder's insurance was seen" },
+      { id:"risks", label:"What could go wrong" },
+      { id:"decisions", label:"Decisions needed from the client", hint:"The decision, the options, when it is needed by, and what happens if it is missed" },
+      { id:"escalations", label:"Messages on the WhatsApp line", hint:"When, who raised it, what about, what was done" },
+      { id:"call", label:"The monthly call", hint:"Date, who was on it, points agreed, and each action with its owner and due date" },
+    ],
+  },
+  pm_stage: {
+    what: "Yaadly's record of one stage of a managed build: a project record, not a certificate. You type the result and the value yourself afterwards.",
+    files: "Photographs of the stage and the scope",
+    who: { attended:"Who inspected the stage", capacity:"Their role. Never the trade who did the work" },
+    visited: true,
+    fields: [
+      { id:"stage", label:"The stage", short:true },
+      { id:"trade", label:"The trade", short:true },
+      { id:"checks", label:"Scope items checked", hint:"One per line: the scope item, what had to be true, what was found. In words", rows:6 },
+      { id:"open", label:"Items still open", hint:"What, where, and when it has to close by" },
+    ],
+  },
+};
+
+// What was typed into each box, kept per service, so switching the service
+// and back does not lose a half written visit.
+const RPT_TYPED = {};
+
+function rptFormKeep(){
+  const kind = $("rptFields")?.dataset.kind; if (!kind) return;
+  const keep = RPT_TYPED[kind] = RPT_TYPED[kind] || {};
+  document.querySelectorAll("#rptFields [data-rpt-f]").forEach(el => { keep[el.dataset.rptF] = el.value; });
+}
+
+function rptFormDraw(){
+  const box = $("rptFields"); if (!box) return;
+  const kind = $("rptKind").value, form = RPT_FORMS[kind]; if (!form) { box.innerHTML = ""; return; }
+  const was = RPT_TYPED[kind] || {};
+  const val = (id) => esc(was[id] || "");
+  const input = (id, label, hint, short, rows) => `<label class="fl" style="margin-top:10px">${esc(label)}</label>` + (short
+    ? `<input class="inp" data-rpt-f="${esc(id)}" value="${val(id)}" placeholder="${esc(hint || "")}">`
+    : `<textarea class="inp" data-rpt-f="${esc(id)}" rows="${rows || 3}" placeholder="${esc(hint || "")}">${val(id)}</textarea>`);
+  let h = "";
+  if (form.visited) h += `<label class="fl" style="margin-top:10px">Date of the visit</label><input class="inp" type="date" data-rpt-f="_visited" value="${val("_visited")}">`;
+  if (form.who) {
+    h += input("_attended", form.who.attended, "Name", true)
+       + input("_capacity", form.who.capacity, "", true)
+       + `<label class="fl" style="margin-top:10px">How you reviewed it</label><select class="inp" data-rpt-f="_mode">
+           <option value="in_person"${was._mode === "in_person" ? " selected" : ""}>In person, I was there</option>
+           <option value="remote"${was._mode === "remote" ? " selected" : ""}>Remotely, from the evidence</option></select>`;
+  }
+  h += form.fields.map(f => input(f.id, f.label, f.hint, f.short, f.rows)).join("");
+  box.dataset.kind = kind;
+  box.innerHTML = h;
+  $("rptKindWhat").textContent = form.what;
+  $("rptFilesLbl").textContent = form.files;
+}
+
+// The boxes, as the notes the agent reads: one labelled heading per box that
+// was filled in, in the template's order, then anything else.
+function rptFormNotes(){
+  rptFormKeep();
+  const kind = $("rptKind").value, form = RPT_FORMS[kind] || { fields: [] }, t = RPT_TYPED[kind] || {};
+  const parts = [];
+  if (form.who && (t._attended || "").trim()) parts.push(`${form.who.attended.toUpperCase()}:\n${t._attended.trim()}${(t._capacity || "").trim() ? ", " + t._capacity.trim() : ""}`);
+  for (const f of form.fields) if ((t[f.id] || "").trim()) parts.push(`${f.label.toUpperCase()}:\n${t[f.id].trim()}`);
+  const extra = ($("rptNotes").value || "").trim();
+  if (extra) parts.push(`ANYTHING ELSE:\n${extra}`);
+  return {
+    notes: parts.join("\n\n"),
+    visited_on: (t._visited || "").trim() || null,
+    who: form.who ? { attended: (t._attended || "").trim(), capacity: (t._capacity || "").trim(), mode: t._mode === "remote" ? "remote" : "in_person" } : null,
+  };
+}
+
 const READ_FN = SUPABASE_URL + "/functions/v1/yaad-report-read";
 
 // What the reader transcribed for the draft that is about to be made. Held
@@ -11204,7 +11526,7 @@ async function preReports(rows){
   const ids = (rows || []).map(r => r.id).filter(Boolean);
   if (!ids.length) return rows;
   const [{ data: reps }, { data: fs }, { data: eds }] = await Promise.all([
-    sb.from("reports").select("id,verdict,verdict_line,sections,omitted,questions,scrubbed,source_text,model,provider,issued_by,issued_at").in("id", ids),
+    sb.from("reports").select("id,verdict,verdict_line,sections,omitted,questions,scrubbed,source_text,model,provider,issued_by,issued_at,human").in("id", ids),
     sb.from("report_findings").select("report_id,ord,heading,body,why,action,severity,rated_by,rated_at").in("report_id", ids).order("ord"),
     // Hand corrections (20260928190000). A desk older than the migration
     // simply gets an error here and shows no log, rather than no page.
@@ -11224,8 +11546,63 @@ async function preReports(rows){
     r._model = x.model || ""; r._provider = x.provider || "";
     r._issued_by = x.issued_by || ""; r._findingRows = fBy[r.id] || [];
     r._edits = eBy[r.id] || [];
+    r._human = (x.human && typeof x.human === "object") ? x.human : {};
   }
   return rows;
+}
+
+const RPT_RESULT = { released:"Released", released_with_conditions:"Released with conditions", not_released:"Not released", complete:"Complete", complete_with_items:"Complete with items", not_complete:"Not complete" };
+const RPT_STATUS = { on_track:["ok","On track"], at_risk:["warn","At risk"], off_track:["crit","Off track"] };
+// The stored codes, in words. A document never prints a code.
+const RPT_SINCE = { new:"New", same:"Same", worse:"Worse", resolved:"Resolved" };
+const RPT_CHANGE = { asked:"Asked for", priced:"Priced", agreed:"Agreed", turned_down:"Turned down", withdrawn:"Withdrawn" };
+const RPT_ACTION = { done:"Done", open:"Open", blocked:"Blocked", dropped:"Dropped" };
+const RPT_RESULT_TONE = { released:"ok", complete:"ok", released_with_conditions:"warn", complete_with_items:"warn", not_released:"crit", not_complete:"crit" };
+function rptMoneyText(cur, n){ return n == null || n === "" ? "Not known" : (cur || "GBP") + " " + Number(n).toLocaleString("en-GB", { maximumFractionDigits: 2 }); }
+
+// What only a person decides on this service, shown with who is to type it.
+function rptHumanCard(r){
+  const hm = r._human || {}, who = (r._sections || {}).who || {};
+  const bits = [];
+  if (r.kind !== "deposit_check") bits.push(`<div class="jpv"><span>Who attended</span><div class="jpvv">${esc(who.attended || "Not recorded")}${sub_(who.capacity || "")}</div></div>
+      <div class="jpv"><span>Reviewed</span><div class="jpvv">Monique Sewell-Bennett${sub_(who.mode === "remote" ? "remotely, from the evidence" : "in person")}</div></div>`);
+  if (r.kind === "technical_signoff" || r.kind === "pm_stage")
+    bits.push(`<div class="jpv"><span>Result</span><div class="jpvv">${hm.result ? `<b>${esc(RPT_RESULT[hm.result] || hm.result)}</b>` : mute_("not typed yet: Type the result")}</div></div>`);
+  if (r.kind === "oversight") {
+    const st = hm.status || {};
+    bits.push(`<div class="jpv"><span>The month</span><div class="jpvv">${["overall","time","money","quality","safety","scope"].map(a => { const x = RPT_STATUS[st[a]]; return `${esc(a)} ${x ? chip_(x[0], x[1]) : mute_("not rated")}`; }).join(" &middot; ")}</div></div>`);
+  }
+  if (RPT_MONEY[r.kind]) {
+    const m = hm.money || {};
+    bits.push(`<div class="jpv"><span>Money</span><div class="jpvv">${m.currency ? (RPT_MONEY[r.kind].map(([k, l]) => `${esc(l)}: ${esc(rptMoneyText(m.currency, m[k]))}`).join("<br>")) : mute_("not typed yet: Type the money")}</div></div>`);
+  }
+  return bits.length ? `<div class="jpc" style="margin-top:12px"><h6>Typed by you, never drafted</h6>${bits.join("")}</div>` : "";
+}
+
+// The two record only services are never rated: "They record. They do not
+// rate or advise." The database refuses a rating on them (20260929001000).
+function rptRated(kind){ return kind !== "visual_check" && kind !== "property_care"; }
+
+// The money lines a person types, per service. Keys must match the list in
+// set_report_human(), which refuses anything else.
+const RPT_MONEY = {
+  oversight: [["agreed_price","Agreed price for the work"],["agreed_changes","Agreed changes"],["paid_to_date","Paid to date"],["requested_unpaid","Asked for, not yet paid"],["changes_pending","Changes asked for, not yet agreed (builder's figure)"],["builder_forecast","Builder's own forecast of the final total"]],
+  pm_stage: [["agreed_price","Agreed price"],["agreed_changes","Agreed changes to date"],["prior_signed_off","Value of stages signed off before this one"],["this_stage","Value of this stage"],["asked_for","What the trade asked for"]],
+};
+function rptMoneyAsk(r){
+  const was = (r._human || {}).money || {};
+  return [{ k:"currency", label:"Currency", from:() => was.currency || "GBP", options:[["GBP","GBP"],["USD","USD"],["CAD","CAD"],["JMD","JMD"]] },
+    ...(RPT_MONEY[r.kind] || []).map(([k, label]) => ({ k, label, from:() => was[k] == null ? "" : String(was[k]), placeholder:"Number, or leave empty" })),
+    { k:"reason", label:r.kind === "pm_stage" ? "If the value differs from what the trade asked for, why" : "What moved this month, and why", type:"long", from:() => was.reason || "" }];
+}
+function rptMoneyValue(r, v){
+  const out = { currency: v.currency || "GBP", reason: v.reason || null };
+  for (const [k] of (RPT_MONEY[r.kind] || [])) {
+    const t = String(v[k] || "").replace(/[, ]/g, "");
+    // Not a number goes to the database as typed, which refuses it by name.
+    out[k] = t === "" ? null : (Number.isFinite(Number(t)) ? Number(t) : v[k]);
+  }
+  return out;
 }
 
 function reportPage(r){
@@ -11238,15 +11615,19 @@ function reportPage(r){
   const handN = (r._edits || []).length;
   const service = RPT_SERVICE[r.kind] || r.kind;
   const fs = r._findingRows || [];
-  const unrated = fs.filter(f => !f.severity).length;
-  const sevChip = (f) => f.severity
+  const rated = rptRated(r.kind);
+  const unrated = rated ? fs.filter(f => !f.severity).length : 0;
+  const hm = r._human || {};
+  const decisionMissing = ((r.kind === "technical_signoff" || r.kind === "pm_stage") && !hm.result)
+    || (r.kind === "oversight" && !((hm.status || {}).overall));
+  const sevChip = (f) => !rated ? chip_("mute", "recorded, not rated") : f.severity
     ? chip_(f.severity === "severe" ? "crit" : f.severity === "moderate" ? "warn" : "ok", f.severity) + sub_((f.rated_by || "").split("@")[0] + (f.rated_at ? ", " + ago_(f.rated_at) + " ago" : ""))
     : chip_("warn", "unrated");
   const state = r.status === "issued"
     ? `<b class="evpok">Issued${r._issued_by ? " by " + esc(r._issued_by.split("@")[0]) : ""}${r.issued_at ? ", " + esc(ago_(r.issued_at)) + " ago" : ""}.</b><span>Readable in the client's portal. Nothing on it changes now.</span>`
-    : (unrated === 0 && r._verdict_line)
-      ? `<b class="evpok">Ready to issue.</b><span>Every finding is rated and the verdict is written. Issue it below and the number is minted.</span>`
-      : `<b class="evpyou">Yours to finish.</b><span>${unrated ? unrated + " finding" + (unrated === 1 ? "" : "s") + " unrated" : "All findings rated"}${r._verdict_line ? ", verdict written." : ", verdict not written."} The report cannot issue until both are done, and nothing here drafts either.</span>`;
+    : (unrated === 0 && r._verdict_line && !decisionMissing)
+      ? `<b class="evpok">Ready to issue.</b><span>${rated ? "Every finding is rated, t" : "T"}he verdict is written${decisionMissing ? "" : (r.kind === "oversight" ? ", the month is rated" : (hm.result ? ", the result is typed" : ""))}. Issue it below and the number is minted.</span>`
+      : `<b class="evpyou">Yours to finish.</b><span>${rated ? (unrated ? unrated + " finding" + (unrated === 1 ? "" : "s") + " unrated, " : "All findings rated, ") : "A record, so nothing is rated, "}${r._verdict_line ? "verdict written" : "verdict not written"}${decisionMissing ? (r.kind === "oversight" ? ", the month not rated" : ", the result not typed") : ""}. The report cannot issue until each is done, and nothing here drafts any of them.</span>`;
 
   const srcOf = Object.fromEntries((sx.finding_refs || []).map(x => [x.ord, x.source]));
   const findings = fs.length ? fs.map(f => `
@@ -11268,7 +11649,7 @@ function reportPage(r){
   return `<div class="jp rpp">
     <div class="jphead">
       <div class="jpt">${esc(service)}${r.number ? ", " + esc(r.number) : ", draft"}</div>
-      <div class="jpchips">${tone_(r.status)} ${chip_("mute", fs.length + " finding" + (fs.length === 1 ? "" : "s"))} ${unrated ? chip_("warn", unrated + " unrated") : chip_("ok", "all rated")} ${r._verdict_line ? chip_("ok", "verdict written") : chip_("warn", "no verdict")} ${check.length ? chip_(gaps ? "crit" : "ok", gaps + " gap" + (gaps === 1 ? "" : "s") + " in the paperwork") : ""} ${r._scrubbedList.length ? chip_("warn", r._scrubbedList.length + " scrubbed") : ""}</div>
+      <div class="jpchips">${tone_(r.status)} ${chip_("mute", fs.length + " finding" + (fs.length === 1 ? "" : "s"))} ${!rated ? chip_("mute", "a record, not rated") : unrated ? chip_("warn", unrated + " unrated") : chip_("ok", "all rated")} ${r._verdict_line ? chip_("ok", "verdict written") : chip_("warn", "no verdict")} ${check.length ? chip_(gaps ? "crit" : "ok", gaps + " gap" + (gaps === 1 ? "" : "s") + " in the paperwork") : ""} ${r._scrubbedList.length ? chip_("warn", r._scrubbedList.length + " scrubbed") : ""}</div>
       <div class="evpwho">${state}</div>
     </div>
 
@@ -11284,6 +11665,8 @@ function reportPage(r){
           : `<div class="rpv held"><b>Not written.</b><p>Read the findings below first. Then Write the verdict at the foot of this page. No model has seen this field and none will.</p></div>`}
       </div>
     </div>
+
+    ${rptHumanCard(r)}
 
     ${r.kind === "deposit_check" ? `<h5 class="rph">Page one and about this review <span>drafted, all correctable</span></h5>
     <div class="jpgrid two">
@@ -11466,7 +11849,7 @@ function wireReportEdits(row, el){
 // every report, and no preview outside the desk could show it, because the
 // policy is only applied on the real hostname.
 const RPT_LOGO = "data:image/png;base64,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";
-const RPT_SERVICE = { deposit_check:"Deposit Protection Check", condition:"Condition Report", technical_signoff:"Technical Sign-off", visual_check:"Visual Check" };
+const RPT_SERVICE = { deposit_check:"Deposit Protection Check", condition:"Condition Report", technical_signoff:"Technical Sign-off", visual_check:"Visual Check", property_care:"Property Care", oversight:"Oversight Retainer", pm_stage:"Stage Completion Record" };
 const RPT_STATE = { confirmed:["Confirmed","ok"], provided:["Provided","ok"], not_provided:["Not provided","gap"], not_found:["Not found","gap"], referred:["Referred on","ref"], not_applicable:["Not applicable","na"] };
 
 async function openReportDocument(id){
@@ -11536,7 +11919,8 @@ table.ck{width:100%;border-collapse:collapse;font-size:9.8pt}table.ck tr{break-i
 table.ck td{border-bottom:1pt solid var(--line);padding:6px 4px;vertical-align:top}
 table.ck td.g{font:600 7.2pt/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--mute);padding-top:13px;border:none}table.ck td.s{width:29mm;text-align:right;white-space:nowrap}
 .tag{font:600 7.2pt/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;border-radius:99px;padding:4px 8px;display:inline-block}
-.t-ok{color:#fff;background:var(--teal)}.t-gap{color:#fff;background:var(--coral)}.t-ref{color:var(--ink);background:#eceef4;border:1pt solid var(--line)}.t-na{color:var(--mute);border:1pt solid var(--line)}
+.t-ok{color:#fff;background:var(--teal)}.t-warn{color:#fff;background:var(--mango)}
+.result{font-family:var(--disp);font-size:20pt;font-weight:600;line-height:1.2;margin:6px 0 12px;padding:4px 0 4px 12px;border-left:5pt solid var(--teal)}.result.warn{border-color:var(--mango)}.result.crit{border-color:var(--coral)}.t-gap{color:#fff;background:var(--coral)}.t-ref{color:var(--ink);background:#eceef4;border:1pt solid var(--line)}.t-na{color:var(--mute);border:1pt solid var(--line)}
 .note{display:block;color:var(--mute);font-size:8.8pt;margin-top:2px}
 ul.q{margin:0;padding-left:17px}ul.q li{margin-bottom:6px}
 .scope{background:var(--wash);border:1pt solid var(--line);border-radius:2pt;padding:12px 15px;font-size:9.4pt}.scope p{margin:0 0 6px}.scope p:last-child{margin:0}
@@ -11544,7 +11928,358 @@ footer{margin-top:22px;padding-top:10px;border-top:1pt solid var(--line);font-si
 @media print{.printbar{display:none}.wrap{max-width:none;padding:0}}
 `;
 
+// ---------------------------------------------------------------- the six
+// services as documents, 28 September 2026.
+//
+// Each follows the layout of its blank template (scripts/report-templates),
+// so a report written by hand from the template and one drafted here read as
+// the same product. Same rule as the Deposit Protection Check document: it
+// writes no sentence of its own about the job. Everything job specific was
+// drafted by yaad-report and screened, or typed by a named person (ratings,
+// verdict, and reports.human: result, status, money), and the fixed text is
+// the house standard. A part the report does not carry shows as a dashed box.
+const RPT_KEYS = {
+  condition: [["severe","Deal with it now.","Left alone it is likely to cause serious damage, a safety risk, or a much bigger repair. Get it seen to, or the right professional in, before anything else."],
+              ["moderate","Plan to deal with it.","It needs repairing or replacing, but it is not urgent. Budget for it in the coming months."],
+              ["low","Normal upkeep.","No repair needed now. Keep it maintained and watch it."]],
+  technical_signoff: [["severe","Put right before anything covers it.","The next stage must not start and this work must not be covered up until it is put right and seen again."],
+              ["moderate","Put right before handover.","It does not stop the next stage, but it must be closed before the work is accepted."],
+              ["low","Put right when convenient.","A finish or tidy item, to close before the final payment."]],
+  oversight: [["severe","Needs your decision now.","Left alone this month, it affects time, money or safety on the build."],
+              ["moderate","Watch it this month.","Being dealt with; it is on the list for the next call."],
+              ["low","Noted.","Recorded so the trend is visible. No action needed from you."]],
+  pm_stage: [["severe","Stops the next stage.","The next stage does not start, and this stage is not paid, until it is closed."],
+              ["moderate","Close before handover.","The next stage can go ahead; it must be closed before the work is handed over."],
+              ["low","Close in the defects period.","A finish item, tracked on the defects list."]],
+};
+
+function rptDoc(rep, findings, o){
+  const service = RPT_SERVICE[rep.kind] || rep.kind;
+  const issued = !!rep.number;
+  const practice = /practice/i.test(String(rep.client_name || "")) || /practice/i.test(String(rep.property || ""));
+  const dateOf = (s) => s ? new Date(s).toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" }) : "";
+  const byLine = o.company
+    ? `<b>Issued by Yaadly Ltd</b>, England and Wales no. 17358077. A named person at Yaadly signs every record and approves every payment to a trade. This is a project record between Yaadly and the client, not a certificate issued under any law, building code or professional scheme.`
+    : `<b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader.<br>${o.coverNote}`;
+  return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8">
+<title>${esc(service)}${rep.number ? ", " + esc(rep.number) : ", draft"}</title>
+<style>${RPT_DOC_CSS}${RPT_DEP_CSS}</style></head><body>
+<div class="printbar"><span>Print, then choose Save as PDF</span><button onclick="window.print()">Print</button></div>
+<div class="wrap">
+<div class="cover">
+  <div class="top"><img src="${RPT_LOGO}" alt=""><div class="wm">Yaad<span>ly</span></div></div>
+  <div class="mid">
+    <div class="kicker">${esc(service)}</div>
+    <h1>${esc(o.title)}</h1>
+    <p class="sub">${esc(o.sub)}</p>
+    <dl>
+      <dt>Prepared for</dt><dd>${esc(rep.client_name || "Not named")}</dd>
+      <dt>Property</dt><dd>${esc(rep.property || "Not given")}</dd>
+      <dt>${esc(o.dateLabel || "Date of visit")}</dt><dd>${esc(rep.visited_on ? dateOf(rep.visited_on) : dateOf(rep.issued_at || rep.drafted_at))}</dd>
+      <dt>Reference</dt><dd>${esc(rep.number || "Number minted on issue")}</dd>
+    </dl>
+    <div><span class="stamp${issued ? " issued" : ""}">${issued ? "Issued" : (o.draftStamp || "Draft, not issued")}</span></div>
+  </div>
+  <div class="bottom">${byLine}</div>
+</div>
+<table class="doc"><thead><tr><td>
+<div class="runhead"><img src="${RPT_LOGO}" alt=""><div class="wm">Yaad<span>ly</span></div><div class="svc">${esc(service)}<br>${esc(rep.number || "Draft, not issued")}</div></div>
+</td></tr></thead><tbody><tr><td>
+${practice ? `<div class="draftbar"><b>Practice document.</b> Invented client and property. Nothing in it relates to a real person or a real place.</div>` : ""}
+<h1>Contents</h1>
+<ol class="toc">${o.toc.map(([l, t, d]) => `<li><span class="l">${l}</span>${esc(t)}<span class="d">${esc(d)}</span></li>`).join("")}</ol>
+${o.body}
+<footer>
+  ${o.company ? "Yaadly Ltd, registered in England and Wales, company number 17358077." : "Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077."}<br>
+  Drafted by the Yaadly report agent${rep.model ? ` (${esc(rep.model)}, EU)` : ""} from the notes of the people named in this document, then screened for language, measurements and figures. ${o.footNote}
+</footer>
+</td></tr></tbody></table>
+</div></body></html>`;
+}
+
+// Pieces the six documents share.
+const rptArr = (a) => Array.isArray(a) ? a : [];
+const rptBlank = (what) => `<div class="blank"><div class="lbl">Not drafted on this report</div><p>${esc(what)}</p></div>`;
+const rptSev = (f) => f.severity ? `<span class="sev s-${esc(f.severity)}">${esc(f.severity)}</span>` : `<span class="sev blankchip">rating to add</span>`;
+function rptKey(kind){
+  const k = RPT_KEYS[kind]; if (!k) return "";
+  return `<table class="key">${k.map(([s, lead, rest]) => `<tr><td class="k"><span class="sev s-${s}">${s}</span></td><td><b>${esc(lead)}</b> ${esc(rest)}</td></tr>`).join("")}</table>`;
+}
+function rptWho(rep, attendedRole){
+  const w = (rep.sections || {}).who || {};
+  return `<table class="gl"><tr><th style="width:34%">Role</th><th>Name</th><th style="width:30%">Capacity</th><th style="width:18%">How</th></tr>
+<tr><td>${esc(attendedRole)}</td><td>${esc(w.attended || "Not recorded")}</td><td>${esc(w.capacity || "")}</td><td>In person</td></tr>
+<tr><td>Reviewed the evidence and wrote this report</td><td>Monique Sewell-Bennett</td><td>Project manager, seven years UK construction</td><td>${w.mode === "remote" ? "Remotely" : "In person"}</td></tr></table>
+<p><b>Related party disclosure.</b> Nobody named above has any personal, family or business connection to the owner, the occupier, or anybody who carried out work at this property, or receives anything from any of them.</p>`;
+}
+function rptPros(questions){
+  const pros = [];
+  for (const q of rptArr(questions)) {
+    const m = /^([A-Za-z][A-Za-z ,'&]{1,40}):\s*(.+)$/s.exec(String(q));
+    const name = m ? m[1].trim() : "Other professionals", raw = (m ? m[2] : String(q)).trim();
+    let p = pros.find(x => x.name.toLowerCase() === name.toLowerCase());
+    if (!p) pros.push(p = { name, items: [] });
+    p.items.push(raw.charAt(0).toUpperCase() + raw.slice(1));
+  }
+  return pros.length ? pros.map(p => `<h4 class="pro">${esc(p.name)}</h4><ul class="q">${p.items.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`).join("")
+    : `<p class="lead">None were raised.</p>`;
+}
+function rptFinding(f, extra){
+  return `<div class="f"><div class="f-head"><div class="n">${esc(f.ord)}</div><h3>${esc(f.heading)}</h3>${extra && extra.noRating ? "" : rptSev(f)}</div>
+  <div class="f-body">${extra && extra.where ? `<p class="lead" style="margin:0 0 4px">${esc(extra.where)}</p>` : ""}<p>${esc(f.body)}</p>
+  ${f.why ? `<div class="why"><b>Why it matters</b>${esc(f.why)}</div>` : ""}
+  ${f.action ? `<div class="act"><b>${esc((extra && extra.actionLabel) || "What to do")}</b>${esc(f.action)}</div>` : ""}</div></div>`;
+}
+const RPT_SEV_ORDER = { severe: 0, moderate: 1, low: 2 };
+const rptWorstFirst = (fs) => fs.slice().sort((a, b) => (RPT_SEV_ORDER[a.severity] ?? 3) - (RPT_SEV_ORDER[b.severity] ?? 3) || a.ord - b.ord);
+const rptVerdict = (rep, blankTitle) => rep.verdict_line || rep.verdict
+  ? `<p class="vline">${esc(rep.verdict_line || "")}</p><p>${esc(rep.verdict || "")}</p>`
+  : `<div class="blank"><div class="lbl">${esc(blankTitle)} not written yet</div><p>Written by a person, never drafted. The report cannot issue without it.</p></div>`;
+const rptSign = (a, b) => `<div class="sig"><div><span>${esc(a)}</span>Name</div><div><span></span>Signature</div><div><span></span>Date</div></div>${b ? `<div class="sig"><div><span>${esc(b)}</span>Name</div><div><span></span>Signature</div><div><span></span>Date</div></div>` : ""}`;
+
+const RPT_ELEMENT_NAME = { roof:"Roof", structure:"Structure", water:"Water", electrics:"Electrics", drainage:"Drainage", termites:"Termites and timber", security:"Security provision", external:"External works" };
+
+function reportDocumentCondition(rep, findings){
+  const sx = rep.sections || {};
+  const refs = Object.fromEntries(rptArr(sx.finding_refs).map(r => [r.ord, r]));
+  const els = Object.keys(RPT_ELEMENT_NAME);
+  const L = "EFGHIJKL";
+  const inEl = (e) => rptWorstFirst(findings.filter(f => (refs[f.ord] || {}).element === e));
+  const worst = (fs) => fs.length ? (fs.find(f => f.severity === "severe") ? "severe" : fs.find(f => f.severity === "moderate") ? "moderate" : fs.find(f => f.severity === "low") ? "low" : "") : "";
+  const p = sx.property || {}, v = sx.visit || {};
+  const toc = [["A","How to read this report","the ratings and what each one asks of you"],["B","About this inspection","who, when, how the evidence was gathered"],["C","The property","what it is and how it is served"],["D","At a glance","the verdict and every section's worst rating"],
+    ...els.map((e, i) => [L[i], RPT_ELEMENT_NAME[e], "worst first"]),["M","What to do now","in order of the ratings"],["N","Documents and other professionals","by profession"],["O","What this report is and is not","limits, and the declaration"]];
+  const body = `
+<h2 class="brk">A. How to read this report</h2>
+<p class="lead">Every finding carries one rating, written by the reviewer. Within each section the worst finding is first.</p>
+${rptKey("condition")}
+<p class="lead" style="margin-top:12px">Yaadly never states a dimension. Size is described in words. Left and right are as you face the part described; the front faces the road.</p>
+<h2 class="brk">B. About this inspection</h2>
+${rptWho(rep, "Attended the property and took the photographs")}
+<div class="meta"><div><dt>Weather</dt><dd>${esc(v.weather || "Not recorded")}</dd></div><div><dt>Occupied</dt><dd>${esc(v.occupied || "Not recorded")}</dd></div><div><dt>Access</dt><dd>${esc(v.access || "Not recorded")}</dd></div><div><dt>Present</dt><dd>${esc(v.present || "Not recorded")}</dd></div></div>
+<p>The evidence was gathered on foot, from the ground and from inside, with a photograph of every part in sections E to L. Nothing was climbed, opened up, lifted or moved, and no services were tested.</p>
+<h2>C. The property</h2>
+<div class="meta">${[["Type",p.type],["Age",p.age],["Storeys",p.storeys],["Walls",p.walls],["Roof",p.roof],["Floors",p.floors],["Water",p.water],["Waste",p.waste],["Power",p.power]].map(([k, x]) => `<div><dt>${k}</dt><dd>${esc(x || "Not recorded")}</dd></div>`).join("")}</div>
+<h2 class="brk">D. At a glance</h2>
+${rptVerdict(rep, "The verdict")}
+<table class="gl" style="margin-top:12px"><tr><th>Section</th><th style="width:28mm">Worst rating</th><th style="width:18mm">Severe</th><th style="width:20mm">Moderate</th><th style="width:16mm">Low</th></tr>
+${els.map((e, i) => { const fs = inEl(e), w = worst(fs); return `<tr><td>${L[i]} ${esc(RPT_ELEMENT_NAME[e])}</td><td>${w ? `<span class="sev s-${w}">${w}</span>` : (fs.length ? '<span class="sev blankchip">to rate</span>' : "Nothing found")}</td><td>${fs.filter(f => f.severity === "severe").length}</td><td>${fs.filter(f => f.severity === "moderate").length}</td><td>${fs.filter(f => f.severity === "low").length}</td></tr>`; }).join("")}</table>
+<p class="lead">This page is a summary. It is not the report, and it should not be relied on without the sections behind it.</p>
+${els.map((e, i) => { const fs = inEl(e), lim = (sx.limits || {})[e] || {}; return `<h2${fs.length ? ' class="brk"' : ""}>${L[i]}. ${esc(RPT_ELEMENT_NAME[e])}</h2>
+<div class="meta"><div><dt>How it was seen</dt><dd>${esc(lim.seen || "Not recorded")}</dd></div><div><dt>What could not be seen</dt><dd>${esc(lim.not_seen || "Nothing recorded")}</dd></div></div>
+${fs.length ? fs.map(f => rptFinding(f, { where: (refs[f.ord] || {}).where })).join("") : `<p class="lead">Nothing was recorded here.</p>`}`; }).join("")}
+<h2 class="brk">M. What to do now</h2>
+${findings.some(f => f.action) ? `<ol class="plan">${rptWorstFirst(findings).filter(f => f.action).map(f => `<li><div>${esc(f.action)}</div><span class="w">Finding ${esc(f.ord)}${f.severity ? ", " + esc(f.severity) : ""}</span></li>`).join("")}</ol><p class="lead">Where a repair needs pricing, get at least two written quotes against the same description of the work.</p>` : rptBlank("No action was drafted on any finding.")}
+<h2>N. Documents and other professionals</h2>
+${rptArr(sx.documents_to_get).length ? `<table class="gl"><tr><th>Document to get</th><th style="width:30%">From</th><th style="width:34%">Why</th></tr>${sx.documents_to_get.map(d => `<tr><td>${esc(d.document)}</td><td>${esc(d.from || "")}</td><td>${esc(d.why || "")}</td></tr>`).join("")}</table>` : ""}
+${rptPros(rep.questions)}
+${rptArr(rep.omitted).length ? `<h4 class="pro">Could not be established</h4><ul class="q">${rep.omitted.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+<h2 class="brk">O. What this report is and is not</h2>
+<div class="scope"><p>It is a visual record of the parts of the property that could be seen and safely reached on the day, and a project manager's rating of what to do about each thing found. It is not a building survey or a structural engineering survey, a valuation, a legal or title opinion, or a boundary survey, and those questions go to a PERB registered engineer, a licensed valuer, an attorney and a commissioned land surveyor. Services were seen and not tested. Nothing was opened up, so hidden defects may exist. It gives no estimate of repair costs, describes condition on the day only, and is not a warranty or a guarantee.</p>
+<p>Monique Sewell-Bennett is a project manager. She is not a chartered surveyor, a structural engineer, or a licensed electrician, plumber or pest control operator, and nothing in this report is offered as their work.</p></div>
+<div class="decl"><b>Declaration</b><br>I reviewed the evidence gathered at the property by the person named in section B, and rated every finding myself. This report is a true account of that evidence, and I have not understated or overstated anything in it.
+${rptSign(((rep.sections || {}).who || {}).attended || "", "Monique Sewell-Bennett")}</div>`;
+  return rptDoc(rep, findings, { title:"The condition of your property", sub:"Every part of the property that could be seen, recorded and rated, worst first, with what to do and who to ask.", coverNote:"Every finding is rated by her and nobody else, from what was seen on site and the photographs taken there. What it does not do: value the property, confirm title, give a structural engineering opinion, set boundaries, or estimate repair costs.", toc, body, footNote:"Every finding is rated, and the verdict written, by a named person before the report is issued." });
+}
+
+function reportDocumentTechnical(rep, findings){
+  const sx = rep.sections || {}, hm = rep.human || {}, st = sx.stage || {};
+  const refs = Object.fromEntries(rptArr(sx.finding_refs).map(r => [r.ord, r]));
+  const byCheck = {};
+  for (const r of rptArr(sx.finding_refs)) if (r.check) (byCheck[r.check] = byCheck[r.check] || []).push(r.ord);
+  const toc = [["A","The result","on one page"],["B","How to read this report","the hold point and the ratings"],["C","About this inspection","who, when, independence"],["D","What the work was checked against","written down before the visit"],["E","The checks","line by line, with what was found"],["F","Put right list","what must be done"],["G","Questions for other professionals","outside a workmanship inspection"],["H","What this sign-off is and is not","and the declarations"]];
+  const res = hm.result;
+  const body = `
+<h2 class="brk">A. The result</h2>
+<div class="meta"><div><dt>Stage</dt><dd>${esc(st.stage || "Not recorded")}</dd></div><div><dt>Trade</dt><dd>${esc(st.trade || "Not recorded")}</dd></div><div><dt>Work carried out by</dt><dd>${esc(st.work_by || "Not recorded")}</dd></div></div>
+${res ? `<p class="result ${RPT_RESULT_TONE[res] || ""}">${esc(RPT_RESULT[res] || res)}</p>` : `<div class="blank"><div class="lbl">Result not typed yet</div><p>Released, released with conditions, or not released: the trade inspector's judgement, typed at the desk. The report cannot issue without it.</p></div>`}
+${rptVerdict(rep, "The explanation")}
+<h2 class="brk">B. How to read this report</h2>
+<p class="lead">This stage is a hold point: the next stage should not start, and this work should not be covered up, until it is released in writing.</p>
+${rptKey("technical_signoff")}
+<h2 class="brk">C. About this inspection</h2>
+${rptWho(rep, "Trade inspector: attended and judged the workmanship")}
+<h2>D. What the work was checked against</h2>
+${rptArr(sx.standard).length ? `<table class="gl"><tr><th>Standard or document</th><th style="width:40%">Reference, date or version</th></tr>${sx.standard.map(d => `<tr><td>${esc(d.document)}</td><td>${esc(d.reference || "")}</td></tr>`).join("")}</table>` : rptBlank("The standard the work was checked against.")}
+<h2 class="brk">E. The checks</h2>
+${rptArr(sx.checks).length ? `<table class="gl"><tr><th style="width:8mm">#</th><th>What was checked</th><th>Pass mark</th><th style="width:14mm">How</th><th>Found</th><th style="width:22mm">Put right</th></tr>${sx.checks.map((c, i) => `<tr><td>${i + 1}</td><td>${esc(c.what)}</td><td>${esc(c.pass_mark || "Not stated")}</td><td>${esc(c.how || "")}</td><td>${esc(c.found || "")}</td><td>${byCheck[i + 1] ? "Item " + esc(byCheck[i + 1].join(", ")) : "None raised"}</td></tr>`).join("")}</table>` : rptBlank("The checks.")}
+<h2 class="brk">F. Put right list</h2>
+${findings.length ? rptWorstFirst(findings).map(f => rptFinding(f, { where: (refs[f.ord] || {}).where, actionLabel: "What must be done" })).join("") : `<p class="lead">Nothing to put right was recorded.</p>`}
+<p class="lead">Each item is dealt with by repair, redo, or replace. Accepting an item as it is, is the client's decision only, in writing, and never for anything that affects safety. Who pays for a re-inspection follows who was at fault, as set out in the agreement.</p>
+<h2>G. Questions for other professionals</h2>
+${rptPros(rep.questions)}
+<h2 class="brk">H. What this sign-off is and is not</h2>
+<div class="scope"><p>It is an opinion, to the best of the inspector's knowledge and belief, that the work that could be seen on the day met, or did not meet, the standard in section D. It does not cover work that was hidden, covered or could not be reached; it does not judge the adequacy of the design or the structure; it does not say how the work will perform in future; it is not a warranty or a guarantee; and it does not take away any of the builder's responsibility for the work. Leaving something off the put right list does not make it acceptable.</p>
+<p>It does not replace the inspections the municipal corporation makes at its own stages, or any certificate a regulator issues. Monique Sewell-Bennett arranges the inspection, confirms the inspector is independent of the work, checks the record is complete and issues it. She does not judge trade workmanship herself.</p></div>
+<div class="decl"><b>Inspector's declaration</b><br>I inspected the work described on the date on the cover. The results and the put right list are my own judgement of the workmanship against the standard in section D.
+${rptSign(((rep.sections || {}).who || {}).attended || "", "Monique Sewell-Bennett, issued for Yaadly")}</div>`;
+  return rptDoc(rep, findings, { title:"Stage inspection and sign-off", sub:"One stage of work, inspected by somebody who did not do it, against a standard written down before the visit.", coverNote:"The workmanship is judged by a qualified inspector for that trade, named in this report. She arranges the inspection, confirms the inspector is independent of the work, and issues it. It is not a warranty.", toc, body, footNote:"The result is the inspector's judgement, typed by a named person. Every put right item is rated by a person." });
+}
+
+function reportDocumentVisual(rep, findings){
+  const sx = rep.sections || {}, v = sx.visit || {};
+  const refs = Object.fromEntries(rptArr(sx.finding_refs).map(r => [r.ord, r]));
+  const STATE = { recorded:["ok","Recorded"], part:["gap","Part"], no_access:["na","No access"] };
+  const area = (a) => findings.filter(f => ((refs[f.ord] || {}).area || "outside") === a);
+  const table = (fs) => fs.length ? `<table class="gl"><tr><th style="width:8mm">#</th><th style="width:28%">Item</th><th style="width:22mm">Recorded</th><th style="width:18mm">Photos</th><th>What the photographs show</th></tr>${fs.map(f => { const r = refs[f.ord] || {}, s = STATE[r.state] || STATE.recorded; return `<tr><td>${esc(f.ord)}</td><td>${esc(f.heading)}</td><td><span class="tag t-${s[0]}">${s[1]}</span></td><td>${esc(r.photos || "")}</td><td>${esc(f.body)}</td></tr>`; }).join("")}</table>` : `<p class="lead">Nothing was recorded here.</p>`;
+  const toc = [["A","How to read this record","what it is, and the one mark on each line"],["B","This visit","who, when, how long"],["C","What you asked us to capture","your own items, first"],["D","Outside","gate to roof line"],["E","Inside","room by room"],["F","Water, power and drains","as seen, not tested"],["G","What this record is and is not","and the declarations"]];
+  const body = `
+<h2 class="brk">A. How to read this record</h2>
+<p class="lead">This is a record, not a report. The checker photographed every item on the agreed checklist and wrote down plainly what each photograph shows. There are no ratings, no opinions, and no advice in it, on purpose.</p>
+<table class="key"><tr><td class="k"><span class="tag t-ok">Recorded</span></td><td>Photographed as agreed.</td></tr><tr><td class="k"><span class="tag t-gap">Part</span></td><td>Only part of it could be photographed. What was missed is written against it.</td></tr><tr><td class="k"><span class="tag t-na">No access</span></td><td>Could not be reached or seen.</td></tr></table>
+<h3 style="margin-top:14px">Summary of the visit</h3>
+${rptVerdict(rep, "The summary")}
+<h2 class="brk">B. This visit</h2>
+<div class="meta"><div><dt>Scheduled</dt><dd>${esc(v.scheduled || "Not recorded")}</dd></div><div><dt>Time in</dt><dd>${esc(v.time_in || "Not recorded")}</dd></div><div><dt>Time out</dt><dd>${esc(v.time_out || "Not recorded")}</dd></div><div><dt>Weather</dt><dd>${esc(v.weather || "Not recorded")}</dd></div><div><dt>Access</dt><dd>${esc(v.access || "Not recorded")}</dd></div></div>
+${rptWho(rep, "Checker: attended and took the photographs")}
+<h2>C. What you asked us to capture</h2>${table(area("client"))}
+<h2 class="brk">D. Outside</h2>${table(area("outside"))}
+<h2>E. Inside</h2>${table(area("inside"))}
+<h2>F. Water, power and drains</h2><p class="lead">As seen. Nothing was tested, switched on or opened up.</p>${table(area("services"))}
+${rptArr(rep.omitted).length ? `<h4 class="pro">Could not be recorded</h4><ul class="q">${rep.omitted.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+<h2 class="brk">G. What this record is and is not</h2>
+<div class="scope"><p>It is a photographic record of what could be seen, in the areas that could be reached, on the day. It is not an inspection, a survey or an opinion on condition, it does not say whether anything is a defect or what it would cost to put right, and it is not a valuation, a structural, legal or boundary opinion, or insurance. The full resolution photographs are sent with this record as a separate folder, named with the reference on the cover.</p></div>
+<div class="decl"><b>Declarations</b><br>Checker: I attended the property on the date on the cover. The photographs were taken by me on that visit and have not been altered, and the descriptions are what the photographs show.<br>Reviewer: I have checked that this record covers the agreed checklist and that the descriptions match the photographs. I have added no opinion to it.
+${rptSign(((rep.sections || {}).who || {}).attended || "", "Monique Sewell-Bennett")}</div>`;
+  return rptDoc(rep, findings, { title:"Photographic record of condition", sub:"What was there on the day, photographed against the checklist agreed with you. It records. It does not rate, judge or advise.", coverNote:"The checker who attends records and photographs. They do not rate what they see, give an opinion on it, or advise.", toc, body, footNote:"Nothing in this record is rated. The summary is written by a named person." });
+}
+
+function reportDocumentPropertyCare(rep, findings){
+  const sx = rep.sections || {}, v = sx.visit || {}, res = sx.resident || {};
+  const S = { nothing_noted:["ok","Nothing noted"], noted:["gap","Noted"], called_on_site:["gap","Called you"], no_access:["na","No access"], not_recorded:["na","Not recorded"] };
+  const groups = [];
+  for (const it of rptArr(sx.checklist)) { if (!groups.length || groups[groups.length - 1].name !== it.group) groups.push({ name: it.group, rows: [] }); groups[groups.length - 1].rows.push(it); }
+  const toc = [["A","How to read this record","the marks on each line"],["B","This visit","who, when, how long"],["C","Needs your decision","the short list, first"],["D","Readings","taken every visit"],["E","The checklist","the same lines every visit"],["F","If somebody lives here","what was seen and passed on"],["G","Carried forward","open items from earlier visits"],["H","What this record is and is not","and the next visit"]];
+  const body = `
+<h2 class="brk">A. How to read this record</h2>
+<p class="lead">Every line is marked twice: what was seen today, and what changed since the last visit. Anything marked new is the first place to look. Nothing in this record is rated; the decisions are yours.</p>
+<table class="key">${Object.values(S).slice(0, 4).map(([t, l]) => `<tr><td class="k"><span class="tag t-${t}">${l}</span></td><td>${l === "Called you" ? "You were called or messaged while the visitor was still on site." : l === "Noted" ? "Something for your decision. It is in section C." : l === "No access" ? "Could not be seen. A no access line is not a nothing noted." : "Seen, nothing to report."}</td></tr>`).join("")}</table>
+<h3 style="margin-top:14px">Summary of the visit</h3>
+${rptVerdict(rep, "The summary")}
+<h2 class="brk">B. This visit</h2>
+<div class="meta">${[["Plan",v.plan],["Home",v.home],["Visit",v.visit_number],["Time in",v.time_in],["Time out",v.time_out],["Weather",v.weather],["Access",v.access],["Alarm on arrival",v.alarm_in],["Alarm on leaving",v.alarm_out]].map(([k, x]) => `<div><dt>${k}</dt><dd>${esc(x || "Not recorded")}</dd></div>`).join("")}</div>
+${rptWho(rep, "Visitor: attended and took the photographs")}
+<h2>C. Needs your decision</h2>
+${findings.length ? findings.map(f => rptFinding(f, { noRating: true, actionLabel: "Suggested next step" })).join("") : `<p class="lead">Nothing needs a decision from you this visit.</p>`}
+<h2>D. Readings</h2>
+${rptArr(sx.readings).length ? `<table class="gl"><tr><th>Reading</th><th style="width:40%">This visit</th></tr>${sx.readings.map(r => `<tr><td>${esc(r.reading)}</td><td>${esc(r.value)}</td></tr>`).join("")}</table>` : `<p class="lead">No readings were recorded.</p>`}
+<h2 class="brk">E. The checklist</h2>
+${groups.length ? `<table class="ck">${groups.map(g => `<tr><td class="g" colspan="3">${esc(g.name)}</td></tr>${g.rows.map(c => { const s = S[c.state] || S.not_recorded; return `<tr><td>${esc(c.item)}${c.note ? `<span class="note">${esc(c.note)}</span>` : ""}</td><td class="w">${esc(c.since ? "Since last visit: " + (RPT_SINCE[c.since] || c.since) : "")}</td><td class="s"><span class="tag t-${s[0]}">${s[1]}</span></td></tr>`; }).join("")}`).join("")}</table>` : rptBlank("The checklist.")}
+<h2>F. If somebody lives here</h2>
+${res.seen || res.spoke || res.passed_on ? `<div class="meta"><div><dt>Seen</dt><dd>${esc(res.seen || "")}</dd></div><div><dt>Spoke with them</dt><dd>${esc(res.spoke || "")}</dd></div></div>${res.passed_on ? `<p><b>What they asked us to pass on.</b> ${esc(res.passed_on)}</p>` : ""}` : `<p class="lead">Nobody living at the property was recorded.</p>`}
+<p class="lead">The visitor notes what they see and passes messages on. They do not give personal care, medication, medical opinion or advice, handle money, or accept gifts.</p>
+<h2>G. Carried forward</h2>
+${rptArr(sx.carried_forward).length ? `<table class="gl"><tr><th>Item</th><th style="width:26%">First noted</th><th style="width:26%">Status today</th></tr>${sx.carried_forward.map(c => `<tr><td>${esc(c.item)}</td><td>${esc(c.first_noted || "")}</td><td>${esc(c.today || "")}</td></tr>`).join("")}</table>` : `<p class="lead">Nothing carried forward.</p>`}
+<h2 class="brk">H. What this record is and is not</h2>
+<div class="scope"><p>It is a visual record of what could be seen, on the day, in the areas that could be reached. It is not a survey, a structural opinion, a valuation, a security service, or insurance, and it does not replace the checks your insurer asks for unless your insurer has agreed that it does.</p><p><b>Next visit:</b> ${esc(sx.next_visit || "As the plan sets it")}</p></div>
+<div class="decl"><b>Signed</b>${rptSign(((rep.sections || {}).who || {}).attended || "", "Monique Sewell-Bennett")}</div>`;
+  return rptDoc(rep, findings, { title:"Property care visit record", sub:"The same checklist, run the same way every visit, so anything new at your property stands out.", coverNote:"The visit is a visual walk round of the areas that could be reached on the day. It is not a survey, a security patrol, or care for anybody living at the property.", toc, body, footNote:"Nothing in this record is rated. The summary is written by a named person." });
+}
+
+function reportDocumentOversight(rep, findings){
+  const sx = rep.sections || {}, hm = rep.human || {}, st = hm.status || {}, m = hm.money || {};
+  const S = RPT_STATUS;
+  const chip = (x) => S[x] ? `<span class="tag t-${S[x][0] === "crit" ? "gap" : S[x][0] === "warn" ? "warn" : "ok"}">${S[x][1]}</span>` : `<span class="tag t-na">Not rated</span>`;
+  const hasLast = ["overall","time","money","quality","safety","scope"].some(a => st["last_" + a]);
+  const hasLastMoney = Object.keys(m).some(k => k.startsWith("last_") && m[k] != null);
+  const n = (k) => m[k] == null ? null : Number(m[k]);
+  const total = n("agreed_price") != null ? (n("agreed_price") + (n("agreed_changes") || 0)) : null;
+  const left = total != null && n("paid_to_date") != null ? total - n("paid_to_date") - (n("requested_unpaid") || 0) : null;
+  const lastTotal = n("last_agreed_price") != null ? (n("last_agreed_price") + (n("last_agreed_changes") || 0)) : null;
+  const lastLeft = lastTotal != null && n("last_paid_to_date") != null ? lastTotal - n("last_paid_to_date") - (n("last_requested_unpaid") || 0) : null;
+  const money = (x) => rptMoneyText(m.currency, x);
+  const toc = [["A","This month in one page","status, the verdict"],["B","How the status is set","the rule behind each rating"],["C","Site attendance","every visit this month"],["D","Progress","done this month, planned next"],["E","Programme","each milestone against the agreed date"],["F","Money","against what was agreed"],["G","Changes to the work","every change, and who agreed it"],["H","Quality and safety","what was seen"],["I","Issues and risks","rated by the author"],["J","Decisions for you","with the date needed"],["K","Escalations","the WhatsApp line"],["L","The monthly call","points agreed and actions"],["M","What this report is and is not","and the declaration"]];
+  const rows = (a, cols) => rptArr(a).length ? `<table class="gl"><tr>${cols.map(c => `<th>${esc(c[1])}</th>`).join("")}</tr>${a.map(r => `<tr>${cols.map(c => `<td>${esc(r[c[0]] || "")}</td>`).join("")}</tr>`).join("")}</table>` : `<p class="lead">None recorded this month.</p>`;
+  const body = `
+<h2 class="brk">A. This month in one page</h2>
+<table class="gl" style="margin-bottom:14px"><tr><th>Area</th>${hasLast ? `<th style="width:30mm">Last month</th>` : ""}<th style="width:30mm">This month</th></tr>${["overall","time","money","quality","safety","scope"].map(a => `<tr><td>${a.charAt(0).toUpperCase() + a.slice(1)}</td>${hasLast ? `<td>${chip(st["last_" + a])}</td>` : ""}<td>${chip(st[a])}</td></tr>`).join("")}</table>
+${rptVerdict(rep, "The month in a paragraph")}
+<h2 class="brk">B. How the status is set</h2>
+<table class="gl"><tr><th>Area</th><th>On track</th><th>At risk</th><th>Off track</th></tr>
+<tr><td>Time</td><td>Forecast finish within 1 week of the agreed finish</td><td>1 to 4 weeks late</td><td>More than 4 weeks late, or no forecast</td></tr>
+<tr><td>Money</td><td>Paid and asked for within the agreed total</td><td>Changes asked for, not yet agreed, up to 10% of the agreed total</td><td>Over 10%, or money asked for without matching work</td></tr>
+<tr><td>Quality</td><td>No open put right items older than 2 weeks</td><td>Open items older than 2 weeks</td><td>Work covered before a problem was put right</td></tr>
+<tr><td>Safety</td><td>Nothing seen</td><td>A risk seen and raised</td><td>An injury, or a risk raised and not dealt with</td></tr>
+<tr><td>Scope</td><td>Work matches the agreed scope</td><td>A change is being discussed</td><td>Work done that nobody agreed</td></tr></table>
+<h2 class="brk">C. Site attendance</h2>
+${rows(sx.attendance, [["date","Date"],["attended_by","Attended by"],["builder_on_site","Builder on site"],["workers","Workers"],["weather","Weather"]])}
+${rptWho(rep, "Site attendance, on the dates above")}
+<h2>D. Progress</h2>
+<h4 class="pro">Done this month, as seen on site</h4>${rptArr(sx.done).length ? `<ul class="q">${sx.done.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="lead">Nothing recorded.</p>`}
+<h4 class="pro">Planned for next month, as the builder stated it</h4>${rptArr(sx.next).length ? `<ul class="q">${sx.next.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="lead">Nothing recorded.</p>`}
+<h2>E. Programme</h2>
+${rows(sx.milestones, [["milestone","Milestone"],["agreed","Agreed date"],["forecast","Forecast or actual"]])}
+<h2 class="brk">F. Money</h2>
+<p class="lead">Typed by the author, never drafted. Figures from the builder are marked as the builder's. This tracks spending against what was agreed; it does not estimate what the work should cost.</p>
+${m.currency ? `<table class="gl"><tr><th>Line</th>${hasLastMoney ? `<th style="width:34mm">Last month</th>` : ""}<th style="width:40mm">This month</th></tr>
+<tr><td>1 Agreed price for the work</td>${hasLastMoney ? `<td>${money(n("last_agreed_price"))}</td>` : ""}<td>${money(n("agreed_price"))}</td></tr>
+<tr><td>2 Agreed changes</td>${hasLastMoney ? `<td>${money(n("last_agreed_changes"))}</td>` : ""}<td>${money(n("agreed_changes"))}</td></tr>
+<tr><td><b>3 Agreed total (1 + 2)</b></td>${hasLastMoney ? `<td><b>${money(lastTotal)}</b></td>` : ""}<td><b>${money(total)}</b></td></tr>
+<tr><td>4 Paid to date</td>${hasLastMoney ? `<td>${money(n("last_paid_to_date"))}</td>` : ""}<td>${money(n("paid_to_date"))}</td></tr>
+<tr><td>5 Asked for, not yet paid</td>${hasLastMoney ? `<td>${money(n("last_requested_unpaid"))}</td>` : ""}<td>${money(n("requested_unpaid"))}</td></tr>
+<tr><td><b>6 Left to pay on the agreed total (3 minus 4 minus 5)</b></td>${hasLastMoney ? `<td><b>${money(lastLeft)}</b></td>` : ""}<td><b>${money(left)}</b></td></tr>
+<tr><td>7 Changes asked for, not yet agreed (builder's figure)</td>${hasLastMoney ? `<td>${money(n("last_changes_pending"))}</td>` : ""}<td>${money(n("changes_pending"))}</td></tr>
+<tr><td>8 Builder's own forecast of the final total</td>${hasLastMoney ? `<td>${money(n("last_builder_forecast"))}</td>` : ""}<td>${money(n("builder_forecast"))}</td></tr></table>${m.reason ? `<p><b>What moved, and why.</b> ${esc(m.reason)}</p>` : ""}` : `<div class="blank"><div class="lbl">Money not typed yet</div><p>Typed at the desk by the author, line by line. Never drafted.</p></div>`}
+<h2>G. Changes to the work</h2>
+${rptArr(sx.changes).length ? `<table class="gl"><tr><th>Change</th><th>Asked for by</th><th>Time effect</th><th>Status</th></tr>${sx.changes.map(c => `<tr><td>${esc(c.change)}</td><td>${esc(c.asked_by || "")}</td><td>${esc(c.time_effect || "")}</td><td>${esc(RPT_CHANGE[c.state] || c.state || "")}</td></tr>`).join("")}</table>` : `<p class="lead">No changes this month.</p>`}
+<h2>H. Quality and safety</h2>
+${rows(sx.quality, [["seen","What was seen"],["where","Where"],["raised_with","Raised with"],["on","On"]])}
+<p><b>Builder's insurance seen:</b> ${esc({ yes: "Yes", no: "No" }[sx.insurance_seen] || "Not recorded")}</p>
+<h2 class="brk">I. Issues and risks</h2>
+${rptKey("oversight")}
+${findings.length ? rptWorstFirst(findings).map(f => rptFinding(f)).join("") : `<p class="lead">No issues recorded this month.</p>`}
+<h2>J. Decisions for you</h2>
+${rows(sx.decisions, [["decision","Decision needed"],["options","Options"],["needed_by","Needed by"],["if_missed","If it is missed"]])}
+<h2>K. Escalations</h2>
+${rows(sx.escalations, [["when","When"],["raised_by","Raised by"],["what","About"],["done","What was done"]])}
+<h2>L. The monthly call</h2>
+${(sx.call || {}).date ? `<div class="meta"><div><dt>Date</dt><dd>${esc(sx.call.date)}</dd></div><div><dt>On the call</dt><dd>${esc(sx.call.attendees || "")}</dd></div></div>${rptArr(sx.call.points).length ? `<ul class="q">${sx.call.points.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}` : `<p class="lead">No call recorded.</p>`}
+${rows(rptArr(sx.actions).map(a => ({ ...a, state: RPT_ACTION[a.state] || a.state })), [["action","Action"],["owner","Owner"],["due","Due"],["state","Status"]])}
+<h2 class="brk">M. What this report is and is not</h2>
+<div class="scope"><p>This report records what was seen on the site visits in section C and what the builder and you said in writing. The author observes and reports on your behalf, and does not design the work, instruct the builder, certify the work, supervise day to day, or estimate what the work should cost, and nothing in it makes the author responsible for the builder's work, programme or price.</p></div>
+<div class="decl"><b>Declaration</b><br>I compiled this report from the site visits in section C, made by the people named there, from the photographs and notes they returned, and from what the builder and you said in writing. It is a true record of that, to the best of my knowledge and belief.
+${rptSign("Monique Sewell-Bennett")}</div>`;
+  return rptDoc(rep, findings, { title:"Monthly oversight report", sub:"Where your build stands this month: what was seen, progress against the programme, money against what was agreed, and the decisions only you can make.", coverNote:"She observes, records and reports. She does not design, instruct the builder, certify the work, or estimate what it should cost.", dateLabel:"Prepared", toc, body, footNote:"The status of the month, every sum of money, every rating and the verdict are typed by a named person. None of them is drafted." });
+}
+
+function reportDocumentStage(rep, findings){
+  const sx = rep.sections || {}, hm = rep.human || {}, m = hm.money || {}, st = sx.stage || {};
+  const refs = Object.fromEntries(rptArr(sx.finding_refs).map(r => [r.ord, r]));
+  const n = (k) => m[k] == null ? null : Number(m[k]);
+  const money = (x) => rptMoneyText(m.currency, x);
+  const toDate = n("agreed_price") != null ? n("agreed_price") + (n("agreed_changes") || 0) : null;
+  const signed = n("prior_signed_off") != null && n("this_stage") != null ? n("prior_signed_off") + n("this_stage") : null;
+  const toc = [["A","The result","complete, with items, or not"],["B","What these records are","and what they are not"],["C","About this stage","who inspected it"],["D","What was checked","against the agreed scope"],["E","Items still open","rated, with the date they close by"],["F","Value","typed by hand"],["G","Signatures",""]];
+  const body = `
+<h2 class="brk">A. The result</h2>
+<div class="meta"><div><dt>Stage</dt><dd>${esc(st.stage || "Not recorded")}</dd></div><div><dt>Trade</dt><dd>${esc(st.trade || "Not recorded")}</dd></div></div>
+${hm.result ? `<p class="result ${RPT_RESULT_TONE[hm.result] || ""}">${esc(RPT_RESULT[hm.result] || hm.result)}</p>` : `<div class="blank"><div class="lbl">Result not typed yet</div><p>Complete, complete with items, or not complete. Typed at the desk by a named person.</p></div>`}
+${rptVerdict(rep, "The explanation")}
+<h2>B. What these records are</h2>
+<div class="scope"><p>A record of what was checked, what was agreed and who signed, kept between Yaadly and you. It is not a certificate issued under any law, building code or professional scheme. Inspections and approvals by the municipal corporation, and any certificate a regulator issues, are separate.</p></div>
+<h2>C. About this stage</h2>
+${rptWho(rep, "Inspected the stage, never the trade who did it")}
+<h2 class="brk">D. What was checked</h2>
+${rptArr(sx.checks).length ? `<table class="gl"><tr><th style="width:8mm">#</th><th>Scope item</th><th>Pass mark</th><th>Found</th></tr>${sx.checks.map((c, i) => `<tr><td>${i + 1}</td><td>${esc(c.scope_item)}</td><td>${esc(c.pass_mark || "Not stated")}</td><td>${esc(c.found || "")}</td></tr>`).join("")}</table>` : rptBlank("The checks.")}
+<h2>E. Items still open</h2>
+${rptKey("pm_stage")}
+${findings.length ? rptWorstFirst(findings).map(f => rptFinding(f, { where: [(refs[f.ord] || {}).where, (refs[f.ord] || {}).close_by ? "Close by " + refs[f.ord].close_by : ""].filter(Boolean).join(". ") })).join("") : `<p class="lead">Nothing is still open.</p>`}
+<h2 class="brk">F. Value</h2>
+${m.currency ? `<table class="gl"><tr><th>Line</th><th style="width:40mm">Amount</th></tr>
+<tr><td>1 Agreed price</td><td>${money(n("agreed_price"))}</td></tr><tr><td>2 Agreed changes to date</td><td>${money(n("agreed_changes"))}</td></tr>
+<tr><td><b>3 Agreed price to date (1 + 2)</b></td><td><b>${money(toDate)}</b></td></tr><tr><td>4 Value of stages signed off before this one</td><td>${money(n("prior_signed_off"))}</td></tr>
+<tr><td>5 Value of this stage</td><td>${money(n("this_stage"))}</td></tr><tr><td><b>6 Total signed off to date (4 + 5)</b></td><td><b>${money(signed)}</b></td></tr>
+<tr><td>7 Left to sign off (3 minus 6)</td><td>${money(toDate != null && signed != null ? toDate - signed : null)}</td></tr>
+${n("asked_for") != null ? `<tr><td>What the trade asked for</td><td>${money(n("asked_for"))}</td></tr>` : ""}</table>${m.reason ? `<p><b>Why the value differs from what was asked for.</b> ${esc(m.reason)}</p>` : ""}` : `<div class="blank"><div class="lbl">Value not typed yet</div><p>Typed at the desk by a named person. Never drafted. Paying the trade goes through Yaadly's invoices, separately.</p></div>`}
+<h2>G. Signatures</h2>
+<div class="decl">${rptSign(((rep.sections || {}).who || {}).attended || "", "Signed off for Yaadly")}${rptSign("Client, seen and accepted", "Trade payment approved by")}</div>`;
+  return rptDoc(rep, findings, { company:true, title:"Stage completion record", sub:"One stage of your build, checked against the agreed scope by somebody who did not do the work, before the trade is paid for it.", dateLabel:"Date inspected", toc, body, footNote:"The result, the value, every rating and the verdict are typed by a named person at Yaadly. None of them is drafted." });
+}
+
+const RPT_DOCS = { condition: reportDocumentCondition, technical_signoff: reportDocumentTechnical, visual_check: reportDocumentVisual, property_care: reportDocumentPropertyCare, oversight: reportDocumentOversight, pm_stage: reportDocumentStage };
+
 function reportDocumentHtml(rep, findings){
+  if (RPT_DOCS[rep.kind]) return RPT_DOCS[rep.kind](rep, findings);
   const service = RPT_SERVICE[rep.kind] || rep.kind;
   const issued = !!rep.number;
   const sx = (rep.sections && typeof rep.sections === "object") ? rep.sections : {};
@@ -11586,7 +12321,7 @@ ${RPT_DOC_CSS}</style></head><body>
     <div><span class="stamp${issued ? " issued" : ""}">${issued ? "Issued" : "Draft, not issued"}</span></div>
   </div>
   <div class="bottom">
-    <b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS.<br>
+    <b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader.<br>
     Every finding in this report is rated, and the verdict written, by her and nobody else. What it does not do: value the property, confirm title, give a structural opinion, or estimate what the work should cost.
   </div>
 </div>
@@ -11657,7 +12392,7 @@ ${(rep.omitted || []).length ? `<h2>What this review could not establish</h2><ul
 </div>
 
 <footer>
-  Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077.<br>
+  Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077.<br>
   Findings drafted by the Yaadly report agent${rep.model ? ` (${esc(rep.model)}, EU)` : ""} from the reviewer's notes, then screened for language, measurements and figures. Every finding is rated, and the verdict written, by a named person before the report is issued.
 </footer>
 </td></tr></tbody></table>
@@ -11805,7 +12540,7 @@ function reportDocumentDeposit(rep, findings){
     <div><span class="stamp${issued ? " issued" : ""}">${issued ? "Issued" : "Draft, not issued"}</span></div>
   </div>
   <div class="bottom">
-    <b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS.<br>
+    <b>Prepared by Monique Sewell-Bennett</b>, seven years of UK construction and IoT project management, supplying professional services as a sole trader.<br>
     Every finding in this report is rated, and the verdict written, by her and nobody else. What it does not do: value the property, confirm title, give a structural opinion, or estimate what the work should cost.
   </div>
 </div>
@@ -11929,7 +12664,7 @@ ${rep.source_text ? `<p class="lead">As the documents were read, word for word, 
 <div class="apx">${esc(rep.source_text)}</div>` : `<div class="blank"><div class="lbl">No transcript on this report</div><p>The documents are reproduced here when they were read with Read the files before drafting.</p></div>`}
 
 <footer>
-  Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader, 55 Remington Road, London N15 6SS. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077.<br>
+  Prepared by Monique Sewell-Bennett, supplying professional services as a sole trader. Jobs and full project management are supplied separately by Yaadly Ltd, registered in England and Wales, company number 17358077.<br>
   Findings drafted by the Yaadly report agent${rep.model ? ` (${esc(rep.model)}, EU)` : ""} from the documents received and the reviewer's notes, then screened for language, measurements and figures. Every finding is rated, and the verdict written, by a named person before the report is issued.
 </footer>
 </td></tr></tbody></table>

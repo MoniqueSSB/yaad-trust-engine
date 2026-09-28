@@ -9,6 +9,7 @@
 // agreed amount for the work, plus 15% Guarantee & Support on top. Change one,
 // change the other. Pure: rows in, bytes out, so the test runs it offline.
 
+import { LOGO } from "./logo.ts";
 import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from "npm:pdf-lib@1.17.1";
 
 export type AddonForPdf = {
@@ -90,8 +91,10 @@ export async function addonPdf(a: AddonForPdf, job: JobForPdf, portalUrl: string
   };
   const rule = () => { page.drawLine({ start: { x: M, y }, end: { x: M + W, y }, thickness: 0.8, color: LINE }); y -= 16; };
 
-  // Head
-  text("Yaadly", M, 20, bold);
+  // Head: the logo on every document (founder, 28 Sep 2026), then the name.
+  const logo = await doc.embedPng(Uint8Array.from(atob(LOGO.split(",")[1]), (c) => c.charCodeAt(0)));
+  page.drawImage(logo, { x: M, y: y - 5, width: 24, height: 24 });
+  text("Yaadly", M + 30, 20, bold);
   const ref = `ADD-ON  ·  ${job.id}  ·  VERSION ${a.rev}`;
   page.drawText(clean(ref), { x: M + W - reg.widthOfTextAtSize(clean(ref), 8), y: y + 6, size: 8, font: reg, color: MUTE });
   y -= 14;

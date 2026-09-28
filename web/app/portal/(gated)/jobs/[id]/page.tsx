@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { WORKER_STATUS } from "@/components/portal/JobList";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -404,7 +405,43 @@ export default async function JobRoom({
     .limit(1)
     .maybeSingle();
 
+  /* The worker's own set up is their own Worker Guidelines signature, at
+     the current version, the same rule jq_insert_vetted applies. Until
+     28 Sep 2026 a worker's job room showed the CLIENT's set up checklist
+     ("Confirm your email address", "Sign the Client Guidelines") and listed
+     the Client Guidelines under "Your documents". */
+  const { data: wgSig } = role === "worker"
+    ? await supabase
+        .from("doc_signatures")
+        .select("id")
+        .eq("doc_type", "worker_guidelines")
+        .eq("doc_version", legal.WG_VERSION)
+        .ilike("signer_email", email)
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+  const workerSigned = !!wgSig;
+
   const ev = (evidence ?? []) as Evidence[];
+
+  /* Corrections (20260929040000), read on their own and allowed to fail: until
+     that migration is applied the column and the table do not exist, and a
+     missing correction must never take the evidence list down with it. */
+  if (ev.length) {
+    const [{ data: corr }, { data: hist }] = await Promise.all([
+      supabase.from("evidence").select("id,corrected_at").eq("job_id", id).not("corrected_at", "is", null),
+      supabase.from("evidence_corrections").select("evidence_id,old_label,at").eq("job_id", id).order("at", { ascending: true }),
+    ]);
+    const correctedAt = new Map((corr ?? []).map((c) => [c.id as string, c.corrected_at as string]));
+    const firstLabel = new Map<string, string | null>();
+    for (const h of hist ?? []) {
+      if (!firstLabel.has(h.evidence_id as string)) firstLabel.set(h.evidence_id as string, (h.old_label as string | null) ?? null);
+    }
+    for (const e of ev as (Evidence & { corrected_at?: string | null; first_label?: string | null })[]) {
+      e.corrected_at = correctedAt.get(e.id) ?? null;
+      e.first_label = firstLabel.get(e.id) ?? null;
+    }
+  }
 
   /* Evidence filed since the bucket move lives in private storage, so the page
      mints a short-lived signed URL per object as it renders. Nothing in that
@@ -1021,11 +1058,13 @@ export default async function JobRoom({
   const stepState = (done: boolean, now: boolean): Step["state"] =>
     done ? "done" : now ? "now" : "todo";
 
-  const setupSteps: Step[] = gates.map((g) => ({
-    title: g.title,
-    state: g.done ? "done" : ("now" as const),
-  }));
-  const setupDone = gates.every((g) => g.done);
+  const setupSteps: Step[] = role === "worker"
+    ? [{ title: `Sign the Worker Guidelines, version ${legal.WG_VERSION}`, state: workerSigned ? "done" : "now" }]
+    : gates.map((g) => ({
+        title: g.title,
+        state: g.done ? "done" : ("now" as const),
+      }));
+  const setupDone = setupSteps.every((x) => x.state === "done");
 
   const hasQuotes = qs.length > 0;
   const hasWon = !!won;
@@ -1105,7 +1144,7 @@ export default async function JobRoom({
   const phases: Phase[] = [
     {
       title: "Set up",
-      summary: setupDone ? "Done" : gates.filter((g) => g.done).length + " of " + gates.length + " done",
+      summary: setupDone ? "Done" : setupSteps.filter((x) => x.state === "done").length + " of " + setupSteps.length + " done",
       state: phaseState(setupDone, !setupDone),
       steps: setupSteps,
       href: jobBase + "?tab=overview",
@@ -1148,15 +1187,25 @@ export default async function JobRoom({
      exist; a blank row is not, and the client had been reading blank rows as
      breakage. */
   const docs: Doc[] = [
-    {
-      icon: "\u2713",
-      title: "Client Guidelines",
-      note: signed
-        ? "Signed, immutable, version " + legal.CG_VERSION
-        : "Sign these and the job can go to workers",
-      state: signed ? "ready" : "not_completed",
-      href: "/portal/guidelines",
-    },
+    role === "worker"
+      ? {
+          icon: "\u2713",
+          title: "Worker Guidelines",
+          note: workerSigned
+            ? "Signed, immutable, version " + legal.WG_VERSION
+            : "A newer version is waiting for your signature",
+          state: workerSigned ? "ready" : "not_completed",
+          href: "/portal/guidelines",
+        }
+      : {
+          icon: "\u2713",
+          title: "Client Guidelines",
+          note: signed
+            ? "Signed, immutable, version " + legal.CG_VERSION
+            : "Sign these and the job can go to workers",
+          state: signed ? "ready" : "not_completed",
+          href: "/portal/guidelines",
+        },
     {
       icon: confirmedQuote ? "\ud83d\udcc4" : "\u25cb",
       title: "Quote Pack",
@@ -1254,7 +1303,16 @@ export default async function JobRoom({
         parish={job.parish}
         addr={addr}
         addrHidden={role === "worker" && !bookedWorker}
-        statusLabel={STATUS_LABEL[job.status] ?? job.status}
+        /* The worker reads the worker's wording. This used the client map for
+           everybody until 28 Sep 2026, so a worker whose evidence was with the
+           client was told "Evidence waiting on you" directly above "The client
+           is reviewing your stage 1 evidence". WORKER_STATUS is the same map
+           the worker's job list already uses. */
+        statusLabel={
+          role === "worker"
+            ? (WORKER_STATUS[job.status]?.label ?? job.status)
+            : (STATUS_LABEL[job.status] ?? job.status)
+        }
         stageDetail={
           jobStage > 0 && job.status !== "complete"
             ? "Stage " + jobStage + (packStages.length ? " of " + packStages.length : "")
@@ -1965,7 +2023,16 @@ export default async function JobRoom({
                     {m.sent_at ? "Sent " + whenDate(m.sent_at) : "Being sent"}
                   </span>
                   <span className="text-dim">
-                    {m.receipt_ref?.trim() ? "Receipt " + m.receipt_ref : m.sent_at ? "Receipt to come" : ""}
+                    {/* "Receipt to come" sat here next to an overview saying
+                        the receipt was filed (28 Sep 2026): the release row
+                        only learns of a receipt when Yaadly records it, while
+                        a filed file is already on the job. Same source the
+                        overview uses, materialsReceipt(). */}
+                    {m.receipt_ref?.trim()
+                      ? "Receipt " + m.receipt_ref
+                      : receipt.state === "filed"
+                        ? "Receipt filed, being checked"
+                        : m.sent_at ? "Receipt to come" : ""}
                   </span>
                   <span className="ml-auto text-dim">
                     {m.released_at ? whenDate(m.released_at) : "not yet released"}
@@ -2074,6 +2141,8 @@ export default async function JobRoom({
             stageProofs={evidenceStageProofs}
             currentStage={job.stage ?? 0}
             role={role === "worker" ? "worker" : "client"}
+            me={role === "worker" ? email : null}
+            closed={job.status === "complete"}
             awaitingApproval={awaitingApproval}
             jobId={job.id}
             startsWhen={

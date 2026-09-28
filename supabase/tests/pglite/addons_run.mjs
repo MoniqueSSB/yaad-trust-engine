@@ -11,7 +11,7 @@
 //
 // Run, from any scratch folder (nothing is installed into the repository):
 //   npm i @electric-sql/pglite@0.2
-//   cp <repo>/supabase/tests/pglite/addons_run.mjs . && node addons_run.mjs <repo>/supabase/migrations/20260928235000_add_on_work_on_a_booked_job.sql
+//   cp <repo>/supabase/tests/pglite/addons_run.mjs . && node addons_run.mjs <repo>/supabase/migrations/20260928235000_add_on_work_on_a_booked_job.sql <repo>/supabase/migrations/20260929030000_an_agreed_add_on_can_be_cancelled_by_a_person.sql
 // Every line should read PASS.
 import { PGlite } from "@electric-sql/pglite";
 import fs from "fs";
@@ -22,6 +22,8 @@ await db.exec(STUB);
 // sync_job_status trigger is attached by an old migration; the migration only replaces the function.
 let mig = fs.readFileSync(MIG, "utf8");
 await db.exec(mig);
+for (const extra of process.argv.slice(3)) await db.exec(fs.readFileSync(extra, "utf8"));
+const CANCEL = process.argv.slice(3).some((f) => /cancelled_by_a_person/.test(f));
 await db.exec(`create trigger invoices_starts_job_default before insert on public.invoices for each row execute function public.invoice_starts_job_default();`);
 await db.exec(`create trigger sync_job_status before insert or update on public.jobs for each row execute function public.sync_job_status();`);
 await db.exec(`insert into admins values ('admin@yaadly.test');`);
@@ -263,6 +265,38 @@ r = await as(W, `select count(*)::int n from job_addons`);
 ok("booked worker reads them", !r.err && r.rows[0].n === 7, r.err || String(r.rows[0].n));
 r = await as(W, `update job_addons set amount_jmd = 1`);
 ok("direct update refused", !!r.err, r.err);
+
+if (CANCEL) {
+  // Cancelling (20260929030000), on J5
+  await db.exec(`update jobs set stage = 1, status = 'in_progress' where id='J5'`);
+  r = await as(C, `select public.propose_addon_as_me('J5','Cancel me',5000) id`);
+  const AC = r.rows?.[0]?.id;
+  r = await as(W, `select * from public.agree_addon_as_me('${AC}', 1)`);
+  const CINV = r.rows?.[0]?.invoice_id;
+  r = await as(C, `select * from public.cancel_addon('${AC}', 'Client changed their mind')`);
+  ok("only an admin can cancel", !!r.err && /Admin only/.test(r.err), r.err);
+  r = await as(A, `select * from public.cancel_addon('${AC}', '')`);
+  ok("a reason is required", !!r.err && /Say why/.test(r.err), r.err);
+  await db.exec(`update invoices set status='sent' where id='${CINV}'`);
+  r = await as(A, `select * from public.cancel_addon('${AC}', 'Client changed their mind')`);
+  ok("a sent invoice must be voided first", !!r.err && /Void it on Invoices first/.test(r.err), r.err);
+  await db.exec(`update invoices set status='draft' where id='${CINV}'`);
+  await db.exec("delete from sent");
+  r = await as(A, `select * from public.cancel_addon('${AC}', 'Client changed their mind')`);
+  ok("an admin cancels an agreed add-on and its draft is voided", !r.err && r.rows[0].status === "cancelled" && r.rows[0].voided === CINV, r.err);
+  ok("its draft invoice is void", (await sys(`select status from invoices where id=$1`, [CINV])).rows[0].status === "void");
+  const crow = (await sys(`select * from job_addons where id=$1`, [AC])).rows[0];
+  ok("who and why are recorded", crow.closed_by === A && crow.closed_reason === "Client changed their mind");
+  ok("nobody is messaged on a cancel", (await sys(`select count(*)::int n from sent`)).rows[0].n === 0);
+  r = await as(A, `select * from public.cancel_addon('${AC}', 'again')`);
+  ok("a cancelled add-on cannot be cancelled again", !!r.err, r.err);
+  r = await as(C, `select public.propose_addon_as_me('J5','Paid then cancel',3000) id`);
+  const AP = r.rows?.[0]?.id;
+  r = await as(W, `select * from public.agree_addon_as_me('${AP}', 1)`);
+  await db.exec(`update invoices set status='sent' where id='${r.rows[0].invoice_id}'; update invoices set status='paid' where id='${r.rows[0].invoice_id}';`);
+  r = await as(A, `select * from public.cancel_addon('${AP}', 'Too late')`);
+  ok("anything paid is a refund decision, refused", !!r.err && /refund decision/.test(r.err), r.err);
+}
 
 console.log(results.join("\n"));
 const fails = results.filter(x => x.startsWith("FAIL")).length;

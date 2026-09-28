@@ -3,6 +3,7 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { pickTextProvider, providerAttrs, chatWithFailover, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 import { payLinkToken } from "./stripe.ts";
 import { invoicePdf, workerFeeBreakdown } from "./pdf.ts";
+import { LOGO } from "./logo.ts";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 
 // yaad-invoice
@@ -146,6 +147,7 @@ function renderInvoice(inv: Record<string, any>, lines: Record<string, any>[], s
          border-bottom:3px solid var(--teal);padding-bottom:22px}
   .mark{font-family:'Anton',Impact,sans-serif;font-size:34px;letter-spacing:.5px;line-height:1}
   .mark span{color:var(--teal)}
+  .mark .logo{width:34px;height:34px;vertical-align:-4px;margin-right:10px}
   .issuer{font-size:13px;color:var(--mute);margin-top:8px;white-space:pre-line}
   .title{text-align:right}
   .title h1{font-family:'Anton',Impact,sans-serif;font-weight:400;font-size:30px;margin:0;letter-spacing:1px}
@@ -187,7 +189,7 @@ function renderInvoice(inv: Record<string, any>, lines: Record<string, any>[], s
 <body><div class="sheet">
   <header>
     <div>
-      <div class="mark">YAADLY<span>.</span></div>
+      <div class="mark"><img src="${LOGO}" alt="" class="logo">YAADLY<span>.</span></div>
       <div class="issuer">${esc(settings.invoice_issuer_name)}
 Company number ${esc(settings.invoice_issuer_number)}
 ${esc(settings.invoice_issuer_address)}

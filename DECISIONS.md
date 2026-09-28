@@ -6,6 +6,20 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-29 · An agreed add-on can be cancelled, by a named person, only while nothing is paid
+
+The first live test of add-ons found a dead end. Once both sides agreed, nothing could close an add-on. `decline_addon_as_me()` only works while it is still being agreed, so a client changing their mind after agreeing, or a test add-on, held the job short of complete for good.
+
+`cancel_addon(p_addon, p_reason)` is the one way out, and it is admin only (the desk's **Cancel add-on**):
+
+- **Draft invoice:** voided in the same step, because nobody was ever asked to pay it.
+- **Sent invoice:** refused, naming the invoice. It must be voided on Invoices first, deliberately, because the client has it.
+- **Anything paid:** refused. That is a refund decision, and this button does not make refund decisions.
+- **Record:** who cancelled it and why.
+- **Messages:** none, to either side. A cancellation after agreement is a conversation the desk has. The new status, `cancelled`, is not one `sync_job_status` counts, so the job is free to complete.
+
+---
+
 ## 2026-09-28 · Extra work on a booked job is an add-on, agreed by both sides and billed on its own
 
 Until today a booked job could not take extra work at all. `request_quote_change_as_me()` refuses a booked job and tells the client to message Yaadly, and nothing recorded what happened next, so hidden defects found once a job opened up were either done off the books or stopped the job. Monique set the rules on 28 September 2026:
@@ -4650,3 +4664,29 @@ Until today a wrong line in a drafted report had one fix, drafting the whole rep
 **Cut to the person, not to a surveyor.** The first set was modelled on 111 published documents (RICS surveys, ASHI and AS 4349.1 samples, JCT and AIA certificates, home watch reports) and read as a surveyor's work. Monique is a project manager, in London until the November Gate, with legal sign off and insurance not in place. So: every site template has a "who did what" table separating who attended from who reviewed and issued, and in person from remote; electrics, termites and structure are seen and referred on, never judged; the Technical Sign-off names a qualified trade inspector who judges the workmanship, and Monique issues; Full PM says "record", not "certificate", and says it is not issued under any law, code or scheme.
 
 **The measurement rule applies to templates too.** The first set asked for crack widths in millimetres and a measured value with units on every sign-off line, which `report_guard_issue` would refuse at issue. `gate.js` now runs `hasMeasurement()` and `guardrails.scan()` from `_shared` over every string a template can print, plus the no-dash rule, and CI runs it. A sentence that implies a measurement without a number ("the actual measurement, with units") passes the pattern and was caught by reading, which is the gap `measurements.ts` already names.
+
+## 2026-09-29 · A job posted while signed in joins that portal straight away
+
+**Why.** Found 28 Sep 2026: a job posted from the website by somebody who already had a portal account never reached it. The form saves the job anonymously and sends the contact details as an enquiry, and the only join between the two is the "Set up my portal" link, which a signed-in person has no reason to click. Founder decision the same day, "do it now", choosing this over binding jobs to whatever email an enquiry gives.
+
+**What.** `claim_my_posted_job(job, code)`, migration `20260929000000`. It requires a signed-in account with a confirmed email and the job's id with its portal code, then goes through `pend_portal_code()` and `bind_confirmed_portal_claims()`, the join link's own path, so the attempt limits and "never take a job that already has a client" hold unchanged. The form calls it on Send only when the typed email is the account's own (`joinsSignedInPortal`), and says "It is already in your portal" instead of offering the link.
+
+**Rejected.** Binding a job to the email typed in the enquiry when that address next signs in. It would catch people who were not signed in, but anybody could put a job into a stranger's portal by typing their address, which is what the portal code exists to stop.
+
+## 2026-09-28 · Every service drafts into its own template, and what only a person decides has its own column
+
+**Why.** Founder instruction, 28 Sep 2026: the templates are "the templates that are used" when the agent drafts a report once a service is booked; the form should "show the inputs I need for each report" and "not be so general"; picking a template should show "exactly what is needed to fill out the template adequately".
+
+**What.** Three new report kinds (`property_care`, `oversight`, `pm_stage`), migration `20260929001000`. `yaad-report` takes a brief per service from `kinds.ts`, each asking for the sections its template carries, and screens them like a finding. The Property Care checklist is a house list fixed in code, like the Deposit Protection Check's. The desk's drafter asks for different inputs per service, sends them to the agent as labelled headings, and records who attended and whether the review was in person or remote as `sections.who`, typed rather than read out of notes. Each service prints in the layout of its template.
+
+**Two rules changed on purpose.** First, the Visual Check and Property Care are never rated. `report_guard_issue` required a rating on every finding of every kind, so a Visual Check could only issue by breaking "They record. They do not rate or advise." on the services page. A rating on those two is now refused, not required. Second, `reports.human` holds a Technical Sign-off's or stage record's result, an oversight report's status ratings, and every sum of money. Money is allowed there and nowhere else in a report, because a figure a person types is a figure they stand behind, which is the line `20260925220000` drew. It is written only by `set_report_human()`, which is admin only, refuses an issued report, accepts only listed keys and values, and logs to `report_edits`; a trigger refuses any other write, including a direct update, so the desk form is the only door. A stage record's value is what the document says; paying a trade still goes through Invoices.
+
+**Left for Monique.** The meaning of each rating on the new kinds (`RPT_KEYS` in the desk), the oversight status rules, and the "what you need" lists are first drafts cut from the templates, and are hers to correct. `edit_report()` corrects the findings and referrals of the new kinds but not their new sections; a wrong line there is fixed in the notes and drafted again.
+
+## 2026-09-28 · A test worker sees test jobs; nobody else does
+
+`20260909150000` took jobs marked `is_test` off `open_jobs` for everybody. Running a worker test on 28 Sep 2026 showed the cost: a test job reached no worker at all, so testing the worker side meant leaving the job unmarked on the public board, the exact thing the flag exists to prevent. `20260929010000` keeps a test job in `open_jobs` only when `viewer_is_test_worker()` is true: the caller's JWT email matches an active `worker_profiles` row a person marked `is_test`. The alternative, a separate test board page, would have been a second copy of the board to keep in step. Visibility only: quoting never read `is_test` (`job_open_for_quotes`, `jq_insert_vetted`) and still does not. Both flags stay person-set from the desk, never inferred.
+
+## 2026-09-28 · A worker can correct the words and part of their own evidence, and the original stays on record
+
+Founder instruction while running a job end to end: the worker must always have a way to edit or correct. Evidence was insert only, and the portal told the worker "It cannot be edited now". `20260929040000` adds `correct_evidence_as_me()`: the worker who filed an item may change its label and phase while its stage is the one being worked and the job is open. The file, the sha256, the stage and the kind never change, because those are what make it a record, and a materials item is what passes the risk in the materials to the client. Every correction writes the before and after to `evidence_corrections` (read only to the two parties and admin, written only by the function) and stamps `evidence.corrected_at`, so the client sees "Corrected by the worker" and the first wording rather than a silent rewrite. Withdrawing an item was deliberately left out: it would change what every reader of `evidence` (the client ledger, the drafted reports, the desk, the Completion Report) counts, and that is a separate decision.
