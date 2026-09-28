@@ -6127,7 +6127,14 @@ Desk, **Reports**. Service: Deposit Protection Check. Client name and property a
 3. **Portal, Completion Report.** Download PDF saves `Completion Report <job>.pdf`. If it fails, the page says so and opens the print dialog; choose Save as PDF. The light colours for both come from `html.pdf-render` and `@media print` in `web/app/globals.css`.
 4. **Checking the desk under its real policy.** Serve a copy with the same `Content-Security-Policy` header the desk worker sets (see 31 above), press Preview, and confirm the box shows a PDF, not a web page.
 
-## 33. A Completion Report: it runs on its own, and when to step in (28 Sep 2026)
+## 33. "Pay the worker" on a pay invoice is greyed out (28 Sep 2026)
+
+1. Open the pay invoice on Invoices. Under the buttons it now says either "The client has paid for this work", or "Not payable yet" with the database's own reason and a button to open the client's bill that is holding it up.
+2. The rule behind it is `worker_pay_client_unpaid()`: a worker is paid only once the client's money for that work is marked paid. Any client bill on the job that is still a draft or sent and unpaid blocks it, including the unsent balance of a bill that was split into parts. Send and collect that bill, or void it if it should never go, then come back. Do not change the function to get one payment through: that is a decision about releasing money, and it is Monique's.
+3. When it can be paid, **Pay the worker** opens Pay workers with a card for that invoice at the top, offering only the way the worker asked to be paid: **Pay with Stripe** if they set up a Stripe payout account, **Pay by Wise** if they gave bank details in Wise from the portal, and Wise with "take them by phone" if they gave nothing. If nobody has phoned them to check their bank details yet, the card says so first, with **Call-back done**.
+4. On Pay workers, a row waiting on the client has a button that opens the client's bill holding it up (for example **Open INV-2026-0024**). It used to open the job's invoice list, whose Pay the worker came straight back to Pay workers, round and round.
+
+## 34. A Completion Report: it runs on its own, and when to step in (28 Sep 2026)
 
 It is the worker's document. Nothing on the desk edits it. When a job
 completes, the report opens for the worker with drafted care notes and they
