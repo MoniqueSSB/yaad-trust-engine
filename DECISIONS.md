@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-28 · "What this job costs" has two sections: main work and additional work
+
+Monique: "give extra work its own break down prices... that is added underneath, so there is no confusions", and "this section would now have two sections for the main work and the additional work".
+
+The same day, agreed extra work had been folded into the money panel as one line, and added into the job's "All in" total, so a client could not tell what the quote cost from what the extras cost. Now there are two sections:
+
+- **Main work:** exactly as the quote set it, with its own total.
+- **Additional work:** underneath, with one card per agreed or approved add-on.
+  - The client sees the work, Yaadly's 15% and what they pay.
+  - The worker sees the work, the 5% taken off and what they are paid.
+  - It has its own total.
+
+A last line adds the two together and says so. The figures are `addonClientBill()` and `addonWorkerPay()`, the same arithmetic as the add-on invoices.
+
+---
+
 ## 2026-09-28 · Invoices download as the emailed PDF, and "Your documents" offers each PDF from the list
 
 **Invoices.** Monique: "invoice download as pdf also". Every non-draft invoice in the portal's money panel has **Download PDF**. It is the same file the invoice email attaches, drawn by `invoicePdf()` in `yaad-invoice`, so it cannot differ from what was sent.
