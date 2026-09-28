@@ -6188,7 +6188,7 @@ switches the user triggers on jobs, completion_reports and disputes off for
 its own run, so nothing is messaged, which is why it must be inside a
 transaction.
 
-## 34. Finding what a worker is owed, and Yaadly's 5% (28 Sep 2026)
+## 35. Finding what a worker is owed, and Yaadly's 5% (28 Sep 2026)
 
 1. **Invoices, Worker pay.** Every worker's pay invoice, grouped under its job, with what is owed and what is paid on that job. Jobs with money owed come first. The summary at the top counts real jobs only; your own tests are listed underneath and counted in none of the figures. **Pay the worker** on a row opens Pay workers on that invoice, with the way the worker asked to be paid.
 2. **Invoices, Worker fees.** Yaadly's 5% from each tradesperson, job by job. It is kept out of their pay, so it is never an invoice of its own. The figure is worked out from the accepted quote at today's rate, not read from an invoice. **Agency fees** now holds only the client side: the 15% and services.
