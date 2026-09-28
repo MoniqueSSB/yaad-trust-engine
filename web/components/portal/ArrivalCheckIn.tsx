@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { logArrival } from "@/app/portal/arrival-actions";
 
 /**
@@ -44,6 +45,7 @@ export function ArrivalCheckIn({
   checkedInToday: boolean;
   recent: { stage: number; arrivedAt: string }[];
 }) {
+  const router = useRouter();
   const [state, setState] = useState<"idle" | "busy" | "error">("idle");
   const [msg, setMsg] = useState("");
 
@@ -80,11 +82,18 @@ export function ArrivalCheckIn({
                     setState("error");
                     setMsg(r.message);
                   } else {
+                    /* Asked for explicitly. Seen 28 Sep 2026: the check-in
+                       saved and the card still showed the button until a
+                       manual reload, which invites a second tap. */
                     setState("idle");
+                    router.refresh();
                   }
                 } catch {
+                  /* Seen live 28 Sep 2026: the check-in SAVED and the server
+                     still answered 503, so "it failed" would be a lie as
+                     often as not. Say what is known, and how to find out. */
                   setState("error");
-                  setMsg("That did not go through. Check your connection, reload the page and press it once more.");
+                  setMsg("We could not confirm it. Reload the page: if it says you are checked in, it went through. If not, press it once more.");
                 }
               }}
               className="mt-2.5"
