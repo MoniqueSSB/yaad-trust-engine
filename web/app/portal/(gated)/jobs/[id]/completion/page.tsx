@@ -52,6 +52,9 @@ type Ev = {
   item_code: string | null; storage_path: string | null; img: string | null;
 };
 
+/* The stored values, as jobs_walk_platform_chk allows them, in words. */
+const WALK_PLATFORM: Record<string, string> = { whatsapp: "WhatsApp video", google_meet: "Google Meet", zoom: "Zoom" };
+
 const h2 = "mb-2 flex flex-wrap items-baseline gap-2 border-b border-line pb-1.5 text-[15px] font-bold text-ink";
 const lead = "mb-2.5 text-[12.5px] text-dim";
 const card = "rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[12.5px] text-mute";
@@ -419,7 +422,7 @@ export default async function Completion({
           <section className="mt-6">
             <h2 className={h2}>{next()} · Video walkthrough</h2>
             <p className={lead}>
-              {job.walk_platform ?? "A call"}{job.walk_date ? ", " + job.walk_date : ""}
+              {WALK_PLATFORM[job.walk_platform ?? ""] ?? "A call"}{job.walk_date ? ", " + job.walk_date : ""}
               {job.walk_who ? " · " + job.walk_who : ""}
             </p>
             <p className="whitespace-pre-wrap rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13px] leading-relaxed text-mute">{job.walk_call_notes}</p>

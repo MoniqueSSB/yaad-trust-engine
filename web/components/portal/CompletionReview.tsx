@@ -65,7 +65,7 @@ export function WorkerSign({
       <label className="mt-3 block text-[12px] font-bold text-dim">
         What you did, in your own words (optional)
         <textarea name="account" rows={4} maxLength={2000} defaultValue={account} className={input}
-          placeholder="Stripped the loose tiles, replaced the soft board behind the valve, tanked, retiled and fitted the new mixer." />
+          placeholder="What you did on each stage, anything you found on site, and anything the owner should know." />
       </label>
       <label className="mt-3 block text-[12px] font-bold text-dim">
         Looking after it, one note per line

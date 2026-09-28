@@ -199,7 +199,7 @@ export function JobRail({
             (ContactYaadly.tsx). The Yaadly number stays underneath for
             anybody who would rather just WhatsApp. */}
         <p className="mb-3 text-[12.5px] leading-relaxed text-mute">
-          Goes straight to Monique, on WhatsApp and by email, with this job
+          Goes straight to a person at Yaadly, on WhatsApp and by email, with this job
           attached. Patois or English.
         </p>
         <Link
