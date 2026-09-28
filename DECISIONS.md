@@ -4287,3 +4287,17 @@ decision-log illustration on `how-we-use-ai.html` are avatars, sitting next to
 "DW" for a worker called Devon W., and they read as initials because the thing
 beside them is initials. Neither is the logo lockup. If Monique wants either
 changed, they are one rule each.
+
+## 2026-09-28 · The Deposit Protection Check is built to read as a professional report
+
+Monique's test was that the document should read as worth five hundred pounds at the published price, and the one it replaced read as a good £149 note. It was rebuilt against the RICS Level 3 survey layout and published guidance on reviewing a builder's quote, after she approved an invented sample: contents, a key saying what each rating asks the client to do, who reviewed what (documents received, what was checked independently, a related party disclosure), a page one summary with the verdict and the red flags against a "resolve by" point, a numbered plan, every red flag tied to its source, the builder's quote reproduced line by line with the red flag numbers beside it, payment terms side by side, the checklist with why each line matters, referrals grouped by profession, a signed declaration, and the documents word for word as an appendix. A section of builder pushback replies was in the sample and was cut on her instruction.
+
+What stays where it was. The agent still never rates and never writes the verdict. "Resolve by" is derived from the rating a person gave, so it decides nothing. The payment terms are split on purpose: the agent fills only what the builder proposed and where it says so; what to agree instead, and why, is Yaadly's standard, fixed in `yaad-report` like the checklist lines, because a client buying the same service twice is owed the same standard twice. The two working days and ten working days in it are Monique's numbers, not a price. The checklist grew from 18 lines to 25 (waste, own account, cash, who else is on site, guarantee, permissions, disputes).
+
+Two deliberate changes of rule. First, the transcript was "never shown to a client"; on a Deposit Protection Check it is now the appendix, because showing the documents word for word is how the client sees nothing was added. Second, the quote is reproduced with the builder's own figures in it. That does not loosen rule 4: the agent still cannot write a figure and the scrubber still removes any it tries; the reproduced quote is the builder's words, stored beside the screened sections rather than inside them, and the document says above it that it does not say whether the figures are fair. It is taken from the notes as corrected at the desk first, so a digit fixed by hand is the digit printed.
+
+A missing section now shows as a dashed "not drafted" box instead of vanishing. A report drafted on 25 September, 27 minutes before the sections existed, read as though they never had, and that is what prompted the whole change.
+
+`scripts/render-report.mjs` no longer carries its own template. It lifts the renderer out of `concierge/concierge.html` and calls it, because the two copies drifted within a day of being written with a note asking for them to be kept in step by hand.
+
+No migration: everything new lives in `reports.sections`, which the issue gates do not read, and the finding text they do read is unchanged in shape.

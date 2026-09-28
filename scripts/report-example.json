@@ -1,0 +1,499 @@
+{
+ "_note": "Invented data for scripts/render-report.mjs. Not a real client, builder or property. Ratings and verdict are left empty on purpose: they are a person's, not an example's.",
+ "report": {
+  "id": "00000000-0000-4000-8000-0000000000e1",
+  "kind": "deposit_check",
+  "number": null,
+  "client_name": "PRACTICE, Miss A. Brown (invented)",
+  "property": "PRACTICE, Portmore, St Catherine",
+  "visited_on": null,
+  "status": "draft",
+  "drafted_at": "2026-09-28T10:00:00Z",
+  "issued_at": null,
+  "verdict_line": null,
+  "verdict": null,
+  "model": "mistral-small-latest",
+  "provider": "mistral",
+  "scrubbed": [],
+  "omitted": [
+   "Whether the builder has completed similar work: no past jobs or references were provided, and none were found.",
+   "The condition of the drainage under the bathroom floor, which cannot be seen until the floor is lifted."
+  ],
+  "questions": [
+   "Structural engineer: whether the rear wall needs looking at before it is rebuilt, and whether the cause of the crack has to be dealt with first.",
+   "Local authority: whether the wall work needs the municipal corporation to be told, or any approval, before it starts.",
+   "Attorney: whether an agreement made by WhatsApp messages is enough on a job of this size."
+  ],
+  "source_text": "DOCUMENT 1 (quote), quote.jpg:\nD. Campbell, Building and Tiling\nTo Miss Brown, Portmore. 20/9/26\nTake out old bathroom suite and tiles. Supply and fit new toilet, basin, shower and tiles.\nFix back wall, block and render.\nMaterials J$520,000\nLabour J$380,000. Total J$900,000\n70% to start, balance when finish\nStart soon\nThanks, Dave\nWhatsApp 876 555 0142\nLayout: handwritten, no letterhead, dated, no TRN, no address.\n\nDOCUMENT 2 (message), whatsapp.png:\n16 Sep, 10:02 Client: Hi Dave, my aunt gave me your number for the bathroom and the back wall.\n18 Sep, 21:14 Dave: Send the 70% to my cousin Marlon account and I can buy everything Monday.\n22 Sep, 19:30 Dave: Miss you ready? Price going up next week on the tiles.\n\nPHOTOGRAPH 3, wall.jpg:\nThe rear wall from the yard, block with a render finish, a crack running from the window corner.",
+  "sections": {
+   "finding_refs": [
+    {
+     "ord": 1,
+     "source": "document 1, quote, line 7",
+     "lines": [
+      7
+     ]
+    },
+    {
+     "ord": 2,
+     "source": "document 2, WhatsApp, 18 September 2026, 21:14",
+     "lines": []
+    },
+    {
+     "ord": 3,
+     "source": "document 1, quote; the reviewer's own search",
+     "lines": [
+      1,
+      10
+     ]
+    },
+    {
+     "ord": 4,
+     "source": "document 1, quote, line 5",
+     "lines": [
+      5
+     ]
+    },
+    {
+     "ord": 5,
+     "source": "document 1, quote, line 8",
+     "lines": [
+      8
+     ]
+    }
+   ],
+   "glance": {
+    "proposed": "70 percent before any work starts",
+    "proposed_detail": "Paid to a relative's account, with no receipt, no stages and nothing held back.",
+    "ours": "Nothing before materials are on site",
+    "ours_detail": "Then five stages, each paid only against dated evidence, to an account in the builder's own name."
+   },
+   "documents": [
+    {
+     "what": "Quote from D. Campbell, handwritten, one page",
+     "dated": "20 Sep 2026",
+     "form": "1 photograph"
+    },
+    {
+     "what": "WhatsApp messages between the client and the builder",
+     "dated": "16 to 22 Sep 2026",
+     "form": "6 screenshots"
+    },
+    {
+     "what": "Photographs of the bathroom and the rear wall as they are now",
+     "dated": "23 Sep 2026",
+     "form": "5 photographs"
+    }
+   ],
+   "checked": "A search for the builder's name and number across Facebook, Google and Instagram, and for a registered business in his name. Nothing was found.",
+   "next_payment": "Monday 5 October 2026",
+   "get_before_paying": [
+    {
+     "document": "Builder's full name, TRN and physical address, in writing",
+     "finding": 3
+    },
+    {
+     "document": "A bank account in the builder's own name, confirmed in writing",
+     "finding": 2
+    },
+    {
+     "document": "An itemised materials list with the supplier for each",
+     "finding": 4
+    },
+    {
+     "document": "Written agreement to the payment terms in section G",
+     "finding": 1
+    },
+    {
+     "document": "Start date, working days and completion date",
+     "finding": 5
+    }
+   ],
+   "next_steps": [
+    {
+     "step": "Tell the builder, politely, that you are not paying on Monday 5 October and that you will send some questions today.",
+     "who": "You",
+     "when": "today"
+    },
+    {
+     "step": "Send the message in section I as it stands.",
+     "who": "You",
+     "when": "today"
+    },
+    {
+     "step": "When the TRN arrives, check that the name on it matches the builder.",
+     "who": "You",
+     "when": "within two days"
+    },
+    {
+     "step": "Agree the payment terms and the schedule in sections G and H in writing, with the share for each stage filled in.",
+     "who": "You and the builder",
+     "when": "this week"
+    },
+    {
+     "step": "Pay stage 1 only once the materials are on site with a supplier invoice in your name, and get a receipt.",
+     "who": "You",
+     "when": "before stage 1"
+    }
+   ],
+   "payment_terms": [
+    {
+     "term": "Money before work",
+     "proposed": "70 percent to start",
+     "source": "document 1, quote, line 7",
+     "instead": "Nothing before the materials are on site. The first payment is stage 1 of the schedule.",
+     "why": "Your money should never be ahead of what you can see."
+    },
+    {
+     "term": "Who is paid",
+     "proposed": "His cousin's account",
+     "source": "document 2, WhatsApp, 18 September 2026",
+     "instead": "An account in the contractor's own name, confirmed in writing, or the materials supplier directly.",
+     "why": "A payment has to be traceable to the contractor and the job."
+    },
+    {
+     "term": "How it is paid",
+     "proposed": "Not stated",
+     "source": null,
+     "instead": "Bank transfer only. Never cash, and never a transfer to a person collecting on their behalf.",
+     "why": "A transfer is a record. Cash is not."
+    },
+    {
+     "term": "Materials",
+     "proposed": "One lump sum to the builder",
+     "source": "document 1, quote, line 5",
+     "instead": "Supplier invoices made out in your name. Pay the supplier directly if the contractor agrees.",
+     "why": "Materials in your name are yours if the job stops."
+    },
+    {
+     "term": "Stages",
+     "proposed": "None. Start and finish only",
+     "source": "document 1, quote, line 7",
+     "instead": "Paid in stages, each only against the evidence in the payment schedule.",
+     "why": "Money follows progress you can see from abroad."
+    },
+    {
+     "term": "When a stage is paid",
+     "proposed": "Not stated",
+     "source": null,
+     "instead": "Within two working days of the evidence arriving, so the contractor is never kept waiting once the work is proven.",
+     "why": "Protects the contractor as much as you. Fair terms are easier to hold them to."
+    },
+    {
+     "term": "Receipts",
+     "proposed": "Not mentioned",
+     "source": null,
+     "instead": "A written receipt for every payment, dated, naming the stage.",
+     "why": "Your record of what has been paid and for what."
+    },
+    {
+     "term": "The last payment",
+     "proposed": "Balance when finish",
+     "source": "document 1, quote, line 7",
+     "instead": "Paid only once a snag list is agreed and every item on it is signed off.",
+     "why": "Finished needs a definition both of you signed."
+    },
+    {
+     "term": "Currency",
+     "proposed": "Jamaican dollars",
+     "source": "document 1, quote",
+     "instead": "Each stage fixed in Jamaican dollars in writing, so an exchange rate move does not change what is owed.",
+     "why": "Removes an argument before it starts."
+    },
+    {
+     "term": "If work stops",
+     "proposed": "Not stated",
+     "source": null,
+     "instead": "If no work happens for ten working days without a written reason, no further stage is paid until you have both agreed a new date in writing.",
+     "why": "Gives you a clear point at which to act."
+    },
+    {
+     "term": "Changes",
+     "proposed": "Not stated",
+     "source": null,
+     "instead": "No extra work is paid unless it is agreed in writing before it starts.",
+     "why": "The most common way a job goes over."
+    }
+   ],
+   "scope_included": [
+    "Remove the existing bathroom suite and tiles",
+    "Supply and fit a new toilet, basin, shower and tiling",
+    "Rebuild and render the damaged section of the rear wall"
+   ],
+   "scope_not_stated": [
+    "Disposal of the removed materials",
+    "Any work to the drainage under the floor",
+    "Electrical work beyond the bathroom",
+    "Making good the paint after the wall repair",
+    "Taps, shower valve and fittings: which ones, and who chooses"
+   ],
+   "payment_stages": [
+    {
+     "stage": "1. Materials",
+     "when": "Bathroom materials delivered to site",
+     "evidence": "Supplier invoice in your name; dated photographs of the delivery, matched against the itemised list"
+    },
+    {
+     "stage": "2. Strip out and first fix",
+     "when": "Old bathroom removed, pipework and wiring first fix complete",
+     "evidence": "Dated photographs and a short video walking the room before the walls are closed"
+    },
+    {
+     "stage": "3. Wall repair",
+     "when": "Rear wall rebuilt and rendered",
+     "evidence": "Dated photographs of each side, from the same points as the photographs of 23 September"
+    },
+    {
+     "stage": "4. Fit and finish",
+     "when": "Suite, tiling and fittings installed and working",
+     "evidence": "A video showing taps, shower and toilet running, and the drain clearing"
+    },
+    {
+     "stage": "5. Final stage",
+     "when": "Snag list agreed and cleared",
+     "evidence": "A snag list signed by you and the builder, every item marked done"
+    }
+   ],
+   "ask_the_builder": "Hi Dave, thank you for the quote. Before we go ahead, could you send me the following in writing, please:\n\n1. Your full name or business name, your TRN and a physical address.\n2. The bank account you would like to be paid into, in your own name.\n3. An itemised list of the materials, with the supplier for each, and the invoices made out in my name.\n4. A start date, how many working days the job will take, and a completion date.\n5. What happens if the job runs late, and what happens if I need to stop the work.\n6. Whether you hold any insurance, and whether anyone else will be working with you.\n7. Whether you give any guarantee on the work once it is finished.\n\nOn payment, I would rather not pay up front. I would like to pay in stages as the work goes, each stage paid promptly once I have the photos or receipts for it, by bank transfer to your own account. I will send you the stages so we can agree the amount for each one together before anything starts.\n\nIf anything changes once you are on site, please stop at that point and write down what changed, and what it does to the time and the price, so we can agree it before carrying on.\n\nThank you, I look forward to hearing from you.",
+   "checklist": [
+    {
+     "item": "Contractor named on the quote",
+     "group": "identity",
+     "why": "You need to know who you are agreeing with.",
+     "state": "provided",
+     "note": "First name only."
+    },
+    {
+     "item": "Business registration or TRN",
+     "group": "identity",
+     "why": "The only formal way to identify them later.",
+     "state": "not_provided",
+     "note": null
+    },
+    {
+     "item": "Verifiable address and a number other than WhatsApp",
+     "group": "identity",
+     "why": "A WhatsApp number can disappear overnight.",
+     "state": "not_provided",
+     "note": "WhatsApp number only."
+    },
+    {
+     "item": "Independent trace of the business",
+     "group": "identity",
+     "why": "Past work others can see is the best evidence of a track record.",
+     "state": "not_found",
+     "note": null
+    },
+    {
+     "item": "Quote in writing and dated",
+     "group": "the quote",
+     "why": "Fixes what was offered and when.",
+     "state": "provided",
+     "note": "Handwritten, dated 20 September."
+    },
+    {
+     "item": "Quote itemised by element of work",
+     "group": "the quote",
+     "why": "Lets each stage be matched to what it pays for.",
+     "state": "not_provided",
+     "note": null
+    },
+    {
+     "item": "Labour and materials separated",
+     "group": "the quote",
+     "why": "Shows how much of the money is materials you could own.",
+     "state": "provided",
+     "note": null
+    },
+    {
+     "item": "Quantities and specification stated",
+     "group": "the quote",
+     "why": "Stops cheaper materials being swapped in.",
+     "state": "not_provided",
+     "note": null
+    },
+    {
+     "item": "Who supplies the materials",
+     "group": "materials",
+     "why": "Decides who you pay for them.",
+     "state": "provided",
+     "note": "Contractor supplies."
+    },
+    {
+     "item": "Who owns the materials once paid for",
+     "group": "materials",
+     "why": "Decides whether they are yours if the job stops.",
+     "state": "not_provided",
+     "note": null
+    },
+    {
+     "item": "Who receives deliveries on site",
+     "group": "materials",
+     "why": "Somebody has to count what arrives.",
+     "state": "not_provided",
+     "note": null
+    },
+    {
+     "item": "Waste removal and clean up",
+     "group": "materials",
+     "why": "Often left out, then charged as extra.",
+     "state": "not_provided",
+     "note": null
+    },
+    {
+     "item": "Payment structure written down",
+     "group": "money",
+     "why": "The single biggest source of risk on a job like this.",
+     "state": "provided",
+     "note": "70 percent to start, balance on completion."
+    },
+    {
+     "item": "Payment to an account in the contractor's own name",
+     "group": "money",
+     "why": "Makes every payment traceable to the contractor and the job.",
+     "state": "not_provided",
+     "note": "A relative's account was asked for."
+    },
+    {
+     "item": "No request for cash",
+     "group": "money",
+     "why": "Cash leaves no record.",
+     "state": "provided",
+     "note": null
+    },
+    {
+     "item": "What the client is exposed to at each stage",
+     "group": "money",
+     "why": "Tells you the most you could lose at any moment.",
+     "state": "not_provided",
+     "note": null
+    },
+    {
+     "item": "Receipt for anything already paid",
+     "group": "money",
+     "why": "Your record of what has moved.",
+     "state": "not_applicable",
+     "note": "Nothing paid yet."
+    },
+    {
+     "item": "Insurance held by the contractor",
+     "group": "risk",
+     "why": "Covers damage or injury on your property.",
+     "state": "not_provided",
+     "note": null
+    },
+    {
+     "item": "Who else will work on site",
+     "group": "risk",
+     "why": "You should know who is in your house.",
+     "state": "not_provided",
+     "note": null
+    },
+    {
+     "item": "Guarantee on the finished work",
+     "group": "risk",
+     "why": "Says what happens if something fails after they leave.",
+     "state": "not_provided",
+     "note": null
+    },
+    {
+     "item": "Permissions needed for the work",
+     "group": "risk",
+     "why": "Some work needs the local authority told before it starts.",
+     "state": "referred",
+     "note": null
+    },
+    {
+     "item": "Start date, working duration and completion date",
+     "group": "programme",
+     "why": "Without dates, nothing is ever late.",
+     "state": "not_provided",
+     "note": null
+    },
+    {
+     "item": "What happens if the contractor is late",
+     "group": "programme",
+     "why": "Gives you a point at which to act.",
+     "state": "not_provided",
+     "note": null
+    },
+    {
+     "item": "What happens if the client stops the work",
+     "group": "programme",
+     "why": "Protects the contractor as well as you.",
+     "state": "not_provided",
+     "note": null
+    },
+    {
+     "item": "How a disagreement is settled",
+     "group": "programme",
+     "why": "Agreed now, it is a process. Agreed later, it is a fight.",
+     "state": "not_provided",
+     "note": null
+    }
+   ],
+   "quote": {
+    "doc": 1,
+    "lines": [
+     "D. Campbell, Building and Tiling",
+     "To Miss Brown, Portmore. 20/9/26",
+     "Take out old bathroom suite and tiles. Supply and fit new toilet, basin, shower and tiles.",
+     "Fix back wall, block and render.",
+     "Materials J$520,000",
+     "Labour J$380,000. Total J$900,000",
+     "70% to start, balance when finish",
+     "Start soon",
+     "Thanks, Dave",
+     "WhatsApp 876 555 0142"
+    ]
+   }
+  }
+ },
+ "findings": [
+  {
+   "report_id": "00000000-0000-4000-8000-0000000000e1",
+   "ord": 1,
+   "heading": "Most of the money is asked for before work starts",
+   "body": "The quote asks for 70 percent to start and the balance when the job is finished. There is no stage in between, and nothing is held back at the end.",
+   "why": "Once most of the money has moved, you have very little left to hold if the work stops, slows or is not what was agreed. From abroad, you would be relying entirely on goodwill.",
+   "action": "Replace it with the payment terms in section G and the staged schedule in section H, where money follows evidence.",
+   "severity": null
+  },
+  {
+   "report_id": "00000000-0000-4000-8000-0000000000e1",
+   "ord": 2,
+   "heading": "Payment asked for into a third party's account",
+   "body": "The builder asked for the deposit to be sent to his cousin's account so that the materials could be bought on Monday.",
+   "why": "A payment to someone who is not the builder is very hard to trace back to the job if something goes wrong.",
+   "action": "Pay only into an account in the builder's own name, or pay the materials supplier directly.",
+   "severity": null
+  },
+  {
+   "report_id": "00000000-0000-4000-8000-0000000000e1",
+   "ord": 3,
+   "heading": "No business is named on the quote",
+   "body": "The quote carries a first name, a trading description and a WhatsApp number. There is no business name, no TRN and no address, and the reviewer's search found no business registered under this name.",
+   "why": "If something goes wrong there is nobody formally identifiable to hold to the agreement, and no way to check a track record.",
+   "action": "Ask for his full name, TRN and a physical address, and check them before paying anything.",
+   "severity": null
+  },
+  {
+   "report_id": "00000000-0000-4000-8000-0000000000e1",
+   "ord": 4,
+   "heading": "Materials are not itemised and ownership is not stated",
+   "body": "The quote gives one line for materials with no list, no specification and no supplier.",
+   "why": "You cannot tell what you are paying for, or whether the materials are yours if the job stops.",
+   "action": "Ask for an itemised list and for the supplier invoices to be made out in your name.",
+   "severity": null
+  },
+  {
+   "report_id": "00000000-0000-4000-8000-0000000000e1",
+   "ord": 5,
+   "heading": "No start or finish date",
+   "body": "The quote says the work will start soon. No dates or duration are written anywhere.",
+   "why": "Without dates there is no point at which the job is late, so there is nothing to act on if it drags.",
+   "action": "Agree a start date, a number of working days and a completion date in writing.",
+   "severity": null
+  }
+ ]
+}

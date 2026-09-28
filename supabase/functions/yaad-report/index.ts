@@ -97,13 +97,33 @@ Questions of title, ownership, transfer, structural soundness and boundaries com
 Each finding also carries "why": one to three plain sentences on what this exposes the client to and how. Not how serious it is. That is a rating and it is not yours.
 
 IN ADDITION, for this service only, return a top-level "sections" object beside "findings", exactly this shape:
-{"sections":{"scope_included":[],"scope_not_stated":[],"payment_stages":[{"stage":"","when":"","evidence":""}],"ask_the_builder":"","checklist":[{"state":"","note":""}]}}
+{"sections":{"finding_refs":[{"source":"","lines":[]}],"glance":{"proposed":"","proposed_detail":"","ours":"","ours_detail":""},"documents":[{"what":"","dated":"","form":""}],"checked":"","next_payment":"","get_before_paying":[{"document":"","finding":0}],"next_steps":[{"step":"","who":"","when":""}],"payment_terms":[{"proposed":"","source":""}],"scope_included":[],"scope_not_stated":[],"payment_stages":[{"stage":"","when":"","evidence":""}],"ask_the_builder":"","checklist":[{"state":"","note":""}]}}
 
+- "finding_refs": one entry per finding, in the same order as "findings". "source" says where the finding came from, plainly: "document 1, quote, line 7", "document 2, WhatsApp, 18 September 2026", "reviewer's own search". "lines" is the list of QUOTE LINE numbers the finding rests on, using the numbering in the QUOTE, LINE BY LINE block if there is one, otherwise an empty list.
+- "glance": two short sides for page one. "proposed" is one line on the payment arrangement as the builder proposed it, and "proposed_detail" one sentence adding who is paid, receipts and stages. "ours" is one line on the arrangement this report proposes instead (normally: nothing paid before materials are on site), and "ours_detail" one sentence on the stages and evidence. Percentages the builder used may be repeated. No sums of money.
+- "documents": one entry per document the reviewer received, in order: what it is, the date it carries or covers, and its form ("1 photograph", "6 screenshots", "PDF, 2 pages"). Only what the notes show.
+- "checked": one or two sentences on what the reviewer checked independently, only if the notes record it. Empty if they do not.
+- "next_payment": when the builder has asked for the next payment, as the notes record it ("Monday 5 October 2026"). Empty if the notes do not say.
+- "get_before_paying": the documents the client should get from the builder before paying anything, each tied to the finding number it answers.
+- "next_steps": three to seven practical steps for the client, in order, each with "who" (you, you and the builder) and "when" (today, within two days, this week, before stage 1). None of them may be paying anyone, except paying the first stage once its evidence exists.
+- "payment_terms": exactly 11 entries, in this order, one per term below. "proposed" is what the builder's quote or messages say on that term, in a few words and in the builder's terms where possible, or "Not stated" if nothing does. "source" says where, as in finding_refs, or is empty. Do not write what should be agreed instead: that part is Yaadly's standard and is filled in for you.
+  1 Money before work
+  2 Who is paid
+  3 How it is paid
+  4 Materials
+  5 Stages
+  6 When a stage is paid
+  7 Receipts
+  8 The last payment
+  9 Currency
+  10 If work stops
+  11 Changes
 - "scope_included": what the quote says it covers, one line per element, in the contractor's own wording where the notes give it.
 - "scope_not_stated": what the quote does not say and therefore is not agreed either way: quantities, brands, who supplies, purlins, fascia, making good, waste, access, protection from rain, who receives deliveries. Only items the notes support.
 - "payment_stages": the ORDER money should move in for this job, three to six stages, each with "when" (the condition) and "evidence" (what must exist before it moves: dated photographs, a supplier invoice in the client's name, a short video, a signed snag list). Never a share, never a percentage, never a figure. The person signing decides the shares.
-- "ask_the_builder": one message the client can copy and send as it stands, in plain warm British English, numbering the things the contractor needs to provide in writing, then one paragraph proposing staged payment against evidence, then one paragraph on changes: stop, write down what changed and what it does to time and price, agree before carrying on. No figures anywhere in it. No dashes.
-- "checklist": exactly 18 entries, in this order, one per line below. For each give "state", one of: provided, confirmed, not_provided, not_found, referred, not_applicable, and a short "note" only where the notes give a reason. Do not repeat the line text; the order is the key.
+- "ask_the_builder": one message the client can copy and send as it stands, in plain warm British English, numbering the things the contractor needs to provide in writing (including a bank account in their own name, and any guarantee on the finished work), then one paragraph proposing staged payment against evidence, by bank transfer to their own account, each stage paid promptly once its evidence arrives, then one paragraph on changes: stop, write down what changed and what it does to time and price, agree before carrying on. No figures anywhere in it. No dashes.
+- "questions", for this service, starts each entry with the profession it belongs to and a colon: "Structural engineer: whether the rear wall...", "Attorney: ...", "Local authority: ...".
+- "checklist": exactly 25 entries, in this order, one per line below. For each give "state", one of: provided, confirmed, not_provided, not_found, referred, not_applicable, and a short "note" only where the notes give a reason. Do not repeat the line text; the order is the key.
   1 Contractor named on the quote
   2 Business registration or TRN
   3 Verifiable address and a number other than WhatsApp
@@ -115,13 +135,20 @@ IN ADDITION, for this service only, return a top-level "sections" object beside 
   9 Who supplies the materials
   10 Who owns the materials once paid for
   11 Who receives deliveries on site
-  12 Payment structure written down
-  13 What the client is exposed to at each stage
-  14 Receipt for anything already paid
-  15 Insurance held by the contractor
-  16 Start date, working duration and completion date
-  17 What happens if the contractor is late
-  18 What happens if the client stops the work`,
+  12 Waste removal and clean up
+  13 Payment structure written down
+  14 Payment to an account in the contractor's own name
+  15 No request for cash
+  16 What the client is exposed to at each stage
+  17 Receipt for anything already paid
+  18 Insurance held by the contractor
+  19 Who else will work on site
+  20 Guarantee on the finished work
+  21 Permissions needed for the work
+  22 Start date, working duration and completion date
+  23 What happens if the contractor is late
+  24 What happens if the client stops the work
+  25 How a disagreement is settled`,
 
   condition: `SERVICE BRIEF: Condition Report.
 
@@ -224,35 +251,92 @@ const CORS = {
 const KINDS = ["deposit_check", "condition", "technical_signoff", "visual_check"] as const;
 
 // The house checklist for a Deposit Protection Check. The model supplies a
-// state and a note against each line; the line itself is fixed here, so a
-// client buying the same service twice gets the same list twice, including
-// the lines where nothing was wrong. Keep this in step with the numbered list
-// in the deposit_check brief above; the two are asserted equal at load.
-const DEPOSIT_CHECKLIST: { item: string; group: string }[] = [
-  ["Contractor named on the quote", "identity"],
-  ["Business registration or TRN", "identity"],
-  ["Verifiable address and a number other than WhatsApp", "identity"],
-  ["Independent trace of the business", "identity"],
-  ["Quote in writing and dated", "the quote"],
-  ["Quote itemised by element of work", "the quote"],
-  ["Labour and materials separated", "the quote"],
-  ["Quantities and specification stated", "the quote"],
-  ["Who supplies the materials", "materials"],
-  ["Who owns the materials once paid for", "materials"],
-  ["Who receives deliveries on site", "materials"],
-  ["Payment structure written down", "money"],
-  ["What the client is exposed to at each stage", "money"],
-  ["Receipt for anything already paid", "money"],
-  ["Insurance held by the contractor", "risk"],
-  ["Start date, working duration and completion date", "programme"],
-  ["What happens if the contractor is late", "programme"],
-  ["What happens if the client stops the work", "programme"],
-].map(([item, group]) => ({ item, group }));
+// state and a note against each line; the line itself, and the one line on
+// why it matters, are fixed here, so a client buying the same service twice
+// gets the same list twice, including the lines where nothing was wrong. Keep
+// this in step with the numbered list in the deposit_check brief above; the
+// two are asserted equal at load.
+//
+// 18 lines until 28 September 2026. The seven added that day (waste, own
+// account, cash, who else is on site, guarantee, permissions, disputes) came
+// out of comparing the document against published guidance on reviewing a
+// builder's quote. A report drafted before then carries 18, and the renderer
+// prints whatever the report stored rather than this list.
+const DEPOSIT_CHECKLIST: { item: string; group: string; why: string }[] = [
+  ["Contractor named on the quote", "identity", "You need to know who you are agreeing with."],
+  ["Business registration or TRN", "identity", "The only formal way to identify them later."],
+  ["Verifiable address and a number other than WhatsApp", "identity", "A WhatsApp number can disappear overnight."],
+  ["Independent trace of the business", "identity", "Past work others can see is the best evidence of a track record."],
+  ["Quote in writing and dated", "the quote", "Fixes what was offered and when."],
+  ["Quote itemised by element of work", "the quote", "Lets each stage be matched to what it pays for."],
+  ["Labour and materials separated", "the quote", "Shows how much of the money is materials you could own."],
+  ["Quantities and specification stated", "the quote", "Stops cheaper materials being swapped in."],
+  ["Who supplies the materials", "materials", "Decides who you pay for them."],
+  ["Who owns the materials once paid for", "materials", "Decides whether they are yours if the job stops."],
+  ["Who receives deliveries on site", "materials", "Somebody has to count what arrives."],
+  ["Waste removal and clean up", "materials", "Often left out, then charged as extra."],
+  ["Payment structure written down", "money", "The single biggest source of risk on a job like this."],
+  ["Payment to an account in the contractor's own name", "money", "Makes every payment traceable to the contractor and the job."],
+  ["No request for cash", "money", "Cash leaves no record."],
+  ["What the client is exposed to at each stage", "money", "Tells you the most you could lose at any moment."],
+  ["Receipt for anything already paid", "money", "Your record of what has moved."],
+  ["Insurance held by the contractor", "risk", "Covers damage or injury on your property."],
+  ["Who else will work on site", "risk", "You should know who is in your house."],
+  ["Guarantee on the finished work", "risk", "Says what happens if something fails after they leave."],
+  ["Permissions needed for the work", "risk", "Some work needs the local authority told before it starts."],
+  ["Start date, working duration and completion date", "programme", "Without dates, nothing is ever late."],
+  ["What happens if the contractor is late", "programme", "Gives you a point at which to act."],
+  ["What happens if the client stops the work", "programme", "Protects the contractor as well as you."],
+  ["How a disagreement is settled", "programme", "Agreed now, it is a process. Agreed later, it is a fight."],
+].map(([item, group, why]) => ({ item, group, why }));
 
 for (const [i, row] of DEPOSIT_CHECKLIST.entries()) {
   if (!BRIEFS.deposit_check.includes(`${i + 1} ${row.item}`)) {
     throw new Error(`yaad-report: checklist line ${i + 1} differs between DEPOSIT_CHECKLIST and the brief.`);
   }
+}
+
+// The payment terms Yaadly recommends in place of whatever the builder asked
+// for. The model fills in only the left column, what was proposed and where
+// it says so; the right two columns are the house standard and are written
+// here, not by the model, for the same reason the checklist lines are. Added
+// 28 September 2026 on Monique's instruction ("include payment terms also
+// based on information"). The two working days and the ten working days are
+// her numbers to change; they are a standard, not a price, and there is no
+// sum of money anywhere in this list.
+const PAYMENT_TERMS: { term: string; instead: string; why: string }[] = [
+  ["Money before work", "Nothing before the materials are on site. The first payment is stage 1 of the schedule.", "Your money should never be ahead of what you can see."],
+  ["Who is paid", "An account in the contractor's own name, confirmed in writing, or the materials supplier directly.", "A payment has to be traceable to the contractor and the job."],
+  ["How it is paid", "Bank transfer only. Never cash, and never a transfer to a person collecting on their behalf.", "A transfer is a record. Cash is not."],
+  ["Materials", "Supplier invoices made out in your name. Pay the supplier directly if the contractor agrees.", "Materials in your name are yours if the job stops."],
+  ["Stages", "Paid in stages, each only against the evidence in the payment schedule.", "Money follows progress you can see from abroad."],
+  ["When a stage is paid", "Within two working days of the evidence arriving, so the contractor is never kept waiting once the work is proven.", "Protects the contractor as much as you. Fair terms are easier to hold them to."],
+  ["Receipts", "A written receipt for every payment, dated, naming the stage.", "Your record of what has been paid and for what."],
+  ["The last payment", "Paid only once a snag list is agreed and every item on it is signed off.", "Finished needs a definition both of you signed."],
+  ["Currency", "Each stage fixed in Jamaican dollars in writing, so an exchange rate move does not change what is owed.", "Removes an argument before it starts."],
+  ["If work stops", "If no work happens for ten working days without a written reason, no further stage is paid until you have both agreed a new date in writing.", "Gives you a clear point at which to act."],
+  ["Changes", "No extra work is paid unless it is agreed in writing before it starts.", "The most common way a job goes over."],
+].map(([term, instead, why]) => ({ term, instead, why }));
+
+for (const [i, row] of PAYMENT_TERMS.entries()) {
+  if (!BRIEFS.deposit_check.includes(`  ${i + 1} ${row.term}\n`)) {
+    throw new Error(`yaad-report: payment term ${i + 1} differs between PAYMENT_TERMS and the brief.`);
+  }
+}
+
+// The builder's quote, line by line, taken out of what yaad-report-read
+// transcribed. Numbered here so the model can point a finding at a line and
+// the document can reproduce the quote with the finding's number beside it.
+// Verbatim and unscreened, figures included, for the same reason source_text
+// is: it is the record of what the builder wrote, not the agent's words, and
+// the document says so above it. Only the first quote is taken; the reader's
+// "Layout:" line is its own description, not the builder's, and is dropped.
+function quoteFrom(source: string | null): { doc: number; lines: string[] } | null {
+  if (!source) return null;
+  const m = /^DOCUMENT (\d+) \(quote\)[^\n]*:\n([\s\S]*?)(?=\n\s*\n(?:DOCUMENT|PHOTOGRAPH) \d|\s*(?![\s\S]))/m.exec(source);
+  if (!m) return null;
+  const lines = m[2].split("\n").map((l) => l.trim()).filter((l) => l && !/^layout:/i.test(l)).slice(0, 60);
+  return lines.length ? { doc: Number(m[1]), lines: lines.map((l) => l.slice(0, 300)) } : null;
 }
 
 const CHECK_STATES = new Set(["provided", "confirmed", "not_provided", "not_found", "referred", "not_applicable"]);
@@ -322,10 +406,16 @@ Deno.serve(async (req: Request) => {
       visual_check: "INSPECTOR'S NOTES FROM THE VISIT",
     };
 
+    // The quote, numbered, from the notes as corrected at the desk first and
+    // the reader's own transcript only if the notes no longer carry it, so a
+    // digit fixed by hand is the digit the document reproduces.
+    const quote = kind === "deposit_check" ? (quoteFrom(notes) ?? quoteFrom(sourceText)) : null;
+
     const userBlock = [
       `SERVICE: ${kind}`,
       `${NOTES_LABEL[kind]}:\n${notes}`,
       captions.length ? `PHOTOGRAPH CAPTIONS:\n${captions.map((c, i) => `${i + 1}. ${c}`).join("\n")}` : "",
+      quote ? `QUOTE, LINE BY LINE (document ${quote.doc}):\n${quote.lines.map((l, i) => `${i + 1}. ${l}`).join("\n")}` : "",
     ].filter(Boolean).join("\n\n");
 
     // A desk call, not a webhook: the person drafting can wait for the file.
@@ -340,13 +430,15 @@ Deno.serve(async (req: Request) => {
     }, async (s) => {
       const { provider, res: r } = await chatWithFailover(prov, {
         temperature: 0,
-        // Room for a reasoning model to think and then still answer.
-        max_tokens: 6000,
+        // Room for a reasoning model to think and then still answer. Raised
+        // from 6000 on 28 September 2026, when the deposit check grew from
+        // five sections to thirteen.
+        max_tokens: 12000,
         messages: [
           { role: "system", content: systemFor(kind) },
           { role: "user", content: userBlock },
         ],
-      }, { timeoutMs: 60_000, retries: 2, maxRetryWaitMs: 15_000 });
+      }, { timeoutMs: 90_000, retries: 2, maxRetryWaitMs: 15_000 });
       let j: any = {};
       try { j = await r.json(); } catch (_) { /* a non-JSON body reads as an empty answer below */ }
       s.setAttributes({
@@ -411,9 +503,49 @@ Deno.serve(async (req: Request) => {
       const checklist = DEPOSIT_CHECKLIST.map((row, i) => {
         const st = (states[i] && typeof states[i] === "object") ? states[i] as Record<string, unknown> : {};
         const state = CHECK_STATES.has(String(st.state)) ? String(st.state) : "not_provided";
-        return { item: row.item, group: row.group, state, note: clean(st.note, `checklist ${i + 1} note`) || null };
+        return { item: row.item, group: row.group, why: row.why, state, note: clean(st.note, `checklist ${i + 1} note`) || null };
       });
+      const obj = (v: unknown) => (v && typeof v === "object" ? v as Record<string, unknown> : {});
+      const arr = (v: unknown, n: number) => (Array.isArray(v) ? v : []).slice(0, n).map(obj);
+      const nLines = quote ? quote.lines.length : 0;
+      const refs = arr(sx.finding_refs, 40);
+      const finding_refs = findings.map((f: { ord: number }, i: number) => ({
+        ord: f.ord,
+        source: clean(refs[i]?.source, `finding ${f.ord} source`) || null,
+        lines: (Array.isArray(refs[i]?.lines) ? refs[i].lines as unknown[] : [])
+          .map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= nLines).slice(0, 10),
+      }));
+      const g = obj(sx.glance);
+      const proposed = arr(sx.payment_terms, PAYMENT_TERMS.length);
+      const payment_terms = PAYMENT_TERMS.map((t, i) => ({
+        term: t.term,
+        proposed: clean(proposed[i]?.proposed, `payment term ${i + 1}`) || "Not stated",
+        source: clean(proposed[i]?.source, `payment term ${i + 1} source`) || null,
+        instead: t.instead,
+        why: t.why,
+      }));
+      const ords = new Set(findings.map((f: { ord: number }) => f.ord));
       sections = {
+        finding_refs,
+        glance: {
+          proposed: clean(g.proposed, "at a glance, as proposed"),
+          proposed_detail: clean(g.proposed_detail, "at a glance, as proposed, detail"),
+          ours: clean(g.ours, "at a glance, as recommended"),
+          ours_detail: clean(g.ours_detail, "at a glance, as recommended, detail"),
+        },
+        documents: arr(sx.documents, 20).map((d, i) => ({
+          what: clean(d.what, `document ${i + 1}`), dated: clean(d.dated, `document ${i + 1} date`), form: clean(d.form, `document ${i + 1} form`),
+        })).filter((d) => d.what),
+        checked: clean(sx.checked, "checked independently"),
+        next_payment: clean(sx.next_payment, "next payment asked for"),
+        get_before_paying: arr(sx.get_before_paying, 12).map((d, i) => ({
+          document: clean(d.document, `document to get ${i + 1}`),
+          finding: ords.has(Number(d.finding)) ? Number(d.finding) : null,
+        })).filter((d) => d.document),
+        next_steps: arr(sx.next_steps, 8).map((st, i) => ({
+          step: clean(st.step, `next step ${i + 1}`), who: clean(st.who, `next step ${i + 1} who`), when: clean(st.when, `next step ${i + 1} when`),
+        })).filter((st) => st.step),
+        payment_terms,
         scope_included: list(sx.scope_included, "scope included", 20),
         scope_not_stated: list(sx.scope_not_stated, "scope not stated", 30),
         payment_stages: stages,
@@ -422,6 +554,11 @@ Deno.serve(async (req: Request) => {
       };
     }
     const sectionsText = JSON.stringify(sections);
+    // Added after the screen, not before: the quote is the builder's words,
+    // figures and all, and screening it would either refuse the draft over a
+    // sum the builder wrote or scrub the one place the document is meant to
+    // show exactly what was quoted.
+    if (quote) sections.quote = quote;
 
     // The banned-language screen, on everything a client would read. A hit is
     // reported rather than silently rewritten, because the desk needs to know
