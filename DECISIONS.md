@@ -38,7 +38,21 @@ Each body was read live with `pg_get_functiondef` and matched the repository bef
 
 **How it was tested.** No local database exists on this machine, so the migration ran in PGlite, an in-memory Postgres, with stand-ins for the tables that predate the migrations (`supabase/tests/pglite/`). All 61 checks pass. That proves the logic, not production's wiring. `supabase/tests/job_addons_guards.sql` checks the live wiring once the migration is applied.
 
-**Not built yet: telling people.** Nobody is messaged when an add-on is written, changed or agreed. For now each side sees it on the job's Extra work tab and the desk sees it on Add-ons. New WhatsApp message kinds in `yaad-notify-client` are the next piece. Messages outside WhatsApp's 24-hour window need approved templates.
+**Telling people, and the client's confirmation on WhatsApp** (the same day, on Monique's "build all"). A trigger on `job_addons` calls `yaad-notify-client` with the add-on id and revision, one message per recipient:
+
+- the worker when the client writes or changes one;
+- the client when the worker changes one;
+- both sides when it is agreed;
+- the other side when it is turned down or withdrawn;
+- the worker when its first invoice is paid, which is when the work may start.
+
+The function reads every word from the row. If the row has moved on since the trigger fired, it sends nothing.
+
+The client's message carries the add-on as a PDF (`yaad-addon-pdf`). That is a public GET, and its token is an HMAC of the add-on id and revision under the service role key, with its own context string so it cannot be swapped for a pay link. Replying `CONFIRM <code>` accepts that revision through `agree_addon_via_whatsapp()`, service role only, with the phone as the credential, as for quotes and the Completion Report. The code is new on every revision, so a reply to an older version finds nothing. It never contains the job id, so it can never be read as a stage approval by the later lanes of `yaad-inbound`.
+
+Monique's rule is "edits only done in portal", so WhatsApp can accept and nothing else. Changing, declining or writing an add-on is the portal.
+
+Known limit: a client outside WhatsApp's 24-hour window gets the email (with the PDF link) and SMS. No approved client template carries a PDF, and the template route cannot carry media at all.
 
 ---
 

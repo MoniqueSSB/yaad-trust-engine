@@ -39,9 +39,10 @@ const C = "client@x.test", W = "worker@x.test", O = "other@x.test", A = "admin@y
 
 // Job J1: booked, fee paid, 2 stages, working stage 1.
 await db.exec(`
-insert into stage_count values ('J1', 2), ('J2', 1), ('J3', 1);
+insert into stage_count values ('J1', 2), ('J2', 1), ('J3', 1), ('J5', 1);
 insert into jobs (id, title, client_email, client_name, worker_email, worker_name, stage) values
   ('J1','Repaint bedrooms','${C}','Client','${W}','Worker',1),
+  ('J5','Gate repair','${C}','Client','${W}','Worker',1),
   ('J2','Fix sink','${C}','Client','${W}','Worker',1),
   ('J3','Unbooked','${C}','Client',null,null,0),
   ('J4','Not paid','${C}','Client','${W}','Worker',0);
@@ -49,6 +50,11 @@ insert into job_quotes (job_id, worker_email, worker_name, labour_jmd, materials
 insert into invoices (id, job_id, client_email, status, payable_to) values ('BILL-J1','J1','${C}','draft','yaadly'),('BILL-J2','J2','${C}','draft','yaadly'),('BILL-J4','J4','${C}','draft','yaadly');
 insert into invoice_lines (invoice_id, description, qty, unit_amount_pence, is_fee) values ('BILL-J1','work',1,115000,true),('BILL-J2','work',1,57500,true),('BILL-J4','work',1,1000,true);
 update invoices set status='paid' where id in ('BILL-J1','BILL-J2');
+update jobs set updated_at = now();
+update jobs set client_phone = '+1 876 555 0101' where id = 'J5';
+insert into invoices (id, job_id, client_email, status, payable_to) values ('BILL-J5','J5','${C}','draft','yaadly');
+insert into invoice_lines (invoice_id, description, qty, unit_amount_pence, is_fee) values ('BILL-J5','work',1,1000,true);
+update invoices set status='paid' where id='BILL-J5';
 update jobs set updated_at = now();
 `);
 const st = async (j) => (await sys(`select status from jobs where id=$1`, [j])).rows[0].status;
@@ -205,13 +211,56 @@ const A4 = r.rows?.[0]?.id;
 r = await as(C, `select public.decline_addon_as_me('${A4}') s`);
 ok("client withdraws its own proposal", !r.err && r.rows[0].s === "withdrawn", r.err);
 
+// Messages and the WhatsApp confirm, on J5
+await db.exec("delete from sent");
+r = await as(C, `select public.propose_addon_as_me('J5','New gate hinge',8000) id`);
+const A5 = r.rows?.[0]?.id;
+let sent = (await sys(`select kind from sent order by at`)).rows.map(x => x.kind);
+ok("writing an add-on tells the worker", JSON.stringify(sent) === '["addon_for_worker"]', JSON.stringify(sent));
+const code1 = (await sys(`select confirm_code from job_addons where id=$1`, [A5])).rows[0].confirm_code;
+ok("a confirmation code is set", /^[0-9A-F]{6}$/.test(code1), code1);
+await db.exec("delete from sent");
+r = await as(W, `select public.edit_addon_as_me('${A5}', 1, 'New gate hinge and latch', 9500, 'in_full') rev`);
+const code2 = (await sys(`select confirm_code from job_addons where id=$1`, [A5])).rows[0].confirm_code;
+sent = (await sys(`select kind from sent`)).rows.map(x => x.kind);
+ok("the worker's change tells the client", JSON.stringify(sent) === '["addon_for_client"]', JSON.stringify(sent));
+ok("the code changes with the version", code1 !== code2);
+r = await sys(`select * from public.agree_addon_via_whatsapp('+1 876 555 0101', $1)`, [code1]).then(x=>({rows:x.rows}),e=>({err:e.message}));
+ok("the old code is refused on WhatsApp", !!r.err && /No add-on is waiting/.test(r.err), r.err);
+r = await sys(`select * from public.agree_addon_via_whatsapp('+1 876 555 9999', $1)`, [code2]).then(x=>({rows:x.rows}),e=>({err:e.message}));
+ok("another phone is refused", !!r.err, r.err);
+r = await sys(`select * from public.agree_addon_via_whatsapp('+1 876 555 0101', 'JOB-X')`).then(x=>({rows:x.rows}),e=>({err:e.message}));
+ok("a job id is never read as a code", !!r.err && /not one Yaadly sent/.test(r.err), r.err);
+await db.exec("delete from sent");
+r = await sys(`select * from public.agree_addon_via_whatsapp('18765550101', $1)`, [code2.toLowerCase()]).then(x=>({rows:x.rows}),e=>({err:e.message}));
+ok("the client confirms by WhatsApp reply", !r.err && r.rows[0].addon_id === A5 && !!r.rows[0].invoice_id, r.err);
+sent = (await sys(`select kind from sent order by kind`)).rows.map(x => x.kind);
+ok("both sides are told it is agreed", JSON.stringify(sent) === '["addon_agreed","addon_agreed_worker"]', JSON.stringify(sent));
+r = await sys(`select * from public.agree_addon_via_whatsapp('18765550101', $1)`, [code2]).then(x=>({rows:x.rows}),e=>({err:e.message}));
+ok("confirming twice finds nothing", !!r.err, r.err);
+r = await as(C, `select public.agree_addon_via_whatsapp('18765550101', '${code2}')`);
+ok("the WhatsApp confirm is not callable from the browser", !!r.err && /permission denied/.test(r.err), r.err);
+await db.exec("delete from sent");
+r = await as(C, `select public.propose_addon_as_me('J5','Paint the gate',4000) id`);
+const A6 = r.rows?.[0]?.id;
+await db.exec("delete from sent");
+await as(W, `select public.decline_addon_as_me('${A6}', 'Not my trade')`);
+sent = (await sys(`select kind from sent`)).rows.map(x => x.kind);
+ok("a worker's decline tells the client", JSON.stringify(sent) === '["addon_closed"]', JSON.stringify(sent));
+r = await as(C, `select public.propose_addon_as_me('J5','Oil the gate',1000) id`);
+const A7 = r.rows?.[0]?.id;
+await db.exec("delete from sent");
+await as(C, `select public.decline_addon_as_me('${A7}')`);
+sent = (await sys(`select kind from sent`)).rows.map(x => x.kind);
+ok("a client's withdrawal tells the worker", JSON.stringify(sent) === '["addon_closed_worker"]', JSON.stringify(sent));
+
 // RLS reads
 r = await as(O, `select count(*)::int n from job_addons`);
 ok("stranger reads no add-ons", !r.err && r.rows[0].n === 0, r.err);
 r = await as(C, `select count(*)::int n from job_addons`);
-ok("client reads its add-ons", !r.err && r.rows[0].n === 4, r.err || String(r.rows[0].n));
+ok("client reads its add-ons", !r.err && r.rows[0].n === 7, r.err || String(r.rows[0].n));
 r = await as(W, `select count(*)::int n from job_addons`);
-ok("booked worker reads them", !r.err && r.rows[0].n === 4, r.err || String(r.rows[0].n));
+ok("booked worker reads them", !r.err && r.rows[0].n === 7, r.err || String(r.rows[0].n));
 r = await as(W, `update job_addons set amount_jmd = 1`);
 ok("direct update refused", !!r.err, r.err);
 
@@ -233,13 +282,18 @@ create table storage.objects (bucket_id text, name text);
 create function storage.foldername(name text) returns text[] language sql as $$ select string_to_array(name, '/') $$;
 alter table storage.objects enable row level security;
 
+create schema net;
+create table public.sent (kind text, meta jsonb, at timestamptz default clock_timestamp());
+create function net.http_post(url text, body jsonb, headers jsonb, timeout_milliseconds int) returns bigint language sql as $$ insert into public.sent (kind, meta) values (body->>'kind', body->'meta') returning 1::bigint $$;
+create function public.notify_trigger_secret() returns text language sql as $$ select 'x' $$;
+create function public.same_phone(a text, b text) returns boolean language sql as $$ select right(regexp_replace(coalesce(a,''),'\\D','','g'),10) = right(regexp_replace(coalesce(b,''),'\\D','','g'),10) and length(regexp_replace(coalesce(a,''),'\\D','','g')) >= 9 $$;
 create table public.admins (email text);
 create function public.is_admin() returns boolean language sql stable security definer set search_path to 'public' as $$
   select exists (select 1 from admins where lower(email) = lower(auth.jwt() ->> 'email')) $$;
 grant execute on function public.is_admin() to authenticated, service_role;
 
 create table public.jobs (id text primary key, title text, status text, open boolean default false, stage int default 0,
-  client_email text, client_name text, worker_email text, worker_name text, updated_at timestamptz default now());
+  client_email text, client_name text, client_phone text, worker_email text, worker_name text, updated_at timestamptz default now());
 create table public.job_quotes (id uuid primary key default gen_random_uuid(), job_id text, worker_email text, worker_name text,
   labour_jmd numeric, materials_jmd numeric, status text, billing_mode text);
 create table public.evidence (id uuid primary key default gen_random_uuid(), job_id text, stage int, storage_path text);

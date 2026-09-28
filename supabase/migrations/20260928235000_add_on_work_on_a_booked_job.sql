@@ -72,7 +72,12 @@ create table if not exists public.job_addons (
   signed_off_at   timestamptz,
   signed_off_by   text,
   created_at      timestamptz not null default now(),
-  updated_at      timestamptz not null default now()
+  updated_at      timestamptz not null default now(),
+  -- The client can confirm a version the worker changed by replying
+  -- "CONFIRM <code>" on WhatsApp. A new code on every revision, so a reply
+  -- to an older version finds nothing. Never contains the job id, so it can
+  -- never be read as a stage approval by yaad-inbound's later lanes.
+  confirm_code    text not null default upper(substring(md5(random()::text || clock_timestamp()::text) from 1 for 6))
 );
 
 create index if not exists job_addons_job on public.job_addons (job_id);
@@ -264,6 +269,26 @@ as $function$
   update jobs set updated_at = now() where id = p_job;
 $function$;
 
+-- Both sides have agreed the current revision: book it and draft its invoice.
+-- Shared by the portal (agree_addon_as_me) and WhatsApp (agree_addon_via_whatsapp).
+create or replace function public._finish_addon_agreement(p_addon uuid)
+returns text
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_a   job_addons%rowtype;
+  v_inv text;
+begin
+  select * into v_a from job_addons where id = p_addon;
+  update job_addons set status = 'agreed', agreed_at = now(), updated_at = now() where id = p_addon;
+  v_inv := public._draft_addon_client_invoice(p_addon, case when v_a.terms = 'in_full' then 'full' else 'first' end);
+  perform public._touch_job(v_a.job_id);
+  return v_inv;
+end $function$;
+
+revoke all on function public._finish_addon_agreement(uuid) from public, anon, authenticated;
 revoke all on function public._addon_side(text, text) from public, anon, authenticated;
 revoke all on function public._draft_addon_client_invoice(uuid, text) from public, anon, authenticated;
 revoke all on function public._touch_job(text) from public, anon, authenticated;
@@ -381,6 +406,7 @@ begin
          terms          = p_terms,
          last_edit_side = v_side,
          status         = case when v_side = 'worker' then 'with_client' else 'with_worker' end,
+         confirm_code   = upper(substring(md5(random()::text || clock_timestamp()::text) from 1 for 6)),
          updated_at     = now()
    where id = p_addon;
 
@@ -433,12 +459,7 @@ begin
     raise exception 'The other side has not agreed this version, so it cannot be booked yet.';
   end if;
 
-  update job_addons set status = 'agreed', agreed_at = now(), updated_at = now() where id = p_addon;
-
-  v_inv := public._draft_addon_client_invoice(p_addon,
-             case when v_a.terms = 'in_full' then 'full' else 'first' end);
-
-  perform public._touch_job(v_a.job_id);
+  v_inv := public._finish_addon_agreement(p_addon);
   return query select 'agreed'::text, v_inv;
 end $function$;
 
@@ -968,3 +989,152 @@ begin
   return new;
 end;
 $function$;
+
+-- =========================================================================
+-- The client confirms on WhatsApp; both sides are told what happened.
+-- Founder, 28 Sep 2026: the add-on should be viewable on WhatsApp as a PDF
+-- "so the client can confirm, edits only done in portal".
+-- =========================================================================
+
+-- "CONFIRM <code>" from the client's own phone accepts the revision the
+-- worker sent. Nothing else can be done on WhatsApp: a change, a decline or
+-- a new add-on is the portal. Service role only: yaad-inbound calls it with
+-- the number Twilio saw, and the phone is the credential, as with
+-- agree_quote_via_whatsapp and sign_completion_report_via_whatsapp.
+create or replace function public.agree_addon_via_whatsapp(p_phone text, p_code text)
+returns table(job_id text, addon_id uuid, invoice_id text)
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+#variable_conflict use_column
+declare
+  v_code  text := upper(btrim(coalesce(p_code, '')));
+  v_n     integer;
+  v_a     job_addons%rowtype;
+  v_email text;
+  v_inv   text;
+begin
+  if length(regexp_replace(coalesce(p_phone, ''), '\D', '', 'g')) < 9 then
+    raise exception 'That number could not be read.';
+  end if;
+  if v_code !~ '^[0-9A-F]{6}$' then
+    raise exception 'That confirmation code is not one Yaadly sent.';
+  end if;
+
+  select count(*) into v_n
+    from job_addons a join jobs j on j.id = a.job_id
+   where a.confirm_code = v_code and a.status = 'with_client'
+     and public.same_phone(j.client_phone, p_phone);
+  if v_n = 0 then
+    raise exception 'No add-on is waiting for you under code %. It may have changed since, so check the latest message or your portal.', v_code;
+  end if;
+  if v_n > 1 then
+    raise exception 'That code matches more than one add-on. Please confirm it in your portal instead.';
+  end if;
+
+  select a.* into v_a
+    from job_addons a join jobs j on j.id = a.job_id
+   where a.confirm_code = v_code and a.status = 'with_client'
+     and public.same_phone(j.client_phone, p_phone)
+   for update of a;
+  select lower(client_email) into v_email from jobs where id = v_a.job_id;
+
+  insert into job_addon_agreements (addon_id, rev, side, email)
+  values (v_a.id, v_a.rev, 'client', coalesce(v_email, 'whatsapp:' || p_phone))
+  on conflict do nothing;
+
+  if (select count(distinct x.side) from job_addon_agreements x where x.addon_id = v_a.id and x.rev = v_a.rev) < 2 then
+    raise exception 'The tradesperson has not agreed this version, so it cannot be booked yet.';
+  end if;
+
+  v_inv := public._finish_addon_agreement(v_a.id);
+  return query select v_a.job_id, v_a.id, v_inv;
+end $function$;
+
+revoke all on function public.agree_addon_via_whatsapp(text, text) from public, anon, authenticated;
+grant execute on function public.agree_addon_via_whatsapp(text, text) to service_role;
+
+-- Telling each side. One message per recipient per change, built by
+-- yaad-notify-client from the row itself; the trigger sends only ids.
+create or replace function public.notify_on_addon_change()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_url  text := 'https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-notify-client';
+  v_hdr  jsonb := jsonb_build_object('Content-Type','application/json','apikey','sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz','Authorization','Bearer '||'sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz');
+  v_kinds text[] := '{}';
+begin
+  if tg_op = 'UPDATE' and new.status = old.status and new.rev = old.rev then
+    return new;
+  end if;
+
+  if new.status = 'with_worker' then
+    v_kinds := array['addon_for_worker'];
+  elsif new.status = 'with_client' then
+    v_kinds := array['addon_for_client'];
+  elsif new.status = 'agreed' then
+    v_kinds := array['addon_agreed', 'addon_agreed_worker'];
+  elsif new.status = 'declined' then
+    -- The side it waited on turned it down: tell the side that sent it.
+    v_kinds := array[case when old.status = 'with_worker' then 'addon_closed' else 'addon_closed_worker' end];
+  elsif new.status = 'withdrawn' then
+    -- The side that sent it took it back: tell the side it was waiting on.
+    v_kinds := array[case when old.status = 'with_worker' then 'addon_closed_worker' else 'addon_closed' end];
+  end if;
+
+  for i in 1 .. coalesce(array_length(v_kinds, 1), 0) loop
+    perform net.http_post(
+      url := v_url,
+      body := jsonb_build_object('secret', public.notify_trigger_secret(), 'jobId', new.job_id,
+        'kind', v_kinds[i], 'meta', jsonb_build_object('addonId', new.id, 'rev', new.rev)),
+      headers := v_hdr,
+      timeout_milliseconds := 15000
+    );
+  end loop;
+  return new;
+end
+$function$;
+
+revoke all on function public.notify_on_addon_change() from public, anon, authenticated;
+drop trigger if exists trg_notify_on_addon_change on public.job_addons;
+create trigger trg_notify_on_addon_change
+  after insert or update of status, rev on public.job_addons
+  for each row execute function public.notify_on_addon_change();
+
+
+-- The worker hears when the add-on's up-front invoice is paid, which is when
+-- the extra work may start (file_addon_evidence_as_me refuses before then).
+-- The second half of "half now, half on sign-off" is paid after the work is
+-- done, so only the first client invoice to be paid sends this.
+create or replace function public.notify_addon_paid()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+begin
+  if new.addon_id is not null and coalesce(new.payable_to, 'yaadly') = 'yaadly'
+     and new.status = 'paid' and old.status is distinct from 'paid'
+     and not exists (select 1 from invoices i where i.addon_id = new.addon_id and i.id <> new.id
+                       and coalesce(i.payable_to, 'yaadly') = 'yaadly' and i.status = 'paid') then
+    perform net.http_post(
+      url := 'https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-notify-client',
+      body := jsonb_build_object('secret', public.notify_trigger_secret(), 'jobId', new.job_id,
+        'kind', 'addon_paid_worker', 'meta', jsonb_build_object('addonId', new.addon_id)),
+      headers := jsonb_build_object('Content-Type','application/json','apikey','sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz','Authorization','Bearer '||'sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz'),
+      timeout_milliseconds := 15000
+    );
+  end if;
+  return new;
+end
+$function$;
+
+revoke all on function public.notify_addon_paid() from public, anon, authenticated;
+drop trigger if exists trg_notify_addon_paid on public.invoices;
+create trigger trg_notify_addon_paid
+  after update of status on public.invoices
+  for each row execute function public.notify_addon_paid();

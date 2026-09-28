@@ -42,6 +42,13 @@ begin
     t := t || r || ' knows about add-ons: ' || case when b then 'PASS' else 'FAIL' end || E'\n';
   end loop;
 
+  t := t || 'the WhatsApp confirm is service role only: '
+       || case when not has_function_privilege('authenticated', 'public.agree_addon_via_whatsapp(text,text)', 'execute')
+                and has_function_privilege('service_role', 'public.agree_addon_via_whatsapp(text,text)', 'execute') then 'PASS' else 'FAIL' end || E'\n';
+  select exists (select 1 from pg_trigger where tgname = 'trg_notify_on_addon_change') into b;
+  t := t || 'add-on changes notify (trigger present): ' || case when b then 'PASS' else 'FAIL' end || E'\n';
+  select exists (select 1 from pg_trigger where tgname = 'trg_notify_addon_paid') into b;
+  t := t || 'a paid add-on notifies the worker (trigger present): ' || case when b then 'PASS' else 'FAIL' end || E'\n';
   select exists (select 1 from pg_trigger where tgname = 'invoices_addon_never_a_part') into b;
   t := t || 'add-on invoices cannot be split (trigger present): ' || case when b then 'PASS' else 'FAIL' end || E'\n';
 
