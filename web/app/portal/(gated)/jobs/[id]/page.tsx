@@ -2023,7 +2023,16 @@ export default async function JobRoom({
                     {m.sent_at ? "Sent " + whenDate(m.sent_at) : "Being sent"}
                   </span>
                   <span className="text-dim">
-                    {m.receipt_ref?.trim() ? "Receipt " + m.receipt_ref : m.sent_at ? "Receipt to come" : ""}
+                    {/* "Receipt to come" sat here next to an overview saying
+                        the receipt was filed (28 Sep 2026): the release row
+                        only learns of a receipt when Yaadly records it, while
+                        a filed file is already on the job. Same source the
+                        overview uses, materialsReceipt(). */}
+                    {m.receipt_ref?.trim()
+                      ? "Receipt " + m.receipt_ref
+                      : receipt.state === "filed"
+                        ? "Receipt filed, being checked"
+                        : m.sent_at ? "Receipt to come" : ""}
                   </span>
                   <span className="ml-auto text-dim">
                     {m.released_at ? whenDate(m.released_at) : "not yet released"}
