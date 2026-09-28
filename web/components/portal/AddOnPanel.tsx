@@ -7,7 +7,8 @@
  * changes it or turns it down; a change goes back to the client; nothing is
  * booked until both have agreed the same version. Once agreed it is billed
  * as its own invoice on the job and the job cannot finish until it is done
- * and signed off by a named person at Yaadly.
+ * and approved by the client on its photos (or, as a fallback, signed off at
+ * the desk).
  *
  * Every rule lives in Postgres. This only shows where each add-on stands and
  * offers the one move that belongs to the person reading it. */
@@ -19,7 +20,7 @@ import {
   TERMS_LABEL, addonClientBill, addonStateLine, addonWorkerPay, waitingOn,
   type AddonStatus, type AddonTerms, type Side,
 } from "@/lib/jobs/addon";
-import { agreeAddon, declineAddon, editAddon, proposeAddon, uploadAddonEvidence } from "@/app/portal/addon-actions";
+import { agreeAddon, approveAddon, declineAddon, editAddon, proposeAddon, uploadAddonEvidence } from "@/app/portal/addon-actions";
 
 export type AddonRow = {
   id: string;
@@ -34,6 +35,9 @@ export type AddonRow = {
   signed_off_at: string | null;
   created_at: string;
 };
+
+/** A photograph filed on an add-on, with a short-lived signed URL. */
+export type AddonPhoto = { id: string; label: string | null; img: string | null; created_at: string };
 
 export type AddonInvoice = { id: string; addon_id: string; status: string; total_pence: number | null; payable_to: string | null; period_label: string | null };
 
@@ -123,10 +127,47 @@ function AddonForm({
   );
 }
 
+/** The client's sign-off on finished extra work (20260929050000). A tick
+ *  first, the same as a stage: approving is a signature. Used on the Extra
+ *  work tab and on Approvals. */
+export function AddonApprove({ jobId, addonId, amountLabel, otherName }: { jobId: string; addonId: string; amountLabel: string; otherName: string }) {
+  const router = useRouter();
+  const [sure, setSure] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  return (
+    <div className="mt-3 rounded-xl border border-mango/40 bg-mango/[.07] p-3.5">
+      <p className="text-[13px] font-bold text-ink">Is the extra work done as agreed?</p>
+      <p className="mt-1 text-[12.5px] leading-relaxed text-mute">
+        Approving is your signature on it. It pays {otherName} {amountLabel} for this work through Yaadly. If something is not right, do not approve: message Yaadly from the Help tab instead.
+      </p>
+      <label className="mt-2 flex items-start gap-2 text-[12.5px] text-mute">
+        <input type="checkbox" checked={sure} onChange={(e) => setSure(e.target.checked)} className="mt-0.5" />
+        I have looked at the photos and the extra work is done as agreed.
+      </label>
+      {error && <p role="alert" className="mt-2 text-[12.5px] text-coral">{error}</p>}
+      <button
+        type="button"
+        disabled={!sure || busy}
+        onClick={async () => {
+          setBusy(true); setError("");
+          const r = await approveAddon(jobId, addonId);
+          setBusy(false);
+          if (!r.ok) { setError(r.error); return; }
+          router.refresh();
+        }}
+        className="mt-2.5 rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2 text-[13px] font-bold text-onbrand disabled:opacity-40"
+      >
+        {busy ? "Approving…" : "Approve this extra work"}
+      </button>
+    </div>
+  );
+}
+
 function AddonCard({
-  a, me, otherName, jobId, invoices, evidenceCount,
+  a, me, otherName, jobId, invoices, evidenceCount, photos,
 }: {
-  a: AddonRow; me: Side; otherName: string; jobId: string; invoices: AddonInvoice[]; evidenceCount: number;
+  a: AddonRow; me: Side; otherName: string; jobId: string; invoices: AddonInvoice[]; evidenceCount: number; photos: AddonPhoto[];
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<"view" | "edit" | "decline">("view");
@@ -231,13 +272,38 @@ function AddonCard({
           {clientInv.length === 0 && <p>Yaadly is preparing the invoice for this add-on.</p>}
           {clientInv.length > 0 && !paid && (
             me === "client"
-              ? <p>Its invoice is on the <a href="?tab=approvals" className="font-bold text-tealb underline-offset-2 hover:underline">Approvals</a> tab once Yaadly sends it. The extra work starts once it is paid.</p>
+              ? <p>Its invoice is on the <a href="?tab=money" className="font-bold text-tealb underline-offset-2 hover:underline">Money</a> tab once Yaadly sends it. The extra work starts once it is paid.</p>
               : <p>The extra work starts once the client has paid its invoice. You will see it here.</p>
           )}
           {paid && (
             <>
-              <p><b className="text-ink">Paid. The extra work can start.</b> File photos of it here. Yaadly signs it off on this evidence, then pays you.</p>
+              {me === "worker" ? (
+                <p><b className="text-ink">Paid. The extra work can start.</b> File photos of it here. The client approves it on these photos, then Yaadly pays you.</p>
+              ) : (
+                <p><b className="text-ink">Paid. The extra work can start.</b> The tradesperson files photos of it here, and you approve it on them.</p>
+              )}
               <p className="mt-1">{evidenceCount} photo{evidenceCount === 1 ? "" : "s"} filed on this add-on.</p>
+              {/* The client was shown a count and never the photos until
+                  28 Sep 2026, so there was nothing to approve on. */}
+              {photos.length > 0 && (
+                <ul className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {photos.map((ph) => (
+                    <li key={ph.id} className="overflow-hidden rounded-lg border border-line bg-panel">
+                      {ph.img ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={ph.img} alt={ph.label ?? "Photo of the extra work"} className="h-28 w-full object-cover" />
+                      ) : (
+                        <div className="grid h-28 place-items-center text-[11px] text-dim">No image</div>
+                      )}
+                      <p className="px-2 py-1 text-[11px] leading-snug text-mute">{ph.label ?? "Photo"} · {day(ph.created_at)}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {me === "client" && evidenceCount > 0 && (
+                <AddonApprove jobId={jobId} addonId={a.id} amountLabel={jmd(a.amount_jmd)} otherName={otherName} />
+              )}
+              {me === "worker" && (
               <form onSubmit={upload} className="mt-2.5 flex flex-wrap items-center gap-2">
                 <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required className="text-[12px] text-ink" />
                 <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="What this shows" maxLength={300}
@@ -246,11 +312,12 @@ function AddonCard({
                   {busy ? "Filing…" : "File photo"}
                 </button>
               </form>
+              )}
             </>
           )}
         </div>
       )}
-      {a.status === "signed_off" && <p className="mt-3 text-[12.5px] text-mute">Signed off by Yaadly on {day(a.signed_off_at)}.</p>}
+      {a.status === "signed_off" && <p className="mt-3 text-[12.5px] text-mute">Approved on {day(a.signed_off_at)}.</p>}
       {(a.status === "declined" || a.status === "withdrawn" || a.status === "cancelled") && a.closed_reason && (
         <p className="mt-3 text-[12.5px] text-mute">Reason given: {a.closed_reason}</p>
       )}
@@ -272,8 +339,9 @@ function AddonCard({
 }
 
 export function AddOnPanel({
-  jobId, me, otherName, canPropose, closedReason, addons, invoices, evidenceCounts,
+  jobId, me, otherName, canPropose, closedReason, addons, invoices, evidenceCounts, photos = {},
 }: {
+  photos?: Record<string, AddonPhoto[]>;
   jobId: string;
   me: Side;
   otherName: string;
@@ -335,7 +403,7 @@ export function AddOnPanel({
       )}
       {addons.map((a) => (
         <AddonCard key={a.id} a={a} me={me} otherName={otherName} jobId={jobId}
-          invoices={invoices.filter((i) => i.addon_id === a.id)} evidenceCount={evidenceCounts[a.id] ?? 0} />
+          invoices={invoices.filter((i) => i.addon_id === a.id)} evidenceCount={evidenceCounts[a.id] ?? 0} photos={photos[a.id] ?? []} />
       ))}
     </section>
   );

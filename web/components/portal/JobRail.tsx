@@ -3,7 +3,8 @@ import type { TabKey } from "@/components/portal/TabBar";
 
 const JOB_LINKS: { tab: TabKey; label: string; hint: string }[] = [
   { tab: "evidence", label: "Progress evidence", hint: "Photos and videos for each stage" },
-  { tab: "approvals", label: "Approvals", hint: "Sign off stages and pay invoices" },
+  { tab: "approvals", label: "Approvals", hint: "Sign off stages and extra work" },
+  { tab: "money", label: "Money", hint: "Invoices, payments and who has been paid" },
   { tab: "overview", label: "Overview & documents", hint: "The brief, documents and your job link" },
 ];
 

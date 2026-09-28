@@ -82,6 +82,26 @@ export async function agreeAddon(jobId: string, addonId: string, rev: number): P
   return { ok: true };
 }
 
+/** The client approves finished extra work on its photos (20260929050000),
+ *  the same way they accept a stage. Raises the worker's pay invoice; pays
+ *  nobody. Postgres refuses anyone but this job's client, and refuses until
+ *  it is agreed, its invoice is paid and a photo is filed. */
+export async function approveAddon(jobId: string, addonId: string): Promise<AddonResult> {
+  await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("approve_addon_as_me", { p_addon: addonId });
+  if (error) {
+    return {
+      ok: false,
+      error: /could not find the function|does not exist/i.test(error.message)
+        ? "Approving extra work here is not switched on yet. Message Yaadly and it will be signed off for you."
+        : error.message,
+    };
+  }
+  done(jobId);
+  return { ok: true };
+}
+
 /** Turn it down (the side it waits on) or withdraw it (the side waiting). */
 export async function declineAddon(jobId: string, addonId: string, reason: string): Promise<AddonResult> {
   await requireUser();

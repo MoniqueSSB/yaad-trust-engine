@@ -177,7 +177,7 @@ export default async function ClientPortal() {
       case "quoted":
         return { label: n ? `Choose from ${n} quote${n === 1 ? "" : "s"}` : "Choose a quote", href: jobHref(j.id, "?tab=scope#quotes") };
       case "awaiting_payment":
-        return { label: "Pay the invoice to start the job", href: jobHref(j.id, "?tab=approvals#invoices") };
+        return { label: "Pay the invoice to start the job", href: jobHref(j.id, "?tab=money#invoices") };
       case "confirmed":
         return j.materials_store
           ? { label: "Booked. Work starts soon", href: jobHref(j.id, "?tab=overview") }
@@ -187,7 +187,7 @@ export default async function ClientPortal() {
       case "evidence":
         return { label: "Look at the evidence and approve the stage", href: jobHref(j.id, "?tab=approvals#approve") };
       case "complete":
-        return { label: "Closed. See the record and the invoices", href: jobHref(j.id, "?tab=approvals#invoices") };
+        return { label: "Closed. See the record and the invoices", href: jobHref(j.id, "?tab=money#invoices") };
       default:
         return null;
     }
@@ -309,7 +309,7 @@ export default async function ClientPortal() {
   const payHref = !oldest
     ? null
     : oldest.job_id
-      ? jobHref(oldest.job_id, "?tab=approvals#invoices")
+      ? jobHref(oldest.job_id, "?tab=money#invoices")
       : oldest.service_id
         ? "/portal/services/" + encodeURIComponent(oldest.service_id)
         : null;
