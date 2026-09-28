@@ -111,6 +111,10 @@ export function EvidenceLedger({
   );
   const filed = items.length;
   const checked = items.filter((e) => e.ok === true).length;
+  /* The headline is about the stage being worked, so it counts that stage's
+     items. It counted the whole job until 28 Sep 2026: "Stage 2 is under
+     way, with 6 items filed so far" when all six were stage 1's. */
+  const filedNow = items.filter((e) => (e.stage ?? 0) === currentStage).length;
 
   /* One sentence, before any list, answering the question the page is open
      for. Everything below it is the supporting detail. */
@@ -127,10 +131,10 @@ export function EvidenceLedger({
       : "Photos are in. The client has been asked to approve them."
     : currentStage === 0
       ? "Nothing filed yet. Evidence starts when the first stage does."
-      : filed === 0
+      : filedNow === 0
         ? stageTitle(currentStage) + " is under way. No photos filed against it yet."
-        : stageTitle(currentStage) + " is under way, with " + filed +
-          " item" + (filed === 1 ? "" : "s") + " filed so far.";
+        : stageTitle(currentStage) + " is under way, with " + filedNow +
+          " item" + (filedNow === 1 ? "" : "s") + " filed so far.";
 
   function stageTitle(n: number): string {
     const name = stageNames[n - 1];
@@ -199,7 +203,17 @@ export function EvidenceLedger({
       </div>
 
       <ul className="mt-3 grid gap-2.5">
-        {stages.map((n) => {
+        {/* Founder, 28 Sep 2026: the stage being worked at the top, the
+            stages still to come under it, finished stages at the bottom. */}
+        {[...stages]
+          .sort((a, b) => {
+            const rank = (n: number) => {
+              const l = stageLock(n, currentStage);
+              return l === "now" ? 0 : l === "done" ? 2 : 1;
+            };
+            return rank(a) - rank(b) || a - b;
+          })
+          .map((n) => {
           const mine = items.filter((e) => (e.stage ?? 1) === n);
           /* Founder, 14 Sep 2026: only the stage being worked is open, and
              the rest are blacked out until each stage before them is signed

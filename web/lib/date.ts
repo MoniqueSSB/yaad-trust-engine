@@ -18,11 +18,18 @@
 
 /** "3 Sep 2026". Short, unambiguous across UK, US and Jamaican readers, which
  *  a numeric date is not. Same rendering JobList already used. */
+/* Both helpers render in Jamaica time, where the work happens and the worker
+   is. Until 28 Sep 2026 they used the runtime's zone, which on Cloudflare is
+   UTC: a check-in at 10:10 am in Kingston, 3:10 pm in London, read "2:10 pm",
+   true for nobody. The time carries its zone so a client abroad knows what it
+   is. Jamaica keeps no daylight saving, so this never shifts. */
+const SITE_TZ = "America/Jamaica";
+
 export function whenDate(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: SITE_TZ });
 }
 
 /** "3 Sep 2026, 2:30 pm". */
@@ -32,8 +39,8 @@ export function whenDateTime(iso: string | null | undefined): string | null {
   if (Number.isNaN(d.getTime())) return null;
   const date = whenDate(iso);
   const time = d
-    .toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true })
+    .toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: SITE_TZ })
     .replace(/^0/, "")
     .toLowerCase();
-  return `${date}, ${time}`;
+  return `${date}, ${time} Jamaica time`;
 }
