@@ -2,6 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { pickTextProvider, providerAttrs, chatWithFailover, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 import { payLinkToken } from "./stripe.ts";
+import { invoicePdf } from "./pdf.ts";
+import { encodeBase64 } from "jsr:@std/encoding/base64";
 
 // yaad-invoice
 //
@@ -247,7 +249,10 @@ ${esc(inv.client_email)}${inv.client_address ? "\n" + esc(inv.client_address) : 
         + (settings.invoice_bank_details
           ? `Bank transfer: ${esc(settings.invoice_bank_details)}. Use ${esc(inv.id)} as the reference.<br>`
           : "")}
-    ${esc(settings.invoice_vat_status)}. ${esc(settings.invoice_issuer_name)} is registered in England and Wales, company number ${esc(settings.invoice_issuer_number)}.<br>
+    ${/* Blank since 28 Sep 2026 on Monique's instruction: the VAT line shows
+         nothing and this sentence starts at the company name. A value in
+         app_settings.invoice_vat_status still prints, in both places. */
+      settings.invoice_vat_status ? esc(settings.invoice_vat_status) + ". " : ""}${esc(settings.invoice_issuer_name)} is registered in England and Wales, company number ${esc(settings.invoice_issuer_number)}.<br>
     Services are project management, observation and documentation. They are not a survey, a valuation, a legal opinion or a quantity surveyor's estimate.
   </footer>
 </div></body></html>`;
@@ -343,6 +348,19 @@ Deno.serve(async (req) => {
       const payUrl = inv.payable_to === "worker" ? "" : await payLinkUrlFor(inv.id);
       const html = renderInvoice({ ...inv, status: "sent", _payUrl: payUrl }, lines, settings);
 
+      // The same invoice as a PDF, attached (28 Sep 2026). Drawn here from
+      // the same rows, stamped sent like the email. If it cannot be made,
+      // nothing is emailed and the invoice stays a draft: an invoice that
+      // arrives without the attachment the client was told to expect is
+      // worse than one that is held back with the reason on the desk.
+      let pdf: Uint8Array;
+      try {
+        pdf = await invoicePdf({ ...inv, status: "sent", _payUrl: payUrl }, lines, settings, money);
+      } catch (e) {
+        root.recordError(`invoice pdf: ${String(e).slice(0, 200)}`);
+        return fail(`The PDF of ${id} could not be made, so nothing was emailed and it is still a draft: ${String(e).slice(0, 200)}`, 500);
+      }
+
       const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
       if (!resendKey) return fail("RESEND_API_KEY is not set, so this cannot email anybody yet. Render and send it by hand instead.", 500);
 
@@ -356,6 +374,7 @@ Deno.serve(async (req) => {
             reply_to: settings.invoice_issuer_email || undefined,
             subject: `Invoice ${inv.id}${inv.period_label ? ", " + inv.period_label : ""} — ${money(inv.total_pence, inv.currency)}`,
             html,
+            attachments: [{ filename: `${inv.id}.pdf`, content: encodeBase64(pdf) }],
           }),
           signal: AbortSignal.timeout(15000),
         });
@@ -399,6 +418,13 @@ Deno.serve(async (req) => {
 
       const payUrl = inv.status === "sent" && inv.payable_to !== "worker" ? await payLinkUrlFor(inv.id) : "";
       const html = renderInvoice({ ...inv, _payUrl: payUrl }, lines, settings);
+      // pdf: true adds the PDF, base64, for the desk's Preview. It is the
+      // same function as the email attachment, so what the desk shows for a
+      // whole invoice is the file the client gets (the email stamps it sent).
+      if (body.pdf === true && body.as === "json") {
+        const pdf = await invoicePdf({ ...inv, _payUrl: payUrl }, lines, settings, money);
+        return done(JSON.stringify({ invoice: inv, lines, html, pdf: encodeBase64(pdf) }), 200);
+      }
       return body.as === "json"
         ? done(JSON.stringify({ invoice: inv, lines, html }), 200)
         : done(html, 200, "text/html; charset=utf-8");
