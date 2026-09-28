@@ -407,3 +407,14 @@ describe("what the form does with a photograph once it is picked", () => {
     assert.match(source, /accept="image\/jpeg,image\/png,image\/webp"/);
   });
 });
+
+// 29 Sep 2026: a job posted while signed in joins that portal only when the
+// email typed is the account's own.
+test("a posted job joins the signed-in portal only for the same email", async () => {
+  const { joinsSignedInPortal } = m;
+  assert.equal(joinsSignedInPortal("Client@Example.com", " client@example.com "), true);
+  assert.equal(joinsSignedInPortal("client@example.com", "someone.else@example.com"), false);
+  assert.equal(joinsSignedInPortal("client@example.com", "+1 876 555 0101"), false);
+  assert.equal(joinsSignedInPortal(null, "client@example.com"), false);
+  assert.equal(joinsSignedInPortal("", "client@example.com"), false);
+});

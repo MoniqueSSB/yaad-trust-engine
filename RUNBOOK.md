@@ -6230,6 +6230,13 @@ transaction.
 9. **The PDF link says "not valid" or "replaced".** Not valid means the link was altered. Replaced means the add-on was changed after that message; the newer message has the current PDF.
 10. **Deploy.** `yaad-addon-pdf` is public (Twilio fetches the attachment with no session), so it is deployed with `--no-verify-jwt` and belongs on the CLAUDE.md §12 list. `yaad-notify-client` and `yaad-inbound` import the new `_shared/addon-link.ts` (notify) and `addon-confirm.ts` (inbound): run `supabase/functions/sync-shared.sh` first.
 
+## 39. A client posted a job and cannot see it in their portal (29 Sep 2026)
+
+1. Find the job: its reference is in the enquiry the form sent. If `jobs.client_email` is blank, nobody has claimed it yet. That is normal for a job posted by somebody who was not signed in.
+2. They can claim it with the "Set up your portal" link in their receipt email, which carries the job's code.
+3. A job posted while signed in, with the same email typed on the form, joins that portal on Send (`claim_my_posted_job`, 20260929000000). The enquiry says "signed in: it is already in their portal" when it did.
+4. If it did not join although they were signed in: a different email was typed on the form, the account's email is not confirmed, or the code attempt limit tripped (five failures in fifteen minutes, `portal_code_attempts`). The link still works once the limit clears.
+
 ## 40. A report on the new services: will not draft, will not issue, or will not rate (28 Sep 2026)
 
 1. **"kind must be one of"** from the drafter: `yaad-report` on the server is older than `kinds.ts`. Deploy it from disk: `supabase functions deploy yaad-report --project-ref leffyisvfvjwzilydlwf` (it keeps the platform check; no `--no-verify-jwt`).

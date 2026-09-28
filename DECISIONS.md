@@ -4651,6 +4651,14 @@ Until today a wrong line in a drafted report had one fix, drafting the whole rep
 
 **The measurement rule applies to templates too.** The first set asked for crack widths in millimetres and a measured value with units on every sign-off line, which `report_guard_issue` would refuse at issue. `gate.js` now runs `hasMeasurement()` and `guardrails.scan()` from `_shared` over every string a template can print, plus the no-dash rule, and CI runs it. A sentence that implies a measurement without a number ("the actual measurement, with units") passes the pattern and was caught by reading, which is the gap `measurements.ts` already names.
 
+## 2026-09-29 · A job posted while signed in joins that portal straight away
+
+**Why.** Found 28 Sep 2026: a job posted from the website by somebody who already had a portal account never reached it. The form saves the job anonymously and sends the contact details as an enquiry, and the only join between the two is the "Set up my portal" link, which a signed-in person has no reason to click. Founder decision the same day, "do it now", choosing this over binding jobs to whatever email an enquiry gives.
+
+**What.** `claim_my_posted_job(job, code)`, migration `20260929000000`. It requires a signed-in account with a confirmed email and the job's id with its portal code, then goes through `pend_portal_code()` and `bind_confirmed_portal_claims()`, the join link's own path, so the attempt limits and "never take a job that already has a client" hold unchanged. The form calls it on Send only when the typed email is the account's own (`joinsSignedInPortal`), and says "It is already in your portal" instead of offering the link.
+
+**Rejected.** Binding a job to the email typed in the enquiry when that address next signs in. It would catch people who were not signed in, but anybody could put a job into a stranger's portal by typing their address, which is what the portal code exists to stop.
+
 ## 2026-09-28 · Every service drafts into its own template, and what only a person decides has its own column
 
 **Why.** Founder instruction, 28 Sep 2026: the templates are "the templates that are used" when the agent drafts a report once a service is booked; the form should "show the inputs I need for each report" and "not be so general"; picking a template should show "exactly what is needed to fill out the template adequately".
@@ -4660,4 +4668,3 @@ Until today a wrong line in a drafted report had one fix, drafting the whole rep
 **Two rules changed on purpose.** First, the Visual Check and Property Care are never rated. `report_guard_issue` required a rating on every finding of every kind, so a Visual Check could only issue by breaking "They record. They do not rate or advise." on the services page. A rating on those two is now refused, not required. Second, `reports.human` holds a Technical Sign-off's or stage record's result, an oversight report's status ratings, and every sum of money. Money is allowed there and nowhere else in a report, because a figure a person types is a figure they stand behind, which is the line `20260925220000` drew. It is written only by `set_report_human()`, which is admin only, refuses an issued report, accepts only listed keys and values, and logs to `report_edits`; a trigger refuses any other write, including a direct update, so the desk form is the only door. A stage record's value is what the document says; paying a trade still goes through Invoices.
 
 **Left for Monique.** The meaning of each rating on the new kinds (`RPT_KEYS` in the desk), the oversight status rules, and the "what you need" lists are first drafts cut from the templates, and are hers to correct. `edit_report()` corrects the findings and referrals of the new kinds but not their new sections; a wrong line there is fixed in the notes and drafted again.
-
