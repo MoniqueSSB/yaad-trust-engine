@@ -1644,19 +1644,32 @@ Deno.serve(async (req: Request) => {
     } else if (kind === "completion_report_worker") {
       // The Completion Report is the worker's document (20260928210000). The
       // link carries the signing code, read here by job, never passed in, so
-      // a stale trigger cannot send yesterday's code. A report sent back by
-      // Monique says why, in her words.
+      // a stale trigger cannot send yesterday's code. A report sent back says
+      // why, signed as Yaadly, never a person's name.
       const { data: r } = await admin.from("completion_reports")
-        .select("status, sign_code, return_reason, returned_name").eq("job_id", jobId).maybeSingle();
+        .select("status, sign_code, return_reason").eq("job_id", jobId).maybeSingle();
       if (!r || r.status !== "with_worker" || !r.sign_code) return json({ ok: true, skipped: "not with the worker" });
       const signLink = `${APP_URL}/portal/jobs/${encodeURIComponent(job.id)}/completion?code=${encodeURIComponent(r.sign_code)}`;
       reportSignLink = signLink;
       subject = `Your Completion Report to sign: ${job.title}`;
       line = r.return_reason
-        ? `${r.returned_name || "Yaadly"} has sent the Completion Report for ${job.title} back to you:\n\n"${clip(String(r.return_reason), 600)}"\n\n` +
+        ? `Yaadly has sent the Completion Report for ${job.title} back to you:\n\n"${clip(String(r.return_reason), 600)}"\n\n` +
           `It is your document. Change your words and sign it again here: ${signLink}`
         : `The Completion Report for ${job.title} (${job.id}) is ready. It is your document: read it, change the care notes ` +
-          `or add your own account of the work if anything is wrong, then sign it. It goes to the owner when you sign: ${signLink}`;
+          `or add your own account of the work if anything is wrong, then press Sign. It goes to the owner when you sign: ${signLink}\n\n` +
+          `If it is right as it stands, you can sign it from here: tap Sign the report, or reply ${job.id}.`;
+      // The Sign button follows, the same way the client's Approve button
+      // follows an evidence report: its payload is the job's code, which
+      // yaad-inbound signs through sign_completion_report_via_whatsapp().
+      // No template recorded means no button; the reply and the portal still work.
+      let signSid = Deno.env.get("TWILIO_CONTENT_SID_SIGN_REPORT") ?? "";
+      if (!signSid) {
+        const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_sign_report").maybeSingle();
+        try { signSid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { signSid = String(st?.value ?? ""); }
+      }
+      if (/^HX[0-9a-f]{32}$/i.test(signSid)) {
+        approveButton = { sid: signSid, vars: { "1": `${job.title ?? "your job"} (${job.id})`, "2": String(job.id) } };
+      }
     } else if (kind === "completion_report_issued") {
       const { data: r } = await admin.from("completion_reports")
         .select("status, worker_signed_name").eq("job_id", jobId).maybeSingle();

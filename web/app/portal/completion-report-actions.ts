@@ -26,7 +26,6 @@ export async function signCompletionReport(_prev: ReportActionState, formData: F
   const { data, error } = await supabase.rpc("sign_completion_report", {
     p_job: jobId,
     p_code: String(formData.get("code") ?? ""),
-    p_name: String(formData.get("name") ?? ""),
     p_care_notes: notesFromText(String(formData.get("careNotes") ?? "")),
     p_worker_account: String(formData.get("account") ?? ""),
   });
