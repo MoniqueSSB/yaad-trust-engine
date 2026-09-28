@@ -6076,7 +6076,8 @@ Desk, **Reports**. Service: Deposit Protection Check. Client name and property a
 3. **Draft the findings.** The agent returns the red flags with a why on each, the scope in and out, the payment stages (never a share), the message to the builder, the checklist states against the fixed 18 lines, the referrals and the omissions. Every sentence is screened for measurements, figures, rating words and banned language before it is saved. The transcript is kept on the report as `source_text`, unscreened, as the record of what the documents said.
 4. **Rate every finding** (Severe, Moderate, Low) and **Write the verdict**. Nothing drafts either. The database refuses to issue until both are done.
 5. **Issue it.** Mints the number. Refused while a finding is unrated, the verdict is empty, or a drafted sentence states a measurement or a figure.
-6. **Open the document.** Builds the full report in a new tab: cover with the logo, header on every page, verdict, red flags, payment schedule, message to the builder, checklist, scope in and out, the variation rule, referrals. Press **Print** in the top right and choose **Save as PDF**. Before issue it opens with the blanks showing, which is useful for reading it whole before you rate.
+6. **Read it on the desk first.** Click the row and the report opens as a page: verdict, every finding with its rating, the payment stages, the message, the checklist, scope, referrals, what was scrubbed, and the transcript under a fold. The actions sit at the foot of that page. Teal is done, mango is yours to do, coral is a gap in the paperwork.
+7. **Open the document.** Builds the full report in a new tab: cover with the logo, header on every page, verdict, red flags, payment schedule, message to the builder, checklist, scope in and out, the variation rule, referrals. Press **Print** in the top right and choose **Save as PDF**. Before issue it opens with the blanks showing, which is useful for reading it whole before you rate.
 
 **"The browser blocked the new tab."** Allow pop-ups for `concierge.yaadly.co.uk` once. The document opens with `window.open`, and the first time a browser sees that from a site it asks.
 
@@ -6086,4 +6087,8 @@ Desk, **Reports**. Service: Deposit Protection Check. Client name and property a
 
 **A finding reads "[figure removed]".** The agent repeated a sum out of the notes and the scrubber took it out. The finding still reads; if the number belongs in the document, put it in the verdict, which is yours.
 
-**The document has no logo.** It loads `https://yaadly.co.uk/logo-v1.png` from the marketing site. If the site is down or the file is renamed, the wordmark still prints and the logo does not. Renaming the logo means changing `RPT_LOGO` in `concierge.html`.
+**The document has no logo.** The logo is embedded in the desk as a small data URI (`RPT_LOGO` in `concierge.html`), made with `sips -Z 160 brand/yaadly-logo-master.png`. It was a link to the marketing site until 28 September 2026 and never once displayed, because the desk's Content-Security-Policy allows images from the desk itself, `data:` and `blob:` only. Anything the desk or the document loads from another host must be on the list in `concierge-deploy/src/index.ts` or it is refused silently.
+
+**The desk looks the same after a deploy.** A tab opened before the deploy keeps running the old page. Reload it. You are on the current desk if Reports shows a file chooser labelled "The quote, receipts, messages and photographs".
+
+**Testing the desk under its real policy.** Access answers every outside request, so the policy cannot be observed from the internet, and a plain local preview does not apply it. Serve a copy of `concierge.html` locally with the same `Content-Security-Policy` header the worker sets and test there. On 28 September that showed the photo path and the PDF path both working under the policy and the logo link blocked.
