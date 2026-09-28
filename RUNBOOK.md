@@ -6274,3 +6274,10 @@ On their own item, on the stage still being worked, the worker presses **Correct
 ## 44. A client raises a problem: it goes to Yaadly (28 Sep 2026)
 
 Founder: "you raise this with Yaadly". The portal opens a new dispute already escalated, so it is with Yaadly from the start. The worker is told at once with what the client said and is asked to give their side with Message Yaadly. Disputes opened before this in the direct state still show Reply, That sorts it and Escalate as before. The client and worker messages change only once `yaad-notify-client` is redeployed; until then they still describe the worker-first route.
+
+## 45. The street address, and the Job details tab (28 Sep 2026)
+
+1. **Apply `20260929070000_the_client_adds_the_street_address.sql`**, then deploy the app. Before that, Add the address says it is not switched on yet.
+2. **Where it is:** the job page's **Job details** tab, with the portal link and access code, This job, and the job as agreed. None of it is on Overview any more.
+3. **Who:** the client adds or changes it while the job is open; the booked worker reads it; a worker who only quoted never sees it. Each change writes a line to `agent_actions` (who, added or changed), never the old address.
+4. **Nudges:** once a worker is booked and there is no address, the client's list says Add the street address and the worker's says Waiting on the street address.

@@ -28,6 +28,7 @@ import { TabBar, TABS, type TabKey } from "@/components/portal/TabBar";
 import { AddOnPanel, AddonApprove, type AddonInvoice, type AddonPhoto, type AddonRow } from "@/components/portal/AddOnPanel";
 import { addonClientBill, addonWorkerPay, waitingOn } from "@/lib/jobs/addon";
 import { MoneyTrail, type TrailWorkerPay } from "@/components/portal/MoneyTrail";
+import { JobAddress } from "@/components/portal/JobAddress";
 import { EvidenceLedger } from "@/components/portal/EvidenceLedger";
 import { GoLive, type Gate } from "@/components/portal/GoLive";
 import { Outstanding, type OutItem } from "@/components/portal/Outstanding";
@@ -1031,6 +1032,27 @@ export default async function JobRoom({
      receipt against the money is still one named person's decision at the
      desk, and a filed receipt never records itself. */
   const receipt = materialsReceipt(matReleases, jobFiles);
+  /* The street address, once somebody is booked to go there (28 Sep 2026:
+     a job at stage 2 had none, and nothing asked for it). */
+  if (job.worker_email && !addr && job.status !== "complete") {
+    outstanding.push(
+      isClient
+        ? {
+            who: "you",
+            title: "Add the street address",
+            detail: "Your tradesperson is booked and needs it to find the property. Only they and Yaadly see it.",
+            href: jobBase + "?tab=details#address",
+            cta: "Add it",
+          }
+        : {
+            who: "them",
+            title: "Waiting on the street address",
+            detail: "The client has been asked for it. Do not set off until it is on Job details.",
+            href: jobBase + "?tab=details#address",
+            cta: "See it",
+          },
+    );
+  }
   if (receipt.state === "due" && job.status !== "complete") {
     outstanding.push({
       who: isClient ? "them" : "you",
@@ -2013,6 +2035,35 @@ export default async function JobRoom({
         </section>
       )}
 
+      {job.status === "complete" && !myReview && (
+        <div id="review" className="scroll-mt-6">
+        <ReviewForm
+          jobId={job.id}
+          direction={role === "client" ? "client_of_worker" : "worker_of_client"}
+          subjectEmail={(role === "client" ? job.worker_email : job.client_email) ?? ""}
+          subjectName={role === "client" ? (job.worker_name ?? "the worker") : "the client"}
+        />
+        </div>
+      )}
+      {job.status === "complete" && myReview && (
+        <p className="mt-4 rounded-2xl border border-softline bg-soft px-4 py-3 text-[13px] text-mute">
+          Your review of this job is in. It publishes when the other side
+          writes theirs, or after fourteen days.
+        </p>
+      )}
+        </>
+      )}
+
+      {tab === "details" && (
+        <>
+      <JobAddress
+        jobId={job.id}
+        role={role === "worker" ? "worker" : "client"}
+        addr={addr}
+        parish={job.parish ?? null}
+        booked={!!job.worker_email}
+        closed={job.status === "complete"}
+      />
       {role === "client" && (
         <PortalCard
           reference={job.id}
@@ -2033,12 +2084,6 @@ export default async function JobRoom({
                 <>
                   <dt className="text-mute">Trade</dt>
                   <dd className="text-right">{job.trade}</dd>
-                </>
-              )}
-              {(role === "client" || bookedWorker) && (
-                <>
-                  <dt className="text-mute">Address</dt>
-                  <dd className="text-right">{addr ?? <span className="text-dim">Not added yet</span>}</dd>
                 </>
               )}
               {job.parish && (
@@ -2081,22 +2126,6 @@ export default async function JobRoom({
         role={role === "worker" ? "worker" : "client"}
       />
 
-      {job.status === "complete" && !myReview && (
-        <div id="review" className="scroll-mt-6">
-        <ReviewForm
-          jobId={job.id}
-          direction={role === "client" ? "client_of_worker" : "worker_of_client"}
-          subjectEmail={(role === "client" ? job.worker_email : job.client_email) ?? ""}
-          subjectName={role === "client" ? (job.worker_name ?? "the worker") : "the client"}
-        />
-        </div>
-      )}
-      {job.status === "complete" && myReview && (
-        <p className="mt-4 rounded-2xl border border-softline bg-soft px-4 py-3 text-[13px] text-mute">
-          Your review of this job is in. It publishes when the other side
-          writes theirs, or after fourteen days.
-        </p>
-      )}
         </>
       )}
 
