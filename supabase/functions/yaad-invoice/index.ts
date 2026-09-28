@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { pickTextProvider, providerAttrs, chatWithFailover, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 import { payLinkToken } from "./stripe.ts";
-import { invoicePdf } from "./pdf.ts";
+import { invoicePdf, workerFeeBreakdown } from "./pdf.ts";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 
 // yaad-invoice
@@ -167,6 +167,10 @@ function renderInvoice(inv: Record<string, any>, lines: Record<string, any>[], s
   tr.unpriced td{color:#8A5A00;background:#FFFBF2}
   .flag{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;
         background:#FFE9B8;color:#8A5A00;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+  .wfee{margin-top:18px;padding:12px 16px;background:#F4F7F6;border-radius:8px;font-size:14px}
+  .wfee h2{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--mute);margin:0 0 6px}
+  .wfee div{display:flex;justify-content:space-between;padding:3px 0}
+  .wfee .r{font-weight:700;border-top:1px solid var(--line);margin-top:4px;padding-top:7px}
   .totals{margin-top:18px;margin-left:auto;width:min(300px,100%)}
   .totals div{display:flex;justify-content:space-between;padding:7px 0}
   .totals .grand{border-top:2px solid var(--deep);margin-top:6px;padding-top:12px;
@@ -217,6 +221,16 @@ ${esc(inv.client_email)}${inv.client_address ? "\n" + esc(inv.client_address) : 
     <thead><tr><th>Service</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Amount</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
+
+  ${(() => {
+    /* Yaadly's worker fee, on a worker's pay invoice raised since 28 Sep 2026
+       (pdf.ts workerFeeBreakdown; the PDF draws the same three lines). */
+    const wf = workerFeeBreakdown(inv);
+    return wf ? `<div class="wfee"><h2>How this pay is worked out</h2>
+      <div><span>Quoted labour</span><span>${money(wf.labour, "JMD")}</span></div>
+      <div><span>Less Yaadly's worker fee (${wf.pct}%)</span><span>-${money(wf.fee, "JMD")}</span></div>
+      <div class="r"><span>Agreed rate, paid to you</span><span>${money(wf.rate, "JMD")}</span></div></div>` : "";
+  })()}
 
   <div class="totals">
     <div><span>Subtotal</span><span>${money(inv.subtotal_pence, inv.currency)}</span></div>
