@@ -18,21 +18,57 @@ import { scrub } from "@/lib/scrub";
 
 export type ReportActionState = { ok?: boolean; error?: string; changed?: boolean };
 
-export async function signCompletionReport(_prev: ReportActionState, formData: FormData): Promise<ReportActionState> {
-  await requireUser();
-  const jobId = String(formData.get("jobId") ?? "");
-  if (!jobId) return { error: "Which job is this?" };
+/* The worker's three acts, 28 Sep 2026 (20260928233000): change the words,
+ * sign, or raise an issue. No login: the code in the WhatsApp link is the
+ * key, checked in Postgres, where ten wrong codes lock the link. The same
+ * actions serve the portal page, which carries the same code. */
+async function byCode(fn: string, args: Record<string, unknown>): Promise<ReportActionState> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("sign_completion_report", {
-    p_job: jobId,
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) return { error: error.message };
+  const r = (data ?? {}) as { ok?: boolean; error?: string; changed?: boolean };
+  if (r.error) return { error: r.error };
+  return { ok: true, changed: Boolean(r.changed) };
+}
+
+function wordsFrom(formData: FormData) {
+  return {
+    p_job: String(formData.get("jobId") ?? ""),
     p_code: String(formData.get("code") ?? ""),
     p_care_notes: notesFromText(String(formData.get("careNotes") ?? "")),
     p_worker_account: String(formData.get("account") ?? ""),
-  });
-  if (error) return { error: error.message };
+  };
+}
+
+function refresh(jobId: string) {
+  revalidatePath("/report/" + jobId);
   revalidatePath("/portal/jobs/" + jobId + "/completion");
-  const row = Array.isArray(data) ? data[0] : data;
-  return { ok: true, changed: Boolean(row?.worker_did_change) };
+}
+
+export async function saveCompletionWords(_prev: ReportActionState, formData: FormData): Promise<ReportActionState> {
+  const args = wordsFrom(formData);
+  const r = await byCode("edit_completion_report_by_code", args);
+  if (r.ok) refresh(args.p_job);
+  return r;
+}
+
+export async function signCompletionReport(_prev: ReportActionState, formData: FormData): Promise<ReportActionState> {
+  const args = wordsFrom(formData);
+  const r = await byCode("sign_completion_report_by_code", args);
+  if (r.ok) refresh(args.p_job);
+  return r;
+}
+
+export async function raiseCompletionIssue(_prev: ReportActionState, formData: FormData): Promise<ReportActionState> {
+  const jobId = String(formData.get("jobId") ?? "");
+  const r = await byCode("raise_completion_issue_by_code", {
+    p_job: jobId,
+    p_code: String(formData.get("code") ?? ""),
+    // Scrubbed of contact details, the same as any dispute text.
+    p_body: scrub(String(formData.get("issue") ?? "").trim().slice(0, 1500)).clean,
+  });
+  if (r.ok) refresh(jobId);
+  return r;
 }
 
 export async function confirmCompletionReport(_prev: ReportActionState, formData: FormData): Promise<ReportActionState> {

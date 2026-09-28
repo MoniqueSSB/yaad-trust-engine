@@ -25,6 +25,37 @@ breakdown: no figure is better than a guessed one.
 
 ---
 
+## 2026-09-28 · Before signing, the worker can change their words or raise an issue, by button, on WhatsApp or from the link
+
+Monique signed the test report from her own phone and then: "the only issue
+is there is no way to edit", "or raise and issue", "on whatsapp or portal",
+"fix that", "it should be a button". Offered a WhatsApp route or a link that
+opens without logging in, she chose both.
+
+**WhatsApp.** The worker's message is followed by three buttons (template
+`yaadly_sign_completion_report_v2`): Sign the report (payload: the job code),
+Change my words (`EDIT <code>`) and Raise an issue (`ISSUE <code>`). A tap on
+either of the last two is remembered for that phone in
+`completion_report_whatsapp_pending`, and the next message they type is taken
+as their account of the work (saved unsigned: they still press Sign) or as
+the issue. That lane runs ahead of every other worker lane in `yaad-inbound`,
+so their words are never filed as a work update. No "reply 1": buttons only.
+
+**The link, no login** (`/report/[id]?code=`). The code in the WhatsApp link
+is the key, the pattern `/jobs/[id]/quotes` already uses. Three buttons: Sign,
+Save my changes, Raise an issue. Ten wrong codes on a job lock the link until
+Yaadly sends the report back with a new one. The wrong-code count is kept by
+returning a refusal instead of raising an error, because a raised error rolls
+the count back with everything else. The page shows the words and a plain
+summary of the record, never an address, contact details or money.
+
+**Raising an issue stops the report** (`worker_raised`) and alerts Monique.
+It is unsigned, so release now requires a signature: the only answer is to
+send it back with her reply, which is the "something went wrong" she steps in
+on. The worker then signs when it is right.
+
+---
+
 ## 2026-09-28 · The worker signs with a button, first, and no Yaadly person's name is ever on the report
 
 Monique, the same evening, while this was being deployed: "the worker always

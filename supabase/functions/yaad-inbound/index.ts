@@ -2779,6 +2779,63 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // ── the Completion Report: Change my words, Raise an issue ─────────────
+      //
+      // 28 Sep 2026 (20260928233000). Founder: "no way to edit", "or raise and
+      // issue", "on whatsapp or portal", "it should be a button". The worker's
+      // report message carries three buttons. Sign's payload is the job code
+      // and is handled with the other job-code doors further down. The other
+      // two carry "EDIT <code>" and "ISSUE <code>": a tap records which one,
+      // for this phone and this job, and the NEXT message they type is taken
+      // as their words (it replaces their own account of the work, unsigned:
+      // they still press Sign) or as the issue (the report stops, Yaadly is
+      // alerted). Ahead of every other worker lane, so the words they type are
+      // never caught as a work update. Two hours to answer; a button or a job
+      // code typed in the meantime starts again rather than being swallowed.
+      if (!msg.media.length && msg.text.trim()) {
+        const said = msg.text.trim();
+        const tap = /^(EDIT|ISSUE)\s+(\S+)/i.exec(said);
+        if (tap) {
+          const kind = tap[1].toUpperCase() === "EDIT" ? "edit" : "issue";
+          const { data: waiting } = await supabase.from("completion_reports").select("job_id").eq("status", "with_worker");
+          const ids = ((waiting ?? []) as { job_id: string }[]).map((r) => r.job_id);
+          const { data: jobsW } = ids.length ? await supabase.from("jobs").select("id, title, stage, worker_email").in("id", ids) : { data: [] };
+          const emails = [...new Set(((jobsW ?? []) as any[]).map((j) => String(j.worker_email ?? "").toLowerCase()).filter(Boolean))];
+          const { data: profs } = emails.length ? await supabase.from("worker_profiles").select("worker_email, phone").in("worker_email", emails) : { data: [] };
+          const mine = new Set(((profs ?? []) as any[]).filter((w) => samePhone(w.phone, msg.from)).map((w) => String(w.worker_email).toLowerCase()));
+          const target = matchApprovingJob(tap[2], ((jobsW ?? []) as any[]).filter((j) => mine.has(String(j.worker_email ?? "").toLowerCase())));
+          if (target) {
+            await supabase.from("completion_report_whatsapp_pending")
+              .upsert({ phone: msg.from, job_id: target.id, kind, started_at: new Date().toISOString() }, { onConflict: "phone" });
+            root.setAttributes({ "yaadly.whatsapp_report.tap": kind, "yaadly.whatsapp_report.job": target.id });
+            return twiml(kind === "edit"
+              ? `Type what your report should say about the work on ${target.title}, in your own words, in one message. It replaces your account on the report. The dates and photos stay as they are. You still tap Sign when it reads right.`
+              : `Tell us what is wrong with the report for ${target.title}, in one message. It goes to Yaadly and the report waits. It does not go to the owner.`);
+          }
+          return twiml("That report is not waiting on you from this number. Open the link in your last Yaadly message.");
+        }
+
+        const { data: pend } = await supabase.from("completion_report_whatsapp_pending")
+          .select("job_id, kind, started_at").eq("phone", msg.from).maybeSingle();
+        if (pend) {
+          const fresh = Date.now() - new Date(pend.started_at as string).getTime() <= 2 * 3600_000;
+          const looksLikeCode = /^[A-Z]+-[A-Z0-9-]+$/i.test(said);
+          await supabase.from("completion_report_whatsapp_pending").delete().eq("phone", msg.from);
+          if (fresh && !looksLikeCode) {
+            const fn = pend.kind === "edit" ? "edit_completion_account_via_whatsapp" : "raise_completion_issue_via_whatsapp";
+            const args = pend.kind === "edit"
+              ? { p_job: pend.job_id, p_phone: msg.from, p_account: said.slice(0, 2000) }
+              : { p_job: pend.job_id, p_phone: msg.from, p_body: said.slice(0, 1500) };
+            const { error } = await supabase.rpc(fn, args);
+            root.setAttributes({ "yaadly.whatsapp_report.words": String(pend.kind), "yaadly.whatsapp_report.outcome": error ? "refused" : "saved" });
+            if (error) return twiml(`That did not go through: ${error.message}`);
+            return twiml(pend.kind === "edit"
+              ? `Done. Your report now says, in your words:\n\n"${said.slice(0, 600)}"\n\nTap Sign the report above when it reads right, or Change my words again.`
+              : "Sent to Yaadly. The report waits and does not go to the owner. Yaadly will come back to you, and it comes back to you to sign once it is right.");
+          }
+        }
+      }
+
       // A worker answering the "send this draft, or write your own"
       // prompt. "1" means send exactly what was drafted; anything else
       // typed is read as their own version and that is what goes out

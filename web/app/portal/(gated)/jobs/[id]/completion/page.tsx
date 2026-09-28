@@ -92,7 +92,7 @@ export default async function Completion({
   // Not yet theirs to read. The client waits for issue; the worker waits to be
   // sent it. Said plainly, not as a 404, because the job IS complete.
   const canRead = isAdmin || (isClient && status === "issued") ||
-    (isWorker && ["with_worker", "worker_signed", "held", "issued"].includes(status));
+    (isWorker && ["with_worker", "worker_signed", "held", "worker_raised", "issued"].includes(status));
   if (!canRead) {
     return (
       <div className="rounded-2xl border border-line bg-panel p-6">
@@ -174,7 +174,8 @@ export default async function Completion({
       {isAdmin && status !== "issued" && (
         <div className="rounded-2xl border border-gold/40 bg-gold/[0.07] px-5 py-3 text-[13px] text-mute print:hidden">
           <b className="text-goldb">Desk view.</b> This report is <b>{status.replace(/_/g, " ")}</b>
-          {status === "held" && report?.hold_reason ? <> (held for: {report.hold_reason})</> : null}. The client cannot see it until it is issued.
+          {status === "held" && report?.hold_reason ? <> (held for: {report.hold_reason})</> : null}
+          {status === "worker_raised" && report?.worker_issue ? <> (the worker raised: {report.worker_issue})</> : null}. The client cannot see it until it is issued.
         </div>
       )}
       {isWorker && status === "with_worker" && report?.return_reason && (
@@ -184,6 +185,11 @@ export default async function Completion({
       )}
       {isWorker && status === "with_worker" && (
         <WorkerSign jobId={job.id} code={code ?? ""} careNotes={careNotes} account={report?.worker_account ?? ""} workerName={job.worker_name ?? ""} />
+      )}
+      {isWorker && status === "worker_raised" && (
+        <div className="rounded-2xl border border-line bg-bg p-4 text-[13px] text-mute print:hidden">
+          You raised an issue: &ldquo;{report?.worker_issue}&rdquo;. The report is waiting and has not gone to the owner. Yaadly will come back to you.
+        </div>
       )}
       {isWorker && (status === "worker_signed" || status === "held") && (
         <div className="rounded-2xl border border-line bg-bg p-4 text-[13px] text-mute print:hidden">

@@ -1536,6 +1536,17 @@ Deno.serve(async (req: Request) => {
             (d.reply ? `The worker replied: "${clip(String(d.reply), limit)}"` : "The worker has not replied.") +
             `\n\nNothing on the job can be approved while it is open.`;
         }
+      } else if (event === "report_worker_raised") {
+        // The worker raised an issue instead of signing (20260928233000). The
+        // report is unsigned and waits; only sending it back answers it.
+        const { data: r } = await admin.from("completion_reports")
+          .select("worker_issue").eq("job_id", jobId).maybeSingle();
+        if (!r) return json({ error: "No report on this job." }, 404);
+        what = "a worker raised an issue on their Completion Report";
+        pushTitle = "Yaadly: a worker raised an issue on a report";
+        detail = (limit) => `The worker on ${title} raised an issue instead of signing the Completion Report:\n\n` +
+          `"${clip(String(r.worker_issue ?? ""), limit)}"\n\n` +
+          `The report waits and has not gone to the client. On the desk under Completion reports: send it back to the worker with your answer.`;
       } else if (event === "report_held") {
         // The automatic screen on a signed Completion Report found money or a
         // word Yaadly never uses (yaad-completion-flow). It only holds; the
@@ -1649,15 +1660,16 @@ Deno.serve(async (req: Request) => {
       const { data: r } = await admin.from("completion_reports")
         .select("status, sign_code, return_reason").eq("job_id", jobId).maybeSingle();
       if (!r || r.status !== "with_worker" || !r.sign_code) return json({ ok: true, skipped: "not with the worker" });
-      const signLink = `${APP_URL}/portal/jobs/${encodeURIComponent(job.id)}/completion?code=${encodeURIComponent(r.sign_code)}`;
+      // The no-login page (20260928233000): the code is the key.
+      const signLink = `${APP_URL}/report/${encodeURIComponent(job.id)}?code=${encodeURIComponent(r.sign_code)}`;
       reportSignLink = signLink;
       subject = `Your Completion Report to sign: ${job.title}`;
       line = r.return_reason
         ? `Yaadly has sent the Completion Report for ${job.title} back to you:\n\n"${clip(String(r.return_reason), 600)}"\n\n` +
-          `It is your document. Change your words and sign it again here: ${signLink}`
-        : `The Completion Report for ${job.title} (${job.id}) is ready. It is your document: read it, change the care notes ` +
-          `or add your own account of the work if anything is wrong, then press Sign. It goes to the owner when you sign: ${signLink}\n\n` +
-          `If it is right as it stands, you can sign it from here: tap Sign the report, or reply ${job.id}.`;
+          `It is your document. Use the buttons below, or open it here: ${signLink}`
+        : `The Completion Report for ${job.title} (${job.id}) is ready. It is your document. Read it here, no login needed: ${signLink}\n\n` +
+          `Then use the buttons below: Sign the report if it is right, Change my words to put it in your own words first, ` +
+          `or Raise an issue if something is wrong. It goes to the owner only when you sign.`;
       // The Sign button follows, the same way the client's Approve button
       // follows an evidence report: its payload is the job's code, which
       // yaad-inbound signs through sign_completion_report_via_whatsapp().
