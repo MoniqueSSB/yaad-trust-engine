@@ -1,5 +1,4 @@
 import { InvoicePdfButton } from "./InvoicePdfButton";
-import type { ReactNode } from "react";
 import { amount, gbp } from "@/lib/money";
 import { whenDate } from "@/lib/date";
 import { PayByCardButton } from "./PayByCardButton";
@@ -182,82 +181,51 @@ export function MoneyPanel({
           </div>
         ) : (
           <>
+            {/* The main work as one plain card, the same layout as each
+                add-on card below (founder, 28 Sep 2026: "change this layout
+                so it aligns to the additional work layout", the bars and long
+                captions were "too childish"). A line only carries a short
+                note where the note changes what the figure means. */}
             {hasExtra && (
-              <h4 className="mb-2.5 text-[10.5px] font-bold uppercase tracking-[.16em] text-tealb">Main work</h4>
+              <h4 className="mb-2.5 text-[10.5px] font-bold uppercase tracking-[.16em] text-mute">Main work</h4>
             )}
-            <div className="flex flex-col gap-3">
-              <MoneyRow
-                colour="bg-purple"
-                label={side === "client" ? "Worker labour" : "Your labour price"}
-                value={money(labour) ?? "—"}
-                width={fee != null && labour != null ? Math.round((labour / (labour + fee)) * 100) : 100}
-                caption="Paid to the worker stage by stage, as the agreed schedule sets out, each stage once it has been accepted and checked."
-              />
-              {materials != null && materials > 0 && (
-                <MoneyRow
-                  colour="bg-purpleb"
-                  label="Materials"
-                  value={money(materials) ?? "—"}
-                  width={30}
-                  caption={
-                    materialsReleased > 0
-                      ? (money(materialsReleased) ?? "") +
-                        " released to the worker to buy the goods. The receipt comes back afterwards. Never fee'd on either side."
-                      : "Paid to the worker so they can buy the goods, once the client has paid for them and said where materials are kept. The receipt comes back afterwards. Not released yet. Never fee'd on either side."
-                  }
-                />
-              )}
-              <MoneyRow
-                colour="bg-gold"
-                label={side === "client" ? "Yaadly Guarantee & Support fee" : "Yaadly fee, deducted"}
-                value={money(fee) ?? "—"}
-                width={fee != null && labour != null ? Math.max(Math.round((fee / (labour + fee)) * 100), 6) : 15}
-                caption={
-                  side === "client"
-                    ? "15% of the labour price, once, as a line on your job bill, never per stage. The job starts once that bill is paid."
-                    : "Yaadly's 5%, taken from your labour price rather than invoiced to you."
-                }
-              />
-              {showCheck && check && (
-                <MoneyRow
-                  colour="bg-teal"
-                  label={check.label}
-                  value={money(check.jmd) ?? "not set"}
-                  width={
-                    allIn != null && allIn > 0 ? Math.max(Math.round((check.jmd / allIn) * 100), 6) : 6
-                  }
-                  caption={
-                    <>
-                      {check.invoiced ? (
-                        <>Invoiced at {gbp(check.pence)}</>
-                      ) : check.fullPence != null && check.fullPence !== check.pence ? (
-                        <>
-                          <s>{gbp(check.fullPence)}</s> {gbp(check.pence)} at the founding rate
-                        </>
-                      ) : (
-                        <>{gbp(check.pence)}</>
-                      )}
-                      , shown here at J${check.jmdPerGbp.toLocaleString("en-JM")} to £1. Added from the
-                      Approvals tab. Yaadly invoices it in pounds, separately from the job, and it moves
-                      no payment to the worker.
-                    </>
-                  }
-                />
-              )}
-            </div>
-            <div className="mt-4 flex items-baseline justify-between border-t border-line2 pt-3.5">
-              <span className="text-[13px] font-semibold text-ink">
-                {hasExtra
-                  ? side === "client" ? "Main work, what you pay" : "Main work, paid to you"
-                  : side === "client" ? "All in, everything you pay" : "Paid to you in total"}
-              </span>
-              <span className={"font-mono-app font-semibold text-ink " + (hasExtra ? "text-[17px]" : "text-[22px]")}>
-                {money(mainTotal) ?? "—"}
-              </span>
+            <div className="rounded-xl border border-line bg-bg/40 px-3.5 py-3">
+              <div className="grid gap-1.5 text-[12.5px]">
+                <Line label={side === "client" ? "The work, worker labour" : "Your labour price"} value={money(labour)} />
+                {materials != null && materials > 0 && (
+                  <Line
+                    label="Materials, at cost"
+                    value={money(materials)}
+                    note={materialsReleased > 0
+                      ? (money(materialsReleased) ?? "") + " released to the worker to buy them"
+                      : "Not released yet"}
+                  />
+                )}
+                {side === "client" ? (
+                  <Line label="Yaadly Guarantee & Support, 15% of the labour" value={money(fee)} />
+                ) : (
+                  <Line label="Yaadly's 5%, taken off" value={fee == null ? null : "−" + (money(fee) ?? "")} />
+                )}
+                {showCheck && check && (
+                  <Line
+                    label={check.label}
+                    value={money(check.jmd)}
+                    note={(check.invoiced ? "Invoiced at " : "") + gbp(check.pence) + ", billed in pounds, shown at J$" + check.jmdPerGbp.toLocaleString("en-JM") + " to £1"}
+                  />
+                )}
+                <div className="mt-0.5 flex justify-between gap-3 border-t border-line pt-1.5 font-semibold">
+                  <span className="text-mute">
+                    {hasExtra
+                      ? side === "client" ? "Main work, what you pay" : "Main work, paid to you"
+                      : side === "client" ? "All in, everything you pay" : "Paid to you in total"}
+                  </span>
+                  <span className="font-mono-app text-ink">{money(mainTotal) ?? "—"}</span>
+                </div>
+              </div>
             </div>
             {hasExtra && extraWork && (
               <div className="mt-5 border-t border-line2 pt-4">
-                <h4 className="text-[10.5px] font-bold uppercase tracking-[.16em] text-mango">Additional work</h4>
+                <h4 className="text-[10.5px] font-bold uppercase tracking-[.16em] text-mute">Additional work</h4>
                 <p className="mb-3 mt-1 text-[12px] leading-relaxed text-dim">
                   Extra work agreed after the job was booked, on the Extra work tab. Each one is billed on its own
                   invoice and does not change the main work above.
@@ -453,32 +421,14 @@ export function MoneyPanel({
   );
 }
 
-function MoneyRow({
-  colour,
-  label,
-  value,
-  width,
-  caption,
-}: {
-  colour: string;
-  label: string;
-  value: string;
-  width: number;
-  caption: ReactNode;
-}) {
+function Line({ label, value, note }: { label: string; value: string | null; note?: string }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between gap-3 text-[13px]">
-        <span className="flex items-center gap-2 text-mute">
-          <i className={"size-2 shrink-0 rounded-sm " + colour} />
-          {label}
-        </span>
-        <span className="whitespace-nowrap font-mono-app text-[13.5px] font-semibold text-ink">{value}</span>
+    <div>
+      <div className="flex justify-between gap-3">
+        <span className="text-dim">{label}</span>
+        <span className="font-mono-app text-ink">{value ?? "—"}</span>
       </div>
-      <div className="h-[7px] overflow-hidden rounded-[4px] bg-bg/60">
-        <span className={"block h-full rounded-[4px] " + colour} style={{ width: width + "%" }} />
-      </div>
-      <span className="text-[11.5px] leading-snug text-dim">{caption}</span>
+      {note && <div className="text-[11.5px] text-dim/80">{note}</div>}
     </div>
   );
 }
