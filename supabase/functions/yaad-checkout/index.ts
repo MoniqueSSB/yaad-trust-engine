@@ -108,7 +108,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const back = inv.job_id
-      ? `${APP_URL}/portal/jobs/${encodeURIComponent(inv.job_id)}?tab=approvals`
+      ? `${APP_URL}/portal/jobs/${encodeURIComponent(inv.job_id)}?tab=money`
       : `${APP_URL}/portal`;
     const anchor = `#invoice-${encodeURIComponent(inv.id)}`;
 

@@ -27,6 +27,7 @@ export type TabKey =
   | "materials"
   | "messages"
   | "approvals"
+  | "money"
   | "extra"
   | "help";
 
@@ -37,6 +38,10 @@ export const TABS: { key: TabKey; label: string }[] = [
   { key: "materials", label: "Materials" },
   { key: "messages", label: "Messages" },
   { key: "approvals", label: "Approvals" },
+  /* Founder, 28 Sep 2026: the money on its own tab, for both sides: the
+     whole breakdown, where it is, and who has been paid. Approvals keeps
+     only what is waiting on a signature. */
+  { key: "money", label: "Money" },
   { key: "extra", label: "Extra work" },
   { key: "help", label: "Help" },
 ];

@@ -219,7 +219,7 @@ export default async function WorkerPortal() {
       case "evidence":
         return { label: "Your evidence is with the client", href: jobHref(j.id, "?tab=evidence#stage-evidence") };
       case "complete":
-        return { label: "See what you were paid", href: jobHref(j.id, "?tab=approvals#invoices") };
+        return { label: "See what you were paid", href: jobHref(j.id, "?tab=money#invoices") };
       default:
         return null;
     }

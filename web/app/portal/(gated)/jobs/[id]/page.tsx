@@ -25,8 +25,9 @@ import { jobGates } from "@/lib/portal/gates";
 import { materialsReceipt } from "@/lib/portal/materials-receipt";
 import { DocStrip, type Doc } from "@/components/portal/DocStrip";
 import { TabBar, TABS, type TabKey } from "@/components/portal/TabBar";
-import { AddOnPanel, type AddonInvoice, type AddonRow } from "@/components/portal/AddOnPanel";
-import { waitingOn } from "@/lib/jobs/addon";
+import { AddOnPanel, AddonApprove, type AddonInvoice, type AddonPhoto, type AddonRow } from "@/components/portal/AddOnPanel";
+import { addonClientBill, addonWorkerPay, waitingOn } from "@/lib/jobs/addon";
+import { MoneyTrail, type TrailWorkerPay } from "@/components/portal/MoneyTrail";
 import { EvidenceLedger } from "@/components/portal/EvidenceLedger";
 import { GoLive, type Gate } from "@/components/portal/GoLive";
 import { Outstanding, type OutItem } from "@/components/portal/Outstanding";
@@ -375,14 +376,59 @@ export default async function JobRoom({
       .select("id,addon_id,status,total_pence,payable_to,period_label")
       .eq("job_id", id)
       .not("addon_id", "is", null),
-    supabase.from("job_addon_evidence").select("addon_id").eq("job_id", id),
+    supabase.from("job_addon_evidence").select("id,addon_id,label,storage_path,created_at").eq("job_id", id).order("created_at", { ascending: true }),
   ]);
   const addons = (addonRows ?? []) as AddonRow[];
   const addonInvoices = (addonInvRows ?? []) as AddonInvoice[];
   const addonEvidenceCounts: Record<string, number> = {};
-  for (const r of (addonEvRows ?? []) as { addon_id: string }[]) {
+  const addonEvList = (addonEvRows ?? []) as { id: string; addon_id: string; label: string | null; storage_path: string | null; created_at: string }[];
+  for (const r of addonEvList) {
     addonEvidenceCounts[r.addon_id] = (addonEvidenceCounts[r.addon_id] ?? 0) + 1;
   }
+  /* The photographs themselves, so the client can approve on them (28 Sep
+     2026). Same private bucket and five minute signed URLs as stage
+     evidence. */
+  const addonPhotos: Record<string, AddonPhoto[]> = {};
+  if (addonEvList.length) {
+    const paths = addonEvList.map((r) => r.storage_path).filter((x): x is string => !!x);
+    const { data: signedAddon } = paths.length
+      ? await supabase.storage.from("evidence").createSignedUrls(paths, 300)
+      : { data: [] as { path: string | null; signedUrl: string }[] };
+    const urlOf = new Map((signedAddon ?? []).map((r) => [r.path, r.signedUrl]));
+    for (const r of addonEvList) {
+      (addonPhotos[r.addon_id] ??= []).push({
+        id: r.id,
+        label: r.label,
+        img: r.storage_path ? (urlOf.get(r.storage_path) ?? null) : null,
+        created_at: r.created_at,
+      });
+    }
+  }
+  /* Agreed extra work counts in the job's money (founder, 28 Sep 2026: it
+     was on the Extra work tab only, and "What this job costs" left it out).
+     Agreed and approved add-ons only; one still being agreed, turned down,
+     withdrawn or cancelled is not money anybody owes. */
+  const countedAddons = addons.filter((a) => a.status === "agreed" || a.status === "signed_off");
+  const addonClientTotal = countedAddons.reduce((t, a) => t + addonClientBill(a.amount_jmd, a.terms).total, 0);
+  const addonWorkerTotal = countedAddons.reduce((t, a) => t + addonWorkerPay(a.amount_jmd), 0);
+
+  /* Who has been paid (20260929060000), for the Money tab. Read on its own
+     and allowed to fail: before that migration is applied the function does
+     not exist, and the tab then shows nothing paid rather than breaking. */
+  const { data: payRows } = await supabase.rpc("job_worker_payments", { p_job: id });
+  const workerPays: TrailWorkerPay[] = ((payRows ?? []) as {
+    invoice_id: string; what: string; labour_jmd: number | null; status: string; paid_at: string | null;
+  }[]).map((r) => ({ id: r.invoice_id, what: r.what, labour: r.labour_jmd, paid: r.status === "paid", paidAt: r.paid_at }));
+
+  /* Extra work waiting on the client's approval: agreed, its invoice paid,
+     and at least one photo filed. The same gates approve_addon_as_me() uses,
+     so this never offers a button the database would refuse. */
+  const addonsToApprove = addons.filter(
+    (a) =>
+      a.status === "agreed" &&
+      addonInvoices.some((i) => i.addon_id === a.id && i.payable_to !== "worker" && i.status === "paid") &&
+      (addonEvidenceCounts[a.id] ?? 0) > 0,
+  );
 
   const { data: myReview } = await supabase
     .from("reviews")
@@ -862,7 +908,7 @@ export default async function JobRoom({
       detail:
         "Your card payment for " + amount(feeInvoice.total_pence, feeInvoice.currency) +
         " came through. A person at Yaadly checks it and signs it off. Then the bill shows as Paid and the project starts. There is nothing more to pay on it.",
-      href: jobBase + "?tab=approvals#invoice-" + feeInvoice.id,
+      href: jobBase + "?tab=money#invoice-" + feeInvoice.id,
       cta: "See it",
     });
   } else if (job.status === "awaiting_payment") {
@@ -888,7 +934,7 @@ export default async function JobRoom({
          where the independent check panel and the stage ledger sit above
          it and the invoice is a long scroll down. */
       href: isClient
-        ? jobBase + "?tab=approvals#" + (feeInvoice ? "invoice-" + feeInvoice.id : "invoices")
+        ? jobBase + "?tab=money#" + (feeInvoice ? "invoice-" + feeInvoice.id : "invoices")
         : undefined,
       cta: isClient ? "See the invoice" : undefined,
     });
@@ -1029,7 +1075,7 @@ export default async function JobRoom({
         who: "yaadly",
         title: "Card payment received for " + inv.id + ". A person at Yaadly signs it off",
         detail: "It came through by card. A person at Yaadly checks it and signs it off, then the invoice shows as Paid. There is nothing more to pay on it.",
-        href: jobBase + "?tab=approvals#invoice-" + inv.id,
+        href: jobBase + "?tab=money#invoice-" + inv.id,
         cta: "See it",
       });
     } else if (inv.status === "sent" && inv.payable_to !== "worker" && isClient) {
@@ -1037,7 +1083,7 @@ export default async function JobRoom({
         who: "you",
         title: "Invoice " + inv.id + " is unpaid",
         detail: "Sent" + (inv.issue_date ? " on " + inv.issue_date : "") + ". Paid by bank transfer.",
-        href: jobBase + "?tab=approvals#invoice-" + inv.id,
+        href: jobBase + "?tab=money#invoice-" + inv.id,
         cta: "See it",
       });
     }
@@ -1245,7 +1291,12 @@ export default async function JobRoom({
   /* The tab is a search param, so every pane is a real address that survives
      a reload and can be pasted into a message. Anything unrecognised falls
      back to the overview rather than an empty screen. */
-  const tab: TabKey = (TABS.find((t) => t.key === tabParam)?.key ?? "overview");
+  /* A card payment comes back from Stripe on ?card=. Until yaad-checkout is
+     redeployed it still returns to the Approvals tab, where the invoices no
+     longer live (28 Sep 2026), so that one case opens Money instead. */
+  const tab: TabKey = cardParam && tabParam === "approvals"
+    ? "money"
+    : (TABS.find((t) => t.key === tabParam)?.key ?? "overview");
 
   /* jobs.status = 'evidence' is the moment the money is waiting on a human
      rather than on the work. The ledger leads with it, and it is what makes
@@ -1265,7 +1316,8 @@ export default async function JobRoom({
     scope: qs.length,
     evidence: ev.length,
     messages: chat.length,
-    approvals: (awaitingApproval && isClient ? 1 : 0) + unpaidClientInvoices,
+    approvals: (awaitingApproval && isClient ? 1 : 0) + (isClient ? addonsToApprove.length : 0),
+    money: unpaidClientInvoices,
     extra: addons.filter((a) => waitingOn(a.status) === role).length,
     help: helpOpen,
   };
@@ -1814,6 +1866,43 @@ export default async function JobRoom({
           source={packSource}
           paidInFull={!!won && billingModeOf(won.billing_mode) === "in_full"}
         />
+        {/* Extra work waiting on the client's approval (founder, 28 Sep
+            2026): approvals shows what is approved and what is not, stages
+            and extra work alike. */}
+        {role === "client" && addonsToApprove.map((a) => (
+          <section key={a.id} className="mt-4 rounded-2xl border border-line bg-panel p-5">
+            <h2 className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Extra work to approve</h2>
+            <p className="mt-2 max-w-[62ch] whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink">{a.scope}</p>
+            <p className="mt-1.5 text-[12.5px] text-mute">
+              {(addonEvidenceCounts[a.id] ?? 0)} photo{(addonEvidenceCounts[a.id] ?? 0) === 1 ? "" : "s"} filed. See them on{" "}
+              <Link href="?tab=extra" className="font-bold text-tealb underline-offset-2 hover:underline">Extra work</Link>.
+            </p>
+            <AddonApprove jobId={job.id} addonId={a.id} amountLabel={money(a.amount_jmd) ?? ""} otherName={won?.worker_name ?? job.worker_name ?? "the tradesperson"} />
+          </section>
+        ))}
+        {addons.some((a) => a.status === "agreed" || a.status === "signed_off") && (
+          <section className="mt-4 rounded-2xl border border-line bg-panel p-5">
+            <h2 className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Extra work</h2>
+            <ul className="mt-2 grid gap-1.5">
+              {addons.filter((a) => a.status === "agreed" || a.status === "signed_off").map((a) => (
+                <li key={a.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-bg/40 px-3.5 py-2.5 text-[12.5px]">
+                  <span className="min-w-0 flex-1 text-ink">{a.scope.slice(0, 90)}{a.scope.length > 90 ? "…" : ""}</span>
+                  <span className={"rounded-full px-2.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide " + (a.status === "signed_off" ? "bg-tealb/15 text-tealb" : "bg-mango/15 text-mango")}>
+                    {a.status === "signed_off" ? "Approved" : "Not approved yet"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        </>
+      )}
+
+      {/* Founder, 28 Sep 2026: the money on its own tab, for both sides:
+          what the job costs, where the money is, who has been paid, and the
+          invoices. */}
+      {tab === "money" && (
+        <>
         {/* Back from Stripe's payment page. Said plainly either way: a
             cancelled payment charged nothing, and a completed one is not
             "paid" until Yaadly confirms it. */}
@@ -1827,6 +1916,17 @@ export default async function JobRoom({
             Card payment cancelled. Nothing was charged.
           </p>
         )}
+        <MoneyTrail
+          side={role === "worker" ? "worker" : "client"}
+          bills={invoices
+            .filter((i) => i.payable_to !== "worker" && (i.currency ?? "JMD").toUpperCase() === "JMD" && !i.part_of)
+            .map((i) => ({ id: i.id, label: i.period_label ?? i.id, total: i.total_pence, paid: i.status === "paid", paidAt: i.paid_at }))}
+          workerPays={workerPays}
+          materials={won ? { released: materialsReleasedJmd, quoted: materialsQuoted, receiptFiled: receipt.state === "filed" } : null}
+          money={money}
+          day={whenDate}
+          workerName={won?.worker_name ?? job.worker_name ?? "the tradesperson"}
+        />
         <MoneyPanel
           cardPayments={role === "client" ? cardPayments : {}}
           cardReturning={role === "client" && cardParam === "paid"}
@@ -1835,12 +1935,15 @@ export default async function JobRoom({
           labour={labour}
           materials={won?.materials_jmd ?? null}
           fee={role === "worker" ? workerFeeJmd : feeJmd}
-          allIn={role === "client" ? clientAllIn : allIn}
-          takeHome={takeHome}
+          allIn={role === "client" ? (clientAllIn == null ? null : clientAllIn + addonClientTotal) : allIn}
+          takeHome={takeHome == null ? null : takeHome + addonWorkerTotal}
           invoices={invoices}
           money={money}
           materialsReleased={materialsReleasedJmd}
           check={role === "client" ? checkLine : null}
+          extraWork={role === "client"
+            ? (addonClientTotal > 0 ? { jmd: addonClientTotal, count: countedAddons.length } : null)
+            : (addonWorkerTotal > 0 ? { jmd: addonWorkerTotal, count: countedAddons.length } : null)}
         />
         </>
       )}
@@ -2119,6 +2222,7 @@ export default async function JobRoom({
           addons={addons}
           invoices={addonInvoices}
           evidenceCounts={addonEvidenceCounts}
+          photos={addonPhotos}
         />
       )}
 
@@ -2242,7 +2346,7 @@ export default async function JobRoom({
           }
           workerName={won?.worker_name ?? job.worker_name ?? null}
           jobBase={jobBase}
-          moneyHref={jobBase + "?tab=approvals"}
+          moneyHref={jobBase + "?tab=money"}
           active={tab}
         />
       </div>

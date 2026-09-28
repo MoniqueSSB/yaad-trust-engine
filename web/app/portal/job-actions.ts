@@ -190,7 +190,11 @@ export async function raiseDispute(
   const { clean } = scrub(body.trim().slice(0, 2000));
   const { error } = await supabase.from("disputes").insert({
     job_id: jobId, raised_by: (user.email ?? "").toLowerCase(),
-    kinds: kinds.slice(0, 6), body: clean, state: "direct",
+    /* Founder, 28 Sep 2026: "you raise this with Yaadly". A problem opens
+       with Yaadly from the start rather than with the worker first; the
+       worker is still told at once (trg_notify_dispute_raised_worker_desk).
+       Disputes opened before this in 'direct' keep working as they were. */
+    kinds: kinds.slice(0, 6), body: clean, state: "escalated",
   });
   if (error) throw new Error("refused");
   revalidatePath("/portal/jobs/" + jobId);

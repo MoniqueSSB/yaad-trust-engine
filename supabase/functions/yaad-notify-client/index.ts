@@ -1459,8 +1459,10 @@ Deno.serve(async (req: Request) => {
       // the worker (dispute_raised_worker) and Monique (desk_alert) really
       // are told, and this says exactly that and no more.
       subject = `We have your dispute: ${job.title}`;
-      line = `Your message about ${job.title} has gone to the tradesperson, and Yaadly has a copy. ` +
-        `They answer first. If it cannot be sorted between you, press Escalate to Yaadly on the job. ` +
+      // Founder, 28 Sep 2026: a problem is raised with Yaadly, not with the
+      // worker first (raiseDispute now opens it escalated).
+      line = `Your message about ${job.title} has gone to Yaadly. A person at Yaadly looks at it against the ` +
+        `agreed scope and the evidence, and brings the tradesperson in; they have been told. ` +
         `Nothing on this job can be approved while it is open. See it and add anything here: ${roomLink}`;
     } else if (kind === "dispute_raised_worker") {
       // The worker's panel has always said "you hear it first". Until
@@ -1472,10 +1474,11 @@ Deno.serve(async (req: Request) => {
       if (!d) return json({ error: "No such dispute on this job." }, 404);
       recipientEmail = String(job.worker_email ?? "").trim();
       subject = `The client has raised something: ${job.title}`;
-      line = `On ${job.title}, the client has raised something with you, before anybody else:\n\n` +
+      line = `On ${job.title}, the client has raised something with Yaadly:\n\n` +
         `"${String(d.body ?? "").slice(0, 1000)}"\n\n` +
-        `Answer it, or say how you will put it right, here: ${roomLink}\n\n` +
-        `Nothing on the job is approved until it is sorted. If it cannot be sorted between you, the client can ask Yaadly to look at it.`;
+        `A person at Yaadly will look at it with you against the agreed scope and the evidence. ` +
+        `Give your side with Message Yaadly on the job: ${roomLink}\n\n` +
+        `Nothing on the job is approved until it is sorted, and nothing is taken off you in the meantime.`;
     } else if (kind === "desk_alert") {
       // Monique, not a party. Founder, 13 Sep 2026: a problem on a job
       // "comes directly to my whatsapp and email". Fired by the triggers in

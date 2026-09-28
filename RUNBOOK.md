@@ -6257,3 +6257,14 @@ On their own item, on the stage still being worked, the worker presses **Correct
 2. **"This stage has been signed off"**: correct. Approved evidence is fixed as approved. The worker adds a new item, or you handle it from the desk.
 3. **"Only the worker who filed this can correct it"**: the item was filed by somebody else (the client, or you from the desk).
 4. **What was changed:** `select * from evidence_corrections where job_id = '<job>' order by at;` shows every correction with the wording and part before and after. The client sees "Corrected by the worker" on the card and the first wording in the stage record.
+
+## 42. The client approves finished extra work; Money is its own tab (28 Sep 2026)
+
+1. **Apply in this order:** `20260929050000_the_client_approves_finished_extra_work.sql`, then `20260929060000_both_sides_see_who_has_been_paid.sql`. Then deploy the app, then redeploy `yaad-notify-client` and `yaad-checkout` from disk.
+2. **Before the migrations are in:** the client's Approve this extra work button says it is not switched on yet, and Money shows nothing paid out. Nothing breaks.
+3. **Who approves extra work:** the client, on Extra work or on Approvals, once it is agreed, its invoice is paid and a photo is filed. The desk's Sign off stays as the fallback. Either raises the worker's pay (amount less 5%) on Pay workers. Nobody is paid until a person marks it paid.
+4. **Approvals** shows only what is approved and what is not: stages, extra work, the independent check. **Money** holds what the job costs (extra work included), Where the money is, who has been paid stage by stage, and every invoice. A card payment returning to `?tab=approvals&card=...` opens Money.
+
+## 43. A client raises a problem: it goes to Yaadly (28 Sep 2026)
+
+Founder: "you raise this with Yaadly". The portal opens a new dispute already escalated, so it is with Yaadly from the start. The worker is told at once with what the client said and is asked to give their side with Message Yaadly. Disputes opened before this in the direct state still show Reply, That sorts it and Escalate as before. The client and worker messages change only once `yaad-notify-client` is redeployed; until then they still describe the worker-first route.

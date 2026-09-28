@@ -91,7 +91,12 @@ export function MoneyPanel({
   cardPayments = {},
   cardReturning = false,
   bankDetails = "",
+  extraWork = null,
 }: {
+  /** Agreed extra work (add-ons agreed or approved), already included in
+   *  allIn for the client and in takeHome for the worker. Founder, 28 Sep
+   *  2026: it was left out of "What this job costs". */
+  extraWork?: { jmd: number; count: number } | null;
   side: "client" | "worker";
   labour: number | null;
   materials: number | null;
@@ -178,6 +183,21 @@ export function MoneyPanel({
                     : "Yaadly's 5%, taken from your labour price rather than invoiced to you."
                 }
               />
+              {extraWork && extraWork.count > 0 && (
+                <MoneyRow
+                  colour="bg-mango"
+                  label={"Extra work, " + extraWork.count + " agreed add-on" + (extraWork.count === 1 ? "" : "s")}
+                  value={money(extraWork.jmd) ?? "—"}
+                  width={
+                    allIn != null && allIn > 0 ? Math.max(Math.round((extraWork.jmd / allIn) * 100), 6) : 6
+                  }
+                  caption={
+                    side === "client"
+                      ? "Agreed on the Extra work tab, with Yaadly's 15% on top. Billed on its own invoice, below."
+                      : "Agreed on the Extra work tab, less Yaadly's 5%. Paid once the client approves the finished work."
+                  }
+                />
+              )}
               {showCheck && check && (
                 <MoneyRow
                   colour="bg-teal"

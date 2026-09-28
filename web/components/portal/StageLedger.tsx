@@ -63,7 +63,12 @@ export function StageLedger({
   jobBase,
   source,
   paidInFull = false,
+  showPayment = false,
 }: {
+  /** The per-stage invoice line. Off since 28 Sep 2026 (founder: approvals
+      shows what is approved and what is not; the money is on the Money tab,
+      which lists who has been paid for each stage). */
+  showPayment?: boolean;
   /** The client paid the whole job on one bill before work started
       (billing_mode in_full). Accepting a stage then releases the worker's
       pay for it and raises nothing for the client. */
@@ -241,6 +246,7 @@ export function StageLedger({
                 </span>
               </span>
 
+              {showPayment && (
               <span className="flex items-start gap-2.5 text-[12.5px] leading-relaxed text-mute">
                 {s.invoicePaid ? Ico.ok : s.invoiceId ? Ico.wait : Ico.soon}
                 <span>
@@ -272,6 +278,7 @@ export function StageLedger({
                   )}
                 </span>
               </span>
+              )}
 
               {s.current && s.evidenceFiled > 0 && !s.approved && side === "client" && (
                 <div className="mt-0.5 flex flex-wrap items-center gap-3">
