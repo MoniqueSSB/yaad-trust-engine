@@ -791,6 +791,7 @@ td input,td select{padding:6px 9px;font-size:13px}
 .list .item:last-child{border-bottom:0}
 .list a{color:var(--tealb);font-weight:700}
 iframe{width:100%;height:640px;border:1px solid var(--line);border-radius:12px;background:#fff;margin-top:12px}
+iframe.pdfview{height:820px}
 .sketchbox{background:#fff;border-radius:12px;padding:12px;margin:12px 0;overflow-x:auto}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
 .pthumb{position:relative;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--bg)}
@@ -1177,8 +1178,9 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
   </div>
 
   <div class="card hidden" id="previewCard">
-    <div class="chd"><h3>What the client sees</h3><span class="sp"><button class="btn g" id="printBtn">Print or save as PDF</button></span></div>
-    <iframe id="preview" title="Invoice preview"></iframe>
+    <div class="chd"><h3>What the client sees</h3><span class="sp"><button class="btn g" id="pdfBtn" disabled>Download PDF</button></span></div>
+    <p class="hint" id="previewState"></p>
+    <iframe id="preview" class="pdfview" title="Invoice preview, as a PDF"></iframe>
   </div>
 
   <div id="ivNew" class="hidden">
@@ -8535,7 +8537,7 @@ function renderInvoice(){
     const p = picks();
     const doc = new DOMParser().parseFromString(html, "text/html");
     const trs = doc.querySelectorAll("table tbody tr");
-    if (!p.size || trs.length !== lines.length) { $("preview").srcdoc = html; return; }
+    if (!p.size || trs.length !== lines.length) return showInvoicePdf(html, inv.id);
     let sum = 0;
     lines.forEach((l, i) => {
       const tr = trs[i], id = Number(l.id);
@@ -8567,7 +8569,7 @@ function renderInvoice(){
       part.innerHTML = `<span>${canPart ? "This part" : "Highlighted"}</span><span>${esc(amt(sum))}</span>`;
       grand.after(part);
     }
-    $("preview").srcdoc = "<!doctype html>" + doc.documentElement.outerHTML;
+    showInvoicePdf("<!doctype html>" + doc.documentElement.outerHTML, inv.id + " highlighted");
   };
 
   const markTicks = () => {
@@ -8810,7 +8812,84 @@ function renderInvoice(){
   });
 }
 
-$("printBtn").addEventListener("click", () => $("preview").contentWindow.print());
+// ------------------------------------------------------ the preview is a PDF
+//
+// Asked for on 28 Sep 2026: "all invoices should be in pdf when showing
+// preview". The server still renders the invoice as HTML (it is also the
+// email body). This turns that HTML into an A4 PDF in the browser and shows
+// the PDF itself, so what is on screen is the exact file that gets saved.
+//
+// html2pdf.js is loaded inside a hidden copy of the invoice, not into the
+// desk, so the invoice keeps its own fonts and styles and the desk's CSS
+// never touches it. Pinned version with an integrity hash: a changed file on
+// the CDN is refused rather than run. Nothing leaves the browser; the PDF is
+// made from the page already on screen. See DECISIONS.md, 28 Sep 2026.
+const H2P_SRC = "https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.3/dist/html2pdf.bundle.min.js";
+const H2P_SRI = "sha384-1Rq385dzyHeeImKREXc2dTf1lhBKJHL8YR6phOUkikTCsUwGgDyWRoGv8KVG2+qY";
+let PREVIEW_PDF = null, PREVIEW_SEQ = 0;
+
+async function htmlToPdf(html){
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const st = doc.createElement("style");
+  // The on-screen card look (grey page, shadow, rounded sheet) is for a
+  // browser tab. On paper the sheet is the page.
+  st.textContent = "body{background:#fff;padding:0;margin:0}.sheet{box-shadow:none;border-radius:0;max-width:none;width:760px;margin:0;padding:0}";
+  doc.head.appendChild(st);
+  const sc = doc.createElement("script");
+  sc.src = H2P_SRC; sc.integrity = H2P_SRI; sc.crossOrigin = "anonymous";
+  doc.head.appendChild(sc);
+  const f = document.createElement("iframe");
+  f.setAttribute("aria-hidden", "true");
+  f.style.cssText = "position:fixed;left:-10000px;top:0;width:800px;height:1200px;border:0;margin:0";
+  document.body.appendChild(f);
+  try {
+    await new Promise((ok, bad) => { f.onload = ok; f.onerror = bad; f.srcdoc = "<!doctype html>" + doc.documentElement.outerHTML; });
+    const w = f.contentWindow;
+    if (!w.html2pdf) throw new Error("the PDF maker did not load");
+    if (w.document.fonts) await w.document.fonts.ready;
+    // The options are rebuilt inside the hidden page: html2pdf checks
+    // "instanceof Array", and an array made out here fails that in there.
+    const opts = w.JSON.parse(JSON.stringify({
+      margin: [12, 12, 14, 12],
+      image: { type: "jpeg", quality: 0.95 },
+      html2canvas: { scale: 2, backgroundColor: "#ffffff" },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      pagebreak: { mode: ["css", "legacy"], avoid: ["tr", ".totals", ".note", ".warn", ".partnote", "footer"] }
+    }));
+    return await w.html2pdf().set(opts).from(w.document.querySelector(".sheet") || w.document.body).outputPdf("blob");
+  } finally { f.remove(); }
+}
+
+// Every change of picked lines calls this again; only the newest one lands.
+async function showInvoicePdf(html, name){
+  const seq = ++PREVIEW_SEQ;
+  $("pdfBtn").disabled = true;
+  $("previewState").textContent = "Making the PDF\u2026";
+  try {
+    const blob = await htmlToPdf(html);
+    if (seq !== PREVIEW_SEQ) return;
+    if (PREVIEW_PDF) URL.revokeObjectURL(PREVIEW_PDF.url);
+    PREVIEW_PDF = { url: URL.createObjectURL(blob), name: name + ".pdf" };
+    $("preview").removeAttribute("srcdoc");
+    $("preview").src = PREVIEW_PDF.url;
+    $("previewState").textContent = "";
+    $("pdfBtn").disabled = false;
+  } catch (e) {
+    if (seq !== PREVIEW_SEQ) return;
+    // Said out loud rather than a blank box: the web page version is shown
+    // so the invoice can still be read, and nothing pretends to be a PDF.
+    PREVIEW_PDF = null;
+    $("preview").srcdoc = html;
+    $("previewState").textContent = "The PDF could not be made (" + (e && e.message || e) + "), so this is the web page version. Press Preview again to retry.";
+  }
+}
+
+$("pdfBtn").addEventListener("click", () => {
+  if (!PREVIEW_PDF) return;
+  const a = document.createElement("a");
+  a.href = PREVIEW_PDF.url; a.download = PREVIEW_PDF.name;
+  document.body.appendChild(a); a.click(); a.remove();
+});
 
 // ---------------------------------------------------------------- the list
 //
