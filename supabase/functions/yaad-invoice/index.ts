@@ -249,7 +249,10 @@ ${esc(inv.client_email)}${inv.client_address ? "\n" + esc(inv.client_address) : 
         + (settings.invoice_bank_details
           ? `Bank transfer: ${esc(settings.invoice_bank_details)}. Use ${esc(inv.id)} as the reference.<br>`
           : "")}
-    ${esc(settings.invoice_vat_status)}. ${esc(settings.invoice_issuer_name)} is registered in England and Wales, company number ${esc(settings.invoice_issuer_number)}.<br>
+    ${/* Blank since 28 Sep 2026 on Monique's instruction: the VAT line shows
+         nothing and this sentence starts at the company name. A value in
+         app_settings.invoice_vat_status still prints, in both places. */
+      settings.invoice_vat_status ? esc(settings.invoice_vat_status) + ". " : ""}${esc(settings.invoice_issuer_name)} is registered in England and Wales, company number ${esc(settings.invoice_issuer_number)}.<br>
     Services are project management, observation and documentation. They are not a survey, a valuation, a legal opinion or a quantity surveyor's estimate.
   </footer>
 </div></body></html>`;

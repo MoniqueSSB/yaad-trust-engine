@@ -57,3 +57,8 @@ Deno.test("Jamaican dollar invoices and unpriced lines draw without error", asyn
   );
   assertEquals((await PDFDocument.load(bytes)).getPageCount(), 1);
 });
+
+Deno.test("a blank VAT status draws, and leaves the VAT line empty", async () => {
+  const bytes = await invoicePdf(inv, [line("Visual Check")], { ...settings, invoice_vat_status: "" }, money);
+  assertEquals((await PDFDocument.load(bytes)).getPageCount(), 1);
+});

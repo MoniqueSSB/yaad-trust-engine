@@ -218,7 +218,7 @@ export async function invoicePdf(
     if (settings.invoice_bank_details) foot.push({ t: `Bank transfer: ${settings.invoice_bank_details}. Use ${inv.id} as the reference.` });
   }
   foot.push(
-    { t: `${settings.invoice_vat_status ?? ""}. ${settings.invoice_issuer_name ?? ""} is registered in England and Wales, company number ${settings.invoice_issuer_number ?? ""}.` },
+    { t: `${settings.invoice_vat_status ? settings.invoice_vat_status + ". " : ""}${settings.invoice_issuer_name ?? ""} is registered in England and Wales, company number ${settings.invoice_issuer_number ?? ""}.` },
     { t: "Services are project management, observation and documentation. They are not a survey, a valuation, a legal opinion or a quantity surveyor's estimate." },
   );
   const fw = foot.map((f) => ({ ...f, lines: f.t ? wrap(f.t, 8.5, W) : [] }));
