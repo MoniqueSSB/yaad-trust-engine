@@ -72,12 +72,13 @@ import {
 const POST_JOB_FN = "yaad-post-job";
 const ENQUIRY_FN = "yaad-enquiry";
 
-export function PostJob({ initialTrade, initialParish, requestedWorker, requestedWorkerSlug }: { initialTrade?: string; initialParish?: string; requestedWorker?: string; requestedWorkerSlug?: string }) {
+export function PostJob({ initialTrade, initialParish, initialDesc, requestedWorker, requestedWorkerSlug }: { initialTrade?: string; initialParish?: string; initialDesc?: string; requestedWorker?: string; requestedWorkerSlug?: string }) {
   const [stage, setStage] = useState(0);
   const [f, setF] = useState<Fields>(() => ({
     ...EMPTY_FIELDS,
     trade: askedFor(initialTrade, TRADES),
     parish: askedFor(initialParish, PARISHES),
+    desc: initialDesc ?? "",
   }));
 
   const [jobId, setJobId] = useState("");
@@ -131,6 +132,7 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
     const next: Fields = { ...EMPTY_FIELDS, ...kept };
     if (!next.trade) next.trade = askedFor(initialTrade, TRADES);
     if (!next.parish) next.parish = askedFor(initialParish, PARISHES);
+    if (!next.desc && initialDesc) next.desc = initialDesc;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- see the note above this effect
     setF(next);
     if (d.jobId) setJobId(d.jobId);
@@ -142,7 +144,7 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
     const k = firstIncomplete(next);
     const i = k && k !== "reach" ? STAGES.findIndex((s) => s.key === k) : 3;
     setStage(i < 0 ? 0 : i);
-  }, [initialTrade, initialParish]);
+  }, [initialTrade, initialParish, initialDesc]);
 
   /* Written on every change, not on every stage. Somebody who closes the tab
      mid-sentence gets the sentence back. */
@@ -168,9 +170,9 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
 
   const startAgain = useCallback(() => {
     try { window.localStorage.removeItem(DRAFT_KEY); } catch { /* nothing to clear */ }
-    setF({ ...EMPTY_FIELDS, trade: askedFor(initialTrade, TRADES), parish: askedFor(initialParish, PARISHES) });
+    setF({ ...EMPTY_FIELDS, trade: askedFor(initialTrade, TRADES), parish: askedFor(initialParish, PARISHES), desc: initialDesc ?? "" });
     setJobId(""); setPortalCode(""); setRestored(false); setError(""); setSaveFailed(false); setStage(0);
-  }, [initialTrade, initialParish]);
+  }, [initialTrade, initialParish, initialDesc]);
 
   async function call(fn: string, body: Record<string, unknown>) {
     const sb = createClient();
