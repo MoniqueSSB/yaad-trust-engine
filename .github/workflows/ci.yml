@@ -276,6 +276,18 @@ jobs:
       - name: Page copy carries no banned language
         run: node scripts/check-copy.mjs
 
+      # Added 28 September 2026. The blank report templates are page copy a
+      # client ends up holding, so they meet the report's own two screens (no
+      # measurement, no banned language) and the no-dash rule, imported from
+      # supabase/functions/_shared rather than copied. The first set asked for
+      # crack widths in millimetres and would have been refused at issue. The
+      # built files are committed; this also fails if the desk's copy of them
+      # and the deploy folder's copy differ.
+      - name: Report templates pass the report's own screens
+        run: |
+          node scripts/report-templates/gate.js
+          diff -r concierge/templates concierge-deploy/public/templates
+
   migrations:
     name: New migrations sort last
     runs-on: ubuntu-latest

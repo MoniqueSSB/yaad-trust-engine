@@ -6133,3 +6133,12 @@ Desk, **Reports**. Service: Deposit Protection Check. Client name and property a
 2. The rule behind it is `worker_pay_client_unpaid()`: a worker is paid only once the client's money for that work is marked paid. Any client bill on the job that is still a draft or sent and unpaid blocks it, including the unsent balance of a bill that was split into parts. Send and collect that bill, or void it if it should never go, then come back. Do not change the function to get one payment through: that is a decision about releasing money, and it is Monique's.
 3. When it can be paid, **Pay the worker** opens Pay workers with a card for that invoice at the top, offering only the way the worker asked to be paid: **Pay with Stripe** if they set up a Stripe payout account, **Pay by Wise** if they gave bank details in Wise from the portal, and Wise with "take them by phone" if they gave nothing. If nobody has phoned them to check their bank details yet, the card says so first, with **Call-back done**.
 4. On Pay workers, a row waiting on the client has a button that opens the client's bill holding it up (for example **Open INV-2026-0024**). It used to open the job's invoice list, whose Pay the worker came straight back to Pay workers, round and round.
+
+## 34. The blank report templates: changing one, or the desk cannot load them (28 Sep 2026)
+
+1. Change the wording in `scripts/report-templates/services/<service>.js`. Never edit the PDF or Word file itself; the next build overwrites it.
+2. `cd scripts/report-templates && npm ci && node build.js` (add `--hub "<the YaadlyHub Report Templates folder>"` to refresh Monique's copies). It needs Google Chrome for the PDFs.
+3. If it stops with a list of problems, the gate is working: a template stated a measurement, used banned language or carried a dash. Reword it. Do not loosen `gate.js`.
+4. `cp concierge/concierge.html concierge-deploy/public/index.html` if the desk changed, then deploy the desk as usual. The templates travel in `concierge-deploy/public/templates`.
+5. "Could not load the templates" on the desk means `templates/index.json` was not deployed with the desk. Check `concierge-deploy/public/templates` has it, then redeploy.
+6. The Deposit Protection Check template's checklist and payment terms are a copy of `DEPOSIT_CHECKLIST` and `PAYMENT_TERMS` in `yaad-report`. Change one, change the other.

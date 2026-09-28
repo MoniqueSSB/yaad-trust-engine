@@ -1766,7 +1766,12 @@ const VIEWS = [
     search:["number","client_name","property","kind"],
     empty:["No reports yet","Write up what you saw on the visit below and the agent will draft the findings."],
     panel: () => `
-      <div class="card">
+      <div class="card" id="rptTemplates">
+        <b>Blank templates</b>
+        <p class="mute" style="margin:6px 0 12px">One per service, in the same layout the drafted report is printed in. <b>PDF</b> to print and fill by hand on site, <b>Word</b> to type into. Built by <code>scripts/report-templates</code>, which refuses any template that states a measurement or uses banned language.</p>
+        <div id="rptTemplateList" class="mute">Loading the templates.</div>
+      </div>
+      <div class="card" id="rptDrafter">
         <b>Draft a report from your notes</b>
         <p class="mute" style="margin:6px 0 12px">Write what you saw, roughly is fine. The agent turns it into findings in the house structure. <b>It cannot rate them and it cannot write the verdict</b>, so what lands below is deliberately unfinished: that judgment is what the client is paying you for.</p>
         <div class="fgroup" style="max-width:560px">
@@ -6217,7 +6222,40 @@ function renderTableView(k){
 // have opened, and this creates the row in the first place. Everything it can
 // do is bounded by yaad-report, which has no severity field and no verdict
 // field, so the worst outcome here is a draft nobody wanted, sitting at draft.
+// The blank templates, listed from templates/index.json, which
+// scripts/report-templates/build.js writes beside the files. Served from the
+// desk's own origin, so they sit behind the same Access gate as the desk. A
+// template whose kind the drafter takes gets a button that sets the drafter
+// up for it; the rest are for use by hand.
+const RPT_DRAFTABLE = new Set(["deposit_check", "condition", "technical_signoff", "visual_check"]);
+async function loadReportTemplates(){
+  const box = $("rptTemplateList"); if (!box) return;
+  try {
+    const r = await fetch("templates/index.json", { cache: "no-cache" });
+    if (!r.ok) throw new Error("templates/index.json answered " + r.status);
+    const list = await r.json();
+    box.classList.remove("mute");
+    box.innerHTML = `<table class="tbl"><tbody>${list.map(t => `<tr>
+      <td><b>${esc(t.service)}</b>${sub_(t.title + ", " + t.pages + " pages")}</td>
+      <td><div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center">
+        <a class="btn" href="templates/${esc(t.slug)}.pdf" target="_blank" rel="noopener">PDF</a>
+        <a class="btn" href="templates/${esc(t.slug)}.docx" download>Word</a>
+        ${t.kind && RPT_DRAFTABLE.has(t.kind)
+          ? `<button class="btn g" data-rpt-use="${esc(t.kind)}">Draft with the agent</button>`
+          : `<span class="mute">${t.kind ? "Agent drafting to come" : "By hand only"}</span>`}
+      </div></td></tr>`).join("")}</tbody></table>`;
+    box.querySelectorAll("[data-rpt-use]").forEach(b => b.addEventListener("click", () => {
+      const sel = $("rptKind"); if (sel) sel.value = b.dataset.rptUse;
+      const d = $("rptDrafter"); if (d) d.scrollIntoView({ behavior: "smooth", block: "start" });
+      const c = $("rptClient"); if (c) setTimeout(() => c.focus(), 400);
+    }));
+  } catch (e) {
+    box.innerHTML = '<span style="color:var(--coral)">Could not load the templates: ' + esc(String(e.message || e)) + ". They are built by scripts/report-templates and deployed with the desk.</span>";
+  }
+}
+
 function wireReportDrafter(){
+  loadReportTemplates();
   const go = $("rptGo"); if (!go) return;
   const read = $("rptRead");
   if (read) read.addEventListener("click", async () => {
