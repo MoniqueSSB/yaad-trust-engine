@@ -1,4 +1,4 @@
--- Proof of the rules 20260928235000 added for a report on every service.
+-- Proof of the rules 20260929001000 added for a report on every service.
 --
 -- WHAT IS BEING PROVED.
 --   * The three new kinds exist, and a made-up kind is refused.

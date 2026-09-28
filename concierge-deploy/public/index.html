@@ -224,6 +224,36 @@ tr.unpriced td{background:rgba(245,158,11,.07)}
 .dlvbox p{margin:4px 0 0}
 .dlvgrid .dk,.dlvbox .dk{display:block;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
 @media (max-width:560px){.dlvgrid{grid-template-columns:1fr}.dlvrail span{font-size:10px}}
+.dlvst.now{color:var(--mango)}
+.dlvst.now i{background:rgba(245,158,11,.16);border-color:transparent;color:var(--mango)}
+.qpjob{margin:0 0 12px;font-size:14px}.qpjob .dk{display:block;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
+.qpbig{font-family:var(--disp,Georgia);font-size:26px;line-height:1.1;margin:2px 0 8px}
+.qpbig.ok{color:var(--tealb)}.qpbig.warn{color:var(--mango)}.qpbig.crit{color:var(--coral)}
+.qpmeter{height:6px;border-radius:99px;background:var(--panel2);overflow:hidden;margin-bottom:8px}
+.qpmeter i{display:block;height:100%;border-radius:99px}.qpmeter i.ok{background:var(--tealb)}.qpmeter i.warn{background:var(--mango)}.qpmeter i.crit{background:var(--coral)}
+.qpchecks{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.qpsecs{display:flex;align-items:center;gap:4px;margin-top:6px}
+.qpsecs i{width:22px;height:8px;border-radius:3px;background:var(--panel2)}.qpsecs i.on{background:var(--tealb)}
+.qpsecs span{margin-left:8px;color:var(--mute);font-size:12px}
+.qpstages{display:flex;gap:3px;height:14px;margin-top:6px}.qpstages i{border-radius:4px}
+.qpkeys{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:12px;color:var(--mute)}
+.qpe label{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+.qpe-sec{margin-bottom:16px}
+.qpe textarea,.qpe input{width:100%;box-sizing:border-box}
+.qpe-two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:560px){.qpe-two{grid-template-columns:1fr}}
+.qpe-line{display:flex;gap:6px;margin-bottom:6px}
+.qpe-x{flex:none;width:30px;border:1px solid var(--line2);background:transparent;color:var(--dim);border-radius:8px;cursor:pointer;font-size:16px}
+.qpe-x:hover{color:var(--coral);border-color:var(--coral)}
+.qpe-add{border:1px dashed var(--line2);background:transparent;color:var(--tealb);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px}
+.qpe-stage{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px}
+.qpe-stagehd{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.qpe-n{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:rgba(196,170,255,.16);color:var(--tealb);font-weight:700;font-size:12px}
+.qpe-pc{flex:none;display:flex;align-items:center;gap:4px;color:var(--mute)}.qpe-pc input{width:64px}
+.qpe-total{letter-spacing:.05em}
+.qpe-found{border:1px solid rgba(248,113,113,.3);background:rgba(248,113,113,.05);border-radius:12px;padding:10px 12px;margin-bottom:14px;font-size:13px;line-height:1.8}
+.qpe .qpe-hit{outline:2px solid var(--coral);outline-offset:1px}
+.qpkeys b{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:middle}
 .alert.warn{background:rgba(245,158,11,.06);border-color:rgba(245,158,11,.28)}
 .alert.ok{background:rgba(196,170,255,.05);border-color:rgba(196,170,255,.24)}
 .alert .ic{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;flex:0 0 auto;font-size:12px;font-weight:700}
@@ -1614,6 +1644,8 @@ const TONE = {
   sent:"warn", accepted:"ok", rejected:"mute", withdrawn:"mute",
   // invoices / packs
   draft:"warn", paid:"ok", void:"mute", issued:"ok", failed:"crit", ready:"ok", approved:"ok",
+  // add-ons on a booked job (20260928235000); with_worker is already above
+  with_client:"warn", agreed:"warn", signed_off:"ok",
   // calls / waitlist
   // reports. reviewed is amber, not grey: it has been read and still is not
   // with the client, so it is outstanding rather than finished.
@@ -1829,7 +1861,7 @@ const VIEWS = [
         args:(r, v) => ({ p_report:r.id, p_ord:Number(v.ord), p_severity:v.severity }),
         says:r => `Rates one of the ${r.findings} findings on this report in your name, stamped with your email and the time. Nothing drafts this and nothing ever will: it is the professional judgment the client paid for.` },
       // The three decisions a model never drafts, typed into reports.human by
-      // set_report_human() (20260928235000): a result, the month's status,
+      // set_report_human() (20260929001000): a result, the month's status,
       // and money. Only on the services that carry each.
       { label:"Type the result", cls:"",
         when:r => r.status !== "issued" && (r.kind === "technical_signoff" || r.kind === "pm_stage"),
@@ -1889,12 +1921,12 @@ const VIEWS = [
   // the worker with the reason.
   { k:"completion", g:"Documents & money", label:"Completion reports", icon:"doc",
     title:"Completion reports", table:"v_completion_reports",
-    sub:"Every finished job and where its Completion Report is. It runs on its own: when a job completes the report opens for the worker with drafted care notes, they change the words and sign, an automatic check for money and banned words either sends it to the client or holds it for you. It is the worker's document and nothing here edits it. You step in when something goes wrong: a report that did not start, a held report, or a dispute. Send it back to the worker with your reason and they correct it and sign again.",
+    sub:"Every finished job and where its Completion Report is. It runs on its own: when a job completes the report opens for the worker with drafted care notes, they change the words and sign (or raise an issue instead), an automatic check for money and banned words either sends it to the client or holds it for you. It is the worker's document and nothing here edits it. You step in when something goes wrong: a report that did not start, a held report, or a dispute. Send it back to the worker with your reason and they correct it and sign again.",
     select:"*",
     order:"job_updated_at",
     search:["id","title","client_name","worker_name","parish"],
     titleOf: r => "Completion Report, " + r.id,
-    viz:{ date:"job_updated_at", state:"report_status", want:r => !r.is_test && ["not_started","held"].includes(r.report_status), wants:"real, needs you" },
+    viz:{ date:"job_updated_at", state:"report_status", want:r => !r.is_test && ["not_started","held","worker_raised"].includes(r.report_status), wants:"real, needs you" },
     hide:["sign_code","is_test"],
     empty:["No finished jobs yet","A job lands here the moment its last stage is approved, and its report starts on its own."],
     cols:[
@@ -1919,7 +1951,7 @@ const VIEWS = [
         args:(r, v) => { crRemember_(v.name); return { p_job:r.id, p_name:v.name }; },
         says:r => `Held for: ${r.hold_reason || "not recorded"}. Read the report first (Open the report). Releasing sends it to the client exactly as ${r.worker_signed_name || "the worker"} signed it. The report says "Released by Yaadly"; your name is kept only in Yaadly's own record. If the words need to change, do not release: send it back instead.` },
       { label:"Send it back to the worker", cls:"",
-        when:r => ["worker_signed","held","issued"].includes(r.report_status),
+        when:r => ["worker_signed","held","worker_raised","issued"].includes(r.report_status),
         rpc:"return_completion_report",
         ask:[
           { k:"reason", label:"What they need to change, in your words. They read this.", type:"long",
@@ -1927,7 +1959,8 @@ const VIEWS = [
           { k:"name", label:"Your name, for Yaadly's own record (never shown to the worker)", from:() => crName_() },
         ],
         args:(r, v) => { crRemember_(v.name); return { p_job:r.id, p_reason:v.reason, p_name:v.name }; },
-        says:r => `The report goes back to ${r.worker_name || "the worker"} with your reason, from Yaadly, as a new revision with a new link, sent to them automatically. Their signature is cleared${r.report_status === "issued" ? " and the client stops seeing the report until they sign again" : ""}. You do not change a word: they do.` },
+        says:r => (r.report_status === "worker_raised" ? `${r.worker_name || "The worker"} raised: \u201c${r.worker_issue || ""}\u201d. Your answer goes to them as the reason. ` : "")
+          + `The report goes back to ${r.worker_name || "the worker"} with your reason, from Yaadly, as a new revision with a new link, sent to them automatically. Their signature is cleared${r.report_status === "issued" ? " and the client stops seeing the report until they sign again" : ""}. You do not change a word: they do.` },
       { label:"Screen it again", cls:"g",
         when:r => r.report_status === "worker_signed",
         says:() => "The worker signed but the automatic check has not run, or its answer was lost. This runs it again: clean goes to the client, anything found holds it for you.",
@@ -2510,9 +2543,42 @@ const VIEWS = [
         says:r => `Approves ${r.id} in your name, which is what makes it readable in the client's portal. The database refuses this if the payment stages do not total exactly 100 percent; that refusal is the gate working.` },
     ]},
 
+  // Extra work on a booked job, 28 Sep 2026 (20260928235000). The client
+  // writes it, the worker accepts, changes or turns it down, both agree the
+  // same version; its invoice is then DRAFTED here on Invoices for you to send.
+  // The one decision on this page is sign-off, and it is yours: once the
+  // add-on's invoice is paid and its photos are in, Sign off raises the
+  // worker's pay (the amount less 5%) and, on "half now, half later" terms,
+  // drafts the second invoice. A job cannot complete while any add-on is
+  // still open or agreed and not signed off.
+  { k:"addons", g:"Documents & money", label:"Add-ons", icon:"doc",
+    title:"Add-ons", table:"job_addons",
+    sub:"Extra work on booked jobs, written by the client and agreed by both sides. Agreeing drafts the add-on's invoice on Invoices; sending it and marking it paid are still yours. Sign off here once it is paid and the photos show the work. A job cannot complete while an add-on is open.",
+    select:"id,job_id,rev,scope,amount_jmd,terms,status,last_edit_side,written_by,agreed_at,signed_off_at,signed_off_by,closed_reason,history,created_at,updated_at",
+    order:"updated_at", search:["job_id","scope","written_by"], hide:["history"],
+    viz:{ want:r => r.status === "agreed", wants:"agreed, waiting on the work and your sign-off" },
+    empty:["No add-ons yet","An add-on appears when a client adds extra work to a booked job from their portal."],
+    detailTop: r => addonStory_(r), foldFields:true, afterOpen: addonAfterOpen_,
+    titleOf: r => "Add-on on " + r.job_id,
+    cols:[
+      {h:"Job", f:r => id_(r.job_id) + sub_("version " + r.rev)},
+      {h:"Extra work", f:r => said_(r.scope)},
+      {h:"Amount", f:r => esc(jmdFmt(r.amount_jmd)) + sub_(r.terms === "in_full" ? "in full" : "half now, half later")},
+      {h:"State", f:r => chip_(TONE[r.status] || "mute", ADDON_STATE[r.status] || r.status)},
+      {h:"Signed off", f:r => r.signed_off_at ? esc(r.signed_off_by || "") + sub_(ago_(r.signed_off_at)) : mute_("not yet")},
+      {h:"Updated", f:r => mute_(ago_(r.updated_at))},
+    ],
+    actions:[
+      { label:"Sign off", cls:"",
+        when:r => r.status === "agreed",
+        rpc:"sign_off_addon",
+        args:(r) => ({ p_addon:r.id }),
+        says:r => `Signs off ${r.job_id}'s add-on in your name, on the photos above. It raises the worker's pay at the agreed amount less 5% (${jmdFmt(r.amount_jmd - Math.round(r.amount_jmd * 0.05))}) for you to pay from Pay workers${r.terms === "in_full" ? "" : ", and drafts the second half of the client's invoice"}. Refused if the add-on's invoice is not marked paid or no photos have been filed.` },
+    ]},
+
   { k:"qpd", g:"Documents & money", label:"Quote Pack Drafts", icon:"doc",
     title:"Quote Pack Drafts", table:"quote_pack_drafts",
-    sub:"Yaadly's own starting draft for a worker's quote, written for every open, unassigned job. A guardrail-clean draft is approved automatically and folds into whichever quote the worker actually submits; a dirty one is held here, exactly as it was written, until a named human clears it or a fresh draft replaces it. Nothing here is client-facing on its own.",
+    sub:"Yaadly's own starting draft for a worker's quote, written for every open, unassigned job. Every draft waits here for a named human to approve it, clean or not (auto-approval stopped on 4 September 2026); a flagged one cannot be approved until its wording is corrected. Open one for the picture of where it stands, correct it section by section, or open the pack as a PDF. Nothing here is client-facing on its own.",
     select:"id,job_id,status,model,docs,guardrail,error,approved_by,approved_at,created_at,finished_at",
     order:"created_at", search:["id","job_id"], hide:["docs"],
     // Only a draft at ready is waiting on you. Approved cleared itself and
@@ -2520,7 +2586,7 @@ const VIEWS = [
     // Without this the page led with the number of rows it had read.
     viz:{ want:r => r.status === "ready", wants:"held for a person" },
     empty:["No drafts yet","A draft is written when yaad-quote-pack-check finds a live, unassigned job with none yet."],
-    detailExtra: r => `<div class="dfield"><span class="dk">documents</span><div class="reqlist" style="margin-top:0">${qpDocsHtml(r.docs)}</div></div>`,
+    detailTop: qpStory_, foldFields:true, afterOpen: qpAfterOpen_,
     cols:[
       {h:"Draft", f:r => id_(r.id) + sub_(r.model || "not recorded")},
       {h:"Job", f:r => r.job_id ? id_(r.job_id) : mute_("none")},
@@ -2543,13 +2609,7 @@ const VIEWS = [
         says:() => "Marks this draft approved. A worker writing a quote on this job sees it as the starting point for their own scope, timeline and payment stages the moment they open the form. Refused outright if the guardrail still flags price or banned language: fix the draft or wait for a fresh one first." },
 
       { label:"Correct the wording", cls:"g", when:r => r.status === "ready",
-        ask:[
-          { k:"docs", label:"The pack. Correct the wording, keep the shape.", type:"long",
-            from:r => JSON.stringify(r.docs, null, 2) },
-          { k:"note", label:"Why (optional, kept on the row)",
-            placeholder:"\"fully covered\" was about paint, not about cover" },
-        ],
-        call: deskRescanPack,
+        form: qpEditForm_,
         says:r => `Re-checks this pack with the same rule the drafter uses. It clears nothing: if the wording still trips the guardrail it stays flagged and Approve still refuses it. Nothing is sent to anybody, and no model is called.` },
     ]},
 
@@ -5898,6 +5958,319 @@ const QP_DOCS = [
 ];
 const qpDocsHtml = docs => docsListHtml(QP_DOCS, docs);
 
+const ADDON_STATE = { with_worker:"waiting on the worker", with_client:"waiting on the client", agreed:"agreed", signed_off:"signed off", declined:"turned down", withdrawn:"withdrawn" };
+
+// An add-on's drawer: where it stands, what each side gets, its invoices and
+// the photos filed on it, which are what sign-off is judged on.
+function addonStory_(r){
+  const fee = Math.round(r.amount_jmd * 0.15), pay = r.amount_jmd - Math.round(r.amount_jmd * 0.05);
+  const step = { with_worker:1, with_client:1, agreed:2, signed_off:4 }[r.status] || 0;
+  const steps = ["Written by the client", "Agreed by both", "Paid and photographed", "Signed off"];
+  const rail = `<div class="dlvrail">` + steps.map((t, i) => {
+    const n = i + 1, closed = r.status === "declined" || r.status === "withdrawn";
+    const cls = closed && n === 2 ? "stop" : n <= step ? "done" : "";
+    return `<div class="dlvst ${cls}" data-addon-step="${n}"><i>${cls === "stop" ? "&times;" : n <= step ? "&#10003;" : ""}</i><span>${esc(t)}</span></div>`;
+  }).join("") + `</div>`;
+  const wait = r.status === "with_worker" ? "Waiting on the worker" : r.status === "with_client" ? "Waiting on the client" : "";
+  return `<div class="dlvstory">` + rail
+    + `<div class="dlvgrid">`
+    + `<div><span class="dk">Job</span><div>${id_(r.job_id)} ${sub_("version " + r.rev + (wait ? ", " + wait.toLowerCase() : ""))}</div></div>`
+    + `<div><span class="dk">Money</span><div>Client pays <b>${esc(jmdFmt(r.amount_jmd + fee))}</b> ${sub_(jmdFmt(r.amount_jmd) + " + 15%")}<br>Worker is paid <b>${esc(jmdFmt(pay))}</b> ${sub_("less 5%")}</div></div>`
+    + `</div>`
+    + `<div class="dlvbox"><span class="dk">The extra work</span><p style="white-space:pre-wrap">${esc(r.scope)}</p><p class="mute">${r.terms === "in_full" ? "Paid in full before the work starts." : "Half before the work starts, half once it is signed off."}</p></div>`
+    + `<div class="dlvbox"><span class="dk">Invoices</span><div data-addon-inv>${mute_("Reading…")}</div></div>`
+    + `<div class="dlvbox"><span class="dk">Photos filed on this add-on</span><div data-addon-ev>${mute_("Reading…")}</div></div>`
+    + (r.closed_reason ? `<div class="dlvbox"><span class="dk">Reason given</span><p>${esc(r.closed_reason)}</p></div>` : "")
+    + `</div>`;
+}
+
+async function addonAfterOpen_(r, el){
+  const inv = el.querySelector("[data-addon-inv]"), ev = el.querySelector("[data-addon-ev]");
+  const { data: invs, error: e1 } = await sb.from("invoices").select("id,status,total_pence,payable_to,period_label").eq("addon_id", r.id).order("id");
+  if (inv) inv.innerHTML = e1 ? esc(e1.message) : (invs || []).length
+    ? (invs || []).map(i => `<div>${id_(i.id)} ${esc(i.period_label || "")} &middot; ${esc(jmdFmt(i.total_pence || 0))} ${tone_(i.status)}</div>`).join("")
+    : mute_(r.status === "agreed" || r.status === "signed_off" ? "None found" : "None until both sides agree");
+  const { data: rows, error: e2 } = await sb.from("job_addon_evidence").select("storage_path,label,filed_by,created_at").eq("addon_id", r.id).order("created_at");
+  if (!ev) return;
+  if (e2) { ev.textContent = e2.message; return; }
+  if (!(rows || []).length) { ev.innerHTML = mute_("None yet. Sign-off is refused until there are some."); return; }
+  // Step 3 of the rail is a fact about other tables, so it is ticked here.
+  const paid = (invs || []).some(i => i.payable_to !== "worker" && i.status === "paid");
+  const s3 = el.querySelector('[data-addon-step="3"]');
+  if (paid && s3 && r.status === "agreed") { s3.classList.add("done"); s3.querySelector("i").innerHTML = "&#10003;"; }
+  // Downloaded, then shown from a blob: the desk's Content-Security-Policy
+  // allows img-src 'self' data: blob: only, so a signed URL would be refused.
+  const urls = await Promise.all(rows.map(async x => {
+    const got = await sb.storage.from("evidence").download(x.storage_path);
+    return got.data ? URL.createObjectURL(got.data) : null;
+  }));
+  ev.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">` + rows.map((x, i) => {
+    const u = urls[i];
+    return `<a href="${esc(u || "#")}" target="_blank" rel="noopener" style="display:block;width:120px;font-size:11px;color:var(--mute)">`
+      + (u ? `<img src="${esc(u)}" alt="" style="width:120px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">` : "")
+      + `<div>${esc(x.label || "No label")}</div><div>${esc(ago_(x.created_at))} ago</div></a>`;
+  }).join("") + `</div>`;
+}
+
+// The top of a quote pack drawer, a picture rather than a list of dates.
+// Four steps, filled to where the draft got; then how long it has waited on
+// you, what the two checks found, and the shape of the pack itself. The raw
+// columns are still there, folded under it. Added 28 Sep 2026.
+const QP_STAGE_COLS = ["#9B73F5", "#C4AAFF", "#7C55E6", "#DCCBFF", "#6A4BC4", "#B39DFF"];  // purples only: gold and coral mean waiting and blocked here
+function qpShape_(docs){
+  const d = docs || {};
+  const present = QP_DOCS.filter(([k]) => docText(d[k]).trim().length > 0).length;
+  const stages = Array.isArray(d.payment_stages) ? d.payment_stages : [];
+  const total = stages.reduce((t, x) => t + (Number(x && x.proportion_percent) || 0), 0);
+  return { present, stages, total };
+}
+function qpStory_(r){
+  const g = r.guardrail || {};
+  const flags = [];
+  if (g.price_language_detected) flags.push("Price language");
+  if (g.banned_language_detected) flags.push("Banned words");
+  const failed = r.status === "failed";
+  const approved = r.status === "approved";
+  const at = failed ? 1 : flags.length ? 2 : approved ? 4 : 3;
+  const steps = ["Drafted", "Checked for prices and banned words", "Your review", "Workers can see it"];
+  const rail = `<div class="dlvrail">` + steps.map((t, i) => {
+    const n = i + 1;
+    let cls = "", mark = "";
+    if (failed && n === 1) { cls = "stop"; mark = "&times;"; }
+    else if (flags.length && n === 2) { cls = "stop"; mark = "&times;"; }
+    else if (n < at || (approved && n === 4)) { cls = "done"; mark = "&#10003;"; }
+    else if (n === at && !failed && !flags.length) { cls = "now"; mark = "&bull;"; }
+    return `<div class="dlvst ${cls}"><i>${mark}</i><span>${esc(t)}</span></div>`;
+  }).join("") + `</div>`;
+
+  // Waiting: the same thresholds the Overview uses for a held pack.
+  const since = r.finished_at || r.created_at;
+  const hrs = since ? (Date.now() - new Date(since).getTime()) / 3600e3 : 0;
+  const tone = hrs >= 72 ? "crit" : hrs >= 24 ? "warn" : "ok";
+  const fill = Math.min(100, Math.round(100 * hrs / 72));
+  const wait = approved
+    ? `<div class="qpbig">Approved</div><div class="sub">${esc(ago_(r.approved_at))} ago by ${esc(r.approved_by || "unknown")}</div>`
+    : failed
+    ? `<div class="qpbig">Drafting failed</div><div class="sub">The next run tries again. ${esc(r.error || "")}</div>`
+    : `<div class="qpbig ${tone}">${esc(ago_(since) || "just now")}</div>`
+      + `<div class="qpmeter"><i class="${tone}" style="width:${fill}%"></i></div>`
+      + `<div class="sub">${hrs >= 24 ? "The job cannot be quoted until this is cleared." : "Held jobs turn gold at 24 hours and red at 72."}</div>`;
+
+  const checks = failed ? mute_("not run")
+    : `<div class="qpchecks">`
+      + `<span class="chip ${g.price_language_detected ? "crit" : "ok"} dot">${g.price_language_detected ? "Price language found" : "No prices"}</span>`
+      + `<span class="chip ${g.banned_language_detected ? "crit" : "ok"} dot">${g.banned_language_detected ? "Banned words found" : "No banned words"}</span>`
+      + `</div><div class="sub" style="margin-top:6px">A word scan only. Whether the scope and stages are right is your call.</div>`;
+
+  const { present, stages, total } = qpShape_(r.docs);
+  const blocks = QP_DOCS.map(([k, lab]) =>
+    `<i class="${docText((r.docs || {})[k]).trim() ? "on" : ""}" title="${esc(lab)}"></i>`).join("");
+  const bar = stages.length
+    ? `<div class="qpstages">` + stages.map((x, i) =>
+        `<i style="flex:${Number(x.proportion_percent) || 0};background:${QP_STAGE_COLS[i % QP_STAGE_COLS.length]}" title="${esc(x.stage)}: ${esc(String(x.proportion_percent))}%"></i>`).join("") + `</div>`
+      + `<div class="qpkeys">` + stages.map((x, i) =>
+        `<span><b style="background:${QP_STAGE_COLS[i % QP_STAGE_COLS.length]}"></b>${esc(x.stage)} ${esc(String(x.proportion_percent))}%</span>`).join("") + `</div>`
+    : mute_("No payment stages written.");
+
+  return `<div class="dlvstory">`
+    + rail
+    + `<div class="qpjob"><span class="dk">Job</span><div><b data-qp-title>${esc(r.job_id || "No job")}</b> <span class="sub" data-qp-where></span></div></div>`
+    + `<div class="dlvgrid">`
+    + `<div class="dlvbox" style="margin-top:0"><span class="dk">${approved || failed ? "Outcome" : "Waiting on you"}</span>${wait}</div>`
+    + `<div class="dlvbox" style="margin-top:0"><span class="dk">Checks</span>${checks}</div>`
+    + `</div>`
+    + `<div class="dlvbox"><span class="dk">The pack</span>`
+    + `<div class="qpsecs">${blocks}<span>${present} of ${QP_DOCS.length} sections written</span></div>`
+    + `<div class="dk" style="margin-top:12px">Payment stages, ${stages.length} ${total === 100 ? "&middot; total 100%" : `&middot; <span style="color:var(--coral)">total ${total}%, should be 100</span>`}</div>`
+    + bar
+    + `<div class="brow" style="margin-top:14px"><button class="btn" data-qp-pdf>Open the pack as a PDF</button></div>`
+    + `</div>`
+    + `</div>`;
+}
+
+async function qpAfterOpen_(r, el){
+  const btn = el.querySelector("[data-qp-pdf]");
+  if (btn) btn.addEventListener("click", () => openQuotePackDocument(r).catch(e => alert(e.message)));
+  if (!r.job_id) return;
+  const { data: job } = await sb.from("jobs").select("id,title,parish").eq("id", r.job_id).maybeSingle();
+  if (!job) return;
+  const t = el.querySelector("[data-qp-title]"), w = el.querySelector("[data-qp-where]");
+  if (t) t.textContent = job.title || job.id;
+  if (w) w.textContent = [job.parish, job.id].filter(Boolean).join(" · ");
+}
+
+// Correcting a held quote pack, section by section. The words the check found
+// are named at the top and marked on every box that still holds them, live,
+// as you type. Saving re-runs the same check the drafter uses; it clears
+// nothing and approves nothing. Approve is still its own button.
+function qpEditForm_(k, a, row, btn){
+  const d = row.docs || {};
+  const g = row.guardrail || {};
+  const found = [].concat(g.banned_samples || [], g.samples || []).map(String).filter(Boolean);
+  const lines = (v) => (Array.isArray(v) ? v : []).map(x => docText(x));
+  const stages = Array.isArray(d.payment_stages) ? d.payment_stages : [];
+
+  const lineRow = (list, v) => `<div class="qpe-line"><input data-list="${list}" value="${esc(v)}"><button type="button" class="qpe-x" title="Remove this line">&times;</button></div>`;
+  const stageCard = (x, i) => `<div class="qpe-stage" data-stage>
+      <div class="qpe-stagehd"><span class="qpe-n">${i + 1}</span><input data-f="stage" value="${esc(x.stage || "")}" placeholder="Stage name">
+        <span class="qpe-pc"><input data-f="pc" type="number" min="0" max="100" value="${esc(String(x.proportion_percent ?? ""))}">%</span>
+        <button type="button" class="qpe-x" title="Remove this stage">&times;</button></div>
+      <textarea data-f="ev" rows="2" placeholder="What has to be filed and signed off before this stage completes">${esc(x.evidence_note || "")}</textarea>
+    </div>`;
+
+  $("drwMsg").innerHTML = `<div class="card qpe" style="margin-top:12px">
+      ${found.length
+        ? `<div class="qpe-found"><b>The check flagged:</b> ${found.map(w => `<span class="chip crit">${esc(w)}</span>`).join(" ")}<br><span class="mute">Boxes that still contain a flagged word are outlined in red.</span></div>`
+        : `<p class="mute" style="margin:0 0 12px">Nothing is flagged on this draft. Correct anything that reads wrong for the job.</p>`}
+      <div class="qpe-sec"><label>Scope</label><textarea data-sec="scope_summary" rows="5">${esc(docText(d.scope_summary))}</textarea></div>
+      <div class="qpe-two">
+        <div class="qpe-sec"><label>Included</label><div data-listbox="included">${lines(d.included).map(v => lineRow("included", v)).join("")}</div><button type="button" class="qpe-add" data-add="included">+ Add a line</button></div>
+        <div class="qpe-sec"><label>Not included</label><div data-listbox="excluded">${lines(d.excluded).map(v => lineRow("excluded", v)).join("")}</div><button type="button" class="qpe-add" data-add="excluded">+ Add a line</button></div>
+      </div>
+      <div class="qpe-sec"><label>Rough timeline</label><textarea data-sec="rough_timeline" rows="3">${esc(docText(d.rough_timeline))}</textarea></div>
+      <div class="qpe-sec"><label>Payment stages <span class="qpe-total" id="qpeTotal"></span></label><div id="qpeStages">${stages.map(stageCard).join("")}</div><button type="button" class="qpe-add" id="qpeAddStage">+ Add a stage</button></div>
+      <div class="qpe-sec"><label>Why you changed it (optional, kept on the draft)</label><input id="qpeNote" maxlength="300" placeholder="&quot;fully covered&quot; was about paint, not about cover"></div>
+      <div class="brow" style="margin-top:12px">
+        <button class="btn" id="qpeGo">Save and check again</button>
+        <button class="btn g" id="qpeNo">Leave it</button>
+      </div>
+      <p class="conseq" style="margin-top:8px">Saving re-runs the same word check. It does not approve the pack and sends nothing to anybody.</p>
+      <div id="askMsg"></div>
+    </div>`;
+  btn.disabled = true;
+  const box = $("drwMsg");
+
+  const renumber = () => box.querySelectorAll("[data-stage] .qpe-n").forEach((n, i) => { n.textContent = i + 1; });
+  const mark = () => {
+    const re = found.length ? new RegExp(found.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "i") : null;
+    box.querySelectorAll("input,textarea").forEach(el => el.classList.toggle("qpe-hit", !!(re && el.id !== "qpeNote" && re.test(el.value))));
+    const tot = [...box.querySelectorAll('[data-f="pc"]')].reduce((t, el) => t + (Number(el.value) || 0), 0);
+    $("qpeTotal").className = "chip " + (tot === 100 ? "ok" : "crit");
+    $("qpeTotal").textContent = "total " + tot + "%" + (tot === 100 ? "" : ", needs 100");
+  };
+  box.addEventListener("input", mark);
+  box.addEventListener("click", (e) => {
+    const t = e.target;
+    if (t.classList.contains("qpe-x")) { (t.closest(".qpe-line") || t.closest("[data-stage]")).remove(); renumber(); mark(); }
+    if (t.dataset.add) { box.querySelector(`[data-listbox="${t.dataset.add}"]`).insertAdjacentHTML("beforeend", lineRow(t.dataset.add, "")); mark(); }
+    if (t.id === "qpeAddStage") { $("qpeStages").insertAdjacentHTML("beforeend", stageCard({}, box.querySelectorAll("[data-stage]").length)); mark(); }
+  });
+  mark();
+
+  $("qpeNo").addEventListener("click", () => { box.innerHTML = ""; btn.disabled = false; });
+  $("qpeGo").addEventListener("click", async () => {
+    const list = (name) => [...box.querySelectorAll(`[data-list="${name}"]`)].map(el => el.value.trim()).filter(Boolean);
+    const docs = Object.assign({}, d, {
+      scope_summary: box.querySelector('[data-sec="scope_summary"]').value.trim(),
+      included: list("included"),
+      excluded: list("excluded"),
+      rough_timeline: box.querySelector('[data-sec="rough_timeline"]').value.trim(),
+      payment_stages: [...box.querySelectorAll("[data-stage]")].map(c => ({
+        stage: c.querySelector('[data-f="stage"]').value.trim(),
+        proportion_percent: Number(c.querySelector('[data-f="pc"]').value) || 0,
+        evidence_note: c.querySelector('[data-f="ev"]').value.trim(),
+      })).filter(x => x.stage || x.evidence_note),
+    });
+    $("askMsg").innerHTML = `<div class="msg ok"><span class="spin"></span>Checking.</div>`;
+    try { await deskRescanPack(row, { docs: JSON.stringify(docs), note: $("qpeNote").value }); }
+    catch (e) { $("askMsg").innerHTML = `<div class="msg err"><b>Not cleared.</b><br>${esc(e.message || String(e))}</div>`; return; }
+    await loadTableView(k);
+    closeDrawer();
+  });
+}
+
+// The pack as a document: same print route as the report, "Print, then
+// choose Save as PDF", so no PDF library and nothing leaves the browser.
+async function openQuotePackDocument(r){
+  const w = window.open("", "_blank");
+  if (!w) throw new Error("The browser blocked the new tab. Allow pop-ups for the desk and try again.");
+  w.document.write("<p style='font:15px sans-serif;padding:24px'>Building the document.</p>");
+  let job = null;
+  if (r.job_id) ({ data: job } = await sb.from("jobs").select("id,title,parish,trades").eq("id", r.job_id).maybeSingle());
+  w.document.open(); w.document.write(quotePackDocumentHtml(r, job)); w.document.close();
+  w.document.title = "Quote pack, " + (r.job_id || r.id);
+}
+
+function quotePackDocumentHtml(r, job){
+  const d = r.docs || {};
+  const paras = (v) => docText(v).split(/\n\s*\n/).map(p => p.trim()).filter(Boolean).map(p => `<p>${esc(p)}</p>`).join("");
+  const list = (a) => (Array.isArray(a) ? a : []).map(x => `<li>${esc(docText(x))}</li>`).join("");
+  const stages = Array.isArray(d.payment_stages) ? d.payment_stages : [];
+  const approved = r.status === "approved";
+  const dateOf = (s) => s ? new Date(s).toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" }) : "";
+  return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><title>Quote pack, ${esc(r.job_id || r.id)}</title>
+<style>
+:root{--ink:#15161c;--mute:#5c6070;--line:#dcdde5;--wash:#f7f7fa;--mango:#c77a17;--teal:#0f6b63;--coral:#b3372f;
+--disp:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--body:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+@page{size:A4;margin:18mm 16mm 18mm}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);background:#fff;font-family:var(--body);font-size:10.6pt;line-height:1.55;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.wrap{max-width:178mm;margin:0 auto;padding:12mm 0 20mm}
+.printbar{position:fixed;top:14px;right:14px;z-index:9;display:flex;gap:8px;align-items:center;font:600 12px var(--body)}
+.printbar button{font:600 13px var(--body);padding:9px 14px;border-radius:8px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer}
+.printbar span{color:var(--mute);background:#fff;padding:6px 10px;border:1px solid var(--line);border-radius:8px}
+.head{display:flex;align-items:center;gap:10px;border-bottom:1.6pt solid var(--ink);padding-bottom:8px;margin-bottom:9mm}
+.head img{width:11mm;height:11mm;object-fit:contain}.head .wm{font-family:var(--disp);font-size:18pt}.head .wm span{color:var(--mango)}
+.head .ref{margin-left:auto;font:600 7.6pt/1.5 var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--mute);text-align:right}
+.kicker{font:600 8pt/1 var(--mono);text-transform:uppercase;letter-spacing:.14em;color:var(--mango);margin-bottom:8px}
+h1{font-family:var(--disp);font-weight:400;font-size:25pt;line-height:1.1;margin:0 0 8px}
+.lede{color:var(--mute);margin:0 0 16px;max-width:150mm}
+.stamp{display:inline-block;font:600 7.6pt/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--coral);border:1.2pt dashed var(--coral);border-radius:99px;padding:5px 10px;margin-bottom:16px}
+.stamp.ok{color:var(--teal);border-style:solid;border-color:var(--teal)}
+.meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px 18px;background:var(--wash);border:1pt solid var(--line);border-radius:2pt;padding:10px 14px;margin-bottom:18px}
+.meta dt{font:600 7.2pt/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--mute);margin:3px 0 2px}.meta dd{margin:0 0 3px;font-size:10pt}
+h2{font-family:var(--disp);font-weight:400;font-size:14.5pt;margin:20px 0 8px;padding-bottom:5px;border-bottom:1pt solid var(--line);break-after:avoid}
+p{margin:0 0 8px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+ul{margin:0;padding-left:17px}li{margin-bottom:5px}
+.in{border-left:2.5pt solid var(--teal);padding-left:10px}.ex{border-left:2.5pt solid var(--coral);padding-left:10px}
+table{width:100%;border-collapse:collapse;font-size:9.8pt;break-inside:avoid}
+th{font:600 7.2pt/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--mute);text-align:left;padding:0 8px 6px 0;border-bottom:1pt solid var(--line)}
+td{padding:8px 8px 8px 0;border-bottom:1pt solid var(--line);vertical-align:top}
+td.stg{font-weight:650;width:48mm}td.shr{width:18mm;font-weight:650}
+.note{margin-top:16px;border:1pt solid var(--line);border-left:3pt solid var(--mango);background:#fffaf0;padding:9px 12px;font-size:9.4pt;break-inside:avoid}
+.co{border:1pt solid var(--line);border-left:3pt solid var(--teal);border-radius:2pt;padding:10px 14px;break-inside:avoid}
+.co ol{margin:6px 0 0;padding-left:18px}.co li{margin-bottom:5px}
+footer{margin-top:22px;padding-top:9px;border-top:1pt solid var(--line);font-size:8.4pt;color:var(--mute)}
+@media print{.printbar{display:none}.wrap{max-width:none;padding:0}}
+</style></head><body>
+<div class="printbar"><span>Print, then choose Save as PDF</span><button onclick="window.print()">Print</button></div>
+<div class="wrap">
+<div class="head"><img src="${RPT_LOGO}" alt=""><div class="wm">Yaad<span>ly</span></div><div class="ref">Quote pack<br>${esc(r.job_id || r.id)}</div></div>
+<div class="kicker">For the tradesperson quoting this job</div>
+<h1>${esc((job && job.title) || "Quote pack")}</h1>
+<p class="lede">A starting overview for deciding whether and how to quote. Edit it to your own terms and add your own price when you send your quote.</p>
+<div><span class="stamp${approved ? " ok" : ""}">${approved ? "Approved " + esc(dateOf(r.approved_at)) : "Draft, not yet approved"}</span></div>
+<dl class="meta">
+  <div><dt>Location</dt><dd>${esc((job && job.parish) || "Not given")}</dd></div>
+  <div><dt>Trade</dt><dd>${esc((job && job.trades) || "Not given")}</dd></div>
+  <div><dt>Drafted</dt><dd>${esc(dateOf(r.created_at))}</dd></div>
+</dl>
+<h2>Scope</h2>${paras(d.scope_summary) || "<p>Not written.</p>"}
+<div class="two">
+  <div><h2>Included</h2><ul class="in">${list(d.included)}</ul></div>
+  <div><h2>Not included</h2><ul class="ex">${list(d.excluded)}</ul></div>
+</div>
+<h2>Rough timeline</h2>${paras(d.rough_timeline) || "<p>Not written.</p>"}
+<h2>Payment stages</h2>
+<table><thead><tr><th>Stage</th><th>Share</th><th>Evidence to be filed and signed off</th></tr></thead><tbody>
+${stages.map((x, i) => `<tr><td class="stg">${i + 1}. ${esc(x.stage || "Stage")}</td><td class="shr">${esc(String(x.proportion_percent ?? ""))}%</td><td>${esc(x.evidence_note || "")}</td></tr>`).join("")}
+</tbody></table>
+<h2>Work outside this scope</h2>
+<div class="co">
+<p>If something turns up that is not in this pack, stop before doing it and tell Yaadly, with photos, so the client can decide whether to add it on. Extra work is only paid once it has been agreed as an add-on.</p>
+<ol>
+<li><b>The client writes it.</b> A short scope summary of the extra work, the amount they are offering, and how they want to pay it. Unless they say otherwise, it is paid in full in one payment.</li>
+<li><b>You review it.</b> Accept it as written, edit the scope, the amount or the payment terms, or turn it down. If you edit it, it goes back to the client to accept. Nothing changes until you have both agreed the same version.</li>
+<li><b>It joins the job.</b> The agreed add-on goes on the job as its own invoice, counted in the job's total, with the payment terms you both agreed. The usual fees apply, the same as on the main job.</li>
+<li><b>The original stays as it was.</b> The agreed scope and payment stages above do not change. The add-on is signed off on its own evidence by a named person at Yaadly.</li>
+</ol>
+</div>
+<div class="note">Each stage completes when its evidence is filed and a named person at Yaadly has signed it off. Yaadly is the principal contractor: the client buys the job from Yaadly, and Yaadly engages and pays you under its own agreement with you.</div>
+<footer>Yaadly Ltd, company no. 17358077, England and Wales. yaadly.co.uk</footer>
+</div></body></html>`;
+}
+
 function panelKick(rows){ return heldDraftsHtml() + newestPackHtml(rows); }
 
 function newestPackHtml(rows){
@@ -6757,6 +7130,9 @@ async function runAction(k, a, row, btn){
   // It writes nothing, so there is nothing to confirm.
   if (a.nav) { closeDrawer(); return a.nav(row); }
   if (a.ask) return drawAsk(k, a, row, btn);
+  // A FORM action draws its own fields, for an edit a list of single boxes
+  // cannot express: a quote pack is bullets and staged rows, not one sentence.
+  if (a.form) return a.form(k, a, row, btn);
   // A READ action asks a question and shows the answer. It writes nothing, so
   // it skips the confirm (there is nothing to be sure about), leaves the
   // drawer open (the answer is the point) and does not reload the table
@@ -11000,6 +11376,7 @@ function crState_(r){
   if (s === "with_worker") return chip_("warn", "with the worker") + sub_(r.return_reason ? "sent back" : "to read and sign");
   if (s === "worker_signed") return chip_("warn", "signed, checking") + sub_("goes out in a moment");
   if (s === "held") return chip_("crit", "held for you") + sub_(r.hold_reason || "");
+  if (s === "worker_raised") return chip_("crit", "worker raised an issue") + sub_(r.worker_issue || "");
   if (s === "issued") return chip_("ok", "with the client") + sub_(r.issued_name ? "released by " + r.issued_name : "passed the check");
   return tone_(s);
 }
@@ -11010,8 +11387,8 @@ function crRemember_(n){ try { if (n) localStorage.setItem("yaad-desk-name", n);
 function crFirst_(name, fallback){ return String(name || "").trim().split(/\s+/)[0] || fallback; }
 
 function crWorkerMsg_(r){
-  const link = CR_APP + "/portal/jobs/" + encodeURIComponent(r.id) + "/completion?code=" + encodeURIComponent(r.sign_code || "");
-  return `Hello ${crFirst_(r.worker_name, "there")}, this is Yaadly. The Completion Report for job ${r.id} is ready for you to read and sign: ${link}\n\nIt is your document. Change the care notes or add your own account of the work if anything is wrong, then sign it.`;
+  const link = CR_APP + "/report/" + encodeURIComponent(r.id) + "?code=" + encodeURIComponent(r.sign_code || "");
+  return `Hello ${crFirst_(r.worker_name, "there")}, this is Yaadly. The Completion Report for job ${r.id} is ready. Open it here, no login needed: ${link}\n\nIt is your document: sign it, change your words first, or raise an issue if something is wrong.`;
 }
 
 async function crSend_(jobId, to, how, text){
@@ -11189,7 +11566,7 @@ function rptHumanCard(r){
 }
 
 // The two record only services are never rated: "They record. They do not
-// rate or advise." The database refuses a rating on them (20260928235000).
+// rate or advise." The database refuses a rating on them (20260929001000).
 function rptRated(kind){ return kind !== "visual_check" && kind !== "property_care"; }
 
 // The money lines a person types, per service. Keys must match the list in

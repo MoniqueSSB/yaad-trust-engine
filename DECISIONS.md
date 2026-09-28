@@ -6,6 +6,84 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-28 · Extra work on a booked job is an add-on, agreed by both sides and billed on its own
+
+Until today a booked job could not take extra work at all. `request_quote_change_as_me()` refuses a booked job and tells the client to message Yaadly, and nothing recorded what happened next, so hidden defects found once a job opened up were either done off the books or stopped the job. Monique set the rules on 28 September 2026:
+
+- **The client writes it:** a short scope, the amount they offer, and how it is paid. The default is paid in full, before the extra work starts. The one alternative is half now, half on sign-off.
+- **The worker accepts it, changes it, or turns it down.** A change goes back to the client, who can accept it, change it again, or withdraw. Nothing is booked until both sides have agreed the same revision. The revision number does the kickoff pack's confirmation-code job: an accept against a version the other side has since changed is refused.
+- **Fees are the same as the main job.** The client pays the agreed amount plus 15% on top, and the worker is paid the amount less 5%.
+- **It is billed as its own numbered invoice on the same job.** The job's own bill is never touched, sent or not.
+- **Nothing closes while extra work is open.** The job cannot complete while any add-on is still being agreed, or is agreed and not yet signed off.
+
+**Why not an extra stage.** The accepted quote's stages must total exactly 100% (`parse_payment_stages`), and `job_final_stage_count()` decides completion. A bolted-on stage breaks one or the other, so an add-on is its own record (`job_addons`) with its own agreements, evidence, invoices and sign-off.
+
+**What is automatic and what is a person.** Agreeing drafts the add-on's client invoice; drafting is paperwork. Everything with consequence stays a named human's click:
+
+- sending the invoice;
+- marking it paid;
+- signing off the add-on on its photos (`sign_off_addon`, admin only, stamped with the admin's email);
+- paying the worker (`mark_worker_paid`, which waits on every client invoice for that add-on).
+
+No model touches any of it and no price is suggested: the amount is what the two parties wrote (CLAUDE.md §5).
+
+**What had to change in five live functions, and only that.** An invoice with `addon_id` set is kept out of the job's own money:
+
+- `invoice_starts_job_default`: an add-on invoice never starts the job. Without this, a new stage-less invoice would have been taken for the Guarantee & Support bill.
+- `raise_job_client_invoice` and `raise_job_worker_payable`: an add-on invoice is never "the job's bill" or "the job's payable". Without this, an add-on payable raised before completion would have blocked the job's own payable for good.
+- `worker_pay_client_unpaid`: an add-on payable waits on its own client invoices, and the job's payable ignores them.
+- `sync_job_status`: carries the completion gate.
+
+Each body was read live with `pg_get_functiondef` and matched the repository before being restated. Add-on photos live in `job_addon_evidence`, not `evidence`, because the stage rules would otherwise count them as evidence for a stage. An add-on invoice cannot be split into parts (trigger), because its fee line would then be taken for the job's.
+
+**How it was tested.** No local database exists on this machine, so the migration ran in PGlite, an in-memory Postgres, with stand-ins for the tables that predate the migrations (`supabase/tests/pglite/`). All 61 checks pass. That proves the logic, not production's wiring. `supabase/tests/job_addons_guards.sql` checks the live wiring once the migration is applied.
+
+**Telling people, and the client's confirmation on WhatsApp** (the same day, on Monique's "build all"). A trigger on `job_addons` calls `yaad-notify-client` with the add-on id and revision, one message per recipient:
+
+- the worker when the client writes or changes one;
+- the client when the worker changes one;
+- both sides when it is agreed;
+- the other side when it is turned down or withdrawn;
+- the worker when its first invoice is paid, which is when the work may start.
+
+The function reads every word from the row. If the row has moved on since the trigger fired, it sends nothing.
+
+The client's message carries the add-on as a PDF (`yaad-addon-pdf`). That is a public GET, and its token is an HMAC of the add-on id and revision under the service role key, with its own context string so it cannot be swapped for a pay link. Replying `CONFIRM <code>` accepts that revision through `agree_addon_via_whatsapp()`, service role only, with the phone as the credential, as for quotes and the Completion Report. The code is new on every revision, so a reply to an older version finds nothing. It never contains the job id, so it can never be read as a stage approval by the later lanes of `yaad-inbound`.
+
+Monique's rule is "edits only done in portal", so WhatsApp can accept and nothing else. Changing, declining or writing an add-on is the portal.
+
+Known limit: a client outside WhatsApp's 24-hour window gets the email (with the PDF link) and SMS. No approved client template carries a PDF, and the template route cannot carry media at all.
+
+---
+
+## 2026-09-28 · A quote pack draft opens as a picture, prints as a PDF, and is corrected section by section
+
+Monique, looking at a quote pack draft on the desk: "this should be a pdf", the top of the drawer "should be a dashboard, visual one, not just date lines", and "correct the wording needs to be better as it is just a long file". She approved a clickable demo with invented data before the live file was touched.
+
+**The drawer.** It opens on a four-step track: drafted, checked for prices and banned words, your review, workers can see it. Below it are:
+
+- how long the draft has waited, using the same 24 and 72 hour thresholds as the Overview;
+- what the two word checks found;
+- how many of the five sections are written;
+- the payment stages as one bar split by percentage, with a warning if they do not total 100.
+
+The raw columns are folded underneath, not removed.
+
+**The PDF.** "Open the pack as a PDF" uses the same route as reports: a printable page in a new tab, then Print and Save as PDF. No PDF library, and nothing leaves the browser.
+
+Every pack carries fixed wording on work outside the scope, the add-on flow Monique set the same day. It is standard text, not model output, so it cannot drift job to job, and the guardrail never needs to read it.
+
+**Correct the wording.** The action is now a form:
+
+- a box for the scope and a box for the timeline;
+- one row per bullet under Included and Not included;
+- one card per payment stage, with a live total;
+- the flagged words named at the top, and outlined in any box that still holds one.
+
+It saves through the same `deskRescanPack`, so the rule is unchanged: saving re-runs the word check, approves nothing and sends nothing. `runAction` gained a `form` branch for an action that draws its own fields. The generic ask form can only hold single boxes.
+
+---
+
 ## 2026-09-28 · A pay invoice records the labour and the worker fee it was worked out from
 
 Monique asked for Yaadly's worker fee to show on the worker's pay invoice.
@@ -22,6 +100,37 @@ with the two columns added to their insert; the amounts are computed exactly
 as before. The HTML invoice, the PDF, the desk and the worker's portal all
 read those two columns. Pay raised earlier is not backfilled and shows no
 breakdown: no figure is better than a guessed one.
+
+---
+
+## 2026-09-28 · Before signing, the worker can change their words or raise an issue, by button, on WhatsApp or from the link
+
+Monique signed the test report from her own phone and then: "the only issue
+is there is no way to edit", "or raise and issue", "on whatsapp or portal",
+"fix that", "it should be a button". Offered a WhatsApp route or a link that
+opens without logging in, she chose both.
+
+**WhatsApp.** The worker's message is followed by three buttons (template
+`yaadly_sign_completion_report_v2`): Sign the report (payload: the job code),
+Change my words (`EDIT <code>`) and Raise an issue (`ISSUE <code>`). A tap on
+either of the last two is remembered for that phone in
+`completion_report_whatsapp_pending`, and the next message they type is taken
+as their account of the work (saved unsigned: they still press Sign) or as
+the issue. That lane runs ahead of every other worker lane in `yaad-inbound`,
+so their words are never filed as a work update. No "reply 1": buttons only.
+
+**The link, no login** (`/report/[id]?code=`). The code in the WhatsApp link
+is the key, the pattern `/jobs/[id]/quotes` already uses. Three buttons: Sign,
+Save my changes, Raise an issue. Ten wrong codes on a job lock the link until
+Yaadly sends the report back with a new one. The wrong-code count is kept by
+returning a refusal instead of raising an error, because a raised error rolls
+the count back with everything else. The page shows the words and a plain
+summary of the record, never an address, contact details or money.
+
+**Raising an issue stops the report** (`worker_raised`) and alerts Monique.
+It is unsigned, so release now requires a signature: the only answer is to
+send it back with her reply, which is the "something went wrong" she steps in
+on. The worker then signs when it is right.
 
 ---
 
@@ -4546,7 +4655,7 @@ Until today a wrong line in a drafted report had one fix, drafting the whole rep
 
 **Why.** Founder instruction, 28 Sep 2026: the templates are "the templates that are used" when the agent drafts a report once a service is booked; the form should "show the inputs I need for each report" and "not be so general"; picking a template should show "exactly what is needed to fill out the template adequately".
 
-**What.** Three new report kinds (`property_care`, `oversight`, `pm_stage`), migration `20260928235000`. `yaad-report` takes a brief per service from `kinds.ts`, each asking for the sections its template carries, and screens them like a finding. The Property Care checklist is a house list fixed in code, like the Deposit Protection Check's. The desk's drafter asks for different inputs per service, sends them to the agent as labelled headings, and records who attended and whether the review was in person or remote as `sections.who`, typed rather than read out of notes. Each service prints in the layout of its template.
+**What.** Three new report kinds (`property_care`, `oversight`, `pm_stage`), migration `20260929001000`. `yaad-report` takes a brief per service from `kinds.ts`, each asking for the sections its template carries, and screens them like a finding. The Property Care checklist is a house list fixed in code, like the Deposit Protection Check's. The desk's drafter asks for different inputs per service, sends them to the agent as labelled headings, and records who attended and whether the review was in person or remote as `sections.who`, typed rather than read out of notes. Each service prints in the layout of its template.
 
 **Two rules changed on purpose.** First, the Visual Check and Property Care are never rated. `report_guard_issue` required a rating on every finding of every kind, so a Visual Check could only issue by breaking "They record. They do not rate or advise." on the services page. A rating on those two is now refused, not required. Second, `reports.human` holds a Technical Sign-off's or stage record's result, an oversight report's status ratings, and every sum of money. Money is allowed there and nowhere else in a report, because a figure a person types is a figure they stand behind, which is the line `20260925220000` drew. It is written only by `set_report_human()`, which is admin only, refuses an issued report, accepts only listed keys and values, and logs to `report_edits`; a trigger refuses any other write, including a direct update, so the desk form is the only door. A stage record's value is what the document says; paying a trade still goes through Invoices.
 
