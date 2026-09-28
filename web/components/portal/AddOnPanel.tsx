@@ -44,6 +44,7 @@ const CHIP: Record<AddonStatus, string> = {
   signed_off: "border-teal bg-soft text-tealb",
   declined: "border-line bg-panel2 text-dim",
   withdrawn: "border-line bg-panel2 text-dim",
+  cancelled: "border-line bg-panel2 text-dim",
 };
 
 const day = (s: string | null) => (s ? new Date(s).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "");
@@ -250,7 +251,7 @@ function AddonCard({
         </div>
       )}
       {a.status === "signed_off" && <p className="mt-3 text-[12.5px] text-mute">Signed off by Yaadly on {day(a.signed_off_at)}.</p>}
-      {(a.status === "declined" || a.status === "withdrawn") && a.closed_reason && (
+      {(a.status === "declined" || a.status === "withdrawn" || a.status === "cancelled") && a.closed_reason && (
         <p className="mt-3 text-[12.5px] text-mute">Reason given: {a.closed_reason}</p>
       )}
 

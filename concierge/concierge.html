@@ -2574,6 +2574,15 @@ const VIEWS = [
         rpc:"sign_off_addon",
         args:(r) => ({ p_addon:r.id }),
         says:r => `Signs off ${r.job_id}'s add-on in your name, on the photos above. It raises the worker's pay at the agreed amount less 5% (${jmdFmt(r.amount_jmd - Math.round(r.amount_jmd * 0.05))}) for you to pay from Pay workers${r.terms === "in_full" ? "" : ", and drafts the second half of the client's invoice"}. Refused if the add-on's invoice is not marked paid or no photos have been filed.` },
+      // The one way out once both sides have agreed (20260929030000). Voids a
+      // draft invoice itself; a sent one must be voided on Invoices first, and
+      // anything paid is a refund decision the database will not make here.
+      { label:"Cancel add-on", cls:"g",
+        when:r => r.status === "with_worker" || r.status === "with_client" || r.status === "agreed",
+        ask:[ { k:"reason", label:"Why it is being cancelled (kept on the add-on)", placeholder:"The client no longer wants the benches done" } ],
+        rpc:"cancel_addon",
+        args:(r, v) => ({ p_addon:r.id, p_reason:v.reason }),
+        says:r => `Cancels this add-on on ${r.job_id} in your name, so it stops holding the job open. Its draft invoice is voided with it. Refused if its invoice has been sent (void that on Invoices first) or anything on it has been paid. Nobody is messaged: tell the client and the worker yourself.` },
     ]},
 
   { k:"qpd", g:"Documents & money", label:"Quote Pack Drafts", icon:"doc",
@@ -5958,7 +5967,7 @@ const QP_DOCS = [
 ];
 const qpDocsHtml = docs => docsListHtml(QP_DOCS, docs);
 
-const ADDON_STATE = { with_worker:"waiting on the worker", with_client:"waiting on the client", agreed:"agreed", signed_off:"signed off", declined:"turned down", withdrawn:"withdrawn" };
+const ADDON_STATE = { with_worker:"waiting on the worker", with_client:"waiting on the client", agreed:"agreed", signed_off:"signed off", declined:"turned down", withdrawn:"withdrawn", cancelled:"cancelled by Yaadly" };
 
 // An add-on's drawer: where it stands, what each side gets, its invoices and
 // the photos filed on it, which are what sign-off is judged on.

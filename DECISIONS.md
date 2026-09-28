@@ -6,6 +6,20 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-29 · An agreed add-on can be cancelled, by a named person, only while nothing is paid
+
+The first live test of add-ons found a dead end. Once both sides agreed, nothing could close an add-on. `decline_addon_as_me()` only works while it is still being agreed, so a client changing their mind after agreeing, or a test add-on, held the job short of complete for good.
+
+`cancel_addon(p_addon, p_reason)` is the one way out, and it is admin only (the desk's **Cancel add-on**):
+
+- **Draft invoice:** voided in the same step, because nobody was ever asked to pay it.
+- **Sent invoice:** refused, naming the invoice. It must be voided on Invoices first, deliberately, because the client has it.
+- **Anything paid:** refused. That is a refund decision, and this button does not make refund decisions.
+- **Record:** who cancelled it and why.
+- **Messages:** none, to either side. A cancellation after agreement is a conversation the desk has. The new status, `cancelled`, is not one `sync_job_status` counts, so the job is free to complete.
+
+---
+
 ## 2026-09-28 · Extra work on a booked job is an add-on, agreed by both sides and billed on its own
 
 Until today a booked job could not take extra work at all. `request_quote_change_as_me()` refuses a booked job and tells the client to message Yaadly, and nothing recorded what happened next, so hidden defects found once a job opened up were either done off the books or stopped the job. Monique set the rules on 28 September 2026:

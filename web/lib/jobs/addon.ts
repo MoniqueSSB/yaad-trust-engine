@@ -16,7 +16,7 @@ import { CLIENT_FEE_RATE } from "./client-bill";
 
 export const WORKER_FEE_RATE = 0.05;
 
-export type AddonStatus = "with_worker" | "with_client" | "agreed" | "declined" | "withdrawn" | "signed_off";
+export type AddonStatus = "with_worker" | "with_client" | "agreed" | "declined" | "withdrawn" | "signed_off" | "cancelled";
 export type AddonTerms = "in_full" | "half_now_half_on_signoff";
 export type Side = "client" | "worker";
 
@@ -66,6 +66,8 @@ export function addonStateLine(status: AddonStatus, me: Side, other: string): st
       return "Withdrawn";
     case "signed_off":
       return "Done and signed off";
+    case "cancelled":
+      return "Cancelled by Yaadly";
   }
 }
 

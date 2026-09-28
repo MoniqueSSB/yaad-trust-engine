@@ -59,5 +59,7 @@ describe("whose move it is", () => {
     assert.equal(a.addonHoldsJob("agreed"), true);
     assert.equal(a.addonHoldsJob("signed_off"), false);
     assert.equal(a.addonHoldsJob("declined"), false);
+    assert.equal(a.addonHoldsJob("cancelled"), false);
+    assert.equal(a.addonStateLine("cancelled", "client", "x"), "Cancelled by Yaadly");
   });
 });
