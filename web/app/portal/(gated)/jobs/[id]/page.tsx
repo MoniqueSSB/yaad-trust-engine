@@ -1906,6 +1906,28 @@ export default async function JobRoom({
         {/* Extra work waiting on the client's approval (founder, 28 Sep
             2026): approvals shows what is approved and what is not, stages
             and extra work alike. */}
+      {/* The FAQ's own "or": at sign-off a client can approve straight off
+          the evidence, or ask to walk the site live instead. On Approvals
+          since 28 Sep 2026 (founder: the evidence tab is an overview, with
+          nothing to act on), next to the button it is an alternative to. */}
+      {/* A job completing (stage >= 5) has nothing to do with whether a
+          walkthrough's notes are confirmed yet. The panel stays available
+          once a walkthrough is in play so an unconfirmed set of notes is
+          never stranded off-screen; it only stops offering a fresh
+          request once the job is done. */}
+      {job.worker_email && (job.status !== "complete" || job.signoff_method === "walkthrough") && (
+        <WalkthroughPanel
+          jobId={job.id}
+          role={role === "worker" ? "worker" : "client"}
+          walkPlatform={job.walk_platform ?? null}
+          walkLink={job.walk_link ?? null}
+          walkDate={job.walk_date ?? null}
+          walkWho={job.walk_who ?? null}
+          walkNotes={job.walk_notes ?? null}
+          walkCallNotes={job.walk_call_notes ?? null}
+          walkNotesConfirmedAt={job.walk_notes_confirmed_at ?? null}
+        />
+      )}
         {role === "client" && addonsToApprove.map((a) => (
           <section key={a.id} className="mt-4 rounded-2xl border border-line bg-panel p-5">
             <h2 className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Extra work to approve</h2>
@@ -2349,7 +2371,9 @@ export default async function JobRoom({
                   : "Opens when stage 1 starts."
             }
             upload={
-              canFileEvidence ? (
+              /* Founder, 28 Sep 2026: for the client this tab is an overview,
+                 with nothing to do on it. Filing evidence is the worker's. */
+              canFileEvidence && role === "worker" ? (
                 <>
                   <EvidenceUpload
                     jobId={job.id}
@@ -2381,28 +2405,6 @@ export default async function JobRoom({
             }
           />
           </div>
-      {/* The FAQ's own "or": at sign-off a client can approve straight off
-          the evidence above, or ask to walk the site live instead. Sits next
-          to the moment it is an alternative to, not buried in a settings
-          tab. */}
-      {/* A job completing (stage >= 5) has nothing to do with whether a
-          walkthrough's notes are confirmed yet. The panel stays available
-          once a walkthrough is in play so an unconfirmed set of notes is
-          never stranded off-screen; it only stops offering a fresh
-          request once the job is done. */}
-      {job.worker_email && (job.status !== "complete" || job.signoff_method === "walkthrough") && (
-        <WalkthroughPanel
-          jobId={job.id}
-          role={role === "worker" ? "worker" : "client"}
-          walkPlatform={job.walk_platform ?? null}
-          walkLink={job.walk_link ?? null}
-          walkDate={job.walk_date ?? null}
-          walkWho={job.walk_who ?? null}
-          walkNotes={job.walk_notes ?? null}
-          walkCallNotes={job.walk_call_notes ?? null}
-          walkNotesConfirmedAt={job.walk_notes_confirmed_at ?? null}
-        />
-      )}
         </>
       )}
         </div>

@@ -19,8 +19,6 @@
  */
 
 import type { ReactNode } from "react";
-import Link from "next/link";
-import { EvidenceItemComment } from "./EvidenceItemComment";
 import { CorrectEvidence } from "./CorrectEvidence";
 import { whenDateTime } from "@/lib/date";
 import { phaseBadge, sectionsOf, stageLock, updatesOf } from "@/lib/portal/evidence-sections";
@@ -127,7 +125,7 @@ export function EvidenceLedger({
      urgent fact than which stage number the job happens to be on. */
   const headline = awaitingApproval
     ? role === "client"
-      ? "Photos are in and waiting on you. This stage closes when you approve them."
+      ? "Photos are in for this stage. Approving them is on the Approvals tab."
       : "Photos are in. The client has been asked to approve them."
     : currentStage === 0
       ? "Nothing filed yet. Evidence starts when the first stage does."
@@ -192,14 +190,9 @@ export function EvidenceLedger({
             now, next to the money it releases. Client only: a worker
             approving his own work is the thing this whole ledger exists to
             rule out. */}
-        {awaitingApproval && role === "client" && jobId && (
-          <Link
-            href="?tab=approvals"
-            className="mt-3.5 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13.5px] font-bold text-onbrand transition hover:brightness-110"
-          >
-            Go to Approvals to sign off &rarr;
-          </Link>
-        )}
+        {/* No sign-off button here since 28 Sep 2026 (founder: this tab is
+            an overview, with nothing to act on). Approving lives on
+            Approvals; the headline says so in words. */}
       </div>
 
       <ul className="mt-3 grid gap-2.5">
@@ -420,8 +413,6 @@ export function EvidenceLedger({
 function EvidenceUpdateCard({
   group,
   answers,
-  role,
-  jobId,
 }: {
   group: EvidenceItem[];
   answers?: EvidenceItem;
@@ -481,9 +472,6 @@ function EvidenceUpdateCard({
             {answers.label ? ", " + answers.label : ""}
           </p>
         )}
-        {role === "client" && jobId && (
-          <EvidenceItemComment jobId={jobId} evidenceId={first.id} />
-        )}
       </div>
     </li>
   );
@@ -498,7 +486,6 @@ function EvidenceCard({
   e,
   answers,
   answeredBy,
-  role,
   jobId,
   canCorrect = false,
 }: {
@@ -606,9 +593,6 @@ function EvidenceCard({
             worker commenting on their own photo is not what this exists for,
             and the RLS insert policy would refuse it anyway if a stray call
             ever got this far. */}
-        {role === "client" && jobId && (
-          <EvidenceItemComment jobId={jobId} evidenceId={e.id} />
-        )}
       </div>
     </li>
   );
