@@ -959,7 +959,12 @@ export function PostJob({ initialTrade, initialParish, initialDesc, requestedWor
                 </p>
               )}
               <p className="text-[12.5px] leading-relaxed text-dim">
-                Photographs come after this, on the next screen. Your name and
+                {/* Said "Photographs come after this, on the next screen"
+                    until 28 Sep 2026, left over from when photos followed the
+                    review. They are the screen before this one now, and more
+                    can be added from the portal after sending. */}
+                Any photographs you attached are already on the job, and you
+                can add more from your portal after sending. Your name and
                 the way to reach you go to Yaadly only, never onto the
                 marketplace.
               </p>
