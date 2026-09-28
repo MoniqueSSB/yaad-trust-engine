@@ -335,6 +335,18 @@ body {
     --gold: #7a4f06; --goldb: #7a4f06; --green: #0f6b4a; --coral: #8d1900;
     --soft: #f4f1fd; --softline: #cdbdf5;
   }
+  /* The Tailwind utilities (bg-panel, text-ink) read the --color-* names,
+     not the plain aliases above, so those have to turn light as well or the
+     page prints pale text on white paper. Same values, kept in step with
+     html.pdf-render below. Found 28 Sep 2026 while building the PDF. */
+  :root {
+    --color-bg: #ffffff; --color-panel: #ffffff; --color-panel2: #f6f6f9;
+    --color-line: #d8d8e4; --color-line2: #b9b9cc;
+    --color-ink: #111122; --color-mute: #33334d; --color-dim: #55556b;
+    --color-teal: #4B22C0; --color-tealb: #3A1799; --color-purple: #4B22C0; --color-purpleb: #3A1799;
+    --color-gold: #7a4f06; --color-goldb: #7a4f06; --color-green: #0f6b4a; --color-coral: #8d1900;
+    --color-soft: #f4f1fd; --color-softline: #cdbdf5;
+  }
   body { background: #fff !important; color: #111122 !important; }
 
   /* Chrome and Safari drop background colours in print unless asked. The
@@ -351,6 +363,22 @@ body {
   li, tr, .doc-body .callout { break-inside: avoid; page-break-inside: avoid; }
   h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
 }
+
+/* The downloaded PDF (components/portal/PrintReport.tsx). It is drawn from a
+   copy of the page with this class on <html>, because a PDF made in the
+   browser sees the screen styles, not @media print. Same light values as the
+   print block above; change both together. The plain aliases (--ink and so
+   on) follow on their own, since they are var(--color-*). */
+html.pdf-render {
+  --color-bg: #ffffff; --color-panel: #ffffff; --color-panel2: #f6f6f9;
+  --color-line: #d8d8e4; --color-line2: #b9b9cc;
+  --color-ink: #111122; --color-mute: #33334d; --color-dim: #55556b;
+  --color-teal: #4B22C0; --color-tealb: #3A1799; --color-purple: #4B22C0; --color-purpleb: #3A1799;
+  --color-gold: #7a4f06; --color-goldb: #7a4f06; --color-green: #0f6b4a; --color-coral: #8d1900;
+  --color-soft: #f4f1fd; --color-softline: #cdbdf5;
+}
+html.pdf-render body { background: #fff !important; color: #111122 !important; }
+html.pdf-render .print\:hidden { display: none !important; }
 
 /* Landing on a section from the job room's "Everything outstanding" list.
    The link opens a tab and scrolls to the #section; a short gold ring says

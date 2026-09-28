@@ -6,6 +6,44 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-28 · Invoices and the Completion Report are real PDFs, made in the browser
+
+Monique: "all invoices should be in pdf when showing preview", then "in the
+admin desk also", then, on being told the Completion Report deliberately used
+the browser's print dialog instead of making a PDF, "fix this also".
+
+**What changed.** The desk's invoice Preview now shows an actual A4 PDF in the
+browser's PDF viewer, with a Download PDF button that saves it as the invoice
+number. The client portal's Completion Report button is now Download PDF and
+saves `Completion Report <job>.pdf` in one tap. Both are made in the browser
+by html2pdf.js (html2canvas plus jsPDF) from the page already on screen.
+
+**Why in the browser and not on the server.** The server renders the invoice
+as HTML and that HTML is also the email body. Making the PDF from the same
+HTML means the PDF cannot say something different from the preview or the
+email. It also adds no server work, no new service and no new place any
+client data goes: nothing leaves the browser. A server PDF (for example to
+attach to the invoice email) is a bigger job, not built, and would be a new
+decision.
+
+**What this reverses.** `PrintReport.tsx` said, on purpose, that
+`window.print()` was better than "a PDF pipeline this project would then
+have to own". That was a fair trade until the owner asked for a PDF. The
+cost accepted: one library. In the desk it is pinned to 0.10.3 on jsdelivr
+(the CDN the desk already allows) with an integrity hash, and loaded inside a
+hidden copy of the invoice so the desk's styles never touch it. In the portal
+it is an npm dependency (0.14.0, exact) loaded only when the button is
+pressed. The PDF is a picture of the page, so its text cannot be selected or
+searched; that is the price of it matching the screen exactly.
+
+**Found on the way.** The portal's `@media print` block turned the old colour
+names light but not the `--color-*` names the Tailwind classes actually read,
+so a printed report would have come out pale text on white. Both the print
+block and the new `html.pdf-render` class now set the `--color-*` values.
+The two blocks carry the same numbers; change them together.
+
+---
+
 ## 2026-09-25 · The report reads its own paperwork, and the desk is the renderer
 
 Monique, late on 25 September: "I need the AI agent to be able to read a
@@ -4287,6 +4325,16 @@ decision-log illustration on `how-we-use-ai.html` are avatars, sitting next to
 "DW" for a worker called Devon W., and they read as initials because the thing
 beside them is initials. Neither is the logo lockup. If Monique wants either
 changed, they are one rule each.
+
+## 2026-09-28 · A sketch pack is a printed document, laid out like the report
+
+**Why.** Founder instruction, 28 Sep 2026: the sketch pack "should be in pdf also and print out that way", meaning the way the Deposit Check report now prints. It could already be printed, but only by pressing Preview, scrolling to a small frame inside the desk and printing that frame, and the page it printed was designed for a screen: a grey background, a rounded card, sizes in pixels, no A4 set up, no header after page one, and nothing to stop a photograph row or a heading from breaking across a page.
+
+**What.** `renderPack` in `yaad-sketch` keeps every word and every section in the same order and changes only the layout: A4 with margins, sizes in points, the Yaadly mark with the report number repeated at the top of every page (the `<thead>` of a table, which a browser repeats on each printed page), photograph rows, room blocks, the sign-off box and the warning boxes kept whole, headings kept with what follows, and colours that print. No web fonts, the same system font stack as the report document in the desk, because the document now opens under the desk's own security policy and a document that depends on a font server prints differently on the day that server is slow. The logo travels inside the document (`yaad-sketch/logo.ts`, the same image as `RPT_LOGO` in the desk) for the reason recorded on the report the same day: the desk's `img-src` refuses any image from another host. On the desk, the preview frame and its print button are gone; **Open as PDF** on the pack, and **PDF** on each row of the list, open the document in a tab of its own with a Print button that the print hides, the same pattern as `openReportDocument`. The tab is opened on the click, before anything is awaited, because a browser blocks a tab opened after a network call.
+
+**What it does not change.** The `render` action only reads, so nothing about approving, issuing or voiding moved, and neither did the measurement rule: the document shows what the database holds, and `has_measurement()` still refuses to approve a pack carrying one. `yaad-sketch` keeps its platform check.
+
+**Found and left.** The Issue confirm on the desk says the pack "becomes visible to them in the portal". Nothing in `web/` or `docs/` renders a sketch pack, so today a client sees one only when the PDF is sent to them. Raised with Monique rather than fixed here.
 
 ## 2026-09-28 · The Deposit Protection Check is built to read as a professional report
 

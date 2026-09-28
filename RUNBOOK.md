@@ -4453,6 +4453,24 @@ names the pack it refused rather than failing the set anonymously.
 Voiding deletes nothing. The row stays, marked void, and a void pack can be set
 back to draft later.
 
+## Printing a sketch pack, or saving it as a PDF
+
+On the desk, Sketch packs: press **PDF** on the pack's row in the list, or open
+the pack and press **Open as PDF**. The document opens in a new tab with a Print
+button in the top corner. Press it, then choose Save as PDF as the destination.
+The button does not appear on the printout.
+
+If nothing opens, the browser blocked the tab: allow pop-ups for
+`concierge.yaadly.co.uk` and press it again. A draft prints with "Not yet
+approved" in the sign-off box, on purpose; approve it first if that copy is
+going to anybody.
+
+The page is built by the `render` action of `yaad-sketch`, which only reads. A
+change to its layout means redeploying that one function from disk, keeping
+its platform check (no `--no-verify-jwt`), and then the desk if the desk
+changed too. To see a layout change without the desk, feed an invented pack
+through `renderPack` and print it with headless Chrome (`--print-to-pdf`).
+
 ## A sketch pack or a report was refused for a measurement, and the sentence looks innocent
 
 The rule is in one place now: `supabase/functions/_shared/measurements.ts`.
@@ -6098,3 +6116,9 @@ Desk, **Reports**. Service: Deposit Protection Check. Client name and property a
 **The desk looks the same after a deploy.** A tab opened before the deploy keeps running the old page. Reload it. You are on the current desk if Reports shows a file chooser labelled "The quote, receipts, messages and photographs".
 
 **Testing the desk under its real policy.** Access answers every outside request, so the policy cannot be observed from the internet, and a plain local preview does not apply it. Serve a copy of `concierge.html` locally with the same `Content-Security-Policy` header the worker sets and test there. On 28 September that showed the photo path and the PDF path both working under the policy and the logo link blocked.
+
+## 32. An invoice preview or a Completion Report will not come out as a PDF (28 Sep 2026)
+
+1. **Desk, invoice Preview.** Under "What the client sees" the box says "Making the PDF..." for a second, then shows the PDF. If it says "The PDF could not be made (...)", the web page version is shown instead so the invoice can still be read. Most likely cause: jsdelivr was blocked or the file there changed, and the integrity hash refused it. Check the browser console. The pinned address and hash are `H2P_SRC` and `H2P_SRI` in `concierge/concierge.html`; change them only together, and copy the desk into `concierge-deploy/public/index.html` before deploying.
+2. **Portal, Completion Report.** Download PDF saves `Completion Report <job>.pdf`. If it fails, the page says so and opens the print dialog; choose Save as PDF. The light colours for both come from `html.pdf-render` and `@media print` in `web/app/globals.css`.
+3. **Checking the desk under its real policy.** Serve a copy with the same `Content-Security-Policy` header the desk worker sets (see 31 above), press Preview, and confirm the box shows a PDF, not a web page.
