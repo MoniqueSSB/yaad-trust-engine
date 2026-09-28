@@ -6,6 +6,26 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-28 · Every document in "Your documents" downloads as a PDF
+
+Monique: the quote pack in the client and worker portal "should show as a pdf view also", then "these should all be able to review as a pdf". Each completed document uses the Completion Report's Download PDF button (`PrintReport`, now with a file name of its own). The PDF is made in the browser from the page on screen, so it cannot disagree with what the page says, and nothing is sent anywhere.
+
+- **Quote Pack:** the button, plus the fixed "Work outside this scope" wording the desk PDF carries.
+- **Kickoff Pack:**
+  - a button on each document page;
+  - `pack/all`, the whole pack on one page for one file, linked from the pack's front page.
+- **Guidelines:**
+  - `/portal/guidelines/client` and `/worker` show the current version in full, with the reader's signature against it if they have one;
+  - the page used to show the text only while it was being signed, so once signed there was nothing to read or keep;
+  - "Your documents" links a signed set there.
+
+**Fixed while there: the quote pack was showing the client the wrong price.** It read labour plus materials as "Total", without Yaadly's 15%, so a client quoted J$100,000 read J$100,000 and was invoiced J$115,000. It now shows each side what they actually get:
+
+- **Client:** `clientBill()`, the invoice's own arithmetic, with the 15% as its own line.
+- **Worker:** the labour less 5%, plus materials, as `raise_job_worker_payable` pays.
+
+---
+
 ## 2026-09-29 · An agreed add-on can be cancelled, by a named person, only while nothing is paid
 
 The first live test of add-ons found a dead end. Once both sides agreed, nothing could close an add-on. `decline_addon_as_me()` only works while it is still being agreed, so a client changing their mind after agreeing, or a test add-on, held the job short of complete for good.

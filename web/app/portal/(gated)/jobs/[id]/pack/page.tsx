@@ -129,6 +129,12 @@ export default async function PackIndex({
         {PACK_DOC_ORDER.length} documents, each on its own page. Read them in order or jump straight
         to the one you need.
       </p>
+      <Link
+        href={base + "/all" + docQs}
+        className="mt-3 inline-block rounded-full border border-line2 px-4 py-2 text-[12.5px] font-bold text-mute transition hover:border-teal hover:text-tealb"
+      >
+        The whole pack on one page, to download as a PDF
+      </Link>
 
       {pack.status === "approved" && role && (
         <section className="mt-4 rounded-xl border border-line2 bg-panel2 p-4">

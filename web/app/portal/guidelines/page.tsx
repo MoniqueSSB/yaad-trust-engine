@@ -92,6 +92,9 @@ export default async function Guidelines({
             <div className="flex flex-wrap items-center gap-3">
               <b className="text-[15.5px]">{d.label}</b>
               <span className="text-[12px] text-dim">Version {d.version} · {d.date}</span>
+              <a href={`/portal/guidelines/${d.key === "client_guidelines" ? "client" : "worker"}`} className="text-[12px] font-bold text-tealb underline underline-offset-2">
+                Read in full or download as a PDF
+              </a>
               {sig ? (
                 <span className="ml-auto rounded-full border border-softline bg-soft px-3 py-1 text-[11px] font-bold text-tealb">
                   ✓ Signed {String(sig.signed_at).slice(0, 10)}
