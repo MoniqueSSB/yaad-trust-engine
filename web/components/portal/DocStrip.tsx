@@ -52,7 +52,8 @@ export function DocStrip({ docs }: { docs: Doc[] }) {
       </h2>
       <p className="mb-3.5 max-w-[62ch] text-[12.5px] leading-relaxed text-dim">
         Every document this job will have, from the first day. The ones not
-        written yet say so, and say what they are waiting on.
+        written yet say so, and say what they are waiting on. Open a completed
+        one to read it or download it as a PDF.
       </p>
       <div className="grid gap-2">
         {docs.map((d) => {

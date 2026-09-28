@@ -27,7 +27,16 @@ import { useState } from "react";
  * The library is loaded on the tap, not with the page, so nobody who never
  * presses the button downloads it.
  */
-export function PrintReport({ jobId, targetId }: { jobId: string; targetId: string }) {
+export function PrintReport({
+  jobId, targetId, name = "Completion Report",
+}: {
+  jobId: string;
+  targetId: string;
+  /** What the file is called, before the job id. Every document in "Your
+   *  documents" uses this button since 28 Sep 2026, so it is not always a
+   *  Completion Report. */
+  name?: string;
+}) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -45,7 +54,7 @@ export function PrintReport({ jobId, targetId }: { jobId: string; targetId: stri
       await worker
         .set({
           margin: [12, 12, 14, 12],
-          filename: `Completion Report ${jobId}.pdf`,
+          filename: `${name} ${jobId}.pdf`,
           image: { type: "jpeg", quality: 0.95 },
           html2canvas: {
             scale: 2,
