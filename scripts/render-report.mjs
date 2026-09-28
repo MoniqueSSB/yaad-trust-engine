@@ -39,7 +39,10 @@ const PIECES = [
   ["const RPT_LOGO = ", "\n"],
   ["const RPT_SERVICE = ", "\n"],
   ["const RPT_STATE = ", "\n"],
-  ["const RPT_DOC_CSS = ", "\nfunction reportDocumentHtml"],
+  ["const RPT_RESULT = ", "\n// The two record only services"],
+  ["const RPT_MONEY = ", "\nfunction rptMoneyAsk"],
+  ["const RPT_DOC_CSS = ", "\n// ---------------------------------------------------------------- the six"],
+  ["const RPT_KEYS = ", "\nfunction reportDocumentHtml"],
   ["function reportDocumentHtml(", "\nconst RPT_DEP_CSS"],
   ["const RPT_DEP_CSS = ", "\nconst QPR_FN"],
 ];
