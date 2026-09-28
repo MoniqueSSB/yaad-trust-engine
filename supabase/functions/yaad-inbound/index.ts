@@ -276,6 +276,16 @@ async function evidenceSha256(buf: ArrayBuffer): Promise<string> {
   return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// A typed update has no file, so its fingerprint is of the words themselves
+// and the job they were filed on, the same rule evidence-actions.ts has used
+// for a text-only entry since the portal began (label + "|" + job id). Until
+// 28 Sep 2026 a typed WhatsApp update was filed with none, and every stage
+// signed off with one in it showed on the desk as "not bound to the exact
+// files". Founder: "keeps raising issues".
+async function noteSha256(label: string, jobId: string): Promise<string> {
+  return await evidenceSha256(new TextEncoder().encode(label + "|" + jobId).buffer as ArrayBuffer);
+}
+
 // The worker's answer to which section of the job a photograph belongs to,
 // read from a reply sent in answer to exactly that question and nothing else.
 // Deliberately not applied to captions: a caption saying "the joint before
@@ -2973,9 +2983,10 @@ Deno.serve(async (req: Request) => {
         const choices: { id: string; title: string; stage: number }[] = a.job_choices ?? [];
         const pick = pickJobChoice(msg.text, choices);
         if (!pick) return twiml(`Sorry, that did not match a job. ${codePrompt(choices)}`);
+        const noteLabel = String(a.text ?? "").trim().slice(0, 1000);
         const { error } = await supabase.from("evidence").insert({
-          job_id: pick.id, label: String(a.text ?? "").trim().slice(0, 1000), stage: pick.stage,
-          kind: "work", uploaded_by: a.worker_email,
+          job_id: pick.id, label: noteLabel, stage: pick.stage,
+          kind: "work", uploaded_by: a.worker_email, sha256: await noteSha256(noteLabel, pick.id),
         });
         await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
         root.setAttributes({ "yaadly.worker_update.job": pick.id, "yaadly.worker_update.outcome": error ? "insert_failed" : "filed" });
@@ -3026,9 +3037,10 @@ Deno.serve(async (req: Request) => {
           // batch just filed. Null for every other update, which is what it
           // has always been, and what makes the portal draw it on its own.
           const notesBatch = String(a.notes_batch ?? "") || null;
+          const noteLabel = String(a.text ?? "").slice(0, 1000);
           const { error } = await supabase.from("evidence").insert({
-            job_id: job.id, label: String(a.text ?? "").slice(0, 1000), stage: job.stage,
-            kind: "work", uploaded_by: found.email, batch_id: notesBatch,
+            job_id: job.id, label: noteLabel, stage: job.stage,
+            kind: "work", uploaded_by: found.email, batch_id: notesBatch, sha256: await noteSha256(noteLabel, job.id),
           });
           root.setAttributes({
             "yaadly.worker_update.job": job.id,

@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-29 · A typed update carries a fingerprint, and the desk's "No print" counts only real files
+
+The desk's Overview kept showing "No print: 1 sign-off is not bound to the exact files" (Monique: "keeps raising issues"). The one sign-off was stage 1 of the test verandah job. All five photographs on it were fingerprinted. The sixth item was a worker's typed WhatsApp update, "report", which has no file. `yaad-inbound` filed typed updates with no `sha256`, while the portal has always fingerprinted a text-only entry as `label + "|" + job id`. The count runs over all time, so one such note held the warning up for good.
+
+- **The source:** `yaad-inbound` now fingerprints a typed update by the portal's rule.
+- **The reading:** `evidence_at_signoff.fingerprinted` (`20260929110000`) counts an item as bound when it has a fingerprint, or when its evidence row has no file at all. The warning's own words are about files. A photo or video with no fingerprint still counts against it, and so does an item whose evidence row is gone.
+- **The sign-off record:** not touched. The snapshot in `stage_approvals` is what the approver saw.
+
+A read-only dry run against the live data showed every sign-off fully bound under the new rule.
+
+---
+
 ## 2026-09-29 · On a job billed by stage, each stage is paid before it starts; the 15% is paid in full first
 
 Monique, 28 Sep 2026: "can't move on without each stage being paid by the client first", "if the client pays the full bill, fine", and "the 15 is always paid before a job starts, in full, never split through a job".
