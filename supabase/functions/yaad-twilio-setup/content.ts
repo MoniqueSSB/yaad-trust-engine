@@ -100,3 +100,71 @@ export function signReportContent() {
     },
   };
 }
+
+/** The three buttons under a report draft, 29 Sep 2026. Founder: "this should
+ *  also all be buttons also that people tap instead of writing".
+ *
+ *  They follow the draft, which is sent as a message of its own so that a
+ *  long press copies the draft and nothing else. Each id carries the job's
+ *  code, so a button tapped days later on an old message cannot act on a
+ *  different job's draft: yaad-inbound checks the code against the draft that
+ *  is actually waiting. A tap reaches yaad-inbound as text, the same as the
+ *  other buttons, so "Send as written" is a way of replying 1 and not a new
+ *  authority. Used in session only, straight after the worker's own photos,
+ *  so nothing is submitted to Meta. */
+export const REPORT_DRAFT_NAME = "yaadly_report_draft_buttons_v1";
+
+export const REPORT_DRAFT_BODY =
+  "{{1}}: read the draft above against what you did. Send it to the client as written, change it first, or write your own. Nothing goes to the client until you choose.";
+
+export const REPORT_DRAFT_SEND = "DRAFTSEND";
+export const REPORT_DRAFT_EDIT = "DRAFTEDIT";
+export const REPORT_DRAFT_OWN = "DRAFTOWN";
+
+export function reportDraftContent() {
+  return {
+    friendly_name: REPORT_DRAFT_NAME,
+    language: "en",
+    variables: { "1": "Replace stair rails (JOB-WEB-1789253807959)", "2": "JOB-WEB-1789253807959" },
+    types: {
+      "twilio/quick-reply": {
+        body: REPORT_DRAFT_BODY,
+        actions: [
+          { title: "Send as written", id: `${REPORT_DRAFT_SEND} {{2}}` },
+          { title: "Edit it", id: `${REPORT_DRAFT_EDIT} {{2}}` },
+          { title: "Write my own", id: `${REPORT_DRAFT_OWN} {{2}}` },
+        ],
+      },
+    },
+  };
+}
+
+/** The daily check-in, as a button, 29 Sep 2026. One check-in a day covers
+ *  every stage worked that day and may be sent before or after the work.
+ *
+ *  Unlike the draft buttons this goes to people who may NOT have written in
+ *  within 24 hours, so it needs Meta's approval before it is any use, and the
+ *  setting that switches it on is written only once that approval comes back,
+ *  the same as the worker update template. */
+export const ON_SITE_NAME = "yaadly_on_site_checkin_v1";
+
+export const ON_SITE_BODY =
+  "Yaadly, your job {{1}}: are you on site today? Tap the button to check in. One check in a day covers every stage, before or after the work. Then send photos, a short clip or a voice note of the work in this chat. Sending your location as well puts on record where you were.";
+
+export const ON_SITE_TAP = "ONSITE";
+
+export function onSiteContent() {
+  return {
+    friendly_name: ON_SITE_NAME,
+    language: "en",
+    variables: { "1": "Replace stair rails (JOB-WEB-1789253807959)", "2": "JOB-WEB-1789253807959" },
+    types: {
+      "twilio/quick-reply": {
+        body: ON_SITE_BODY,
+        actions: [{ title: "I am on site", id: `${ON_SITE_TAP} {{2}}` }],
+      },
+    },
+  };
+}
+
+export const ON_SITE_APPROVAL = { name: ON_SITE_NAME, category: "UTILITY" };
