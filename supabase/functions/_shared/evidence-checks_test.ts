@@ -165,7 +165,7 @@ Deno.test("a pin shared that day on another stage covers this one, and an old pi
   const base = { stage: 3, evidence: [photo(), clip()], arrivals: [arrival()], checklist: null };
   const today = runEvidenceChecks({ ...base, pins: [{ shared_at: "2026-09-04T18:00:00Z", far_from_site: false }] });
   assertEquals(byName(today, "Location pin").passed, true);
-  const old = runEvidenceChecks({ ...base, pins: [{ shared_at: "2026-09-01T18:00:00Z", far_from_site: true }] });
+  const old = runEvidenceChecks({ ...base, arrivals: [arrival({ lat: null })], pins: [{ shared_at: "2026-09-01T18:00:00Z", far_from_site: true }] });
   assertEquals(byName(old, "Location pin").passed, false);
   assert(!old.some((c) => c.name === "Pin distance"), "a pin from another day raises no distance flag here");
 });
@@ -272,9 +272,11 @@ Deno.test("a shared pin is recorded as a note, never a gap", () => {
   assert(pin.detail.includes("Barbican"), "it shows the address a human would rather read");
 });
 
-Deno.test("NO pin is never a gap and never blocks: it is an offer", () => {
+Deno.test("NO pin is never a gap and never blocks", () => {
+  // The check-in here was by button, a time and no place, so the location
+  // is still owed. A check-in that carried a position is its own test below.
   const checks = runEvidenceChecks({
-    stage: 1, evidence: [photo(), clip()], arrivals: [arrival()], checklist: CHECKLIST, pins: [],
+    stage: 1, evidence: [photo(), clip()], arrivals: [arrival({ lat: null })], checklist: CHECKLIST, pins: [],
   });
   const pin = byName(checks, "Location pin");
   assertEquals(pin.passed, false);
@@ -283,12 +285,14 @@ Deno.test("NO pin is never a gap and never blocks: it is an offer", () => {
   // never gates it. If this ever becomes a gap, a voluntary thing has quietly
   // turned into an obligation and a worker is being judged for declining.
   assertEquals(workerGaps(checks), [], "a missing pin must never reach the gap list");
-  assert(workerNotes(checks).some((n) => /up to you/i.test(n)), "the ask must say it is optional");
+  // Founder, 29 Sep 2026: it "has to be done before leaving the site". The
+  // ask used to have to say it was optional. It now has to say when.
+  assert(workerNotes(checks).some((n) => /before you leave site/i.test(n)), "the ask must say when it is to be done");
 });
 
 Deno.test("the pin ask explains what it is FOR, and tells nobody off", () => {
   const notes = workerNotes(runEvidenceChecks({
-    stage: 1, evidence: [photo()], arrivals: [arrival()], checklist: CHECKLIST, pins: [],
+    stage: 1, evidence: [photo()], arrivals: [arrival({ lat: null })], checklist: CHECKLIST, pins: [],
   }));
   const ask = notes.find((n) => /location/i.test(n))!;
   assert(/you were there|harder to argue/i.test(ask), "says what it buys him: " + ask);
@@ -308,7 +312,7 @@ Deno.test("a far pin is desk only, like the arrival flag", () => {
 });
 
 Deno.test("pins are optional input: omitting them entirely still runs", () => {
-  const checks = runEvidenceChecks({ stage: 1, evidence: [photo()], arrivals: [arrival()], checklist: CHECKLIST });
+  const checks = runEvidenceChecks({ stage: 1, evidence: [photo()], arrivals: [arrival({ lat: null })], checklist: CHECKLIST });
   assertEquals(byName(checks, "Location pin").passed, false);
   assertEquals(workerGaps(checks).length > 0, true, "the other checks still work");
 });
@@ -357,4 +361,23 @@ Deno.test("a job with somebody at home is not marked down for a missing check-in
   // A check-in that was made anyway still counts as one.
   const made = runEvidenceChecks({ ...base, arrivalExpected: false, arrivals: [{ arrived_at: "2026-09-29T12:00:00Z" }] }).find((c) => c.name === "Arrival")!;
   assertEquals(made.detail, "A check-in is logged for the day this work was filed.");
+});
+
+Deno.test("a check-in that carried a location is a location shared", () => {
+  // 29 Sep 2026: the founder checked in and was then told "No location shared
+  // that day".
+  const checks = runEvidenceChecks({ stage: 1, evidence: [photo()], arrivals: [arrival()], checklist: null, pins: [] });
+  assertEquals(byName(checks, "Location pin").passed, true);
+  assert(!workerNotes(checks).some((n) => /location/i.test(n)), "a worker who shared where they were is not asked again");
+});
+
+Deno.test("the location ask says when, and how, and is not asked where somebody is at home", () => {
+  const base = { stage: 1, evidence: [photo()], arrivals: [], checklist: null, pins: [] };
+  const ask = workerNotes(runEvidenceChecks(base)).find((n) => /location/i.test(n)) ?? "";
+  assert(ask.includes("before you leave site for the day"), ask);
+  assert(ask.includes("Send your current location"), ask);
+  assert(!/up to you|nothing waits/i.test(ask), ask);
+  const home = runEvidenceChecks({ ...base, arrivalExpected: false });
+  assertEquals(byName(home, "Location pin").audience, "desk");
+  assert(!workerNotes(home).some((n) => /location/i.test(n)));
 });

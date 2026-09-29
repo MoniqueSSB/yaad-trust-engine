@@ -2932,7 +2932,7 @@ Deno.serve(async (req: Request) => {
           "yaadly.arrival.outcome": error ? "refused" : (row?.already_logged_today ? "already_today" : "logged"),
         });
         if (error) return twiml(`That did not save: ${error.message}`);
-        const pinAsk = "To put on record where you are, tap the + or the paperclip in this chat, then Location, then Send your current location. It is up to you and nothing waits on it.";
+        const pinAsk = "To put on record where you are, tap the + or the paperclip in this chat, then Location, then Send your current location. Do this before you leave site today.";
         return twiml(row?.already_logged_today
           ? `You are already checked in on ${onSiteJob} today. One check in a day covers every stage. ${pinAsk}`
           : `Checked in on ${onSiteJob}. That covers every stage you work today. ${pinAsk}`);
