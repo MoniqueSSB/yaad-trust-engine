@@ -29,6 +29,7 @@ import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-stat
 import { parseAddonConfirm } from "./addon-confirm.ts";
 import { readDraftTap, readOnSiteTap, tapMatchesDraft } from "./report-tap.ts";
 import { screenOwnWords } from "./own-words.ts";
+import { canBeACaption } from "./report-draft.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -3306,7 +3307,18 @@ Deno.serve(async (req: Request) => {
               "Your photos are still waiting to be filed. What do they show? A line on what was done is enough.", trace,
             ));
           }
-          const context = msg.text.trim().slice(0, 140);
+          // A stray "1" is not a description. On 29 Sep 2026 a second 1,
+          // sent after the job had already been confirmed, was filed as the
+          // caption of a photograph and reached the report draft as if it
+          // were an account of the work. It is asked about again. "skip" is
+          // the way out, so nobody is held in a loop for declining to write.
+          const typed = msg.text.trim();
+          const skipping = /^skip$/i.test(typed);
+          if (!skipping && !canBeACaption(typed)) {
+            root.setAttributes({ "yaadly.evidence_intake.outcome": "reply_not_a_caption" });
+            return twiml(`The job is already confirmed as ${confirmedJob.id}, so that reply is not needed. What do the photos show? A line on what was done is enough, or reply SKIP to file them without one.`);
+          }
+          const context = skipping ? "" : typed.slice(0, 140);
           const described = context
             ? pending.map((p) => p.hasCaption ? p : { ...p, label: context, hasCaption: true })
             : pending;

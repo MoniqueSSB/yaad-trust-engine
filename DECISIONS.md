@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-29 · A stage is reported once a day, not once ever; a stray reply is not a caption; the daily check-in goes in the morning
+
+**Decided by Monique, 29 Sep 2026 ("fix all").** She filed two test items on stage 3 and no draft came.
+
+**1. Once a day.** `20260906015600` allowed one notification per job and stage for the life of the stage. That was her own instruction of 5 September, "it should only go to the email ONCE not twice", and it is kept: the client is told about a stage at most once per Jamaica day, read from `draft_decisions`, which is the record of a report actually reaching a client. What changed is that once used to mean forever. A worker who filed on Monday and again on Wednesday got a draft for Monday only, and the one draft was always written from the first batch, ninety seconds after the befores landed, so the afters never reached a report. Until the day's report has gone, new evidence now refreshes the draft the worker is holding, replacing it and never stacking a second. After it has gone, anything else filed that day lands silently as before. **The cost:** evidence filed after the day's report, on a stage nothing more is filed on, is never reported by message. It is on the record and in the portal. **I first recommended this to her as "once per stage per day" without saying the rule it changes was her own. It was, and it is said here.** Migration `20260929210000`.
+
+**2. A stray reply is not a caption.** The "1" that reached the beam draft was traced. A photograph with no caption makes `yaad-inbound` ask what it shows, and any reply was taken as the answer. A second 1, sent after the job was already confirmed, was filed as the caption. A reply that cannot stand as a description is now asked about again, and SKIP files the photograph without one, so nobody is held in a loop for declining to write.
+
+**3. A note about the camera is left out of the draft.** "changing focus" reached the model as an account of the work. `isCameraNote` drops a caption of four words or fewer that uses camera vocabulary. It is narrow on purpose, because reading meaning out of a caption is what the dropped before-and-after check got wrong, and the tests hold real work that uses the same words ("flashing fitted round the chimney", "angle bracket fixed"). It is dropped from the draft only. The caption stays on the evidence as typed.
+
+**4. The daily check-in goes at 8am in Jamaica, not 4pm.** `0 13 * * *`, changed with `cron.alter_job` on job 7. Meta approved `yaadly_on_site_checkin_v1` the same day and it is switched on, so the prompt now asks "are you on site today?" with a button, which is a morning question.
+
+**5. CLAUDE.md section 2 was amended, on her instruction,** to say the banned list has three copies. One sentence added, nothing removed.
+
+`report-draft.ts` moved to `_shared/` because `yaad-inbound` now needs the same test of what a caption is.
+
 ## 2026-09-29 · A worker's own words are screened before they reach a client
 
 **Decided by Monique, 29 Sep 2026.** Since 31 August a worker has been able to set the draft aside and send his own version. Those words went to the client exactly as typed. Everything a model writes passes `guardrails.scan`; the one thing a person typed did not, so "escrow" could reach a client as long as a worker, and not a model, wrote it. Found while building the edit page and flagged to her, not changed until she said so.
