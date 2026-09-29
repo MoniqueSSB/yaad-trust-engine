@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DocLogo } from "@/components/portal/DocLogo";
 import { notFound, redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -115,6 +116,7 @@ export default async function PackIndex({
     <div className="rounded-2xl border border-line bg-panel p-6">
       <Link href={"/portal/jobs/" + encodeURIComponent(id)} className="text-[13px] text-tealb underline-offset-2 hover:underline">&larr; Back to the job</Link>
       <div className="mt-3 border-b-2 border-teal pb-4">
+        <div className="mb-3 mt-3"><DocLogo /></div>
         <h1 className="font-display text-[clamp(22px,3.5vw,30px)] uppercase leading-tight">Kickoff Pack</h1>
         <p className="mt-1 text-[12px] text-dim">
           {pack.id} · rev {pack.rev ?? 1} · {pack.project_title}
@@ -124,9 +126,15 @@ export default async function PackIndex({
       </div>
 
       <p className="mt-4 text-[13px] leading-relaxed text-mute">
-        Nine documents, each on its own page. Read them in order or jump straight
+        {PACK_DOC_ORDER.length} documents, each on its own page. Read them in order or jump straight
         to the one you need.
       </p>
+      <Link
+        href={base + "/all" + docQs}
+        className="mt-3 inline-block rounded-full border border-line2 px-4 py-2 text-[12.5px] font-bold text-mute transition hover:border-teal hover:text-tealb"
+      >
+        The whole pack on one page, to download as a PDF
+      </Link>
 
       {pack.status === "approved" && role && (
         <section className="mt-4 rounded-xl border border-line2 bg-panel2 p-4">

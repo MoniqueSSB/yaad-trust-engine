@@ -64,7 +64,7 @@ import { PhotoAttach } from "./PhotoAttach";
 import { TRADES, PARISHES, LAUNCH_PARISHES } from "@/lib/taxonomy";
 import {
   ACCESS, DRAFT_KEY, EMPTY_FIELDS, STAGES, URGENCY, WORKER_CHOICE, askedFor,
-  draftFields, firstIncomplete, looksLikeEmail, looksLikePhone,
+  draftFields, firstIncomplete, joinsSignedInPortal, looksLikeEmail, looksLikePhone,
   parseDraft, restoreFields, serialiseDraft, stageComplete, worthKeeping,
   type Fields, type StageKey,
 } from "@/lib/jobs/new-form";
@@ -72,12 +72,13 @@ import {
 const POST_JOB_FN = "yaad-post-job";
 const ENQUIRY_FN = "yaad-enquiry";
 
-export function PostJob({ initialTrade, initialParish, requestedWorker, requestedWorkerSlug }: { initialTrade?: string; initialParish?: string; requestedWorker?: string; requestedWorkerSlug?: string }) {
+export function PostJob({ initialTrade, initialParish, initialDesc, requestedWorker, requestedWorkerSlug }: { initialTrade?: string; initialParish?: string; initialDesc?: string; requestedWorker?: string; requestedWorkerSlug?: string }) {
   const [stage, setStage] = useState(0);
   const [f, setF] = useState<Fields>(() => ({
     ...EMPTY_FIELDS,
     trade: askedFor(initialTrade, TRADES),
     parish: askedFor(initialParish, PARISHES),
+    desc: initialDesc ?? "",
   }));
 
   const [jobId, setJobId] = useState("");
@@ -89,6 +90,11 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
   const [error, setError] = useState("");
   const [saveFailed, setSaveFailed] = useState(false);
   const [sent, setSent] = useState(false);
+  /* True when the job joined the portal of the person posting it, because
+     they were already signed in with the email they typed. Then the
+     confirmation screen says so instead of asking them to set up a portal
+     they already have. */
+  const [inPortal, setInPortal] = useState(false);
   const [restored, setRestored] = useState(false);
   /* Narrows the trade chips as you type. Eighteen chips then fourteen more is
      two full phone screens before the first question is answered, on the page
@@ -131,6 +137,7 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
     const next: Fields = { ...EMPTY_FIELDS, ...kept };
     if (!next.trade) next.trade = askedFor(initialTrade, TRADES);
     if (!next.parish) next.parish = askedFor(initialParish, PARISHES);
+    if (!next.desc && initialDesc) next.desc = initialDesc;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- see the note above this effect
     setF(next);
     if (d.jobId) setJobId(d.jobId);
@@ -142,7 +149,7 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
     const k = firstIncomplete(next);
     const i = k && k !== "reach" ? STAGES.findIndex((s) => s.key === k) : 3;
     setStage(i < 0 ? 0 : i);
-  }, [initialTrade, initialParish]);
+  }, [initialTrade, initialParish, initialDesc]);
 
   /* Written on every change, not on every stage. Somebody who closes the tab
      mid-sentence gets the sentence back. */
@@ -168,9 +175,9 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
 
   const startAgain = useCallback(() => {
     try { window.localStorage.removeItem(DRAFT_KEY); } catch { /* nothing to clear */ }
-    setF({ ...EMPTY_FIELDS, trade: askedFor(initialTrade, TRADES), parish: askedFor(initialParish, PARISHES) });
+    setF({ ...EMPTY_FIELDS, trade: askedFor(initialTrade, TRADES), parish: askedFor(initialParish, PARISHES), desc: initialDesc ?? "" });
     setJobId(""); setPortalCode(""); setRestored(false); setError(""); setSaveFailed(false); setStage(0);
-  }, [initialTrade, initialParish]);
+  }, [initialTrade, initialParish, initialDesc]);
 
   async function call(fn: string, body: Record<string, unknown>) {
     const sb = createClient();
@@ -256,9 +263,30 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
     if (i >= 0) { setError(""); setSaveFailed(false); setStage(i); }
   }
 
+  /* A job posted by somebody already signed in to the portal, with the same
+     email they typed, joins their portal now rather than waiting for them to
+     click a link that says "set up" (claim_my_posted_job, 20260929000000).
+     Found 28 Sep 2026: exactly that person posted a job and could not find
+     it. Best effort: if it does not go through, the join link below is still
+     offered, which is how every job was claimed before. */
+  async function joinMyPortal(): Promise<boolean> {
+    if (!jobId || !portalCode) return false;
+    try {
+      const sb = createClient();
+      const { data: { user } } = await sb.auth.getUser();
+      if (!joinsSignedInPortal(user?.email, f.contact)) return false;
+      const { data, error } = await sb.rpc("claim_my_posted_job", { p_job: jobId, p_code: portalCode });
+      return !error && data === true;
+    } catch {
+      return false;
+    }
+  }
+
   async function send() {
     setError(""); setSaveFailed(false); setBusy(true);
     try {
+      const joined = await joinMyPortal();
+      setInPortal(joined);
       const joinLink = jobId && portalCode
         ? `https://app.yaadly.co.uk/portal/join?job=${encodeURIComponent(jobId)}&code=${encodeURIComponent(portalCode)}&next=photos`
         : "";
@@ -267,7 +295,7 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
         contact: f.contact.trim(),
         topic: "Property in Jamaica that needs work doing",
         message:
-          `Job posted from the site, no account.\n\n` +
+          (joined ? `Job posted from the site, signed in: it is already in their portal.\n\n` : `Job posted from the site, no account.\n\n`) +
           `Reference: ${jobId || "draft not saved"}\n` +
           (requestedWorker ? `Client asked for: ${requestedWorker}\n` : "") +
           `Trade: ${f.trade}\nParish: ${f.parish}\n` +
@@ -323,7 +351,23 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
             link the moment they ask about a job in this state; the wizard is
             the same product and should not be a worse route to the same
             door. */}
-        {jobId && portalCode && (
+        {jobId && inPortal && (
+          <div className="mt-6 max-w-[62ch] rounded-2xl border border-teal/40 bg-teal/5 p-6 text-[14.5px] leading-relaxed text-mute">
+            <b className="text-ink">It is already in your portal.</b>
+            <p className="mt-2">
+              You were signed in with the same email, so this job is on your
+              portal now, with quotes, evidence and approvals to follow there.
+              {photoCount > 0 ? "" : " Add photographs from the job's page whenever you are ready."}
+            </p>
+            <Link
+              href="/portal/client"
+              className="mt-4 inline-block rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110"
+            >
+              Open my portal
+            </Link>
+          </div>
+        )}
+        {jobId && portalCode && !inPortal && (
           <div className="mt-6 max-w-[62ch] rounded-2xl border border-teal/40 bg-teal/5 p-6 text-[14.5px] leading-relaxed text-mute">
             {/* Not "send your photos" any more when they already have. The
                 form takes them now, so this screen has to know whether it is
@@ -915,7 +959,12 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
                 </p>
               )}
               <p className="text-[12.5px] leading-relaxed text-dim">
-                Photographs come after this, on the next screen. Your name and
+                {/* Said "Photographs come after this, on the next screen"
+                    until 28 Sep 2026, left over from when photos followed the
+                    review. They are the screen before this one now, and more
+                    can be added from the portal after sending. */}
+                Any photographs you attached are already on the job, and you
+                can add more from your portal after sending. Your name and
                 the way to reach you go to Yaadly only, never onto the
                 marketplace.
               </p>

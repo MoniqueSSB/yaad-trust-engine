@@ -248,8 +248,20 @@ Deno.serve(async (req: Request) => {
     }
     const otp = String(link.properties.email_otp);
 
+    /* A code asked for WITH a job code came off /portal/join, and only that
+       page attaches the job to the account once the code is typed. Found on
+       28 Sep 2026: the founder took a code from this email to the ordinary
+       sign in page, was signed in, and found no job, because nothing here
+       said where the code belonged. Said only on this path; a plain sign in
+       has nothing to attach and the extra sentence would mislead. */
+    const where = role === "client" && code
+      ? `Type it on the Yaadly page where you asked for it, the one headed "Finish your job". ` +
+        `That is the step that attaches your job to your account. ` +
+        `If that page is closed, open the link Yaadly sent you again and ask for a fresh code there. `
+      : "";
+
     const line =
-      `Your Yaadly sign in code is ${otp}. It lasts about an hour and it is single use. ` +
+      `Your Yaadly sign in code is ${otp}. ${where}It lasts about an hour and it is single use. ` +
       `If you did not ask for it, ignore this and nothing happens.`;
 
     let emailed = false;
@@ -271,6 +283,7 @@ Deno.serve(async (req: Request) => {
               html:
                 `<p>Your Yaadly sign in code is:</p>` +
                 `<p style="font-size:28px;font-weight:700;letter-spacing:4px">${otp}</p>` +
+                (where ? `<p>${where.trim()}</p>` : "") +
                 `<p>It lasts about an hour and it is single use. If you did not ask for it, ignore this and nothing happens.</p>`,
             }),
             signal: AbortSignal.timeout(15000),

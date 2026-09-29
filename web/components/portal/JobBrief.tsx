@@ -42,7 +42,12 @@ export function JobBrief({
   trade?: string | null;
   parish?: string | null;
 }) {
-  const { scope, sections } = parseBrief(descr);
+  /* yaad-post-job appends "Submitted through the job wizard on
+     yaadly.co.uk." for the desk; on 28 Sep 2026 it was showing in the
+     client's own copy of their job. The stored text is left as it is. */
+  const { scope, sections } = parseBrief(
+    descr.replace(/\s*Submitted through the job wizard on yaadly\.co\.uk\.?\s*/gi, "\n").trim(),
+  );
 
   // Semicolons are how yaad-inbound joins them; the WhatsApp path writes one
   // per line. Both end up as a list rather than a paragraph, because these are

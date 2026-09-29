@@ -62,7 +62,17 @@ export function StageLedger({
   side,
   jobBase,
   source,
+  paidInFull = false,
+  showPayment = false,
 }: {
+  /** The per-stage invoice line. Off since 28 Sep 2026 (founder: approvals
+      shows what is approved and what is not; the money is on the Money tab,
+      which lists who has been paid for each stage). */
+  showPayment?: boolean;
+  /** The client paid the whole job on one bill before work started
+      (billing_mode in_full). Accepting a stage then releases the worker's
+      pay for it and raises nothing for the client. */
+  paidInFull?: boolean;
   stages: LedgerStage[];
   side: "client" | "worker";
   jobBase: string;
@@ -98,7 +108,16 @@ export function StageLedger({
         names its own evidence and releases its own share of the price.
       </p>
 
-      {stages.map((s) => {
+      {/* Founder, 28 Sep 2026: the stage being worked sits at the top, what
+          comes next under it, and a stage that is finished drops to the
+          bottom. Numbers stay on every card, so the order of work is still
+          readable. */}
+      {[...stages]
+        .sort((a, b) => {
+          const rank = (x: LedgerStage) => (x.approved ? 2 : x.current ? 0 : 1);
+          return rank(a) - rank(b) || a.n - b.n;
+        })
+        .map((s) => {
         const state = s.approved ? "done" : s.current ? "now" : "todo";
         return (
           <div
@@ -227,11 +246,21 @@ export function StageLedger({
                 </span>
               </span>
 
+              {showPayment && (
               <span className="flex items-start gap-2.5 text-[12.5px] leading-relaxed text-mute">
                 {s.invoicePaid ? Ico.ok : s.invoiceId ? Ico.wait : Ico.soon}
                 <span>
-                  <b className="font-semibold text-ink">{side === "client" ? "Invoice:" : "Your pay invoice:"}</b>{" "}
-                  {s.invoiceId ? (
+                  <b className="font-semibold text-ink">{side === "client" ? (paidInFull ? "Payment:" : "Invoice:") : "Your pay invoice:"}</b>{" "}
+                  {side === "client" && paidInFull ? (
+                    /* Found 28 Sep 2026 on a job paid in full up front: stage
+                       1 read "none recorded against this stage" and stages 2
+                       and 3 "not raised until you accept this stage", which
+                       told a client who had already paid that more bills were
+                       coming. Accepting a stage releases the worker's pay. */
+                    s.approved
+                      ? "covered by your job bill. Accepting it released the worker's pay for this stage"
+                      : "covered by your job bill. Accepting it releases the worker's pay for this stage, and costs you nothing more"
+                  ) : s.invoiceId ? (
                     <>
                       <span className="font-mono-app text-[11.5px]">{s.invoiceId}</span>
                       {s.invoicePaid ? " · paid" : " · raised, not yet paid"}
@@ -249,6 +278,7 @@ export function StageLedger({
                   )}
                 </span>
               </span>
+              )}
 
               {s.current && s.evidenceFiled > 0 && !s.approved && side === "client" && (
                 <div className="mt-0.5 flex flex-wrap items-center gap-3">

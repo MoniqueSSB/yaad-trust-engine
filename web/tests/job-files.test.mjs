@@ -50,8 +50,11 @@ describe("what a file may be", () => {
     assert.equal(m.fileProblem("application/pdf", 0), "no file chosen");
   });
 
-  test("the size cap sits under the bucket's 26214400", () => {
-    assert.ok(m.MAX_FILE_BYTES < 26214400);
+  // The bucket's file_size_limit, raised from 26214400 by 20260929090000 when
+  // uploads moved straight to Storage (founder, 28 Sep 2026). The rule this
+  // test holds is unchanged: the app's cap stays under the bucket's.
+  test("the size cap sits under the bucket's 104857600", () => {
+    assert.ok(m.MAX_FILE_BYTES < 104857600);
     assert.match(m.fileProblem("application/pdf", m.MAX_FILE_BYTES + 1), /too large/);
   });
 

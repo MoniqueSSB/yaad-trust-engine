@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { WORKER_STATUS } from "@/components/portal/JobList";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -24,6 +25,10 @@ import { jobGates } from "@/lib/portal/gates";
 import { materialsReceipt } from "@/lib/portal/materials-receipt";
 import { DocStrip, type Doc } from "@/components/portal/DocStrip";
 import { TabBar, TABS, type TabKey } from "@/components/portal/TabBar";
+import { AddOnPanel, AddonApprove, type AddonInvoice, type AddonPhoto, type AddonRow } from "@/components/portal/AddOnPanel";
+import { addonClientBill, addonStateLine, addonWorkerPay, waitingOn } from "@/lib/jobs/addon";
+import { MoneyTrail, type TrailWorkerPay } from "@/components/portal/MoneyTrail";
+import { JobAddress } from "@/components/portal/JobAddress";
 import { EvidenceLedger } from "@/components/portal/EvidenceLedger";
 import { GoLive, type Gate } from "@/components/portal/GoLive";
 import { Outstanding, type OutItem } from "@/components/portal/Outstanding";
@@ -357,6 +362,89 @@ export default async function JobRoom({
         .order("created_at", { ascending: true }),
     ]);
 
+  /* Extra work on a booked job (20260928235000). Read on its own so a
+     database without the add-on tables yet returns nothing here rather than
+     taking the whole room down with it. RLS returns these to the job's own
+     client and booked worker only. */
+  const [{ data: addonRows }, { data: addonInvRows }, { data: addonEvRows }] = await Promise.all([
+    supabase
+      .from("job_addons")
+      .select("id,rev,scope,amount_jmd,terms,status,last_edit_side,history,closed_reason,signed_off_at,created_at")
+      .eq("job_id", id)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("invoices")
+      .select("id,addon_id,status,total_pence,payable_to,period_label")
+      .eq("job_id", id)
+      .not("addon_id", "is", null),
+    supabase.from("job_addon_evidence").select("id,addon_id,label,storage_path,created_at").eq("job_id", id).order("created_at", { ascending: true }),
+  ]);
+  const addons = (addonRows ?? []) as AddonRow[];
+  const addonInvoices = (addonInvRows ?? []) as AddonInvoice[];
+  const addonEvidenceCounts: Record<string, number> = {};
+  const addonEvList = (addonEvRows ?? []) as { id: string; addon_id: string; label: string | null; storage_path: string | null; created_at: string }[];
+  for (const r of addonEvList) {
+    addonEvidenceCounts[r.addon_id] = (addonEvidenceCounts[r.addon_id] ?? 0) + 1;
+  }
+  /* The photographs themselves, so the client can approve on them (28 Sep
+     2026). Same private bucket and five minute signed URLs as stage
+     evidence. */
+  const addonPhotos: Record<string, AddonPhoto[]> = {};
+  if (addonEvList.length) {
+    const paths = addonEvList.map((r) => r.storage_path).filter((x): x is string => !!x);
+    const { data: signedAddon } = paths.length
+      ? await supabase.storage.from("evidence").createSignedUrls(paths, 300)
+      : { data: [] as { path: string | null; signedUrl: string }[] };
+    const urlOf = new Map((signedAddon ?? []).map((r) => [r.path, r.signedUrl]));
+    for (const r of addonEvList) {
+      (addonPhotos[r.addon_id] ??= []).push({
+        id: r.id,
+        label: r.label,
+        img: r.storage_path ? (urlOf.get(r.storage_path) ?? null) : null,
+        created_at: r.created_at,
+      });
+    }
+  }
+  /* Agreed extra work counts in the job's money (founder, 28 Sep 2026: it
+     was on the Extra work tab only, and "What this job costs" left it out).
+     Shown as its own "Additional work" section under the main work, never
+     folded into the main work's total, so the two cannot be confused.
+     Agreed and approved add-ons only; one still being agreed, turned down,
+     withdrawn or cancelled is not money anybody owes. */
+  const countedAddons = addons.filter((a) => a.status === "agreed" || a.status === "signed_off");
+
+  /* Who has been paid (20260929060000), for the Money tab. Read on its own
+     and allowed to fail: before that migration is applied the function does
+     not exist, and the tab then shows nothing paid rather than breaking. */
+  const { data: payRows } = await supabase.rpc("job_worker_payments", { p_job: id });
+  const workerPays: TrailWorkerPay[] = ((payRows ?? []) as {
+    invoice_id: string; addon_id: string | null; what: string; labour_jmd: number | null; status: string; paid_at: string | null;
+  }[]).map((r) => ({ id: r.invoice_id, addonId: r.addon_id, what: r.what, labour: r.labour_jmd, paid: r.status === "paid", paidAt: r.paid_at }));
+
+  /* Whether each piece of extra work has been paid for (20260929080000).
+     The worker cannot read the client's invoices, so without this their
+     card never said the work could start and never offered the photo
+     upload. Falls back to the client's own invoices when the function is
+     not there yet. */
+  const { data: billRows } = await supabase.rpc("job_addon_bill_state", { p_job: id });
+  const addonBill: Record<string, "none" | "sent" | "paid"> = {};
+  for (const r of (billRows ?? []) as { addon_id: string; bill_state: "none" | "sent" | "paid" }[]) addonBill[r.addon_id] = r.bill_state;
+  for (const i of addonInvoices) {
+    if (i.payable_to === "worker" || !i.addon_id) continue;
+    if (i.status === "paid") addonBill[i.addon_id] = "paid";
+    else if (i.status === "sent" && addonBill[i.addon_id] !== "paid") addonBill[i.addon_id] = "sent";
+  }
+
+  /* Extra work waiting on the client's approval: agreed, its invoice paid,
+     and at least one photo filed. The same gates approve_addon_as_me() uses,
+     so this never offers a button the database would refuse. */
+  const addonsToApprove = addons.filter(
+    (a) =>
+      a.status === "agreed" &&
+      addonInvoices.some((i) => i.addon_id === a.id && i.payable_to !== "worker" && i.status === "paid") &&
+      (addonEvidenceCounts[a.id] ?? 0) > 0,
+  );
+
   const { data: myReview } = await supabase
     .from("reviews")
     .select("id")
@@ -378,7 +466,43 @@ export default async function JobRoom({
     .limit(1)
     .maybeSingle();
 
+  /* The worker's own set up is their own Worker Guidelines signature, at
+     the current version, the same rule jq_insert_vetted applies. Until
+     28 Sep 2026 a worker's job room showed the CLIENT's set up checklist
+     ("Confirm your email address", "Sign the Client Guidelines") and listed
+     the Client Guidelines under "Your documents". */
+  const { data: wgSig } = role === "worker"
+    ? await supabase
+        .from("doc_signatures")
+        .select("id")
+        .eq("doc_type", "worker_guidelines")
+        .eq("doc_version", legal.WG_VERSION)
+        .ilike("signer_email", email)
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+  const workerSigned = !!wgSig;
+
   const ev = (evidence ?? []) as Evidence[];
+
+  /* Corrections (20260929040000), read on their own and allowed to fail: until
+     that migration is applied the column and the table do not exist, and a
+     missing correction must never take the evidence list down with it. */
+  if (ev.length) {
+    const [{ data: corr }, { data: hist }] = await Promise.all([
+      supabase.from("evidence").select("id,corrected_at").eq("job_id", id).not("corrected_at", "is", null),
+      supabase.from("evidence_corrections").select("evidence_id,old_label,at").eq("job_id", id).order("at", { ascending: true }),
+    ]);
+    const correctedAt = new Map((corr ?? []).map((c) => [c.id as string, c.corrected_at as string]));
+    const firstLabel = new Map<string, string | null>();
+    for (const h of hist ?? []) {
+      if (!firstLabel.has(h.evidence_id as string)) firstLabel.set(h.evidence_id as string, (h.old_label as string | null) ?? null);
+    }
+    for (const e of ev as (Evidence & { corrected_at?: string | null; first_label?: string | null })[]) {
+      e.corrected_at = correctedAt.get(e.id) ?? null;
+      e.first_label = firstLabel.get(e.id) ?? null;
+    }
+  }
 
   /* Evidence filed since the bucket move lives in private storage, so the page
      mints a short-lived signed URL per object as it renders. Nothing in that
@@ -799,7 +923,7 @@ export default async function JobRoom({
       detail:
         "Your card payment for " + amount(feeInvoice.total_pence, feeInvoice.currency) +
         " came through. A person at Yaadly checks it and signs it off. Then the bill shows as Paid and the project starts. There is nothing more to pay on it.",
-      href: jobBase + "?tab=approvals#invoice-" + feeInvoice.id,
+      href: jobBase + "?tab=money#invoice-" + feeInvoice.id,
       cta: "See it",
     });
   } else if (job.status === "awaiting_payment") {
@@ -825,7 +949,7 @@ export default async function JobRoom({
          where the independent check panel and the stage ledger sit above
          it and the invoice is a long scroll down. */
       href: isClient
-        ? jobBase + "?tab=approvals#" + (feeInvoice ? "invoice-" + feeInvoice.id : "invoices")
+        ? jobBase + "?tab=money#" + (feeInvoice ? "invoice-" + feeInvoice.id : "invoices")
         : undefined,
       cta: isClient ? "See the invoice" : undefined,
     });
@@ -922,6 +1046,27 @@ export default async function JobRoom({
      receipt against the money is still one named person's decision at the
      desk, and a filed receipt never records itself. */
   const receipt = materialsReceipt(matReleases, jobFiles);
+  /* The street address, once somebody is booked to go there (28 Sep 2026:
+     a job at stage 2 had none, and nothing asked for it). */
+  if (job.worker_email && !addr && job.status !== "complete") {
+    outstanding.push(
+      isClient
+        ? {
+            who: "you",
+            title: "Add the street address",
+            detail: "Your tradesperson is booked and needs it to find the property. Only they and Yaadly see it.",
+            href: jobBase + "?tab=details#address",
+            cta: "Add it",
+          }
+        : {
+            who: "them",
+            title: "Waiting on the street address",
+            detail: "The client has been asked for it. Do not set off until it is on Job details.",
+            href: jobBase + "?tab=details#address",
+            cta: "See it",
+          },
+    );
+  }
   if (receipt.state === "due" && job.status !== "complete") {
     outstanding.push({
       who: isClient ? "them" : "you",
@@ -966,7 +1111,7 @@ export default async function JobRoom({
         who: "yaadly",
         title: "Card payment received for " + inv.id + ". A person at Yaadly signs it off",
         detail: "It came through by card. A person at Yaadly checks it and signs it off, then the invoice shows as Paid. There is nothing more to pay on it.",
-        href: jobBase + "?tab=approvals#invoice-" + inv.id,
+        href: jobBase + "?tab=money#invoice-" + inv.id,
         cta: "See it",
       });
     } else if (inv.status === "sent" && inv.payable_to !== "worker" && isClient) {
@@ -974,7 +1119,7 @@ export default async function JobRoom({
         who: "you",
         title: "Invoice " + inv.id + " is unpaid",
         detail: "Sent" + (inv.issue_date ? " on " + inv.issue_date : "") + ". Paid by bank transfer.",
-        href: jobBase + "?tab=approvals#invoice-" + inv.id,
+        href: jobBase + "?tab=money#invoice-" + inv.id,
         cta: "See it",
       });
     }
@@ -995,11 +1140,13 @@ export default async function JobRoom({
   const stepState = (done: boolean, now: boolean): Step["state"] =>
     done ? "done" : now ? "now" : "todo";
 
-  const setupSteps: Step[] = gates.map((g) => ({
-    title: g.title,
-    state: g.done ? "done" : ("now" as const),
-  }));
-  const setupDone = gates.every((g) => g.done);
+  const setupSteps: Step[] = role === "worker"
+    ? [{ title: `Sign the Worker Guidelines, version ${legal.WG_VERSION}`, state: workerSigned ? "done" : "now" }]
+    : gates.map((g) => ({
+        title: g.title,
+        state: g.done ? "done" : ("now" as const),
+      }));
+  const setupDone = setupSteps.every((x) => x.state === "done");
 
   const hasQuotes = qs.length > 0;
   const hasWon = !!won;
@@ -1079,7 +1226,7 @@ export default async function JobRoom({
   const phases: Phase[] = [
     {
       title: "Set up",
-      summary: setupDone ? "Done" : gates.filter((g) => g.done).length + " of " + gates.length + " done",
+      summary: setupDone ? "Done" : setupSteps.filter((x) => x.state === "done").length + " of " + setupSteps.length + " done",
       state: phaseState(setupDone, !setupDone),
       steps: setupSteps,
       href: jobBase + "?tab=overview",
@@ -1122,15 +1269,25 @@ export default async function JobRoom({
      exist; a blank row is not, and the client had been reading blank rows as
      breakage. */
   const docs: Doc[] = [
-    {
-      icon: "\u2713",
-      title: "Client Guidelines",
-      note: signed
-        ? "Signed, immutable, version " + legal.CG_VERSION
-        : "Sign these and the job can go to workers",
-      state: signed ? "ready" : "not_completed",
-      href: "/portal/guidelines",
-    },
+    role === "worker"
+      ? {
+          icon: "\u2713",
+          title: "Worker Guidelines",
+          note: workerSigned
+            ? "Signed, immutable, version " + legal.WG_VERSION
+            : "A newer version is waiting for your signature",
+          state: workerSigned ? "ready" : "not_completed",
+          href: workerSigned ? "/portal/guidelines/worker" : "/portal/guidelines",
+        }
+      : {
+          icon: "\u2713",
+          title: "Client Guidelines",
+          note: signed
+            ? "Signed, immutable, version " + legal.CG_VERSION
+            : "Sign these and the job can go to workers",
+          state: signed ? "ready" : "not_completed",
+          href: signed ? "/portal/guidelines/client" : "/portal/guidelines",
+        },
     {
       icon: confirmedQuote ? "\ud83d\udcc4" : "\u25cb",
       title: "Quote Pack",
@@ -1152,6 +1309,7 @@ export default async function JobRoom({
             note: "Scope, milestones and the evidence checklist",
             state: approvedPack.status === "approved" ? "ready" : "in_progress",
             href: jobBase + "/pack",
+            pdfHref: jobBase + "/pack/all",
           } satisfies Doc,
         ]
       : []),
@@ -1170,7 +1328,12 @@ export default async function JobRoom({
   /* The tab is a search param, so every pane is a real address that survives
      a reload and can be pasted into a message. Anything unrecognised falls
      back to the overview rather than an empty screen. */
-  const tab: TabKey = (TABS.find((t) => t.key === tabParam)?.key ?? "overview");
+  /* A card payment comes back from Stripe on ?card=. Until yaad-checkout is
+     redeployed it still returns to the Approvals tab, where the invoices no
+     longer live (28 Sep 2026), so that one case opens Money instead. */
+  const tab: TabKey = cardParam && tabParam === "approvals"
+    ? "money"
+    : (TABS.find((t) => t.key === tabParam)?.key ?? "overview");
 
   /* jobs.status = 'evidence' is the moment the money is waiting on a human
      rather than on the work. The ledger leads with it, and it is what makes
@@ -1190,7 +1353,9 @@ export default async function JobRoom({
     scope: qs.length,
     evidence: ev.length,
     messages: chat.length,
-    approvals: (awaitingApproval && isClient ? 1 : 0) + unpaidClientInvoices,
+    approvals: (awaitingApproval && isClient ? 1 : 0) + (isClient ? addonsToApprove.length : 0),
+    money: unpaidClientInvoices,
+    extra: addons.filter((a) => waitingOn(a.status) === role).length,
     help: helpOpen,
   };
 
@@ -1198,7 +1363,13 @@ export default async function JobRoom({
      fixed UTC-5, no daylight saving to chase. */
   const jamaicaToday = new Date(new Date().getTime() - 5 * 3600_000).toISOString().slice(0, 10);
   const arrivalRows = arrivals ?? [];
-  const checkedInToday = arrivalRows.some((a) => a.arrived_on === jamaicaToday);
+  /* Today AND this stage, the same pair log_arrival() is unique on. It was
+     today alone until 28 Sep 2026, so a stage 1 check-in told the client
+     "checked in today for stage 2" once stage 1 was approved, and hid the
+     worker's stage 2 button for the rest of the day. */
+  const checkedInToday = arrivalRows.some(
+    (a) => a.arrived_on === jamaicaToday && a.stage === Math.max(job.stage ?? 0, 1),
+  );
   const recentArrivals = arrivalRows.map((a) => ({
     stage: a.stage as number,
     arrivedAt: whenDateTime(a.arrived_at) ?? "",
@@ -1227,7 +1398,16 @@ export default async function JobRoom({
         parish={job.parish}
         addr={addr}
         addrHidden={role === "worker" && !bookedWorker}
-        statusLabel={STATUS_LABEL[job.status] ?? job.status}
+        /* The worker reads the worker's wording. This used the client map for
+           everybody until 28 Sep 2026, so a worker whose evidence was with the
+           client was told "Evidence waiting on you" directly above "The client
+           is reviewing your stage 1 evidence". WORKER_STATUS is the same map
+           the worker's job list already uses. */
+        statusLabel={
+          role === "worker"
+            ? (WORKER_STATUS[job.status]?.label ?? job.status)
+            : (STATUS_LABEL[job.status] ?? job.status)
+        }
         stageDetail={
           jobStage > 0 && job.status !== "complete"
             ? "Stage " + jobStage + (packStages.length ? " of " + packStages.length : "")
@@ -1329,10 +1509,15 @@ export default async function JobRoom({
           }
         />
       )}
-      {role === "client" && (movedOn || onBoard) && (
+      {/* Once the job has moved on (someone booked), this strip sits on Job
+          details only. It used to sit above the tabs on every page, so the
+          client's evidence overview carried an "Add a photo" action (founder,
+          28 Sep 2026: evidence is an overview, nothing to act on). While the
+          job is still on the board it stays above the tabs, where it helps. */}
+      {role === "client" && (onBoard || (movedOn && tab === "details")) && (
         <section className="mt-4 rounded-2xl border border-line bg-panel px-4 pb-4 pt-3">
           <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
-            Your listing
+            {onBoard ? "Your listing" : "Photos of the property"}
           </p>
           <JobEditTools
             jobId={job.id}
@@ -1721,7 +1906,67 @@ export default async function JobRoom({
           side={role === "worker" ? "worker" : "client"}
           jobBase={jobBase}
           source={packSource}
+          paidInFull={!!won && billingModeOf(won.billing_mode) === "in_full"}
         />
+        {/* Extra work waiting on the client's approval (founder, 28 Sep
+            2026): approvals shows what is approved and what is not, stages
+            and extra work alike. */}
+      {/* The FAQ's own "or": at sign-off a client can approve straight off
+          the evidence, or ask to walk the site live instead. On Approvals
+          since 28 Sep 2026 (founder: the evidence tab is an overview, with
+          nothing to act on), next to the button it is an alternative to. */}
+      {/* A job completing (stage >= 5) has nothing to do with whether a
+          walkthrough's notes are confirmed yet. The panel stays available
+          once a walkthrough is in play so an unconfirmed set of notes is
+          never stranded off-screen; it only stops offering a fresh
+          request once the job is done. */}
+      {job.worker_email && (job.status !== "complete" || job.signoff_method === "walkthrough") && (
+        <WalkthroughPanel
+          jobId={job.id}
+          role={role === "worker" ? "worker" : "client"}
+          walkPlatform={job.walk_platform ?? null}
+          walkLink={job.walk_link ?? null}
+          walkDate={job.walk_date ?? null}
+          walkWho={job.walk_who ?? null}
+          walkNotes={job.walk_notes ?? null}
+          walkCallNotes={job.walk_call_notes ?? null}
+          walkNotesConfirmedAt={job.walk_notes_confirmed_at ?? null}
+        />
+      )}
+        {role === "client" && addonsToApprove.map((a) => (
+          <section key={a.id} className="mt-4 rounded-2xl border border-line bg-panel p-5">
+            <h2 className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Extra work to approve</h2>
+            <p className="mt-2 max-w-[62ch] whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink">{a.scope}</p>
+            <p className="mt-1.5 text-[12.5px] text-mute">
+              {(addonEvidenceCounts[a.id] ?? 0)} photo{(addonEvidenceCounts[a.id] ?? 0) === 1 ? "" : "s"} filed. See them on{" "}
+              <Link href="?tab=extra" className="font-bold text-tealb underline-offset-2 hover:underline">Extra work</Link>.
+            </p>
+            <AddonApprove jobId={job.id} addonId={a.id} amountLabel={money(a.amount_jmd) ?? ""} otherName={won?.worker_name ?? job.worker_name ?? "the tradesperson"} />
+          </section>
+        ))}
+        {addons.some((a) => a.status === "agreed" || a.status === "signed_off") && (
+          <section className="mt-4 rounded-2xl border border-line bg-panel p-5">
+            <h2 className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Extra work</h2>
+            <ul className="mt-2 grid gap-1.5">
+              {addons.filter((a) => a.status === "agreed" || a.status === "signed_off").map((a) => (
+                <li key={a.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-bg/40 px-3.5 py-2.5 text-[12.5px]">
+                  <span className="min-w-0 flex-1 text-ink">{a.scope.slice(0, 90)}{a.scope.length > 90 ? "…" : ""}</span>
+                  <span className={"rounded-full px-2.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide " + (a.status === "signed_off" ? "bg-tealb/15 text-tealb" : "bg-mango/15 text-mango")}>
+                    {a.status === "signed_off" ? "Approved" : "Not approved yet"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        </>
+      )}
+
+      {/* Founder, 28 Sep 2026: the money on its own tab, for both sides:
+          what the job costs, where the money is, who has been paid, and the
+          invoices. */}
+      {tab === "money" && (
+        <>
         {/* Back from Stripe's payment page. Said plainly either way: a
             cancelled payment charged nothing, and a completed one is not
             "paid" until Yaadly confirms it. */}
@@ -1735,6 +1980,23 @@ export default async function JobRoom({
             Card payment cancelled. Nothing was charged.
           </p>
         )}
+        <MoneyTrail
+          side={role === "worker" ? "worker" : "client"}
+          bills={invoices
+            .filter((i) => i.payable_to !== "worker" && (i.currency ?? "JMD").toUpperCase() === "JMD" && !i.part_of)
+            .map((i) => ({ id: i.id, label: i.period_label ?? i.id, total: i.total_pence, paid: i.status === "paid", paidAt: i.paid_at }))}
+          workerPays={workerPays}
+          materials={won ? {
+            released: materialsReleasedJmd,
+            quoted: materialsQuoted,
+            /* "none" with money sent means every release has its receipt
+               recorded at the desk; it read "still to come" until 28 Sep. */
+            receipt: receipt.state === "due" ? "due" : receipt.state === "filed" ? "filed" : "recorded",
+          } : null}
+          money={money}
+          day={whenDate}
+          workerName={won?.worker_name ?? job.worker_name ?? "the tradesperson"}
+        />
         <MoneyPanel
           cardPayments={role === "client" ? cardPayments : {}}
           cardReturning={role === "client" && cardParam === "paid"}
@@ -1749,6 +2011,43 @@ export default async function JobRoom({
           money={money}
           materialsReleased={materialsReleasedJmd}
           check={role === "client" ? checkLine : null}
+          extraWork={addons
+            /* Every piece of extra work that is live or settled, founder 28
+               Sep 2026. Turned down or withdrawn ones never had money, so they
+               stay on the Extra work tab only; a cancelled one is listed only
+               if its bill was paid, because then there is money to account for. */
+            .filter((a) => a.status !== "declined" && a.status !== "withdrawn" && (a.status !== "cancelled" || addonBill[a.id] === "paid"))
+            /* Being agreed first, then agreed, then approved, closed last:
+               the same order as the Extra work tab. */
+            .sort((x, y) => {
+              const r = (a: AddonRow) =>
+                a.status === "with_worker" || a.status === "with_client" ? 0 : a.status === "agreed" ? 1 : a.status === "signed_off" ? 2 : 3;
+              return r(x) - r(y) || (y.created_at ?? "").localeCompare(x.created_at ?? "");
+            })
+            .map((a) => {
+            const c = addonClientBill(a.amount_jmd, a.terms);
+            const pay = addonWorkerPay(a.amount_jmd);
+            const counted = a.status === "agreed" || a.status === "signed_off";
+            const bill = addonBill[a.id] ?? "none";
+            const workerPay = workerPays.find((p) => p.addonId === a.id);
+            const other = role === "client" ? (won?.worker_name ?? job.worker_name ?? "the tradesperson") : "the client";
+            const billWords = role === "client"
+              ? (bill === "paid" ? "Its invoice is paid." : bill === "sent" ? "Its invoice is sent, not paid yet." : counted ? "Its invoice is being prepared." : "")
+              : (bill === "paid" ? "The client has paid for it, so the work can start." : counted ? "Waiting on the client's payment before the work starts." : "");
+            const payWords = workerPay
+              ? (workerPay.paid ? (role === "client" ? " The tradesperson has been paid for it." : " Paid to you.") : (role === "client" ? " Approved; the tradesperson is not paid yet." : " Approved; owed to you, not paid yet."))
+              : "";
+            const cancelledWords = a.status === "cancelled" ? " Cancelled after it was paid for: Yaadly settles this with you." : "";
+            const line = role === "client"
+              ? { id: a.id, scope: a.scope, work: c.amount, fee: c.fee, total: c.total, status: a.status }
+              : { id: a.id, scope: a.scope, work: a.amount_jmd, fee: a.amount_jmd - pay, total: pay, status: a.status };
+            return {
+              ...line,
+              counted,
+              stateLabel: addonStateLine(a.status, role === "client" ? "client" : "worker", other),
+              moneyNote: (billWords + payWords + cancelledWords).trim() || null,
+            };
+          })}
         />
         </>
       )}
@@ -1818,6 +2117,35 @@ export default async function JobRoom({
         </section>
       )}
 
+      {job.status === "complete" && !myReview && (
+        <div id="review" className="scroll-mt-6">
+        <ReviewForm
+          jobId={job.id}
+          direction={role === "client" ? "client_of_worker" : "worker_of_client"}
+          subjectEmail={(role === "client" ? job.worker_email : job.client_email) ?? ""}
+          subjectName={role === "client" ? (job.worker_name ?? "the worker") : "the client"}
+        />
+        </div>
+      )}
+      {job.status === "complete" && myReview && (
+        <p className="mt-4 rounded-2xl border border-softline bg-soft px-4 py-3 text-[13px] text-mute">
+          Your review of this job is in. It publishes when the other side
+          writes theirs, or after fourteen days.
+        </p>
+      )}
+        </>
+      )}
+
+      {tab === "details" && (
+        <>
+      <JobAddress
+        jobId={job.id}
+        role={role === "worker" ? "worker" : "client"}
+        addr={addr}
+        parish={job.parish ?? null}
+        booked={!!job.worker_email}
+        closed={job.status === "complete"}
+      />
       {role === "client" && (
         <PortalCard
           reference={job.id}
@@ -1838,12 +2166,6 @@ export default async function JobRoom({
                 <>
                   <dt className="text-mute">Trade</dt>
                   <dd className="text-right">{job.trade}</dd>
-                </>
-              )}
-              {(role === "client" || bookedWorker) && (
-                <>
-                  <dt className="text-mute">Address</dt>
-                  <dd className="text-right">{addr ?? <span className="text-dim">Not added yet</span>}</dd>
                 </>
               )}
               {job.parish && (
@@ -1886,22 +2208,6 @@ export default async function JobRoom({
         role={role === "worker" ? "worker" : "client"}
       />
 
-      {job.status === "complete" && !myReview && (
-        <div id="review" className="scroll-mt-6">
-        <ReviewForm
-          jobId={job.id}
-          direction={role === "client" ? "client_of_worker" : "worker_of_client"}
-          subjectEmail={(role === "client" ? job.worker_email : job.client_email) ?? ""}
-          subjectName={role === "client" ? (job.worker_name ?? "the worker") : "the client"}
-        />
-        </div>
-      )}
-      {job.status === "complete" && myReview && (
-        <p className="mt-4 rounded-2xl border border-softline bg-soft px-4 py-3 text-[13px] text-mute">
-          Your review of this job is in. It publishes when the other side
-          writes theirs, or after fourteen days.
-        </p>
-      )}
         </>
       )}
 
@@ -1938,7 +2244,16 @@ export default async function JobRoom({
                     {m.sent_at ? "Sent " + whenDate(m.sent_at) : "Being sent"}
                   </span>
                   <span className="text-dim">
-                    {m.receipt_ref?.trim() ? "Receipt " + m.receipt_ref : m.sent_at ? "Receipt to come" : ""}
+                    {/* "Receipt to come" sat here next to an overview saying
+                        the receipt was filed (28 Sep 2026): the release row
+                        only learns of a receipt when Yaadly records it, while
+                        a filed file is already on the job. Same source the
+                        overview uses, materialsReceipt(). */}
+                    {m.receipt_ref?.trim()
+                      ? "Receipt " + m.receipt_ref
+                      : receipt.state === "filed"
+                        ? "Receipt filed, being checked"
+                        : m.sent_at ? "Receipt to come" : ""}
                   </span>
                   <span className="ml-auto text-dim">
                     {m.released_at ? whenDate(m.released_at) : "not yet released"}
@@ -2000,6 +2315,29 @@ export default async function JobRoom({
         </>
       )}
 
+      {tab === "extra" && (
+        <AddOnPanel
+          jobId={job.id}
+          me={role === "worker" ? "worker" : "client"}
+          otherName={role === "client" ? (won?.worker_name ?? job.worker_name ?? "your tradesperson") : "the client"}
+          canPropose={role === "client" && (job.status === "in_progress" || job.status === "evidence")}
+          closedReason={
+            !job.worker_email
+              ? "Extra work is added once a tradesperson is booked. Until then, ask for a change to their quote."
+              : job.status === "awaiting_payment"
+                ? "Extra work can be added once the job has started."
+                : job.status === "complete"
+                  ? "This job is complete. Post a new job for anything else."
+                  : null
+          }
+          addons={addons}
+          invoices={addonInvoices}
+          evidenceCounts={addonEvidenceCounts}
+          photos={addonPhotos}
+          billState={addonBill}
+        />
+      )}
+
       {tab === "evidence" && (
         <>
           {job.worker_email && job.status !== "complete" && (
@@ -2026,6 +2364,8 @@ export default async function JobRoom({
             stageProofs={evidenceStageProofs}
             currentStage={job.stage ?? 0}
             role={role === "worker" ? "worker" : "client"}
+            me={role === "worker" ? email : null}
+            closed={job.status === "complete"}
             awaitingApproval={awaitingApproval}
             jobId={job.id}
             startsWhen={
@@ -2036,7 +2376,9 @@ export default async function JobRoom({
                   : "Opens when stage 1 starts."
             }
             upload={
-              canFileEvidence ? (
+              /* Founder, 28 Sep 2026: for the client this tab is an overview,
+                 with nothing to do on it. Filing evidence is the worker's. */
+              canFileEvidence && role === "worker" ? (
                 <>
                   <EvidenceUpload
                     jobId={job.id}
@@ -2068,28 +2410,6 @@ export default async function JobRoom({
             }
           />
           </div>
-      {/* The FAQ's own "or": at sign-off a client can approve straight off
-          the evidence above, or ask to walk the site live instead. Sits next
-          to the moment it is an alternative to, not buried in a settings
-          tab. */}
-      {/* A job completing (stage >= 5) has nothing to do with whether a
-          walkthrough's notes are confirmed yet. The panel stays available
-          once a walkthrough is in play so an unconfirmed set of notes is
-          never stranded off-screen; it only stops offering a fresh
-          request once the job is done. */}
-      {job.worker_email && (job.status !== "complete" || job.signoff_method === "walkthrough") && (
-        <WalkthroughPanel
-          jobId={job.id}
-          role={role === "worker" ? "worker" : "client"}
-          walkPlatform={job.walk_platform ?? null}
-          walkLink={job.walk_link ?? null}
-          walkDate={job.walk_date ?? null}
-          walkWho={job.walk_who ?? null}
-          walkNotes={job.walk_notes ?? null}
-          walkCallNotes={job.walk_call_notes ?? null}
-          walkNotesConfirmedAt={job.walk_notes_confirmed_at ?? null}
-        />
-      )}
         </>
       )}
         </div>
@@ -2105,6 +2425,7 @@ export default async function JobRoom({
           fee={role === "worker" ? workerFeeJmd : feeJmd}
           materials={won?.materials_jmd ?? null}
           check={role === "client" ? checkLine : null}
+          extra={countedAddons.reduce((t, a) => t + (role === "client" ? addonClientBill(a.amount_jmd, a.terms).total : addonWorkerPay(a.amount_jmd)), 0)}
           heldNote={
             labour == null
               ? role === "worker"
@@ -2118,7 +2439,7 @@ export default async function JobRoom({
           }
           workerName={won?.worker_name ?? job.worker_name ?? null}
           jobBase={jobBase}
-          moneyHref={jobBase + "?tab=approvals"}
+          moneyHref={jobBase + "?tab=money"}
           active={tab}
         />
       </div>

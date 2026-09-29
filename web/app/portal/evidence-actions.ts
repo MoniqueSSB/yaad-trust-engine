@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { readCapturedAt, stripApp1 } from "@/lib/exif";
 import { isPhase } from "@/lib/portal/evidence-sections";
+import { LIMITS, capturedAtFrom, isOurPath, verifyStored } from "@/lib/portal/stored-object";
 
 /**
  * Evidence upload, PORTAL-SPEC 5.3. The fingerprint is computed HERE, on
@@ -58,7 +59,8 @@ const EXT: Record<string, string> = {
 // The database's own refusals that are written for the person reading them:
 // the materials gate (20260828c), the pairing checks (20260906020400) and
 // the stage lock (20260914095005). Anything else is a message for the logs.
-const SAYS_WHY = /materials store|answer a before|same job|does not exist|answer itself|Stage \d+ (is|has)/i;
+// "Stage N starts once its bill is paid" (20260929100000) is one of them.
+const SAYS_WHY = /materials store|answer a before|same job|does not exist|answer itself|Stage \d+ (is|has|starts once)/i;
 
 export async function uploadEvidence(formData: FormData): Promise<UploadResult> {
   const user = await requireUser();
@@ -83,7 +85,25 @@ export async function uploadEvidence(formData: FormData): Promise<UploadResult> 
   let size: number | null = null;
   let sha256: string;
 
-  if (file instanceof File && file.size > 0) {
+  /* A photo that went straight to Storage (28 Sep 2026, large files): the
+     browser sends the path the server picked for it, and the bytes are
+     verified and fingerprinted here from what arrived. */
+  const uploadedPath = String(formData.get("uploadedPath") ?? "");
+  if (uploadedPath) {
+    if (!isOurPath(uploadedPath, `${jobId}/`)) return { ok: false, message: "That upload does not belong to this job." };
+    const v = await verifyStored(BUCKET, uploadedPath, LIMITS.evidence_photo);
+    if (!v.ok) return { ok: false, message: v.message };
+    if (!/^image\/(jpeg|png|webp)$/.test(v.mime)) {
+      await supabase.storage.from(BUCKET).remove([uploadedPath]);
+      return { ok: false, message: "That file is not a photograph. Choose a JPEG, PNG or WebP image." };
+    }
+    storagePath = uploadedPath;
+    mime = v.mime;
+    size = v.bytes;
+    sha256 = v.sha256;
+    const when = capturedAtFrom(formData.get("capturedAt"));
+    capturedAt = when ? new Date(when) : null;
+  } else if (file instanceof File && file.size > 0) {
     if (!/^image\//.test(file.type))
       return { ok: false, message: "That file is not a photograph. Choose a JPEG, PNG or WebP image." };
     const ext = EXT[file.type.toLowerCase()];

@@ -68,14 +68,18 @@ export function ChatThread({
           <p role="status" className="mt-2.5 rounded-xl border border-coral/30 bg-coral/10 px-3 py-2.5 text-[12.5px] leading-relaxed text-mute">
             <b className="text-coral">Held back: {warn.join(", ")}.</b>{" "}
             That never reached them. Keeping it on Yaadly is what makes the
-            held money, the evidence trail and the dispute route work; off the
+            agreed price, the evidence trail and the dispute route work; off the
             platform none of that exists, for either of you.
           </p>
         )}
         <p className="mt-2.5 text-[11px] leading-relaxed text-dim">
+          {/* Said "no held money" until 28 Sep 2026. Yaadly is principal
+              and holds nobody's money (CLAUDE.md section 8), so the sentence
+              named the one idea the product must never claim. */}
           Everything stays here until the job is done. Not to hold you
-          hostage: if it happens off Yaadly there is no held money, no
-          evidence trail and nothing to fall back on when it goes wrong.
+          hostage: if it happens off Yaadly there is no agreed price with
+          Yaadly behind it, no evidence trail and nothing to fall back on
+          when it goes wrong.
         </p>
       </div>
     </section>

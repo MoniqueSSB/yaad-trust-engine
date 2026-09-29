@@ -3,8 +3,10 @@ import type { TabKey } from "@/components/portal/TabBar";
 
 const JOB_LINKS: { tab: TabKey; label: string; hint: string }[] = [
   { tab: "evidence", label: "Progress evidence", hint: "Photos and videos for each stage" },
-  { tab: "approvals", label: "Approvals", hint: "Sign off stages and pay invoices" },
-  { tab: "overview", label: "Overview & documents", hint: "The brief, documents and your job link" },
+  { tab: "approvals", label: "Approvals", hint: "Sign off stages and extra work" },
+  { tab: "money", label: "Money", hint: "Invoices, payments and who has been paid" },
+  { tab: "overview", label: "Overview & documents", hint: "What is outstanding, documents and files" },
+  { tab: "details", label: "Job details", hint: "The address, your job link and the job as agreed" },
 ];
 
 /**
@@ -41,6 +43,7 @@ export function JobRail({
   jobBase,
   moneyHref,
   check = null,
+  extra = 0,
   active,
 }: {
   side: "client" | "worker";
@@ -60,8 +63,14 @@ export function JobRail({
   check?: { label: string; jmd: number } | null;
   /** The tab the page is showing, so its row is marked rather than linked. */
   active: TabKey;
+  /** Agreed additional work, priced for this side (client: with 15% on top;
+   *  worker: less 5%). Not inside allIn or takeHome. Added to the headline
+   *  and shown as its own line, so the rail and "What this job costs" end on
+   *  the same figure for both sides (28 Sep 2026). */
+  extra?: number;
 }) {
-  const headline = side === "client" ? allIn : takeHome;
+  const main = side === "client" ? allIn : takeHome;
+  const headline = main == null ? null : main + (extra > 0 ? extra : 0);
   const initials = (workerName ?? "")
     .split(" ")
     .map((x) => x[0])
@@ -112,6 +121,18 @@ export function JobRail({
                 <span className="text-mute">{check.label}</span>
                 <span className="font-mono-app text-[11.5px] text-ink">{money(check.jmd)}</span>
               </div>
+            )}
+            {extra > 0 && (
+              <>
+                <div className="flex justify-between border-t border-gold/15 pt-1.5 text-[12px]">
+                  <span className="text-mute">Main work</span>
+                  <span className="font-mono-app text-[11.5px] text-ink">{money(main)}</span>
+                </div>
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-mute">{side === "client" ? "Additional work, with 15%" : "Additional work, less 5%"}</span>
+                  <span className="font-mono-app text-[11.5px] text-ink">{money(extra)}</span>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -199,8 +220,8 @@ export function JobRail({
             (ContactYaadly.tsx). The Yaadly number stays underneath for
             anybody who would rather just WhatsApp. */}
         <p className="mb-3 text-[12.5px] leading-relaxed text-mute">
-          Goes straight to Monique, on WhatsApp and by email, with this job
-          attached. Patois or English.
+          Goes straight to a person at Yaadly, on WhatsApp and by email, with
+          this job attached. Patois or English.
         </p>
         <Link
           href={jobBase + "?tab=help#contact"}

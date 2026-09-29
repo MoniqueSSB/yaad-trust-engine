@@ -50,17 +50,17 @@ export function DisputePanel({
     if (role === "worker")
       return (
         <div className="mt-6 rounded-2xl border border-line bg-panel p-4 text-[13px] leading-relaxed text-mute">
-          <b className="text-mute">If they raise something, you hear it first.</b>{" "}
-          It comes to you on WhatsApp, straight from them, with 48 hours to
-          answer or put it right. Yaadly gets a copy and steps in only if they
-          escalate. Nothing on the job is approved until it is sorted, and
+          <b className="text-mute">If the client raises something, it goes to Yaadly.</b>{" "}
+          You are told at once, with what they said, and a person at Yaadly
+          looks at it with you both against the agreed scope and the
+          evidence. Nothing on the job is approved until it is sorted, and
           nothing is taken off you either.
         </div>
       );
     if (!open)
       return (
         <div className={box}>
-          <b className="text-[14px] text-coral">Not right? Raise it with {workerName} first.</b>
+          <b className="text-[14px] text-coral">Not right? Raise it with Yaadly.</b>
           <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
             Approving is a signature, so do not approve something you are not
             happy with. Most things are a missing photo or a misunderstanding
@@ -74,7 +74,7 @@ export function DisputePanel({
       );
     return (
       <div className={box}>
-        <b className="text-[14px] text-coral">Tell {workerName} what is wrong</b>
+        <b className="text-[14px] text-coral">Tell Yaadly what is wrong</b>
         <div className="mt-2.5 grid gap-1.5">
           {KINDS.map((k) => {
             const on = picked.includes(k);
@@ -101,10 +101,10 @@ export function DisputePanel({
           <button disabled={busy || tooShort}
             onClick={() => act(() => raiseDispute(jobId, picked, body))}
             className="rounded-full border border-coral/50 px-4 py-2 text-[13px] font-bold text-coral hover:bg-coral/10 disabled:opacity-40">
-            {busy ? "Sending" : `Send it to ${workerName}`}
+            {busy ? "Sending" : "Send it to Yaadly"}
           </button>
           <button onClick={() => { setOpen(false); setErr(""); }} className="rounded-full border border-line2 px-4 py-2 text-[13px] text-ink">Cancel</button>
-          <span className="text-[11.5px] text-dim">Goes to them now on WhatsApp. Yaadly gets a copy and steps in only if you escalate.</span>
+          <span className="text-[11.5px] text-dim">Goes to a person at Yaadly now. {workerName} is told too, and Yaadly brings you both together.</span>
         </div>
         {err && <p className="mt-2 text-[12.5px] text-coral">{err}</p>}
       </div>
@@ -123,7 +123,18 @@ export function DisputePanel({
   if (dispute.state === "escalated")
     return (
       <div className={box}>
-        <b className="text-[14px] text-coral">With Yaadly now. Nothing moves.</b>
+        <b className="text-[14px] text-coral">
+          {role === "worker" ? "The client has raised something with Yaadly. Nothing moves until it is sorted." : "With Yaadly now. Nothing moves until it is sorted."}
+        </b>
+        {/* What was raised, to both sides. The escalated view showed nothing
+            of it until 28 Sep 2026, when disputes started opening here. */}
+        <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-ink">&quot;{dispute.body}&quot;</p>
+        {role === "worker" && (
+          <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
+            Give Yaadly your side with Message Yaadly on this tab. A person
+            looks at both against the scope and the evidence.
+          </p>
+        )}
         <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
           Reviewed against the written scope and the evidence, not against
           who complained loudest. The whole thread, what was raised, what was

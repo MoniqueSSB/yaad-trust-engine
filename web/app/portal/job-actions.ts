@@ -190,7 +190,11 @@ export async function raiseDispute(
   const { clean } = scrub(body.trim().slice(0, 2000));
   const { error } = await supabase.from("disputes").insert({
     job_id: jobId, raised_by: (user.email ?? "").toLowerCase(),
-    kinds: kinds.slice(0, 6), body: clean, state: "direct",
+    /* Founder, 28 Sep 2026: "you raise this with Yaadly". A problem opens
+       with Yaadly from the start rather than with the worker first; the
+       worker is still told at once (trg_notify_dispute_raised_worker_desk).
+       Disputes opened before this in 'direct' keep working as they were. */
+    kinds: kinds.slice(0, 6), body: clean, state: "escalated",
   });
   if (error) throw new Error("refused");
   revalidatePath("/portal/jobs/" + jobId);
@@ -233,4 +237,22 @@ export async function moveDispute(
   const { error } = await supabase.from("disputes").update(patch).eq("id", id);
   if (error) throw new Error("refused");
   revalidatePath("/portal/jobs/" + jobId);
+}
+
+/** The client adds or corrects the street address (20260929070000). Returned,
+ *  never thrown, so the database's own sentence reaches them. */
+export async function setJobAddress(jobId: string, addr: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_job_address_as_me", { p_job: jobId, p_addr: addr.trim().slice(0, 300) });
+  if (error) {
+    return {
+      ok: false,
+      error: /could not find the function|does not exist/i.test(error.message)
+        ? "Adding the address here is not switched on yet. Send it to Yaadly with Message Yaadly on the Help tab."
+        : error.message,
+    };
+  }
+  revalidatePath("/portal/jobs/" + jobId);
+  return { ok: true };
 }

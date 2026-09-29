@@ -17,7 +17,8 @@
 <meta property="og:image:alt" content="Yaadly. Timestamped proof of work on your property in Jamaica.">
 <meta name="twitter:image" content="https://yaadly.co.uk/og.png">
 <link rel="canonical" href="https://yaadly.co.uk/services.html">
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='24'%20fill='%237B4FE0'/%3E%3Ctext%20x='50'%20y='71'%20font-family='Arial,Helvetica,sans-serif'%20font-size='64'%20font-weight='700'%20text-anchor='middle'%20fill='%23ffffff'%3EY%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="/favicon-v1.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon-v1.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,200;1,9..144,300;1,9..144,400;1,9..144,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -290,7 +291,7 @@ footer {
 <body>
 
 <nav class="site-nav"><div class="nav-in">
-  <a class="brand" href="/"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></a>
+  <a class="brand" href="/"><img class="mark" src="/logo-v1.png" alt="" width="30" height="30"><b>Yaadly<span>Hub</span></b></a>
   <div class="views">
     <a class="vbtn" href="/marketplace">Overview</a>
     <a class="vbtn" href="https://app.yaadly.co.uk/jobs">Job board</a>
@@ -330,8 +331,9 @@ footer {
 <section class="sect" id="services">
   <div class="wrap">
     <span id="prices" aria-hidden="true"></span>
-    <div class="kick">Professional services</div>
+    <div class="kick">Professional services, run by the founder</div>
     <h2 class="heading">Every price <em>on the page.</em></h2>
+    <p style="margin-top:14px;font-size:15.5px;color:var(--mute);max-width:60ch;text-wrap:pretty">You buy these directly from the founder of Yaadly, who does the work herself.</p>
 
     <div class="svcs-grid">
 
@@ -513,7 +515,7 @@ footer {
     </div>
 
     <!-- HOW YOU PAY -->
-    <div class="note rv"><b>How you pay:</b> payment terms are agreed in writing for each job, before anything starts. Above £500 the job is invoiced and paid by bank transfer in GBP, USD or CAD. At or under £500, which is every one-off service on this page, you can pay by card: your card is authorised at booking and charged once the work is done and accepted. The fortnightly Oversight Retainer is a monthly card subscription instead, billed from the day you start, with 30 days notice to stop. The weekly retainer is over £500 a month, so it is invoiced monthly. You have 14 days to <a href="/cancellation">cancel</a>. <b>Yaadly does not operate an escrow service and does not hold money on your behalf.</b> <a href="/payments">Full payment terms.</a></div>
+    <div class="note rv"><b>How you pay:</b> payment terms are agreed in writing for each job, before anything starts. Above £500 the job is invoiced and paid by bank transfer in GBP, USD or CAD. At or under £500, which is every one-off service on this page, you can pay by card: your card is authorised at booking and charged once the work is done and accepted. The fortnightly Oversight Retainer is a monthly card subscription instead, billed from the day you start, with 30 days notice to stop. The weekly retainer is over £500 a month, so it is invoiced monthly. You have 14 days to <a href="/cancellation">cancel</a>. <b>You pay the founder for these services. Her Stripe account is called Yaadly Founder, so that is the name on your receipt and on your card statement. Nobody holds money on your behalf.</b> <a href="/payments">Full payment terms.</a></div>
 
     <!-- WHAT THIS IS NOT -->
     <div class="note rv"><b>Inspection and oversight, not a guarantee.</b> Yaadly records condition, judges workmanship against the standard for that trade, and oversees progress. Yaadly does not guarantee an outcome, and four things always go out to a named professional in writing rather than being guessed at: <b>valuation</b> to a licensed valuer, <b>title and legal opinion</b> to an attorney, <b>structural engineering</b> to a PERB registered engineer, and <b>boundaries</b> to a commissioned land surveyor. The same boundaries in full are on <a href="/business">Yaadly for business</a>.</div>
@@ -571,7 +573,7 @@ footer {
 <footer>
   <div class="wrap">
     <div class="fgrid">
-      <span>© 2026 Yaadly Ltd · England and Wales · no. 17358077</span>
+      <span>Professional services by the founder. Jobs and business services by Yaadly Ltd, England and Wales, no. 17358077.</span>
       <span>More parishes as we grow. A named person at Yaadly confirms every step that moves money.</span>
       <div class="flinks">
         <a href="/">Home</a>
@@ -632,18 +634,28 @@ const BOOKING_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-
    Confirmed again by the founder on 5 Sep 2026 when the card path was made
    visible: more prominent, still after the record, never instead of it. */
 const PAYMENT_LINKS = {
-  deposit:        "https://buy.stripe.com/cNicMYb3CgKVdSIdU19Zm09",
-  visual:         "https://buy.stripe.com/8x214ggnW7al8yo5nv9Zm08",
-  condition:      "https://buy.stripe.com/14A9AM9Zy3Y93e4bLT9Zm0b",
-  signoff:        "https://buy.stripe.com/fZu5kwdbK52dg0QaHP9Zm0a",
-  care:           "https://buy.stripe.com/eVqbIU1t20LX7uk6rz9Zm05",
-  "care-large":   "https://buy.stripe.com/6oUbIUgnW8ep9Cs2bj9Zm06",
-  "care-villa":   "https://buy.stripe.com/3cI6oA6Nm0LX7uk2bj9Zm07",
-  /* £495 a month, fortnightly founding rate, from 12 Sep 2026
-     (plink_1UEwJf3T4U3bYNXoXzgepFNV, price_1UEwIT3T4U3bYNXolwZdB0QX).
-     Replaces the £395 link 28E6oAgnWeCN4i8cPX9Zm0c, which is deactivated.
-     Weekly has no link on purpose: it is over £500 and is invoiced. */
-  retainer:       "https://buy.stripe.com/7sYeV62x6bqBaGwdU19Zm0d"
+  /* THE FOUNDER'S OWN Stripe account (acct_1UIPus2B5v0diTai), live mode,
+     created 23 Sep 2026, the day the site started saying she sells these
+     services as a sole trader rather than Yaadly Ltd.
+
+     The previous set of links paid Yaadly Ltd and was emptied out on the
+     same day, because a client reading that they buy from her and then
+     paying the company is the exact fault that change exists to fix. Those
+     old URLs are in git history and must never be pasted back here.
+
+     Every one-off link is a hold (manual capture in Stripe): the card is
+     authorised at booking and only taken once the work is done and the
+     client has accepted it. The retainer is a monthly subscription and
+     bills on the spot, which is why it is worded separately below. */
+  deposit:        "https://buy.stripe.com/eVqeV64pddNufgs33eew800",
+  visual:         "https://buy.stripe.com/eVq3co3l9gZG6JWcDOew801",
+  condition:      "https://buy.stripe.com/3cIbIU1d18ta5FS8nyew802",
+  signoff:        "https://buy.stripe.com/5kQ4gsbRFcJq4BO33eew803",
+  care:           "https://buy.stripe.com/5kQ8wI5thdNu5FSbzKew804",
+  "care-large":   "https://buy.stripe.com/aFa14gf3R6l23xK5bmew805",
+  "care-villa":   "https://buy.stripe.com/3cIcMY7BpaBi9W88nyew806",
+  /* Weekly has no link on purpose: it is over £500 and is invoiced. */
+  retainer:       "https://buy.stripe.com/9B64gsaNB8ta1pC7juew807"
 };
 
 /* The retainer link is a monthly subscription, so it bills on the spot and
@@ -759,10 +771,10 @@ async function sendBooking(){
       + '<a class="btn btn-primary" style="margin-top:14px;width:100%;justify-content:center" href="'
       + payUrl + '" target="_blank" rel="noopener">Pay for ' + esc(b.label)
       + '<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg></a>'
-      + '<div style="margin-top:8px;font-size:12.5px;color:var(--mute)">Card handled by Stripe. Yaadly never sees or stores your card number. Prefer an invoice or a bank transfer? Reply to your receipt and say so.</div>'
+      + '<div style="margin-top:8px;font-size:12.5px;color:var(--mute)">Card handled by Stripe, and it shows as Yaadly Founder on your statement. The founder never sees or stores your card number. Prefer an invoice or a bank transfer? Reply to your receipt and say so.</div>'
     : (startNow
-        ? ' Nothing is charged: Yaadly confirms the scope and the exact price with you in writing first, and the invoice follows only after that.'
-        : ' <b>You have not asked us to start inside your 14 days</b>, so nothing begins until they have run out, and there is nothing to pay before then. Yaadly will confirm the scope and the exact price with you in writing in the meantime. If you change your mind and want it started sooner, say so in your reply and we will take that as the request.');
+        ? ' Nothing is charged: the founder confirms the scope and the exact price with you in writing first, and the invoice follows only after that.'
+        : ' <b>You have not asked us to start inside your 14 days</b>, so nothing begins until they have run out, and there is nothing to pay before then. The founder will confirm the scope and the exact price with you in writing in the meantime. If you change your mind and want it started sooner, say so in your reply and we will take that as the request.');
   say("ok", "<b>Held for you, "+esc(b.name)+".</b> Your reference is <b>"+esc(j.ref)+"</b> and a receipt is on its way by "+channel+", with the code that opens your client portal." + tail);
   ["bk-name","bk-email","bk-phone","bk-parish","bk-msg"].forEach(i=>$id(i).value="");
 }

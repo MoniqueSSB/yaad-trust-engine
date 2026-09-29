@@ -29,6 +29,9 @@ export type Doc = {
   state: DocState;
   /** only meaningful when there is something to open */
   href?: string;
+  /** where the PDF is drawn, when that is not the page itself (the Kickoff
+   *  Pack opens on its contents page; its PDF is the whole pack on one page) */
+  pdfHref?: string;
 };
 
 const LABEL: Record<DocState, string> = {
@@ -52,7 +55,8 @@ export function DocStrip({ docs }: { docs: Doc[] }) {
       </h2>
       <p className="mb-3.5 max-w-[62ch] text-[12.5px] leading-relaxed text-dim">
         Every document this job will have, from the first day. The ones not
-        written yet say so, and say what they are waiting on.
+        written yet say so, and say what they are waiting on. Open a completed
+        one to read it or download it as a PDF.
       </p>
       <div className="grid gap-2">
         {docs.map((d) => {
@@ -85,6 +89,28 @@ export function DocStrip({ docs }: { docs: Doc[] }) {
           /* An openable document is a link. One that is not is not a dimmed
              link, it is a row: nothing to click, and nothing pretending to
              be clickable. */
+          /* A completed document also offers its PDF straight from the list
+             (founder, 28 Sep 2026: "this needs pdf reviews also"). The link
+             opens the document with ?pdf=1, and its Download PDF button
+             starts on arrival, so the file is drawn from the page itself. */
+          if (d.href && d.state === "ready") {
+            const src = d.pdfHref ?? d.href;
+            const pdfHref = src + (src.includes("?") ? "&" : "?") + "pdf=1";
+            return (
+              <div key={d.title} className="flex items-stretch gap-2">
+                <Link href={d.href} className={base + "min-w-0 flex-1 border-line bg-bg hover:border-teal"}>
+                  {inner}
+                </Link>
+                <Link
+                  href={pdfHref}
+                  className="flex flex-none items-center rounded-xl border border-line bg-bg px-3.5 text-[12px] font-bold text-mute transition hover:border-teal hover:text-tealb"
+                  aria-label={"Download " + d.title + " as a PDF"}
+                >
+                  PDF
+                </Link>
+              </div>
+            );
+          }
           return d.href ? (
             <Link
               key={d.title}

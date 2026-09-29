@@ -72,7 +72,7 @@
 // code change. CI fails a function that types the endpoint out itself. The
 // Mistral branch above is the one exception, and it is dated and named.
 
-export type VisionJob = "evidence" | "sketch" | "vetting";
+export type VisionJob = "evidence" | "sketch" | "vetting" | "report";
 
 export type VisionProvider = {
   /** Short name for logs and telemetry. */
@@ -116,6 +116,18 @@ const JOBS: Record<VisionJob, { modelEnv: string; fallbackModel: string; agent: 
     fallbackModel: "meta/llama-3.2-90b-vision-instruct",
     agent: "vetting_review",
   },
+  // Reading a contractor's quote and a client's site photographs for a priced
+  // report, 25 September 2026. Asked for by name: "the AI agent to be able to
+  // read a PDF and photo copies to then make the deposit check document". A
+  // quote carries the contractor's name and number, so it is personal data,
+  // and it goes where the job photographs already go, to Mistral in the EU
+  // under the same terms. Not a new destination; a new kind of document at an
+  // existing one, and named here so the data inventory can say so.
+  report: {
+    modelEnv: "NVIDIA_REPORT_MODEL",
+    fallbackModel: "meta/llama-3.2-90b-vision-instruct",
+    agent: "report_read",
+  },
 };
 
 /** This job's own setting, then the shared one, then the job's own default. */
@@ -127,7 +139,7 @@ function modelFor(job: VisionJob): string {
 
 /** The jobs whose images go to Mistral. Founder-named, 15 September 2026.
  *  "vetting" is deliberately absent: see the header. */
-export const MISTRAL_VISION_JOBS: ReadonlySet<VisionJob> = new Set<VisionJob>(["evidence", "sketch"]);
+export const MISTRAL_VISION_JOBS: ReadonlySet<VisionJob> = new Set<VisionJob>(["evidence", "sketch", "report"]);
 
 export function pickVisionProvider(job: VisionJob): VisionProvider | null {
   // 1. Explicit override. Any OpenAI-compatible vision endpoint, no code change.

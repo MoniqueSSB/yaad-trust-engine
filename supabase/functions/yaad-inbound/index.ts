@@ -26,6 +26,7 @@ import { inboundText, wasTapped } from "./button-tap.ts";
 import { answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith } from "./worker-question.ts";
 import { replyFromCard } from "./reply-from-card.ts";
 import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
+import { parseAddonConfirm } from "./addon-confirm.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -275,6 +276,16 @@ async function evidenceSha256(buf: ArrayBuffer): Promise<string> {
   return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// A typed update has no file, so its fingerprint is of the words themselves
+// and the job they were filed on, the same rule evidence-actions.ts has used
+// for a text-only entry since the portal began (label + "|" + job id). Until
+// 28 Sep 2026 a typed WhatsApp update was filed with none, and every stage
+// signed off with one in it showed on the desk as "not bound to the exact
+// files". Founder: "keeps raising issues".
+async function noteSha256(label: string, jobId: string): Promise<string> {
+  return await evidenceSha256(new TextEncoder().encode(label + "|" + jobId).buffer as ArrayBuffer);
+}
+
 // The worker's answer to which section of the job a photograph belongs to,
 // read from a reply sent in answer to exactly that question and nothing else.
 // Deliberately not applied to captions: a caption saying "the joint before
@@ -298,8 +309,8 @@ type PhaseAnswer = "before" | "during" | "after" | "issue" | "new";
 // is the rarer answer. Nothing here blocks either way: an unrecognised reply
 // still files the evidence unmarked.
 //
-// An after may name the before it answers on the same reply, "A P3", so the
-// code is stripped before the word is read.
+// An after may name the before it answers on the same reply, "After P3" or
+// "A P3", so the code is stripped before the word is read.
 function readPhaseAnswer(text: string): PhaseAnswer | undefined {
   const t = text.trim().toLowerCase().replace(/\s+p\d+\b/, "").replace(/[.!,]+$/, "").trim();
   if (/^(b|before|bfore|befor|the before|before pic|before photo|before shot)$/.test(t)) return "before";
@@ -329,20 +340,71 @@ async function beforesOnJob(admin: { from: (t: string) => any }, jobId: string):
   return (data ?? []) as BeforeShot[];
 }
 
+// How long a half-finished WhatsApp session is still the conversation the
+// next message belongs to. Past this it is not a pause, it is a different
+// day, and a message read as the answer to a question nobody remembers being
+// asked is worse than no session at all.
+const SESSION_STALE_MS = 48 * 3600_000;
+
+// How long after filing a batch a worker's words are still taken to be about
+// it. Long enough that they can put the phone down, climb off the ladder and
+// type; short enough that the next thing they say an hour later is their own
+// update and not a comment on old photographs.
+const NOTE_WINDOW_MINUTES = 30;
+
+// The batch of photographs or videos this worker has just filed, if they
+// filed one recently enough for their next words to be about it.
+//
+// Only batches carrying an actual file count, which is what `storage_path is
+// not null` is doing. A note filed against a batch shares its batch_id, so
+// without that filter a note would renew the window it arrived in and a
+// genuinely new update half an hour later would be swept onto old photos.
+// The window runs from when the pictures landed and nothing extends it.
+async function recentFiledBatch(
+  admin: { from: (t: string) => any },
+  workerEmail: string,
+): Promise<{ batchId: string; jobId: string; stage: number; at: string } | null> {
+  if (!workerEmail) return null;
+  const since = new Date(Date.now() - NOTE_WINDOW_MINUTES * 60_000).toISOString();
+  const { data } = await admin.from("evidence")
+    .select("batch_id, job_id, stage, created_at")
+    .eq("uploaded_by", workerEmail)
+    .not("batch_id", "is", null)
+    .not("storage_path", "is", null)
+    .gte("created_at", since)
+    .order("created_at", { ascending: false }).limit(1);
+  const row = (data ?? [])[0];
+  return row ? { batchId: row.batch_id, jobId: row.job_id, stage: row.stage, at: row.created_at } : null;
+}
+
 // Added to the section question only when there is a before to point at. A
 // worker who photographed the finished work first has done nothing wrong and
 // should not be offered a code list with nothing in it.
 function pairHint(befores: BeforeShot[]): string {
   if (!befores.length) return "";
   const codes = befores.map((b) => b.item_code).filter(Boolean).join(", ");
-  return ` If it is the after for one of the befores on this job (${codes}), put its code after the letter, like "A ${befores[0].item_code}".`;
+  return ` If it is the after for one of the befores on this job (${codes}), put its code after the word, like "After ${befores[0].item_code}".`;
 }
 
 // One short question, in the words a worker would use. Kept as a constant
 // because it goes out from three places in the evidence lane and they must not
 // drift into three slightly different questions.
+//
+// It offers the words, not the letters. Founder, 15 September 2026: "the
+// letters would be confusing and not clear", and again on 20 September, after
+// five days of this question going out because the menu was being refused,
+// "the letter needs to go". The letters are still accepted by
+// readPhaseAnswer(), because the menu's own row ids are the letters and a
+// worker who learnt them should not be told they are wrong. They are simply
+// no longer the thing a worker is asked for.
+//
+// This is the fallback, not the question. On WhatsApp the menu goes first and
+// this only runs when the send is refused. It is deliberately still a real
+// question rather than nothing: the session is already waiting on a section
+// answer, so a worker asked nothing would say something else and the evidence
+// would file unmarked with nobody the wiser.
 const PHASE_QUESTION =
-  'Which is this? Reply B for before, D for during the work, A for after, P for a problem with the work, or N for something new you found that was not in the job. Reply S to skip.';
+  'Which is this? Reply Before, During, After, Problem for something wrong with the work, or New for something you found that was not in the job. Reply Skip to skip.';
 
 // What the worker is told it went down as. "the before" reads naturally, "the
 // issue" does not, and a worker who has just reported rot behind a panel
@@ -623,6 +685,29 @@ async function sendWhatsAppTo(to: string, body: string, trace: Trace, meta: Send
       return false;
     }
   });
+}
+
+/** A Twilio template id, or nothing.
+ *
+ *  A ContentSid is HX and thirty-two hex digits. Anything else is not an id
+ *  and cannot be sent, so it is worth one regular expression to find that out
+ *  here rather than from Twilio.
+ *
+ *  Why this exists. On 15 September 2026 the TWILIO_CONTENT_SID_PHASE secret
+ *  was set to the literal text "HX...", pasted straight off the command in
+ *  RUNBOOK.md, which carried the placeholder. The secret wins over the desk
+ *  setting, so that placeholder went on the wire on every section menu send
+ *  for five days while the correct id sat on the desk untouched. Twilio
+ *  refused each one with 20422 Invalid Parameter, the typed question covered
+ *  for it, and two separate investigations looked past it at the template and
+ *  then at the Messaging Service. yaad-twilio-setup has checked this shape
+ *  since the day it was written. This side did not.
+ *
+ *  It takes the first value that IS an id rather than the first value that is
+ *  set, which is the part that matters: junk in one slot can no longer hide a
+ *  good id in the other. */
+function firstTemplateSid(...candidates: string[]): string {
+  return candidates.find((c) => /^HX[0-9a-f]{32}$/i.test(c.trim()))?.trim() ?? "";
 }
 
 /** The section question as a tappable menu, 15 September 2026.
@@ -1958,9 +2043,12 @@ Deno.serve(async (req: Request) => {
   const askPhase = async (settings: SettingsReader, to: string, channel: string, lead: string) => {
     if (channel === "whatsapp") {
       const set = await readSettings(settings, ["twilio_content_sid_phase", "twilio_messaging_service_sid"]);
-      const contentSid = Deno.env.get("TWILIO_CONTENT_SID_PHASE") || set.twilio_content_sid_phase || "";
+      const contentSid = firstTemplateSid(
+        Deno.env.get("TWILIO_CONTENT_SID_PHASE") ?? "",
+        set.twilio_content_sid_phase ?? "",
+      );
       // Both are needed, and either one blank turns the menu off and leaves
-      // the typed letters, which is still the switch.
+      // the typed question, which is still the switch.
       const serviceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID") || set.twilio_messaging_service_sid || "";
       if (contentSid && await sendPhaseMenu(to, lead, contentSid, serviceSid, trace)) return twimlSilent();
     }
@@ -2487,14 +2575,29 @@ Deno.serve(async (req: Request) => {
     if (msg.channel === "whatsapp" && msg.from) {
       const { data: sess } = await supabase.from("wa_intake_sessions")
         .select("wa_id,answers,photo_count,updated_at").eq("wa_id", msg.from).maybeSingle();
-      const evSession = sess && String((sess.answers as any)?._lane ?? "") === "evidence" ? sess : null;
+      // Aged, 23 Sep 2026, the same way the draft lane below has always been.
+      //
+      // It was not, and the stale drop written for exactly this case sits
+      // AFTER the evidence block, which returns on every path it has. So the
+      // one lane whose comment says an orphaned photo nobody answered for
+      // gets dropped was the one lane it could never run on. Left alone, an
+      // evidence session waited for ever: the founder's own three photographs
+      // from 20 September were still staged and still waiting for a section
+      // answer on the 23rd, and the next thing she typed, about anything at
+      // all, would have been read as that answer and filed them under it.
+      //
+      // Null here rather than deleted here. Going stale is not a decision
+      // about anybody's evidence, it is this lane letting go, and the drop
+      // below is then reachable and does what its comment always said.
+      const evSession = sess && String((sess.answers as any)?._lane ?? "") === "evidence"
+        && Date.now() - new Date(sess.updated_at as string).getTime() <= SESSION_STALE_MS ? sess : null;
       // A document (PDF or Word) waiting on "which job", from either side.
       const fileSession = sess && String((sess.answers as any)?._lane ?? "") === "job_file" ? sess : null;
       const reportSession = sess && String((sess.answers as any)?._lane ?? "") === "report_confirm" ? sess : null;
       const textUpdateSession = sess && String((sess.answers as any)?._lane ?? "") === "text_update" ? sess : null;
       // A worker's typed update, read back and waiting on a reply of 1. See update-draft.ts.
       const draftSession = sess && String((sess.answers as any)?._lane ?? "") === "update_draft"
-        && Date.now() - new Date(sess.updated_at as string).getTime() <= 48 * 3600_000 ? sess : null;
+        && Date.now() - new Date(sess.updated_at as string).getTime() <= SESSION_STALE_MS ? sess : null;
 
       // ── the job alert list ──────────────────────────────────────────────
       //
@@ -2687,6 +2790,63 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // ── the Completion Report: Change my words, Raise an issue ─────────────
+      //
+      // 28 Sep 2026 (20260928233000). Founder: "no way to edit", "or raise and
+      // issue", "on whatsapp or portal", "it should be a button". The worker's
+      // report message carries three buttons. Sign's payload is the job code
+      // and is handled with the other job-code doors further down. The other
+      // two carry "EDIT <code>" and "ISSUE <code>": a tap records which one,
+      // for this phone and this job, and the NEXT message they type is taken
+      // as their words (it replaces their own account of the work, unsigned:
+      // they still press Sign) or as the issue (the report stops, Yaadly is
+      // alerted). Ahead of every other worker lane, so the words they type are
+      // never caught as a work update. Two hours to answer; a button or a job
+      // code typed in the meantime starts again rather than being swallowed.
+      if (!msg.media.length && msg.text.trim()) {
+        const said = msg.text.trim();
+        const tap = /^(EDIT|ISSUE)\s+(\S+)/i.exec(said);
+        if (tap) {
+          const kind = tap[1].toUpperCase() === "EDIT" ? "edit" : "issue";
+          const { data: waiting } = await supabase.from("completion_reports").select("job_id").eq("status", "with_worker");
+          const ids = ((waiting ?? []) as { job_id: string }[]).map((r) => r.job_id);
+          const { data: jobsW } = ids.length ? await supabase.from("jobs").select("id, title, stage, worker_email").in("id", ids) : { data: [] };
+          const emails = [...new Set(((jobsW ?? []) as any[]).map((j) => String(j.worker_email ?? "").toLowerCase()).filter(Boolean))];
+          const { data: profs } = emails.length ? await supabase.from("worker_profiles").select("worker_email, phone").in("worker_email", emails) : { data: [] };
+          const mine = new Set(((profs ?? []) as any[]).filter((w) => samePhone(w.phone, msg.from)).map((w) => String(w.worker_email).toLowerCase()));
+          const target = matchApprovingJob(tap[2], ((jobsW ?? []) as any[]).filter((j) => mine.has(String(j.worker_email ?? "").toLowerCase())));
+          if (target) {
+            await supabase.from("completion_report_whatsapp_pending")
+              .upsert({ phone: msg.from, job_id: target.id, kind, started_at: new Date().toISOString() }, { onConflict: "phone" });
+            root.setAttributes({ "yaadly.whatsapp_report.tap": kind, "yaadly.whatsapp_report.job": target.id });
+            return twiml(kind === "edit"
+              ? `Type what your report should say about the work on ${target.title}, in your own words, in one message. It replaces your account on the report. The dates and photos stay as they are. You still tap Sign when it reads right.`
+              : `Tell us what is wrong with the report for ${target.title}, in one message. It goes to Yaadly and the report waits. It does not go to the owner.`);
+          }
+          return twiml("That report is not waiting on you from this number. Open the link in your last Yaadly message.");
+        }
+
+        const { data: pend } = await supabase.from("completion_report_whatsapp_pending")
+          .select("job_id, kind, started_at").eq("phone", msg.from).maybeSingle();
+        if (pend) {
+          const fresh = Date.now() - new Date(pend.started_at as string).getTime() <= 2 * 3600_000;
+          const looksLikeCode = /^[A-Z]+-[A-Z0-9-]+$/i.test(said);
+          await supabase.from("completion_report_whatsapp_pending").delete().eq("phone", msg.from);
+          if (fresh && !looksLikeCode) {
+            const fn = pend.kind === "edit" ? "edit_completion_account_via_whatsapp" : "raise_completion_issue_via_whatsapp";
+            const args = pend.kind === "edit"
+              ? { p_job: pend.job_id, p_phone: msg.from, p_account: said.slice(0, 2000) }
+              : { p_job: pend.job_id, p_phone: msg.from, p_body: said.slice(0, 1500) };
+            const { error } = await supabase.rpc(fn, args);
+            root.setAttributes({ "yaadly.whatsapp_report.words": String(pend.kind), "yaadly.whatsapp_report.outcome": error ? "refused" : "saved" });
+            if (error) return twiml(`That did not go through: ${error.message}`);
+            return twiml(pend.kind === "edit"
+              ? `Done. Your report now says, in your words:\n\n"${said.slice(0, 600)}"\n\nTap Sign the report above when it reads right, or Change my words again.`
+              : "Sent to Yaadly. The report waits and does not go to the owner. Yaadly will come back to you, and it comes back to you to sign once it is right.");
+          }
+        }
+      }
+
       // A worker answering the "send this draft, or write your own"
       // prompt. "1" means send exactly what was drafted; anything else
       // typed is read as their own version and that is what goes out
@@ -2823,9 +2983,10 @@ Deno.serve(async (req: Request) => {
         const choices: { id: string; title: string; stage: number }[] = a.job_choices ?? [];
         const pick = pickJobChoice(msg.text, choices);
         if (!pick) return twiml(`Sorry, that did not match a job. ${codePrompt(choices)}`);
+        const noteLabel = String(a.text ?? "").trim().slice(0, 1000);
         const { error } = await supabase.from("evidence").insert({
-          job_id: pick.id, label: String(a.text ?? "").trim().slice(0, 1000), stage: pick.stage,
-          kind: "work", uploaded_by: a.worker_email,
+          job_id: pick.id, label: noteLabel, stage: pick.stage,
+          kind: "work", uploaded_by: a.worker_email, sha256: await noteSha256(noteLabel, pick.id),
         });
         await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
         root.setAttributes({ "yaadly.worker_update.job": pick.id, "yaadly.worker_update.outcome": error ? "insert_failed" : "filed" });
@@ -2872,14 +3033,25 @@ Deno.serve(async (req: Request) => {
             root.setAttributes({ "yaadly.worker_update.outcome": "draft_job_not_open" });
             return twiml(`${a.job_id} is not open for updates any more, so nothing was filed. If you need a person, just say so.`);
           }
+          // batch_id carries only when this draft was held as a note about a
+          // batch just filed. Null for every other update, which is what it
+          // has always been, and what makes the portal draw it on its own.
+          const notesBatch = String(a.notes_batch ?? "") || null;
+          const noteLabel = String(a.text ?? "").slice(0, 1000);
           const { error } = await supabase.from("evidence").insert({
-            job_id: job.id, label: String(a.text ?? "").slice(0, 1000), stage: job.stage,
-            kind: "work", uploaded_by: found.email,
+            job_id: job.id, label: noteLabel, stage: job.stage,
+            kind: "work", uploaded_by: found.email, batch_id: notesBatch, sha256: await noteSha256(noteLabel, job.id),
           });
-          root.setAttributes({ "yaadly.worker_update.job": job.id, "yaadly.worker_update.outcome": error ? "insert_failed" : "filed" });
+          root.setAttributes({
+            "yaadly.worker_update.job": job.id,
+            "yaadly.worker_update.outcome": error ? "insert_failed" : (notesBatch ? "filed_as_note" : "filed"),
+          });
+          const landed = notesBatch
+            ? `On record for ${job.id} (${job.title}), with the photos you sent.`
+            : `On record for ${job.id} (${job.title}).`;
           return twiml(error
             ? "That did not save properly. Reply 1 again in a moment."
-            : `On record for ${job.id} (${job.title}). The client hears about it once it is drafted. If you need a person instead, just say so.`);
+            : `${landed} The client hears about it once it is drafted. If you need a person instead, just say so.`);
         }
         // "replace": falls through to the general door below.
       }
@@ -3009,7 +3181,15 @@ Deno.serve(async (req: Request) => {
 
           const stamped = pending.map((item) => ({ ...item, phase, pairsWith }));
           let filed = 0;
-          const batchId = stamped.length > 1 ? crypto.randomUUID() : null;
+          // Minted for one item as well as for several, since 20 Sep 2026.
+          // It used to be null for a single photograph, and the portal draws
+          // an item with no batch as its own update, which was right while
+          // nothing else ever joined a batch. A note filed afterwards joins by
+          // batch_id, so a lone photograph needs one or it is the only kind of
+          // evidence a worker cannot say anything about. Grouping is unchanged
+          // either way: updatesOf() draws a batch of one as one card, exactly
+          // as it drew a null.
+          const batchId = crypto.randomUUID();
           for (const item of stamped) if (await finalizeEvidenceItem(supabase, confirmedJob.id, confirmedJob.stage, workerEmail, item, batchId)) filed++;
           await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
           root.setAttributes({
@@ -3019,9 +3199,18 @@ Deno.serve(async (req: Request) => {
           if (!filed) return twiml("Nothing saved properly there. Try sending the photo again.");
           const filedLabel = await stageLabel(supabase, confirmedJob.id, confirmedJob.stage);
           const answering = named ? `, answering ${named.item_code}` : "";
+          // The invitation to say something about them, offered every time
+          // rather than only when a photograph arrived with no caption.
+          // Founder, 20 Sep 2026: a worker should be told they can comment,
+          // not merely allowed to. It goes here and nowhere earlier because
+          // this is the only point in the lane where a worker's free text is
+          // not already the answer to a question: before this it is the job
+          // code, the caption, or the section.
+          const them = filed === 1 ? "it" : "them";
+          const invite = ` Anything to say about ${them}? Type it now and it goes on the same update.`;
           let body = phase
-            ? `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}, marked as ${PHASE_SAID[phase]}${answering}. Keep them coming.`
-            : `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}. I could not tell which part of the job that was, so it is on record unmarked. Keep them coming.`;
+            ? `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}, marked as ${PHASE_SAID[phase]}${answering}.${invite}`
+            : `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}. I could not tell which part of the job that was, so it is on record unmarked.${invite}`;
           // Said, not silently swallowed. The evidence is filed either way;
           // what is missing is only the link between the two photographs, and
           // the desk can put that right without the worker resending anything.
@@ -3089,10 +3278,15 @@ Deno.serve(async (req: Request) => {
         return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, `Got it, that's for ${pick.id} (${pick.title}), ${await stageSaid(supabase, pick.id, pick.stage)}. Anything you send now files against that stage.${pairHint(await beforesOnJob(supabase, pick.id))}`);
       }
 
-      if (sess && Date.now() - new Date(sess.updated_at as string).getTime() > 48 * 3600_000) {
+      if (sess && Date.now() - new Date(sess.updated_at as string).getTime() > SESSION_STALE_MS) {
         // A stale evidence session is dropped, not salvaged: there is no
         // job description to write down, only an orphaned photo nobody
         // answered for. Falls through and this message is read fresh.
+        //
+        // Unreachable for an evidence session until 23 Sep 2026, because
+        // the block above returned on every path whenever one existed. The
+        // age guard on evSession is what lets this line finally do the job
+        // it was written for.
         await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
       }
 
@@ -3280,6 +3474,27 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // Accepting an add-on (extra work on a booked job, 20260928235000) by
+      // replying "CONFIRM <code>" to the message that carried it. Founder,
+      // 28 Sep 2026: the client confirms on WhatsApp, "edits only done in
+      // portal". Only the exact shape is claimed (parseAddonConfirm), so a
+      // normal message passes straight on to the lanes below. Must run before
+      // the evidence-comment catch-all further down, which would otherwise
+      // file the reply as a note on the job. The phone is the credential, as
+      // with every other WhatsApp confirmation; agree_addon_via_whatsapp()
+      // checks it is the client's and that the code is the current version.
+      if (!msg.media.length && msg.text.trim()) {
+        const addonCode = parseAddonConfirm(msg.text);
+        if (addonCode) {
+          const { data: done, error } = await supabase.rpc("agree_addon_via_whatsapp", { p_phone: msg.from, p_code: addonCode });
+          root.setAttributes({ "yaadly.addon.confirm": error ? "refused" : "agreed" });
+          if (error) return twiml(`That did not go through: ${error.message}`);
+          const row = Array.isArray(done) ? done[0] : done;
+          return twiml(`Confirmed. The extra work on ${row?.job_id ?? "your job"} is agreed, and your tradesperson has been told. ` +
+            `Yaadly will send you its invoice, and the extra work starts once it is paid. Any change from here is made on your job in the Yaadly portal.`);
+        }
+      }
+
       // Confirming a Quote Pack by replying with the job's own code. 2 Sep
       // 2026, founder's own correction: a quote used to go straight from
       // "submitted" to bookable the moment the client replied once, with
@@ -3353,6 +3568,38 @@ Deno.serve(async (req: Request) => {
             return twiml(`Booked. ${quoteTarget.title} is on. A message with the price and how payment works is coming through next. Nothing starts until your invoice from Yaadly is paid.`);
           }
           return twiml(`Noted for ${quoteTarget.title}. Your quote was already your word on the price, so nothing more is needed from you: the client accepts it, and you will get a message on this number the moment they do.`);
+        }
+      }
+
+      // A worker signing their Completion Report, 28 Sep 2026
+      // (20260928220000). Founder: "it has to be a button the work presses,
+      // through whatsapp or the portal". The Sign button's payload is the job's
+      // own code, so a tap arrives here as that code, exactly like the client's
+      // Approve button; typing the code does the same. The phone on the
+      // worker's profile is the credential, checked again inside
+      // sign_completion_report_via_whatsapp(). It signs the words as they
+      // stand: changing them is the portal's job. Only matches a job whose
+      // report is waiting on THIS worker, so it cannot catch any other reply.
+      if (!msg.media.length && msg.text.trim()) {
+        const { data: waiting } = await supabase.from("completion_reports")
+          .select("job_id").eq("status", "with_worker");
+        const ids = ((waiting ?? []) as { job_id: string }[]).map((r) => r.job_id);
+        if (ids.length) {
+          const { data: jobsWaiting } = await supabase.from("jobs")
+            .select("id, title, stage, worker_email").in("id", ids);
+          const emails = [...new Set(((jobsWaiting ?? []) as any[]).map((j) => String(j.worker_email ?? "").toLowerCase()).filter(Boolean))];
+          const { data: profs } = emails.length
+            ? await supabase.from("worker_profiles").select("worker_email, phone").in("worker_email", emails)
+            : { data: [] };
+          const mineEmails = new Set(((profs ?? []) as any[]).filter((w) => samePhone(w.phone, msg.from)).map((w) => String(w.worker_email).toLowerCase()));
+          const mineToSign = ((jobsWaiting ?? []) as any[]).filter((j) => mineEmails.has(String(j.worker_email ?? "").toLowerCase()));
+          const signTarget = matchApprovingJob(msg.text, mineToSign);
+          if (signTarget) {
+            const { error } = await supabase.rpc("sign_completion_report_via_whatsapp", { p_job: signTarget.id, p_phone: msg.from });
+            root.setAttributes({ "yaadly.whatsapp_report_sign.job": signTarget.id, "yaadly.whatsapp_report_sign.outcome": error ? "refused" : "signed" });
+            if (error) return twiml(`That did not go through: ${error.message}`);
+            return twiml(`Signed. Your Completion Report for ${signTarget.title} goes to the owner in a moment. Thank you for the work.`);
+          }
         }
       }
 
@@ -3683,6 +3930,44 @@ Deno.serve(async (req: Request) => {
             root.setAttributes({ "yaadly.worker_update.outcome": "too_short_not_update" });
             return twiml("Nothing is waiting to be filed. Send a few words on how the work went, a photo, or a voice note.");
           }
+          // A note about the photographs just filed, 20 Sep 2026. The filing
+          // confirmation invites one, and this is where the answer lands,
+          // because by then the evidence session is closed and a worker's
+          // words are free text again.
+          //
+          // It holds and reads back exactly as any other typed update does.
+          // Being invited to comment does not buy a way past the 17 September
+          // rule, and the 1 is still the gate. What changes is only where the
+          // words end up: sharing the batch_id of the photographs, so the
+          // portal draws them as one update rather than as a line of text
+          // standing beside pictures nobody connected it to.
+          //
+          // This runs ahead of the one-job and many-jobs branches below and
+          // covers both. With several jobs running it also removes the code
+          // question, which would be asking a worker which job they meant
+          // about photographs they filed four minutes ago. The read-back
+          // names the job, so the worker still sees where it is going and
+          // can drop it.
+          const justFiled = found ? await recentFiledBatch(supabase, found.email) : null;
+          const noteJob = justFiled ? found!.jobs.find((j) => j.id === justFiled.jobId) : undefined;
+          if (found && justFiled && noteJob) {
+            await supabase.from("wa_intake_sessions").upsert({
+              wa_id: msg.from,
+              answers: {
+                _lane: "update_draft", worker_email: found.email,
+                job_id: noteJob.id, job_title: noteJob.title, text: text.slice(0, 1000),
+                notes_batch: justFiled.batchId,
+              },
+              photo_count: 0,
+              updated_at: new Date().toISOString(),
+            });
+            root.setAttributes({
+              "yaadly.worker_update.job": noteJob.id,
+              "yaadly.worker_update.outcome": "held_for_confirm_as_note",
+            });
+            return twiml(draftReadBack(noteJob.id, noteJob.title, text, true));
+          }
+
           // Held and read back, never filed on arrival (17 Sep 2026). The
           // reply of 1 is handled by the update_draft lane above.
           if (found && found.jobs.length === 1) {

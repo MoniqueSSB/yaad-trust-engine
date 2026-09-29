@@ -3,6 +3,7 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { pickTextProvider, providerAttrs, chatWithFailover, answerText, firstJsonObject, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, visionAttrs } from "./visionmodel.ts";
 import { scrub } from "./measurements.ts";
+import { LOGO } from "./logo.ts";
 
 // yaad-sketch
 //
@@ -319,6 +320,11 @@ async function osmMap(address: string, trace: Trace): Promise<string | null> {
 }
 
 function renderPack(p: Record<string, any>, stamp: string): string {
+  // visit_date is a date column ("2026-09-24"). Printed as words, and read as
+  // written, never through a timezone that could move it a day.
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const plain = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(p.visit_date || ""));
+  const visitDay = plain ? `${Number(plain[3])} ${MONTHS[Number(plain[2]) - 1]} ${plain[1]}` : (p.visit_date ? String(p.visit_date) : "");
   const rooms: Room[] = p.rooms || [];
   const frames: any[] = p.frames || [];
   const sev = (s: string) => ({ high: "#B42318", medium: "#8A5A00", low: "#4A5F5A" }[s] || "#4A5F5A");
@@ -361,75 +367,97 @@ function renderPack(p: Record<string, any>, stamp: string): string {
         : `<p class="none">Nothing notable visible in what was filmed here.</p>`}
     </section>`).join("");
 
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+  // Laid out for A4 paper, the same way the report document in the desk is
+  // (reportDocumentHtml in concierge/concierge.html), because this is a thing
+  // that gets printed, saved as a PDF and handed over. Until 28 September 2026
+  // it was a screen page, grey background and a rounded card, printed from a
+  // small preview frame. The words did not change when the layout did.
+  //
+  // The running header is the <thead> of table.doc: a browser repeats a table
+  // header on every printed page, which @page cannot do with content yet.
+  // No web fonts. The desk opens this in a tab under its own security policy,
+  // and a document that depends on a font server prints differently on the day
+  // that server is slow.
+  return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(p.id)} Site Inspection Report</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<title>${esc(p.id)}${p.rev > 1 ? ` rev ${esc(p.rev)}` : ""}, Site Inspection Report</title>
 <style>
-:root{--teal:#14B8A6;--deep:#08110F;--line:#DCE6E2;--mute:#5E7772}
+:root{--teal:#0f6b63;--deep:#15161c;--line:#dcdde5;--mute:#5c6070;--wash:#f7f7fa;--mango:#c77a17;--coral:#b3372f;
+--disp:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--body:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+@page{size:A4;margin:16mm 16mm 16mm}
 *{box-sizing:border-box}
-body{margin:0;padding:32px 20px;background:#F4F7F6;color:var(--deep);font:15px/1.6 'Space Grotesk',-apple-system,sans-serif}
-.sheet{max-width:820px;margin:0 auto;background:#fff;padding:44px 48px;border-radius:14px;box-shadow:0 2px 24px rgba(8,17,15,.08)}
-header{border-bottom:3px solid var(--teal);padding-bottom:20px;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
-.mark{font-family:'Anton',Impact,sans-serif;font-size:32px;line-height:1}.mark span{color:var(--teal)}
-h1{font-family:'Anton',Impact,sans-serif;font-weight:400;font-size:26px;margin:0;letter-spacing:.6px}
-.ref{font-size:15px;font-weight:700;color:var(--mute)}
-.stamp{margin:22px 0;padding:15px 18px;background:#FFFBF2;border:1px solid #FFE0A3;border-radius:9px;color:#8A5A00;font-size:13.5px}
-.meta{display:flex;gap:30px;flex-wrap:wrap;margin:22px 0}
-.meta h2{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--mute);margin:0 0 4px}
-.meta p{margin:0}
-h2.sec{font-family:'Anton',Impact,sans-serif;font-weight:400;font-size:19px;letter-spacing:.7px;margin:34px 0 12px;padding-top:18px;border-top:1px solid var(--line)}
-.summary{font-size:16px}
-.sketch{border:1px solid var(--line);border-radius:10px;padding:14px;background:#fff;overflow-x:auto}
-.room{padding:16px 0;border-bottom:1px solid var(--line)}
-.room h3{margin:0 0 6px;font-size:16px}
-.lvl{font-size:11px;color:var(--mute);font-weight:400;text-transform:uppercase;letter-spacing:1.1px}
-.shots{margin-bottom:8px}
-.shot{display:inline-block;background:#E8F6F4;color:#0B7A6E;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;margin-right:6px}
+body{margin:0;background:#fff;color:var(--deep);font-family:var(--body);font-size:10.4pt;line-height:1.55;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.wrap{max-width:178mm;margin:0 auto;padding:12mm 0 20mm}
+.printbar{position:fixed;top:14px;right:14px;z-index:9;display:flex;gap:8px;align-items:center;font:600 12px var(--body)}
+.printbar button{font:600 13px var(--body);padding:9px 14px;border-radius:8px;border:1px solid var(--deep);background:var(--deep);color:#fff;cursor:pointer}
+.printbar span{color:var(--mute);background:#fff;padding:6px 10px;border:1px solid var(--line);border-radius:8px}
+table.doc{width:100%;border-collapse:collapse}table.doc>thead>tr>td,table.doc>tbody>tr>td{padding:0}table.doc>thead{display:table-header-group}
+.runhead{display:flex;align-items:center;gap:9px;border-bottom:1.6pt solid var(--deep);padding-bottom:5px;margin-bottom:7mm}
+.runhead img{width:8.5mm;height:8.5mm;object-fit:contain}
+.runhead .wm{font-family:var(--disp);font-size:14pt;letter-spacing:-0.01em}.runhead .wm span{color:var(--mango)}
+.runhead .svc{margin-left:auto;font:600 7.6pt/1.35 var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--mute);text-align:right}
+.kicker{font:600 8pt/1 var(--mono);text-transform:uppercase;letter-spacing:.14em;color:var(--mango);margin:0 0 8px}
+h1{font-family:var(--disp);font-weight:400;font-size:24pt;line-height:1.1;margin:0 0 4px;letter-spacing:-0.015em}
+.ref{font:600 8pt/1.4 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--mute)}
+.stamp{margin:18px 0;padding:11px 14px;background:#fff6e6;border:1pt solid #e8cf9a;border-left:3pt solid var(--mango);border-radius:2pt;color:#7a4d0e;font-size:9.6pt;break-inside:avoid}
+h2.sec{font-family:var(--disp);font-weight:400;font-size:14.5pt;margin:24px 0 10px;padding-bottom:5px;border-bottom:1pt solid var(--line);break-after:avoid;page-break-after:avoid}
+.sketch{border:1pt solid var(--line);border-radius:2pt;padding:10px;background:#fff;break-inside:avoid}
+.sketch svg{display:block;max-height:215mm}
+.room{padding:10px 0;border-bottom:1pt solid var(--line);break-inside:avoid}
+.room h3{margin:0 0 5px;font-size:11pt}
+.lvl{font:600 7.2pt/1 var(--mono);color:var(--mute);text-transform:uppercase;letter-spacing:.1em}
+.shots{margin-bottom:6px}
+.shot{display:inline-block;border:1pt solid var(--line);color:var(--teal);border-radius:99px;padding:1.5px 8px;font:600 7.4pt/1.6 var(--mono);margin-right:5px}
 .room ul{margin:0;padding:0;list-style:none}
-.room li{padding:7px 0 7px 20px;position:relative;font-size:14.5px}
-.dot{position:absolute;left:0;top:14px;width:9px;height:9px;border-radius:50%}
-.pro{display:block;color:#B42318;font-style:normal;font-size:13px;margin-top:2px}
-.none{color:var(--mute);font-size:14px;margin:0}
-.gaps{background:#F4F7F6;border-left:3px solid var(--teal);padding:14px 18px;border-radius:0 9px 9px 0}
+.room li{padding:5px 0 5px 18px;position:relative;font-size:10pt}
+.dot{position:absolute;left:0;top:11px;width:8px;height:8px;border-radius:50%}
+.pro{display:block;color:var(--coral);font-style:normal;font-size:9.4pt;margin-top:2px}
+.none{color:var(--mute);font-size:9.4pt;margin:0}
+.gaps{background:var(--wash);border:1pt solid var(--line);border-left:3pt solid var(--teal);padding:11px 14px;border-radius:2pt;font-size:10pt;break-inside:avoid}
 .gaps ul{margin:6px 0 0;padding-left:18px}
-.esc{background:#FEF3F2;border:1px solid #FDA29B;border-radius:9px;padding:14px 18px;color:#B42318;font-size:14px}
-footer{margin-top:34px;padding-top:18px;border-top:1px solid var(--line);font-size:12px;color:var(--mute);line-height:1.75}
-.detail{display:grid;grid-template-columns:170px 1fr;gap:0;margin:22px 0 20px;border-top:1px solid var(--line)}
-.detail dt{font-weight:700;font-size:13px;padding:8px 12px 8px 0;border-bottom:1px solid var(--line)}
-.detail dd{margin:0;font-size:14px;padding:8px 0;border-bottom:1px solid var(--line)}
-.scope p{margin:0 0 10px;font-size:14.5px}
-ul.notes{margin:0 0 6px;padding-left:20px;font-size:14.5px}
-ul.notes li{margin-bottom:5px}
-.sign{width:100%;border-collapse:collapse;margin-top:6px}
-.sign td{border:1px solid var(--line);padding:12px 14px;width:50%;vertical-align:top}
-.sign b{display:block;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--mute);margin-bottom:8px}
-.sign .who{display:block;font-size:17px;font-weight:700;padding-bottom:8px;border-bottom:1px solid var(--deep);margin-bottom:6px}
-.sign .who.unsigned{color:#8A5A00;border-bottom-style:dashed;border-bottom-color:#FFE0A3;font-weight:400}
-.sign .when{display:block;font-size:12px;color:var(--mute)}
+.esc{background:#fdf1f0;border:1pt solid #eab5b0;border-left:3pt solid var(--coral);border-radius:2pt;padding:11px 14px;color:var(--coral);font-size:10pt;break-inside:avoid}
+footer{margin-top:24px;padding-top:10px;border-top:1pt solid var(--line);font-size:8.2pt;color:var(--mute);line-height:1.6;break-inside:avoid}
+.detail{display:grid;grid-template-columns:42mm 1fr;gap:0;margin:16px 0 18px;border-top:1pt solid var(--line)}
+.detail dt{font:600 7.4pt/1.4 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--mute);padding:8px 12px 7px 0;border-bottom:1pt solid var(--line)}
+.detail dd{margin:0;font-size:10pt;padding:6px 0;border-bottom:1pt solid var(--line)}
+.scope{background:var(--wash);border:1pt solid var(--line);border-radius:2pt;padding:12px 15px;font-size:9.8pt}
+.scope p{margin:0 0 7px}.scope p:last-child{margin:0}
+ul.notes{margin:0 0 6px;padding-left:20px;font-size:10pt}
+ul.notes li{margin-bottom:4px}
+.sign{width:100%;border-collapse:collapse;margin-top:6px;break-inside:avoid}
+.sign td{border:1pt solid var(--line);padding:10px 12px;width:50%;vertical-align:top}
+.sign b{display:block;font:600 7.2pt/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin-bottom:8px}
+.sign .who{display:block;font-size:13pt;font-weight:650;padding-bottom:7px;border-bottom:1pt solid var(--deep);margin-bottom:6px}
+.sign .who.unsigned{color:#7a4d0e;border-bottom-style:dashed;border-bottom-color:#e8cf9a;font-weight:400}
+.sign .when{display:block;font-size:8.8pt;color:var(--mute)}
 .photos{width:100%;border-collapse:collapse;margin-top:6px}
-.photos th{text-align:left;font-size:13px;padding:8px 10px;border:1px solid var(--line);background:#F4F7F6}
-.photos td{border:1px solid var(--line);vertical-align:top;padding:10px}
+.photos th{text-align:left;font:600 7.2pt/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--mute);padding:8px 10px;border:1pt solid var(--line);background:var(--wash)}
+.photos td{border:1pt solid var(--line);vertical-align:top;padding:8px 10px}
 .photos td.ph{width:46%}
-.photos td.ph img{width:100%;display:block;border-radius:4px}
-.photos .num{font-weight:700;margin-bottom:6px}
-.photos .noimg{background:#F4F7F6;color:var(--mute);font-size:12px;padding:30px 12px;text-align:center;border-radius:4px}
-.photos td.ds{font-size:13.5px;line-height:1.55}
-.photos td.ds p{margin:0 0 8px}
-.photos tr.rh td{background:#E8F6F4;font-weight:700;font-size:13px;padding:6px 10px}
-.photos tr{page-break-inside:avoid}
-h2.sec{page-break-after:avoid}
-@media print{body{background:#fff;padding:0}.sheet{box-shadow:none;padding:0;max-width:none}}
-</style></head><body><div class="sheet">
-<header>
-  <div><div class="mark">YAADLY<span>.</span></div><div class="ref">Site Inspection Report</div></div>
-  <div style="text-align:right"><h1>${esc(p.property_label)}</h1><div class="ref">${esc(p.id)}${p.rev > 1 ? ` rev ${esc(p.rev)}` : ""}</div></div>
-</header>
+.photos td.ph img{width:100%;max-height:95mm;object-fit:contain;display:block;border-radius:1pt}
+.photos .num{font:600 9pt/1 var(--mono);margin-bottom:6px}
+.photos .noimg{background:var(--wash);color:var(--mute);font-size:8.8pt;padding:26px 12px;text-align:center;border-radius:1pt}
+.photos td.ds{font-size:9.8pt;line-height:1.5}
+.photos td.ds p{margin:0 0 7px}
+.photos tr.rh td{background:#e9f3f1;font-weight:650;font-size:9.6pt;padding:6px 10px}
+.photos tr{break-inside:avoid;page-break-inside:avoid}
+.photos tr.rh{break-after:avoid;page-break-after:avoid}
+@media print{.printbar{display:none}.wrap{max-width:none;padding:0}}
+@media screen and (max-width:640px){.wrap{padding:64px 14px 30px}.detail{grid-template-columns:1fr}.detail dt{border-bottom:none;padding-bottom:0}.photos td.ph{width:50%}}
+</style></head><body>
+<div class="printbar"><span>Print, then choose Save as PDF</span><button onclick="window.print()">Print</button></div>
+<div class="wrap">
+<table class="doc"><thead><tr><td>
+<div class="runhead"><img src="${LOGO}" alt=""><div class="wm">Yaad<span>ly</span></div><div class="svc">Site Inspection Report<br>${esc(p.id)}${p.rev > 1 ? ` rev ${esc(p.rev)}` : ""}</div></div>
+</td></tr></thead><tbody><tr><td>
+
+<div class="kicker">Site Inspection Report</div>
+<h1>${esc(p.property_label)}</h1>
+<div class="ref">${esc(p.id)}${p.rev > 1 ? ` rev ${esc(p.rev)}` : ""}</div>
 
 <dl class="detail">
   <dt>Report number</dt><dd>${esc(p.id)}${p.rev > 1 ? `, revision ${esc(p.rev)}` : ""}</dd>
-  <dt>Date of visit</dt><dd>${esc(p.visit_date || "Not stated")}</dd>
+  <dt>Date of visit</dt><dd>${esc(visitDay || "Not stated")}</dd>
   <dt>Property</dt><dd>${esc(p.property_label)}</dd>
   ${p.address ? `<dt>Site address</dt><dd>${esc(p.address)}${p.parish ? `, ${esc(p.parish)}` : ""}</dd>` : p.parish ? `<dt>Parish</dt><dd>${esc(p.parish)}</dd>` : ""}
   <dt>Prepared for</dt><dd>${esc(p.client_name || "Not stated")}</dd>
@@ -472,7 +500,7 @@ ${(p.gaps || []).length ? `<h2 class="sec">What this pack does not cover</h2>
 <h2 class="sec">Signed off</h2>
 <table class="sign">
   <tr>
-    <td><b>Visit conducted by</b><span class="who">${esc(p.captured_by || "Not stated")}</span><span class="when">${p.visit_date ? `On site ${esc(p.visit_date)}` : "Date not stated"}</span></td>
+    <td><b>Visit conducted by</b><span class="who">${esc(p.captured_by || "Not stated")}</span><span class="when">${visitDay ? `On site ${esc(visitDay)}` : "Date not stated"}</span></td>
     <td><b>Checked and approved by</b>${p.approved_by
       ? `<span class="who">${esc(p.approved_by)}</span><span class="when">${esc(String(p.approved_at || "").slice(0, 16).replace("T", " "))}${p.issued_at ? `, issued ${esc(String(p.issued_at).slice(0, 10))}` : ""}</span>`
       : `<span class="who unsigned">Not yet approved</span><span class="when">This is a draft. Nobody has checked it.</span>`}</td>
@@ -486,6 +514,7 @@ ${(p.gaps || []).length ? `<h2 class="sec">What this pack does not cover</h2>
   Yaadly Ltd, registered in England and Wales, company number 17358077.<br>
   This document records observation and documentation only. It is not a survey, a structural report, a valuation, a legal opinion or a quantity surveyor's estimate, and nothing in it should be relied on as one. Findings reflect conditions visible on the day of filming.
 </footer>
+</td></tr></tbody></table>
 </div></body></html>`;
 }
 

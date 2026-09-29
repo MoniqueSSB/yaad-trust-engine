@@ -58,4 +58,10 @@ describe("invoiceLabel", () => {
     ];
     for (const s of shapes) assert.doesNotMatch(m.invoiceLabel(s), /fee/i);
   });
+
+  test("an add-on invoice says it is an add-on, on both sides", () => {
+    assert.equal(m.invoiceLabel({ payable_to: "yaadly", stage: null, starts_job: false, part_of: null, period_label: "Add-on, first half" }), "Add-on, first half");
+    assert.equal(m.invoiceLabel({ payable_to: "worker", stage: null, period_label: "Add-on completed" }), "Worker pay · add-on");
+    assert.doesNotMatch(m.invoiceLabel({ payable_to: "yaadly", stage: null, period_label: "Add-on" }), /job bill/i);
+  });
 });

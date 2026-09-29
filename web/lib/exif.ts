@@ -26,6 +26,28 @@
  * they store with captured_at null rather than with a guess.
  */
 
+/* Plain Uint8Array throughout since 28 Sep 2026, so the same code runs in the
+   browser: large photos now go straight from the phone to Storage, and the
+   location has to come off before they leave it. A Node Buffer is a
+   Uint8Array, so every server caller works unchanged. */
+const be16 = (b: Uint8Array, o: number) => (b[o] << 8) | b[o + 1];
+const latin1 = (b: Uint8Array, start: number, end: number) => {
+  let out = "";
+  for (let k = start; k < end && k < b.length; k++) out += String.fromCharCode(b[k]);
+  return out;
+};
+function concatBytes(parts: Uint8Array[], like: Uint8Array): Uint8Array {
+  /* A Buffer in gives a Buffer out, so server callers and tests see exactly
+     what they always did; in the browser there is no Buffer. */
+  const B = (globalThis as { Buffer?: { isBuffer(x: unknown): boolean; concat(p: Uint8Array[]): Uint8Array } }).Buffer;
+  if (B && B.isBuffer(like)) return B.concat(parts);
+  const total = parts.reduce((t, p) => t + p.length, 0);
+  const out = new Uint8Array(total);
+  let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
+
 const SOI = 0xffd8;
 const MARKER_APP1 = 0xe1;
 const MARKER_SOS = 0xda;
@@ -44,47 +66,69 @@ const TAG_DATETIME_ORIGINAL = 0x9003; // Exif IFD, when the shutter fired
 const SITE_UTC_OFFSET_MINUTES = -5 * 60;
 
 /** Rebuild a JPEG without any APP1 segment. Anything else passes through. */
-export function stripApp1(buf: Buffer): Buffer {
-  if (buf.length < 4 || buf.readUInt16BE(0) !== SOI) return buf;
-  const keep: Buffer[] = [buf.subarray(0, 2)];
+export function stripApp1<T extends Uint8Array>(buf: T): T {
+  if (buf.length < 4 || be16(buf, 0) !== SOI) return buf;
+  const keep: Uint8Array[] = [buf.subarray(0, 2)];
   let i = 2;
   while (i + 4 <= buf.length) {
     if (buf[i] !== 0xff) break;
     const marker = buf[i + 1];
     if (marker === MARKER_SOS) break; // scan data runs to the end, leave it alone
-    const len = buf.readUInt16BE(i + 2);
+    const len = be16(buf, i + 2);
     if (len < 2 || i + 2 + len > buf.length) break;
     if (marker !== MARKER_APP1) keep.push(buf.subarray(i, i + 2 + len));
     i += 2 + len;
   }
   keep.push(buf.subarray(i));
-  return Buffer.concat(keep);
+  return concatBytes(keep, buf) as T;
+}
+
+/** True when a JPEG still carries an APP1 (Exif, where the location lives)
+ *  segment before its image data. Reads only the header, so it can run on the
+ *  first few hundred kilobytes of a file the server fetched from Storage. */
+export function jpegHasApp1(buf: Uint8Array): boolean {
+  if (buf.length < 4 || be16(buf, 0) !== SOI) return false;
+  let i = 2;
+  while (i + 4 <= buf.length) {
+    if (buf[i] !== 0xff) return false;
+    const marker = buf[i + 1];
+    if (marker === MARKER_SOS) return false;
+    if (marker === MARKER_APP1) return true;
+    const len = be16(buf, i + 2);
+    if (len < 2) return false;
+    i += 2 + len;
+  }
+  return false;
 }
 
 /** The TIFF block inside the Exif APP1 segment, or null. */
-function findExifTiff(buf: Buffer): Buffer | null {
-  if (buf.length < 4 || buf.readUInt16BE(0) !== SOI) return null;
+function findExifTiff(buf: Uint8Array): Uint8Array | null {
+  if (buf.length < 4 || be16(buf, 0) !== SOI) return null;
   let i = 2;
   while (i + 4 <= buf.length) {
     if (buf[i] !== 0xff) return null;
     const marker = buf[i + 1];
     if (marker === MARKER_SOS) return null;
-    const len = buf.readUInt16BE(i + 2);
+    const len = be16(buf, i + 2);
     if (len < 2 || i + 2 + len > buf.length) return null;
     if (marker === MARKER_APP1) {
       const seg = buf.subarray(i + 4, i + 2 + len);
-      if (seg.length > 6 && seg.toString("latin1", 0, 6) === "Exif\0\0") return seg.subarray(6);
+      if (seg.length > 6 && latin1(seg, 0, 6) === "Exif\0\0") return seg.subarray(6);
     }
     i += 2 + len;
   }
   return null;
 }
 
-const u16 = (b: Buffer, o: number, le: boolean) => (le ? b.readUInt16LE(o) : b.readUInt16BE(o));
-const u32 = (b: Buffer, o: number, le: boolean) => (le ? b.readUInt32LE(o) : b.readUInt32BE(o));
+const u16 = (b: Uint8Array, o: number, le: boolean) =>
+  le ? b[o] | (b[o + 1] << 8) : (b[o] << 8) | b[o + 1];
+const u32 = (b: Uint8Array, o: number, le: boolean) =>
+  (le
+    ? (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24))
+    : ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3])) >>> 0;
 
 function eachEntry(
-  tiff: Buffer,
+  tiff: Uint8Array,
   le: boolean,
   ifd: number,
   fn: (tag: number, entry: number) => void,
@@ -99,13 +143,13 @@ function eachEntry(
 }
 
 /** An ASCII EXIF value, read from the entry inline or from its offset. */
-function asciiValue(tiff: Buffer, le: boolean, entry: number): string | null {
+function asciiValue(tiff: Uint8Array, le: boolean, entry: number): string | null {
   if (u16(tiff, entry + 2, le) !== 2) return null; // type 2 is ASCII
   const count = u32(tiff, entry + 4, le);
   if (count === 0 || count > 64) return null;
   const start = count <= 4 ? entry + 8 : u32(tiff, entry + 8, le);
   if (start < 0 || start + count > tiff.length) return null;
-  return tiff.toString("latin1", start, start + count).replace(/\0[\s\S]*$/, "").trim();
+  return latin1(tiff, start, start + count).replace(/\0[\s\S]*$/, "").trim();
 }
 
 /** "YYYY:MM:DD HH:MM:SS" at the site offset, or null if it cannot be true. */
@@ -125,11 +169,11 @@ function parseExifDate(value: string | null, now: Date): Date | null {
 }
 
 /** When the shutter fired, per the camera. Null when nothing usable is there. */
-export function readCapturedAt(buf: Buffer, now: Date = new Date()): Date | null {
+export function readCapturedAt(buf: Uint8Array, now: Date = new Date()): Date | null {
   const tiff = findExifTiff(buf);
   if (!tiff || tiff.length < 8) return null;
 
-  const bom = tiff.toString("latin1", 0, 2);
+  const bom = latin1(tiff, 0, 2);
   const le = bom === "II";
   if (!le && bom !== "MM") return null;
   if (u16(tiff, 2, le) !== 0x2a) return null;

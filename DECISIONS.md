@@ -6,6 +6,636 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-29 · A typed update carries a fingerprint, and the desk's "No print" counts only real files
+
+The desk's Overview kept showing "No print: 1 sign-off is not bound to the exact files" (Monique: "keeps raising issues"). The one sign-off was stage 1 of the test verandah job. All five photographs on it were fingerprinted. The sixth item was a worker's typed WhatsApp update, "report", which has no file. `yaad-inbound` filed typed updates with no `sha256`, while the portal has always fingerprinted a text-only entry as `label + "|" + job id`. The count runs over all time, so one such note held the warning up for good.
+
+- **The source:** `yaad-inbound` now fingerprints a typed update by the portal's rule.
+- **The reading:** `evidence_at_signoff.fingerprinted` (`20260929110000`) counts an item as bound when it has a fingerprint, or when its evidence row has no file at all. The warning's own words are about files. A photo or video with no fingerprint still counts against it, and so does an item whose evidence row is gone.
+- **The sign-off record:** not touched. The snapshot in `stage_approvals` is what the approver saw.
+
+A read-only dry run against the live data showed every sign-off fully bound under the new rule.
+
+---
+
+## 2026-09-29 · On a job billed by stage, each stage is paid before it starts; the 15% is paid in full first
+
+Monique, 28 Sep 2026: "can't move on without each stage being paid by the client first", "if the client pays the full bill, fine", and "the 15 is always paid before a job starts, in full, never split through a job".
+
+A quote could already say `by_stage`, but nothing followed from it. That was "piece 3" of 14 Sep, never built. `20260929100000` builds it, for by-stage jobs only; a job billed in full is unchanged.
+
+- **The start bill:** `raise_job_client_invoice` drafts it instead of the whole-job bill. It is Yaadly's 15% on all the labour, never split, plus materials at cost. It carries the fee line, so paying it starts the job as before.
+- **Stage 1's bill:** stage 1's share of the labour, drafted at the same time.
+- **Each next bill:** drafted when the client approves the stage before it (trigger on `stage_approvals`). Every bill is only drafted; a named person sends it and marks it paid.
+- **The gate:** a stage cannot be worked until its bill is paid. `evidence_on_the_working_stage` refuses work evidence with "Stage N starts once its bill is paid". Materials evidence is let through, because materials were paid on the start bill.
+- **Each stage's share:** the one the worker's stage pay already uses, from the approved Kickoff Pack's schedule, else the quote pack's, `round(labour × percent / 100)`. So the client's stage bill and the worker's stage pay are cut from the same figure, and `worker_pay_client_unpaid` already waits for that stage's bill.
+- **No schedule:** a by-stage job with no approved schedule is refused rather than guessed.
+
+**Tested:** 19 checks in PGlite (`supabase/tests/pglite/stages_run.mjs`). No live job was billed by stage when this was written.
+
+---
+
+## 2026-09-28 · Invoices show the job's main and additional work apart; pending add-ons are shown but not counted
+
+Monique: "the PDF invoice should also show the add-on breakdown", and "the extra work should feed into the money section because it is the price of the overall job".
+
+**Invoices.** Any client invoice on a job that has add-on invoices now carries "This job: main work and additional work", under its own total, in both the PDF (`pdf.ts`) and the emailed HTML (`renderInvoice`):
+
+- **Main work:** the job's own bills.
+- **Additional work:** each add-on invoice with its work, the 15% and its total.
+- **Marker:** the invoice being read is marked "this invoice".
+- **Total:** the job in total across both.
+
+It is read under the caller's token by `jobWorkFor()`, like everything else in `yaad-invoice`. Drafts are left out except the invoice being drawn. A job with no add-on gets no section, so ordinary invoices are unchanged.
+
+**The Money section.** An add-on still being agreed is now shown under Additional work as "Being agreed, not counted". It is never invisible, and it is never counted, because nobody owes money on it until both sides agree. Once agreed it counts in the overall job total automatically.
+
+**The add-on card**, when it is waiting on the other side, now says why there is only "Withdraw it":
+
+- writing or changing it already counts as your agreement;
+- only the side it waits on can change a version;
+- you will be told when they answer;
+- to change it first, withdraw and write it again;
+- to talk it through, message them, with a link to Messages. On your own turn there is an "Ask a question" link too.
+
+---
+
+## 2026-09-28 · "What this job costs" has two sections: main work and additional work
+
+Monique: "give extra work its own break down prices... that is added underneath, so there is no confusions", and "this section would now have two sections for the main work and the additional work".
+
+The same day, agreed extra work had been folded into the money panel as one line, and added into the job's "All in" total, so a client could not tell what the quote cost from what the extras cost. Now there are two sections:
+
+- **Main work:** exactly as the quote set it, with its own total.
+- **Additional work:** underneath, with one card per agreed or approved add-on.
+  - The client sees the work, Yaadly's 15% and what they pay.
+  - The worker sees the work, the 5% taken off and what they are paid.
+  - It has its own total.
+
+A last line adds the two together and says so. The figures are `addonClientBill()` and `addonWorkerPay()`, the same arithmetic as the add-on invoices.
+
+---
+
+## 2026-09-28 · Invoices download as the emailed PDF, and "Your documents" offers each PDF from the list
+
+**Invoices.** Monique: "invoice download as pdf also". Every non-draft invoice in the portal's money panel has **Download PDF**. It is the same file the invoice email attaches, drawn by `invoicePdf()` in `yaad-invoice`, so it cannot differ from what was sent.
+
+`yaad-invoice` was admin only. It now has exactly one other action, `pdf`, handled before the admin gate:
+
+- **The invoice and its lines:** read under the caller's own token, so row level security decides who gets what, exactly as on the portal page. A client gets their own sent or paid invoices, a worker their own pay, and a draft never.
+- **The issuer settings:** only the `invoice_*` app settings (company details and bank line, printed on every invoice) are read with the service role, because `app_settings` is admin-only in RLS.
+- **Effect:** it changes nothing, and the function keeps its platform JWT check.
+
+**"Your documents".** Each completed row now has its own **PDF** button (Monique: "this needs pdf reviews also"). It opens the document with `?pdf=1`, and that page's Download PDF starts on arrival. The Kickoff Pack's goes to the whole pack on one page.
+
+---
+
+## 2026-09-28 · Every document in "Your documents" downloads as a PDF
+
+Monique: the quote pack in the client and worker portal "should show as a pdf view also", then "these should all be able to review as a pdf". Each completed document uses the Completion Report's Download PDF button (`PrintReport`, now with a file name of its own). The PDF is made in the browser from the page on screen, so it cannot disagree with what the page says, and nothing is sent anywhere.
+
+- **Quote Pack:** the button, plus the fixed "Work outside this scope" wording the desk PDF carries.
+- **Kickoff Pack:**
+  - a button on each document page;
+  - `pack/all`, the whole pack on one page for one file, linked from the pack's front page.
+- **Guidelines:**
+  - `/portal/guidelines/client` and `/worker` show the current version in full, with the reader's signature against it if they have one;
+  - the page used to show the text only while it was being signed, so once signed there was nothing to read or keep;
+  - "Your documents" links a signed set there.
+
+**Fixed while there: the quote pack was showing the client the wrong price.** It read labour plus materials as "Total", without Yaadly's 15%, so a client quoted J$100,000 read J$100,000 and was invoiced J$115,000. It now shows each side what they actually get:
+
+- **Client:** `clientBill()`, the invoice's own arithmetic, with the 15% as its own line.
+- **Worker:** the labour less 5%, plus materials, as `raise_job_worker_payable` pays.
+
+---
+
+## 2026-09-29 · An agreed add-on can be cancelled, by a named person, only while nothing is paid
+
+The first live test of add-ons found a dead end. Once both sides agreed, nothing could close an add-on. `decline_addon_as_me()` only works while it is still being agreed, so a client changing their mind after agreeing, or a test add-on, held the job short of complete for good.
+
+`cancel_addon(p_addon, p_reason)` is the one way out, and it is admin only (the desk's **Cancel add-on**):
+
+- **Draft invoice:** voided in the same step, because nobody was ever asked to pay it.
+- **Sent invoice:** refused, naming the invoice. It must be voided on Invoices first, deliberately, because the client has it.
+- **Anything paid:** refused. That is a refund decision, and this button does not make refund decisions.
+- **Record:** who cancelled it and why.
+- **Messages:** none, to either side. A cancellation after agreement is a conversation the desk has. The new status, `cancelled`, is not one `sync_job_status` counts, so the job is free to complete.
+
+---
+
+## 2026-09-28 · Extra work on a booked job is an add-on, agreed by both sides and billed on its own
+
+Until today a booked job could not take extra work at all. `request_quote_change_as_me()` refuses a booked job and tells the client to message Yaadly, and nothing recorded what happened next, so hidden defects found once a job opened up were either done off the books or stopped the job. Monique set the rules on 28 September 2026:
+
+- **The client writes it:** a short scope, the amount they offer, and how it is paid. The default is paid in full, before the extra work starts. The one alternative is half now, half on sign-off.
+- **The worker accepts it, changes it, or turns it down.** A change goes back to the client, who can accept it, change it again, or withdraw. Nothing is booked until both sides have agreed the same revision. The revision number does the kickoff pack's confirmation-code job: an accept against a version the other side has since changed is refused.
+- **Fees are the same as the main job.** The client pays the agreed amount plus 15% on top, and the worker is paid the amount less 5%.
+- **It is billed as its own numbered invoice on the same job.** The job's own bill is never touched, sent or not.
+- **Nothing closes while extra work is open.** The job cannot complete while any add-on is still being agreed, or is agreed and not yet signed off.
+
+**Why not an extra stage.** The accepted quote's stages must total exactly 100% (`parse_payment_stages`), and `job_final_stage_count()` decides completion. A bolted-on stage breaks one or the other, so an add-on is its own record (`job_addons`) with its own agreements, evidence, invoices and sign-off.
+
+**What is automatic and what is a person.** Agreeing drafts the add-on's client invoice; drafting is paperwork. Everything with consequence stays a named human's click:
+
+- sending the invoice;
+- marking it paid;
+- signing off the add-on on its photos (`sign_off_addon`, admin only, stamped with the admin's email);
+- paying the worker (`mark_worker_paid`, which waits on every client invoice for that add-on).
+
+No model touches any of it and no price is suggested: the amount is what the two parties wrote (CLAUDE.md §5).
+
+**What had to change in five live functions, and only that.** An invoice with `addon_id` set is kept out of the job's own money:
+
+- `invoice_starts_job_default`: an add-on invoice never starts the job. Without this, a new stage-less invoice would have been taken for the Guarantee & Support bill.
+- `raise_job_client_invoice` and `raise_job_worker_payable`: an add-on invoice is never "the job's bill" or "the job's payable". Without this, an add-on payable raised before completion would have blocked the job's own payable for good.
+- `worker_pay_client_unpaid`: an add-on payable waits on its own client invoices, and the job's payable ignores them.
+- `sync_job_status`: carries the completion gate.
+
+Each body was read live with `pg_get_functiondef` and matched the repository before being restated. Add-on photos live in `job_addon_evidence`, not `evidence`, because the stage rules would otherwise count them as evidence for a stage. An add-on invoice cannot be split into parts (trigger), because its fee line would then be taken for the job's.
+
+**How it was tested.** No local database exists on this machine, so the migration ran in PGlite, an in-memory Postgres, with stand-ins for the tables that predate the migrations (`supabase/tests/pglite/`). All 61 checks pass. That proves the logic, not production's wiring. `supabase/tests/job_addons_guards.sql` checks the live wiring once the migration is applied.
+
+**Telling people, and the client's confirmation on WhatsApp** (the same day, on Monique's "build all"). A trigger on `job_addons` calls `yaad-notify-client` with the add-on id and revision, one message per recipient:
+
+- the worker when the client writes or changes one;
+- the client when the worker changes one;
+- both sides when it is agreed;
+- the other side when it is turned down or withdrawn;
+- the worker when its first invoice is paid, which is when the work may start.
+
+The function reads every word from the row. If the row has moved on since the trigger fired, it sends nothing.
+
+The client's message carries the add-on as a PDF (`yaad-addon-pdf`). That is a public GET, and its token is an HMAC of the add-on id and revision under the service role key, with its own context string so it cannot be swapped for a pay link. Replying `CONFIRM <code>` accepts that revision through `agree_addon_via_whatsapp()`, service role only, with the phone as the credential, as for quotes and the Completion Report. The code is new on every revision, so a reply to an older version finds nothing. It never contains the job id, so it can never be read as a stage approval by the later lanes of `yaad-inbound`.
+
+Monique's rule is "edits only done in portal", so WhatsApp can accept and nothing else. Changing, declining or writing an add-on is the portal.
+
+Known limit: a client outside WhatsApp's 24-hour window gets the email (with the PDF link) and SMS. No approved client template carries a PDF, and the template route cannot carry media at all.
+
+---
+
+## 2026-09-28 · A quote pack draft opens as a picture, prints as a PDF, and is corrected section by section
+
+Monique, looking at a quote pack draft on the desk: "this should be a pdf", the top of the drawer "should be a dashboard, visual one, not just date lines", and "correct the wording needs to be better as it is just a long file". She approved a clickable demo with invented data before the live file was touched.
+
+**The drawer.** It opens on a four-step track: drafted, checked for prices and banned words, your review, workers can see it. Below it are:
+
+- how long the draft has waited, using the same 24 and 72 hour thresholds as the Overview;
+- what the two word checks found;
+- how many of the five sections are written;
+- the payment stages as one bar split by percentage, with a warning if they do not total 100.
+
+The raw columns are folded underneath, not removed.
+
+**The PDF.** "Open the pack as a PDF" uses the same route as reports: a printable page in a new tab, then Print and Save as PDF. No PDF library, and nothing leaves the browser.
+
+Every pack carries fixed wording on work outside the scope, the add-on flow Monique set the same day. It is standard text, not model output, so it cannot drift job to job, and the guardrail never needs to read it.
+
+**Correct the wording.** The action is now a form:
+
+- a box for the scope and a box for the timeline;
+- one row per bullet under Included and Not included;
+- one card per payment stage, with a live total;
+- the flagged words named at the top, and outlined in any box that still holds one.
+
+It saves through the same `deskRescanPack`, so the rule is unchanged: saving re-runs the word check, approves nothing and sends nothing. `runAction` gained a `form` branch for an action that draws its own fields. The generic ask form can only hold single boxes.
+
+---
+
+## 2026-09-28 · A pay invoice records the labour and the worker fee it was worked out from
+
+Monique asked for Yaadly's worker fee to show on the worker's pay invoice.
+Both functions that raise pay (`raise_job_worker_payable`,
+`raise_job_stage_worker_payable`) already computed the quoted labour and the
+5% and then kept only the difference. Working the fee back from that
+difference can be a dollar out, and before 9 Sep 2026 the fee was 12%, so a
+figure derived on screen would sometimes be wrong on the one document a
+worker reads to check their pay. Instead each pay invoice now stores
+`worker_labour_jmd` and `worker_fee_jmd` as it is raised (20260928230000),
+with a check that they only appear on worker pay and that the fee is never
+more than the labour. The functions are the live definitions of that day
+with the two columns added to their insert; the amounts are computed exactly
+as before. The HTML invoice, the PDF, the desk and the worker's portal all
+read those two columns. Pay raised earlier is not backfilled and shows no
+breakdown: no figure is better than a guessed one.
+
+---
+
+## 2026-09-28 · Before signing, the worker can change their words or raise an issue, by button, on WhatsApp or from the link
+
+Monique signed the test report from her own phone and then: "the only issue
+is there is no way to edit", "or raise and issue", "on whatsapp or portal",
+"fix that", "it should be a button". Offered a WhatsApp route or a link that
+opens without logging in, she chose both.
+
+**WhatsApp.** The worker's message is followed by three buttons (template
+`yaadly_sign_completion_report_v2`): Sign the report (payload: the job code),
+Change my words (`EDIT <code>`) and Raise an issue (`ISSUE <code>`). A tap on
+either of the last two is remembered for that phone in
+`completion_report_whatsapp_pending`, and the next message they type is taken
+as their account of the work (saved unsigned: they still press Sign) or as
+the issue. That lane runs ahead of every other worker lane in `yaad-inbound`,
+so their words are never filed as a work update. No "reply 1": buttons only.
+
+**The link, no login** (`/report/[id]?code=`). The code in the WhatsApp link
+is the key, the pattern `/jobs/[id]/quotes` already uses. Three buttons: Sign,
+Save my changes, Raise an issue. Ten wrong codes on a job lock the link until
+Yaadly sends the report back with a new one. The wrong-code count is kept by
+returning a refusal instead of raising an error, because a raised error rolls
+the count back with everything else. The page shows the words and a plain
+summary of the record, never an address, contact details or money.
+
+**Raising an issue stops the report** (`worker_raised`) and alerts Monique.
+It is unsigned, so release now requires a signature: the only answer is to
+send it back with her reply, which is the "something went wrong" she steps in
+on. The worker then signs when it is right.
+
+---
+
+## 2026-09-28 · The worker signs with a button, first, and no Yaadly person's name is ever on the report
+
+Monique, the same evening, while this was being deployed: "the worker always
+needs to sign off first", "it has to be a button the work presses", "through
+whatsapp or the portal", and "it shund never be my name".
+
+**A button, two doors, one core** (`20260928220000`). The portal form's typed
+name is gone: one Sign the report button, the name taken from the worker's
+Yaadly profile. On WhatsApp the worker's message is followed by a Sign the
+report quick-reply button (`yaadly_sign_completion_report_v1`, created by
+`yaad-twilio-setup` action `create-sign-report`, used in session so no Meta
+approval). Its payload is the job's own code, so a tap reaches `yaad-inbound`
+the way the client's Approve button does, and signs through
+`sign_completion_report_via_whatsapp()`, with the phone on the worker's profile
+as the credential. A WhatsApp tap signs the words as they stand; changing them
+is the portal's job. Both doors share `_do_sign_completion_report()`, and the
+trail records which one was used. Nothing moves towards a client without that
+signature: the screen reads only a signed report, and release reads only a
+held one, which exists only after a signature.
+
+**Never her name.** The report, the worker's messages and the review trail say
+"Yaadly" for anything done from the desk. The name typed on the desk is kept
+in the database as the internal record of who acted and is never printed to a
+client or a worker. The worker's and the owner's own steps keep their own
+names, because those are theirs.
+
+---
+
+## 2026-09-28 · The Completion Report is the worker's document, and Yaadly steps in only when it goes wrong
+
+Supersedes the order in the entry below, the same afternoon. Monique, on
+seeing a desk that let her edit the words: "no i dont edit it, it is the
+workers document, not mine to edit", then "i only step in when things go
+wrong and a dispute is raised". Offered three questions, she took each
+recommended answer.
+
+**It runs on its own.** A job completing fires `yaad-completion-flow` (step
+`start`), which drafts care notes and opens the report for the worker; the
+trigger on `completion_reports` then sends them the link through
+`yaad-notify-client`. If the drafter is down, the report opens with no care
+notes and the worker writes their own. When the worker signs, the same
+function (step `screen`) checks their words for money amounts and the banned
+list both runtimes share. Clean, it is issued to the client. Found anything,
+it is held and Monique is alerted by the ordinary desk alert. The client's
+"Something is wrong or missing" is a dispute row, so the worker hears first,
+Monique is alerted, and it can be escalated, exactly like any other dispute.
+
+**Nobody at Yaadly can write a word of it.** `save_completion_report`,
+`accept_completion_report` and `issue_completion_report` are dropped. What
+she has is `release_completion_report` (a held report goes out unchanged,
+under her name) and `return_completion_report` (back to the worker with her
+reason: new revision, new code, signature cleared). The screen, too, can
+only hold.
+
+**Against the governing rule, argued rather than assumed.** A named human
+still confirms the words before any client reads them: the worker, who signs
+them. Issuing a report moves no money, rules on no dispute and changes no
+reputation, and it is not in `HUMAN_ONLY_DECISIONS`. The automatic step can
+refuse to send; it can never write, edit or approve anything. And the report
+does not pretend otherwise: one that passed the screen says it was sent when
+the worker signed and that Yaadly does not edit it, with no name implying a
+review. A person's name appears only when a person released it.
+
+**A new public door.** `yaad-completion-flow` is deployed with
+`--no-verify-jwt`, because the database triggers hold no session. Its door is
+the notify trigger secret or an admin token, the shape `yaad-notify-client`
+already has. The list in CLAUDE.md section 12 is Monique's file and names
+the functions allowed without platform auth; it needs this one added.
+
+---
+
+## 2026-09-28 · The Completion Report is signed by the worker and issued by a named person
+
+Monique asked for the report to be updated after looking at comparable
+documents. A research pass read twenty two (the JCT and NEC completion
+certificates, the RICS Level 3 survey, new build snagging reports, the IET
+minor works certificate, Checkatrade, TrustMark and NHBC guarantee documents,
+Jobber, Housecall Pro, Fixflo, AppFolio and home watch reports). Nearly all
+open with a one line outcome and the dates that matter, keep what was found
+outside the scope apart from the work done, and end on a named person
+signing. Ours did none of those, and it appeared on its own the moment a job
+completed although PORTAL-SPEC.md says "No auto-published Completion Report".
+She approved a clickable preview and then decided the rest.
+
+**The order is hers: worker first, then the desk, then the client.** The agent
+(yaad-completion, built in August and never called until now) drafts care
+notes; a named person edits and accepts; the worker reads the whole report,
+may change the words and signs with their typed name and a code; a named
+person reads what was signed and issues it; the client can then read it and
+either confirm it or say something is wrong. A worker's change never reaches
+the client unread, because issuing is always a person. A desk edit after the
+worker has signed starts a new revision and sends it back to them, the same
+rule the Kickoff Pack keeps: a changed text is a new claim.
+
+**Only words are stored, and only words can change.** `completion_reports`
+holds the care notes and the worker's own account. Every fact on the report
+(dates, arrivals, approvals, photographs, fingerprints, what was agreed) is
+read from the record by the page at render time, so there is nothing for the
+worker, or the desk, to edit. That is what makes the signature worth
+anything. The outcome line at the top is built by rules in
+`web/lib/portal/completion-report.ts`, never by a model, and its tests assert
+that a new find, an arrival away from the site and a dispute are never left
+out of it.
+
+**A deliberate exception to CLAUDE.md section 9.** The worker changes the words
+and signs on one portal page, `/portal/jobs/[id]/completion?code=`. Section 9
+keeps the worker's web side to sign-up and file upload, and on 1 September
+Monique herself moved the Kickoff Pack confirmation to a WhatsApp reply for
+that reason. Asked on 28 September, with the WhatsApp route offered and
+recommended, she chose the page. It is one page, reached from a WhatsApp link,
+editing two fields. Do not grow it into a worker dashboard, and do not
+"correct" it back to WhatsApp without asking her.
+
+**What else she decided.** No money on the report, materials amounts included,
+so it can be forwarded to family or a buyer. A new find stays on the report as
+a permanent record and also carries "Ask for a quote for this", which opens
+`/jobs/new` with the find described (`?about=`): its own job, its own quote,
+never an addition to this one. Evidence comments are left off the report:
+they are a conversation between the two sides, not a checked record, and can
+carry money talk into a document people forward.
+
+**The legal text.** `completion_section6` carries its own `<h5>6 · ...</h5>`
+from the Kickoff Pack. The page now draws its own numbered heading and drops
+that one when rendering; the words are unchanged. It had been printing a
+second heading, with the wrong number whenever the sections moved.
+
+---
+
+## 2026-09-28 · The invoice email carries the invoice as a PDF, drawn by yaad-invoice
+
+Monique asked for the PDF on the client's email too, and chose option A of
+two: draw the PDF inside `yaad-invoice` (pdf-lib, Helvetica) rather than
+send the invoice page to Cloudflare's browser service to be printed. Option B
+would have looked exactly like the HTML, but every client's name, email and
+invoice would have gone to a new service, which is a data protection
+decision, and it needed a new key. Option A sends nothing anywhere new.
+
+**How it works.** `supabase/functions/yaad-invoice/pdf.ts` draws the invoice
+from the same rows `renderInvoice()` reads, with the same sentences in the
+footer. `send` attaches it to the Resend email as `<invoice>.pdf`, stamped
+sent like the email body. `render` with `pdf: true` returns it to the desk,
+and the desk's Preview of a whole invoice now shows that file, so what the
+founder looks at is what the client receives. A highlighted part is still
+drawn in the browser (entry below), because no client ever receives that.
+
+**If the PDF cannot be made, nothing is emailed.** The invoice stays a draft
+and the desk shows the reason. The alternative, emailing without the
+attachment, sends a client an invoice that is missing what they were told to
+expect, and nobody would know. Helvetica only draws the Windows-1252
+characters, so anything else in a name or description (an emoji, say)
+becomes "?" rather than stopping the send.
+
+**The price.** The PDF is plainer than the HTML: a standard font, not Anton
+and Space Grotesk, and it is drawn rather than printed, so a change to the
+invoice's wording must be made in both `renderInvoice()` and `pdf.ts`. The
+text in it is real text, selectable and searchable.
+
+---
+
+## 2026-09-28 · Invoices and the Completion Report are real PDFs, made in the browser
+
+Monique: "all invoices should be in pdf when showing preview", then "in the
+admin desk also", then, on being told the Completion Report deliberately used
+the browser's print dialog instead of making a PDF, "fix this also".
+
+**What changed.** The desk's invoice Preview now shows an actual A4 PDF in the
+browser's PDF viewer, with a Download PDF button that saves it as the invoice
+number. The client portal's Completion Report button is now Download PDF and
+saves `Completion Report <job>.pdf` in one tap. Both are made in the browser
+by html2pdf.js (html2canvas plus jsPDF) from the page already on screen.
+
+**Why in the browser and not on the server.** The server renders the invoice
+as HTML and that HTML is also the email body. Making the PDF from the same
+HTML means the PDF cannot say something different from the preview or the
+email. It also adds no server work, no new service and no new place any
+client data goes: nothing leaves the browser. A server PDF (for example to
+attach to the invoice email) is a bigger job, not built, and would be a new
+decision.
+
+**What this reverses.** `PrintReport.tsx` said, on purpose, that
+`window.print()` was better than "a PDF pipeline this project would then
+have to own". That was a fair trade until the owner asked for a PDF. The
+cost accepted: one library. In the desk it is pinned to 0.10.3 on jsdelivr
+(the CDN the desk already allows) with an integrity hash, and loaded inside a
+hidden copy of the invoice so the desk's styles never touch it. In the portal
+it is an npm dependency (0.14.0, exact) loaded only when the button is
+pressed. The PDF is a picture of the page, so its text cannot be selected or
+searched; that is the price of it matching the screen exactly.
+
+**Found on the way.** The portal's `@media print` block turned the old colour
+names light but not the `--color-*` names the Tailwind classes actually read,
+so a printed report would have come out pale text on white. Both the print
+block and the new `html.pdf-render` class now set the `--color-*` values.
+The two blocks carry the same numbers; change them together.
+
+---
+
+## 2026-09-25 · The report reads its own paperwork, and the desk is the renderer
+
+Monique, late on 25 September: "I need the AI agent to be able to read a
+PDF and photo copies to then make the deposit check document." Four decisions
+follow, and the shape of them matters more than any one.
+
+**Reading and drafting are two functions and two buttons, with a person in
+between.** `yaad-report-read` transcribes documents verbatim and captions
+photographs factually; it drafts nothing and is not screened, because it is
+the record of the source and a scrubbed transcript would be a false record.
+`yaad-report` drafts from the notes and is screened at every layer. The
+transcript lands in the notes box and the person corrects it before pressing
+draft. That pause is the design, not friction to remove: a vision model
+misreads a digit on a handwritten quote, and a wrong digit in the notes
+becomes a wrong finding with a straight face. A single "make the deposit
+check" button that read and drafted in one go would have removed the only
+point at which a human sees the source before the agent characterises it.
+
+**A PDF becomes images in the browser.** pdf.js renders each page on the
+desk, so the function only ever sees images. One document format server
+side, no PDF parser to defend, and a quote arrives the same way whether it
+was photographed or exported.
+
+**Where the pictures go.** `pickVisionProvider("report")`, a fourth named
+vision job, routed to Mistral EU with evidence and sketch under the "move
+the photos to Mistral" decision of 15 September. A contractor's quote
+carries their name and number, and this is the first time a contractor's
+paperwork has gone to a model at all, so it is a named job in
+`_shared/visionmodel.ts` and a line in the data inventory rather than a
+reuse of "evidence". Not a new destination. A new kind of document at an
+existing one, said out loud. The vetting read is still on NVIDIA and still
+not moved; that stays her call by name.
+
+**The desk builds the document; the Node script mirrors it.** "Open the
+document" reads `reports` and `report_findings` under her own session and
+opens the full report in a tab to print to PDF. It writes nothing and holds
+no model call. `scripts/render-report.mjs` is the same template for a
+laptop without the desk, and the two are kept in step by hand: an
+acknowledged second copy, chosen over a shared module because the desk is
+one static file on purpose and a build step for it would be a bigger change
+than the duplication. The checklist lines live in `yaad-report`, fixed, with
+the model supplying only a state and a note per line, so the same service
+produces the same list every time, and the drafter throws at load if the
+list and the brief drift apart.
+
+Closed the next morning, 26 September: the Reports view now opens each
+report as a page in the drawer (`reportPage`), with the verdict, every
+finding and its rating, the payment stages, the message to the builder, the
+checklist, scope, referrals, what the screens scrubbed, and the transcript it
+was drafted from, with the row's actions underneath. It draws and changes
+nothing. Still open: a finding cannot be corrected in place. A wrong transcript is fixed by drafting
+again from corrected notes. That is deliberate for now, because an edited
+finding is no longer the screened one, and the right shape for an edit that
+re-screens is a separate decision.
+
+---
+
+## 2026-09-25 · A figure is a rule with a scrubber and a gate behind it, and the report is a document
+
+Three decisions from the same evening, all following from reading the first
+real Deposit Protection Check the drafter ever produced.
+
+**A prompt rule with nothing behind it is a wish.** Rule 4 had forbidden
+figures since the prompt was written and had just been tightened to forbid
+repeating one out of the notes. The next draft carried four. The measurement
+rule already had the right shape: the prompt forbids it, `_shared/measurements.ts`
+scrubs it and reports it, `has_measurement()` refuses to issue. Figures now get
+exactly the same three layers: `_shared/figures.ts`, `has_figure()` in
+`20260925220000`, and `figures_test.ts` reads the migration and fails if the
+Postgres copy drifts by a character. Percentages and grouped counts of things
+are deliberately not figures: "60 percent up front" is the shape of an
+arrangement and is the client's business. A year has no comma in it, so 2026
+is safe; 1,240,000 is not, because a grouped number in a condition note is a
+price or a quantity, and rule 4 bans both. The gate does not read the verdict.
+A person writes that, and which numbers belong in the document is that
+person's call.
+
+**The referrals and the omissions are columns now.** Rule 5 exists to keep
+Yaadly out of title, valuation, structure and boundaries by naming the
+professional instead. The agent did that correctly on its first run and the
+answer lived exactly as long as the browser tab, because `reports` had no
+column for `questions` or `omitted`. Now it does. Neither is shown to a client
+automatically.
+
+**Findings carry a `why`.** The service is sold as "every risk, in plain
+English, with why it matters". The drafted finding had a heading, a body and
+an action. The reason was in the reviewer's head. `why` is drafted like the
+body, screened like the body, and read by both gates like the body. The
+action wording in the prompt changed with it: an action should remove or
+reduce the exposure, not only ask for it in writing, because on the first run
+four of five actions were "request it in writing" and the exposure was
+untouched.
+
+**The report is a document, and the renderer is not an agent.** Nothing had
+ever produced the deliverable: issuing a report minted a number and changed a
+status. `scripts/render-report.mjs` produces the HTML and the PDF from one
+JSON input, with the logo on every page, in the order the service is sold:
+verdict, red flags with why, the payment schedule Yaadly would put in its
+place with the shares left blank, the message to send the builder, then the
+checklist, scope in and out, and the variation rule agreed at the start. It
+holds no model call on purpose. Everything on the page was either drafted by
+the agent and screened, or typed by a named person, and a renderer that could
+write a sentence would be a second door for an unrated judgment to reach a
+client. The checklist is the house standard for the service and lives in the
+script, not in the model: a client paying for a review is owed the same list
+every time, including the lines where nothing was wrong.
+
+Still open after this: the desk lists reports and counts findings but cannot
+show one, so the person rating finding 3 cannot read finding 3 on the same
+screen. That is a desk change and its own deploy.
+
+---
+
+## 2026-09-25 · The report drafter gets a brief per service, because a Deposit Protection Check is not a site visit
+
+`yaad-report` drafts four different priced documents and, until today, drafted
+all four from one prompt that opened "You turn an inspector's raw notes and
+photograph captions into the findings of a draft report". Three of the four are
+a site visit. The Deposit Protection Check is not. It is a desk review of a
+contractor and their written quote, done before any money moves, usually with
+nobody having been to the property at all. The only thing that changed between
+a Condition Report and a £149 Deposit Protection Check was the line
+`SERVICE: deposit_check` inside the user block, which the model was free to
+read as a label rather than an instruction. The agent was being asked to
+inspect a building when the client had paid it to read a deal.
+
+So the ten rules stay exactly as they were, one cross-cutting list, and a
+`SERVICE BRIEF` is appended per kind: what the source material is, and what the
+findings are supposed to be about. The deposit check brief names its ground
+directly (who the contractor is and what could be confirmed, what the quote
+leaves undefined, how the payment is structured and what the client is exposed
+to at each stage, what is not written down anywhere, and what does not
+reconcile) and says in terms that the agent is not inspecting a property and
+must not read a building condition out of photographs.
+
+Two clarifications came with it, both narrowing rather than loosening. Rule 6
+now separates a gap in the notes from an absence the notes record: "the notes
+do not say whether he is insured" is an omission, "the notes record that the
+quote names no insurer" is a finding, and on a paperwork review that difference
+is most of the product. Rule 4 now says the draft may describe the SHAPE of an
+arrangement ("most of the price is payable before any materials are on site")
+while still never stating a figure, and explicitly bars repeating a number out
+of the notes: the person signing decides which numbers go in the document.
+Saying a figure is too high remains a rating, which rule 1 already forbids.
+
+Nothing here touches §2 or §3. No brief grants a severity, a verdict, a
+measurement or a figure, there is deliberately no per-service exception
+mechanism for any of those, and a kind deployed without a brief throws at
+module load so the deploy breaks rather than a client's report quietly
+reverting to the generic draft.
+
+Written because the drafter had never actually produced a Deposit Protection
+Check. The only row in `reports` on 25 September 2026 was a practice one
+inserted by hand on 4 September, `provider` "seeded by hand", so what the
+agent does on this service had never been looked at.
+
+---
+
+## 2026-09-23 · Two sellers on one website: the founder sells the professional services, Yaadly Ltd sells the jobs
+
+The six professional services (Deposit Protection Check, Visual Check,
+Condition Report, Technical Sign-off, Property Care, Oversight Retainer) are
+sold by Monique as a sole trader. Jobs, Full Project Management and the
+business page stay with Yaadly Ltd. Founder decision, 22 and 23 September
+2026, and it is a legal and financial one, not a technical one.
+
+The site now says so in the places where it matters: who you contract with, who
+supplies the report, who is paid, the data controller, both anti fraud
+warnings, the FAQ and the footer on all eleven pages. Customer facing copy says
+"the founder"; her full name appears only where the law or a payment needs it.
+
+The part worth remembering is the sequencing, because getting it wrong costs
+real money. Publishing the wording and keeping the card links was not an
+option: every link in `docs/services.html` paid the company's Stripe account,
+so a client would have read that they were buying from her and then paid
+Yaadly Ltd for it. The links are therefore emptied out, not repointed, until
+her own Stripe account is activated. The booking form is unchanged and falls
+through to a path that was already written for the case where no link exists:
+the scope and price are confirmed in writing, and an invoice follows. So the
+site is truthful at every step, just slower to take money than it was.
+
+Her Stripe account (`acct_1UIPuy28HX175y5b`) exists but was still in onboarding
+on 23 September 2026 and is not connected to any Claude session, so nobody but
+her can create anything in it.
+
+---
+
 ## 2026-09-19 · The menu sends, and I cannot prove why, so the entry below is corrected not deleted
 
 **What happened.** At 14:01 the probe sent the section menu to the founder's phone: HTTP 201, delivered four seconds later. The menu works. The entry below says the cause was a missing Messaging Service and that naming it was the fix. **That claim does not survive the evidence and is withdrawn.**
@@ -3993,7 +4623,9 @@ Two refusals keep money on one document. A bill with a live part cannot be voide
 
 **Why.** The section menu was built to fall back to typed letters until a template existed, and the template was left for the founder to type into the Twilio console. She said "fix this". The Twilio credentials are function secrets and cannot be read back, so nothing on a laptop can create the template; the server can.
 
-**How (`yaad-twilio-setup`).** The template is defined in `content.ts`, where its row ids (B, D, A, P, N, S) are held by a test to the letters `readPhaseAnswer()` accepts, and created through Twilio's Content API by a function gated exactly as the scheduled jobs are: the cron secret, or its SHA-256 as held in `app_settings` for any cron job, or an admin session. It writes the ContentSid to `app_settings.twilio_content_sid_phase`; `yaad-inbound` reads the `TWILIO_CONTENT_SID_PHASE` secret first and that row second, so the desk's Settings view is the on-off switch and the secret is the override. Idempotent by template name. It was run once, from inside the database with `net.http_post`, presenting the job-health cron job's own secret, so no credential left the project.
+**How (`yaad-twilio-setup`).** The template is defined in `content.ts`, where its row ids (B, D, A, P, N, S) are held by a test to the letters `readPhaseAnswer()` accepts, and created through Twilio's Content API by a function gated exactly as the scheduled jobs are: the cron secret, or its SHA-256 as held in `app_settings` for any cron job, or an admin session. It writes the ContentSid to `app_settings.twilio_content_sid_phase`; `yaad-inbound` reads the `TWILIO_CONTENT_SID_PHASE` secret first and that row second, so the desk's Settings view is the on-off switch and the secret is the override.
+
+**Amended 20 September 2026: precedence is by validity, not by truthiness.** The secret was set on 15 September to the literal text `HX...`, pasted off a command in `RUNBOOK.md` that still carried its placeholder. Because the override was taken on truthiness, that placeholder beat the correct id on the desk and went out as the ContentSid on every section menu for five days, each one refused by Twilio with 20422, each one covered for by the typed question so completely that two investigations went past it and blamed the template and then the Messaging Service. `askPhase` now runs both candidates through `firstTemplateSid()` and takes the first one shaped like a ContentSid, `HX` and thirty-two hex digits. The shape check on its own would not have been enough: it would have rejected the placeholder and then sent nothing, because the good id was never reached. Scanning for the first usable value is what makes a bad override harmless rather than merely detectable, and that is the general rule worth keeping wherever a secret overrides a stored setting. Idempotent by template name. It was run once, from inside the database with `net.http_post`, presenting the job-health cron job's own secret, so no credential left the project.
 
 **What it does not do.** Send anything, or submit a template to Meta for approval. In-session use needs no approval; a template that may go out to people who have not written in is a decision about what appears under the business's WhatsApp identity, and stays with the founder.
 
@@ -4020,6 +4652,16 @@ Two refusals keep money on one document. A bill with a live part cannot be voide
 **How.** Typed words are held in an `update_draft` session and read back; only a reply of 1 files them (`yaad-inbound/update-draft.ts`). Photos sent while words are waiting take them as their caption. Everything filed in one confirmed WhatsApp batch shares `evidence.batch_id` (20260917190100), and the ledger draws a batch as one card (`updatesOf()` in `web/lib/portal/evidence-sections.ts`). Each item keeps its own row and its own fingerprint.
 
 **Rejected.** Grouping by label or time on the page with no column: two separate filings a minute apart saying the same thing are two filings, and inferring otherwise would overstate the record. Backfilling `batch_id` on old rows for the same reason. A single evidence row holding several files: every gate, fingerprint and comment is per item, and the change would have touched all of them.
+
+**Extended 20 September 2026: a worker may comment on what they just sent, and the comment joins the batch.** Founder's instruction was that a worker should be told they can say something about their photographs, not merely allowed to. The invitation goes on the filing confirmation and nowhere earlier, because every free-text reply before that point is already the answer to a question: the job code, then the caption, then the section. Once the batch is filed the evidence session is closed and the worker's words are free again, which makes that message the only place the offer fits.
+
+**The gate does not move.** The note runs through the same `update_draft` lane as any other typed update: held, read back, filed only on a reply of 1. Inviting somebody to comment is not a reason to start filing their words on arrival, and that is exactly the simplification this is most likely to attract later, so a test fails if the note lane ever inserts into `evidence` itself.
+
+**Two supporting changes.** Every filed batch now gets a `batch_id`, including a batch of one; it was previously null for a single photograph, which made a lone photograph the only evidence nothing could be attached to. `updatesOf()` already drew a batch of one exactly as it drew a null, so nothing moved on the page. And the thirty minute window (`recentFiledBatch()`) counts only rows carrying a file, so a note cannot renew the window it arrived in and pull an unrelated update half an hour later onto old photographs.
+
+**Rejected here too.** Filing the note straight onto the photograph rows by overwriting `label`: the caption is what the worker said when they sent it and the note is what they said afterwards, and collapsing the two loses which was which. A separate notes table: `batch_id` already means "sent together and confirmed as one thing", the portal already groups on it, and a second mechanism for the same idea is how two of them drift apart. Asking which job when several are running: they filed on it minutes ago, and the read-back names the job anyway.
+
+**A half-finished session expires, 23 September 2026.** The evidence session had no age, while every other lane had 48 hours. The stale drop written for exactly that case sits after the evidence block, and that block returns on every path, so the one lane its comment named was the one lane it could never run on. An evidence session waited indefinitely, and a message sent days later was read as the answer to a question nobody remembered being asked: three photographs staged on 20 September were still live on the 23rd, waiting to be filed under whatever word came next. The guard goes on `evSession` and nulls it rather than deleting there, because going stale is a lane letting go and not a decision about somebody's evidence; the existing drop then becomes reachable and does what it always said. All three copies of 48 hours are now one constant, `SESSION_STALE_MS`, because they were already drifting apart in shape if not in value. The order is load bearing in both directions and a test asserts it. **Rejected:** keeping the staged items and re-asking the question instead of dropping, which loses nothing and costs a round trip. It is the kinder behaviour and probably the right one eventually, but the drop was the decision already written into this lane, and changing what happens to a worker's staged evidence is a bigger question than fixing a guard that never ran.
 
 ## 2026-09-17 · A worker is paid only after the client has paid for the work
 
@@ -4050,6 +4692,124 @@ So nothing behavioural was missing from production. The gap was an unused export
 **How.** Deployed the five from disk anyway, so the next content diff tells the truth instead of reporting drift that does not matter. `--no-verify-jwt` preserved on `yaad-inbound` and `yaad-portal-code`, withheld from the other three, per the list in CLAUDE.md 12. Proved by version bump rather than by the deploy output, which printed only a CLI upgrade notice and would have looked identical on a no-op: 18 to 19, 186 to 187, 52 to 53, 51 to 52, 15 to 16. Re-downloaded and diffed clean. Probed all three shapes: intake answers 403 "Signature check failed" to an unsigned post, `yaad-portal-code` reaches its own validation at 400, `yaad-job-health` still answers 401 from the platform.
 
 **Rejected.** Trusting "No drift" from the script. Trusting the deploy output. Deploying only the ones that looked important, which would have left drift behind and taught the next person to ignore the check.
+
+## 2026-09-25 · The logo is shipped as her artwork, not as a redrawn SVG
+
+Monique supplied the Yaadly logo: a purple ring with a gold Y whose right arm
+carries on past the ring and reads as a tick. It replaces the letter Y that
+stood in the header and the tab icon on all twelve pages of `docs/`.
+
+The tempting move was to redraw it as an SVG. An SVG is smaller, stays crisp at
+any size, and could pick up the site's own gradient variables. Measuring the
+file to trace it showed why not. The ring is a 45.5px stroke on a 259px radius
+centred at (422, 410), and it has a gap in the upper right where the tick
+crosses, from 301 to 323.5 degrees. That gap is not centred on the crossing:
+it runs about 16 degrees on one side of the arm and 6 on the other, and it is
+wider than the tick by roughly 23px of clearance on each side. Some of that is
+deliberate and some of it may not be, and there is no way to tell from the
+pixels which is which. A traced SVG would have quietly made that judgement on
+her behalf and shipped a logo that is nearly but not exactly hers. A logo is
+one of the few things in this repository where "nearly" is a defect, so the
+PNG she drew is what gets served.
+
+The colours turned out to already be the site palette, which is a point in the
+logo's favour rather than a coincidence worth acting on: the gold is `#FBBF24`,
+exactly `--goldb`, and the ring runs from about `#8156E4` to `#956CF1` across
+the existing `#7B4FE0` to `#9B73F5` purple range.
+
+The master lives at `brand/yaadly-logo-master.png`, outside `docs/`, so Pages
+does not publish the full 832px file on every visit. Three derived files are
+served, and `RUNBOOK.md` carries the sizes and how to remake them.
+
+Two Y glyphs on the site were deliberately left alone. `.crew-y` on the home
+page is the gold gate badge at the end of the assistants row, sitting beside
+four purple badges reading SC, PA, EV and CH; it is a typographic badge in a
+set, and dropping a purple roundel into the one gold position would break both
+the set and the gold halo animation around it. The `.av` initials in the
+decision-log illustration on `how-we-use-ai.html` are avatars, sitting next to
+"DW" for a worker called Devon W., and they read as initials because the thing
+beside them is initials. Neither is the logo lockup. If Monique wants either
+changed, they are one rule each.
+
+## 2026-09-28 · A sketch pack is a printed document, laid out like the report
+
+**Why.** Founder instruction, 28 Sep 2026: the sketch pack "should be in pdf also and print out that way", meaning the way the Deposit Check report now prints. It could already be printed, but only by pressing Preview, scrolling to a small frame inside the desk and printing that frame, and the page it printed was designed for a screen: a grey background, a rounded card, sizes in pixels, no A4 set up, no header after page one, and nothing to stop a photograph row or a heading from breaking across a page.
+
+**What.** `renderPack` in `yaad-sketch` keeps every word and every section in the same order and changes only the layout: A4 with margins, sizes in points, the Yaadly mark with the report number repeated at the top of every page (the `<thead>` of a table, which a browser repeats on each printed page), photograph rows, room blocks, the sign-off box and the warning boxes kept whole, headings kept with what follows, and colours that print. No web fonts, the same system font stack as the report document in the desk, because the document now opens under the desk's own security policy and a document that depends on a font server prints differently on the day that server is slow. The logo travels inside the document (`yaad-sketch/logo.ts`, the same image as `RPT_LOGO` in the desk) for the reason recorded on the report the same day: the desk's `img-src` refuses any image from another host. On the desk, the preview frame and its print button are gone; **Open as PDF** on the pack, and **PDF** on each row of the list, open the document in a tab of its own with a Print button that the print hides, the same pattern as `openReportDocument`. The tab is opened on the click, before anything is awaited, because a browser blocks a tab opened after a network call.
+
+**What it does not change.** The `render` action only reads, so nothing about approving, issuing or voiding moved, and neither did the measurement rule: the document shows what the database holds, and `has_measurement()` still refuses to approve a pack carrying one. `yaad-sketch` keeps its platform check.
+
+**Found and left.** The Issue confirm on the desk says the pack "becomes visible to them in the portal". Nothing in `web/` or `docs/` renders a sketch pack, so today a client sees one only when the PDF is sent to them. Raised with Monique rather than fixed here.
+
+## 2026-09-28 · The Deposit Protection Check is built to read as a professional report
+
+Monique's test was that the document should read as worth five hundred pounds at the published price, and the one it replaced read as a good £149 note. It was rebuilt against the RICS Level 3 survey layout and published guidance on reviewing a builder's quote, after she approved an invented sample: contents, a key saying what each rating asks the client to do, who reviewed what (documents received, what was checked independently, a related party disclosure), a page one summary with the verdict and the red flags against a "resolve by" point, a numbered plan, every red flag tied to its source, the builder's quote reproduced line by line with the red flag numbers beside it, payment terms side by side, the checklist with why each line matters, referrals grouped by profession, a signed declaration, and the documents word for word as an appendix. A section of builder pushback replies was in the sample and was cut on her instruction.
+
+What stays where it was. The agent still never rates and never writes the verdict. "Resolve by" is derived from the rating a person gave, so it decides nothing. The payment terms are split on purpose: the agent fills only what the builder proposed and where it says so; what to agree instead, and why, is Yaadly's standard, fixed in `yaad-report` like the checklist lines, because a client buying the same service twice is owed the same standard twice. The two working days and ten working days in it are Monique's numbers, not a price. The checklist grew from 18 lines to 25 (waste, own account, cash, who else is on site, guarantee, permissions, disputes).
+
+Two deliberate changes of rule. First, the transcript was "never shown to a client"; on a Deposit Protection Check it is now the appendix, because showing the documents word for word is how the client sees nothing was added. Second, the quote is reproduced with the builder's own figures in it. That does not loosen rule 4: the agent still cannot write a figure and the scrubber still removes any it tries; the reproduced quote is the builder's words, stored beside the screened sections rather than inside them, and the document says above it that it does not say whether the figures are fair. It is taken from the notes as corrected at the desk first, so a digit fixed by hand is the digit printed.
+
+A missing section now shows as a dashed "not drafted" box instead of vanishing. A report drafted on 25 September, 27 minutes before the sections existed, read as though they never had, and that is what prompted the whole change.
+
+`scripts/render-report.mjs` no longer carries its own template. It lifts the renderer out of `concierge/concierge.html` and calls it, because the two copies drifted within a day of being written with a note asking for them to be kept in step by hand.
+
+No migration: everything new lives in `reports.sections`, which the issue gates do not read, and the finding text they do read is unchanged in shape.
+
+## 2026-09-28 · A drafted report can be corrected by hand, and every correction is screened and logged
+
+Until today a wrong line in a drafted report had one fix, drafting the whole report again, and RUNBOOK §31 defended that: an edited finding is no longer the screened one. Monique asked for editing (choosing a desk edit over typing on the printed page, which would have left the PDF different from the record). The reason for the old rule is kept by screening the edit instead of forbidding it. `edit_report()` refuses a non-admin, an issued report, a sum of money and a measurement, the same two Postgres rules the issue gate reads; the banned-language list is checked by `yaad-report` in a screen mode that calls no model, so the list stays in its two runtimes rather than gaining a third copy in SQL that would be the one to drift. Every change is logged in `report_edits` with before and after, so the agent's wording survives and the desk shows what was changed by hand. Not editable, on purpose: the rating and verdict (their own buttons), the quote as reproduced and the transcript (the record of what the documents said; a misread is fixed in the notes and drafted again). The payment terms and checklist are the house standard, so their lines can be reworded but not added or removed. The banned-language check is a desk step before the database call, not a database gate, which means a caller going around the desk could skip it; the callers are admins, and a database copy of the list was judged the worse risk.
+
+## 2026-09-28 · Blank report templates live on the desk, cut to what Monique can do
+
+**Why.** Founder instruction, 28 Sep 2026: a template for every service, printable and in Word, under Reports on the desk, used with the agent once a service is booked, plus a site sketchpad used by hand. Then, the same day: "align my templates to where I am realistically as a person", legally and physically.
+
+**What.** `scripts/report-templates` holds one content file per service and one renderer that writes both the Word file and the A4 PDF from it, so the two cannot drift. `build.js` writes them to `concierge/templates` (listed by the desk from `index.json`) and copies them into `concierge-deploy/public/templates`, so they are served from the desk's own origin behind Access. The Deposit Protection Check template follows the sections of the document the desk prints, and its checklist and payment terms are copied from `yaad-report`; the three have to be kept in step by hand, which is the one weakness here, recorded rather than hidden.
+
+**Cut to the person, not to a surveyor.** The first set was modelled on 111 published documents (RICS surveys, ASHI and AS 4349.1 samples, JCT and AIA certificates, home watch reports) and read as a surveyor's work. Monique is a project manager, in London until the November Gate, with legal sign off and insurance not in place. So: every site template has a "who did what" table separating who attended from who reviewed and issued, and in person from remote; electrics, termites and structure are seen and referred on, never judged; the Technical Sign-off names a qualified trade inspector who judges the workmanship, and Monique issues; Full PM says "record", not "certificate", and says it is not issued under any law, code or scheme.
+
+**The measurement rule applies to templates too.** The first set asked for crack widths in millimetres and a measured value with units on every sign-off line, which `report_guard_issue` would refuse at issue. `gate.js` now runs `hasMeasurement()` and `guardrails.scan()` from `_shared` over every string a template can print, plus the no-dash rule, and CI runs it. A sentence that implies a measurement without a number ("the actual measurement, with units") passes the pattern and was caught by reading, which is the gap `measurements.ts` already names.
+
+## 2026-09-29 · A job posted while signed in joins that portal straight away
+
+**Why.** Found 28 Sep 2026: a job posted from the website by somebody who already had a portal account never reached it. The form saves the job anonymously and sends the contact details as an enquiry, and the only join between the two is the "Set up my portal" link, which a signed-in person has no reason to click. Founder decision the same day, "do it now", choosing this over binding jobs to whatever email an enquiry gives.
+
+**What.** `claim_my_posted_job(job, code)`, migration `20260929000000`. It requires a signed-in account with a confirmed email and the job's id with its portal code, then goes through `pend_portal_code()` and `bind_confirmed_portal_claims()`, the join link's own path, so the attempt limits and "never take a job that already has a client" hold unchanged. The form calls it on Send only when the typed email is the account's own (`joinsSignedInPortal`), and says "It is already in your portal" instead of offering the link.
+
+**Rejected.** Binding a job to the email typed in the enquiry when that address next signs in. It would catch people who were not signed in, but anybody could put a job into a stranger's portal by typing their address, which is what the portal code exists to stop.
+
+## 2026-09-28 · Every service drafts into its own template, and what only a person decides has its own column
+
+**Why.** Founder instruction, 28 Sep 2026: the templates are "the templates that are used" when the agent drafts a report once a service is booked; the form should "show the inputs I need for each report" and "not be so general"; picking a template should show "exactly what is needed to fill out the template adequately".
+
+**What.** Three new report kinds (`property_care`, `oversight`, `pm_stage`), migration `20260929001000`. `yaad-report` takes a brief per service from `kinds.ts`, each asking for the sections its template carries, and screens them like a finding. The Property Care checklist is a house list fixed in code, like the Deposit Protection Check's. The desk's drafter asks for different inputs per service, sends them to the agent as labelled headings, and records who attended and whether the review was in person or remote as `sections.who`, typed rather than read out of notes. Each service prints in the layout of its template.
+
+**Two rules changed on purpose.** First, the Visual Check and Property Care are never rated. `report_guard_issue` required a rating on every finding of every kind, so a Visual Check could only issue by breaking "They record. They do not rate or advise." on the services page. A rating on those two is now refused, not required. Second, `reports.human` holds a Technical Sign-off's or stage record's result, an oversight report's status ratings, and every sum of money. Money is allowed there and nowhere else in a report, because a figure a person types is a figure they stand behind, which is the line `20260925220000` drew. It is written only by `set_report_human()`, which is admin only, refuses an issued report, accepts only listed keys and values, and logs to `report_edits`; a trigger refuses any other write, including a direct update, so the desk form is the only door. A stage record's value is what the document says; paying a trade still goes through Invoices.
+
+**Left for Monique.** The meaning of each rating on the new kinds (`RPT_KEYS` in the desk), the oversight status rules, and the "what you need" lists are first drafts cut from the templates, and are hers to correct. `edit_report()` corrects the findings and referrals of the new kinds but not their new sections; a wrong line there is fixed in the notes and drafted again.
+
+## 2026-09-28 · A test worker sees test jobs; nobody else does
+
+`20260909150000` took jobs marked `is_test` off `open_jobs` for everybody. Running a worker test on 28 Sep 2026 showed the cost: a test job reached no worker at all, so testing the worker side meant leaving the job unmarked on the public board, the exact thing the flag exists to prevent. `20260929010000` keeps a test job in `open_jobs` only when `viewer_is_test_worker()` is true: the caller's JWT email matches an active `worker_profiles` row a person marked `is_test`. The alternative, a separate test board page, would have been a second copy of the board to keep in step. Visibility only: quoting never read `is_test` (`job_open_for_quotes`, `jq_insert_vetted`) and still does not. Both flags stay person-set from the desk, never inferred.
+
+## 2026-09-28 · A worker can correct the words and part of their own evidence, and the original stays on record
+
+Founder instruction while running a job end to end: the worker must always have a way to edit or correct. Evidence was insert only, and the portal told the worker "It cannot be edited now". `20260929040000` adds `correct_evidence_as_me()`: the worker who filed an item may change its label and phase while its stage is the one being worked and the job is open. The file, the sha256, the stage and the kind never change, because those are what make it a record, and a materials item is what passes the risk in the materials to the client. Every correction writes the before and after to `evidence_corrections` (read only to the two parties and admin, written only by the function) and stamps `evidence.corrected_at`, so the client sees "Corrected by the worker" and the first wording rather than a silent rewrite. Withdrawing an item was deliberately left out: it would change what every reader of `evidence` (the client ledger, the drafted reports, the desk, the Completion Report) counts, and that is a separate decision.
+
+## 2026-09-28 · Portal times are shown in Jamaica time, and say so
+
+`lib/date.ts` formatted in the runtime's zone, which on Cloudflare is UTC, so a check-in at 10:10 am in Kingston (3:10 pm in London) read "2:10 pm". Neither party can be served by their own zone from a server render without knowing the viewer, and the job, the worker and the evidence are all in Jamaica, so both helpers now render in `America/Jamaica` and a time carries "Jamaica time". Jamaica keeps no daylight saving, so the offset never moves. Dates near midnight now fall on the Jamaican day, the same day `log_arrival()` counts.
+
+## 2026-09-28 · Extra work is approved by the client; money has its own tab; problems go to Yaadly
+
+Three founder decisions from running a job end to end. **Extra work:** stages were accepted by the client but add-ons were signed off only at the desk, so the client never said paid-for extra work was done. `approve_addon_as_me()` lets the job's client approve it on its photos, through the same `_sign_off_addon()` body the desk now calls, so both routes raise the same worker payable and nothing is paid until a person marks it paid. **Money tab:** Approvals now holds only what is approved and what is not; costs (with agreed extra work), Where the money is, and invoices moved to Money. `job_worker_payments()` gives both parties each worker payable's stage, labour share and owed or paid, never the net or payout details, because invoice RLS let neither side see the other's records and the Mirror Rule says both see the same trail. **Disputes:** the portal opens them escalated, so they go to Yaadly first instead of to the worker first; the worker is told at once.
+
+## 2026-09-28 · The client adds the street address after booking, on a Job details tab
+
+The job form never asks for the street address, on purpose, and nothing asked for it afterwards, so a job at stage 2 had none. `set_job_address_as_me()` lets the job's client set it while the job is open, logged without the old value because `agent_actions` is read more widely than an address should be. Founder: it lives in its own section, so the portal link, the job's facts, the address and the brief moved from Overview to a Job details tab.
+
+## 2026-09-28 · Uploads go straight to Storage, and are fingerprinted by streaming
+
+Founder: 25MB is not enough. Photos and job files rode inside a Server Action body, capped at 25MB, and the video route capped itself at 80MB because it held the whole file in memory to hash it. Every portal upload now goes browser to Storage on a server-chosen, one-path signed URL minted as the user (so Storage's own policies still decide), and the matching action fingerprints what actually arrived, streaming (`crypto.DigestStream` on Cloudflare; `@std/crypto` streaming digest in the video function, checked equal to a whole-file hash). The rule that the fingerprint is taken on the server from the stored bytes is unchanged. The location promise is kept by moving the strip to the browser (the same `stripApp1`, now plain `Uint8Array`) and having the server read the stored header and refuse and delete any JPEG that still carries APP1. The capture time is read in the browser before the strip and sanity-checked on the server; it was always device-reported. Limits: photos 50MB, job files 100MB (bucket raised), videos 500MB (the bucket's existing ceiling). Resumable uploads for weak connections were not added; a failed large upload is sent again.
 
 ## 2026-09-21 · No retention for now
 

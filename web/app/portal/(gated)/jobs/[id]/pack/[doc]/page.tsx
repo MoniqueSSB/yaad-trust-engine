@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { DocLogo } from "@/components/portal/DocLogo";
 import { notFound, redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PACK_DOC_ORDER, renderPackDoc, type Dict } from "@/lib/portal/packDocs";
+import { PrintReport } from "@/components/portal/PrintReport";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +32,11 @@ export default async function PackDoc({
   const { id, doc } = await params;
   const { quote: quoteParam } = await searchParams;
 
-  const idx = PACK_DOC_ORDER.findIndex((x) => x.slug === doc);
+  /* "all" is the whole pack on one page, for one PDF (founder, 28 Sep 2026:
+     every document in "Your documents" can be reviewed as a PDF). Each
+     document still has its own page and its own button. */
+  const whole = doc === "all";
+  const idx = whole ? 0 : PACK_DOC_ORDER.findIndex((x) => x.slug === doc);
   if (idx < 0) notFound();
 
   const supabase = await createClient();
@@ -47,13 +53,47 @@ export default async function PackDoc({
   const prev = PACK_DOC_ORDER[idx - 1];
   const next = PACK_DOC_ORDER[idx + 1];
 
+  if (whole) {
+    return (
+      <div id="pack-doc" className="rounded-2xl border border-line bg-panel p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+          <Link href={base + qs} className="text-[13px] text-tealb underline-offset-2 hover:underline">
+            &larr; All documents in this pack
+          </Link>
+          <PrintReport jobId={id} targetId="pack-doc" name="Kickoff Pack" />
+        </div>
+        <div className="mt-3 border-b-2 border-teal pb-4">
+          <div className="mb-3"><DocLogo /></div>
+          <span className="font-mono text-[10.5px] uppercase tracking-[.15em] text-dim">
+            {pack.id} · rev {pack.rev ?? 1} · {pack.status === "approved" ? "Approved for issue" : pack.status}
+          </span>
+          <h1 className="mt-1 font-display text-[clamp(22px,3.5vw,30px)] uppercase leading-tight">
+            Kickoff Pack{pack.project_title ? ": " + pack.project_title : ""}
+          </h1>
+        </div>
+        {PACK_DOC_ORDER.map((x, i) => (
+          <section key={x.slug} className="mt-6 break-inside-avoid-page">
+            <h2 className="mb-3 border-b border-line pb-1.5 font-display text-[18px] uppercase leading-tight">
+              {i + 1}. {x.title}
+            </h2>
+            {renderPackDoc(x.slug, d)}
+          </section>
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-2xl border border-line bg-panel p-6">
-      <Link href={base + qs} className="text-[13px] text-tealb underline-offset-2 hover:underline">
-        &larr; All documents in this pack
-      </Link>
+    <div id="pack-doc" className="rounded-2xl border border-line bg-panel p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <Link href={base + qs} className="text-[13px] text-tealb underline-offset-2 hover:underline">
+          &larr; All documents in this pack
+        </Link>
+        <PrintReport jobId={id} targetId="pack-doc" name={"Kickoff Pack " + PACK_DOC_ORDER[idx].title} />
+      </div>
 
       <div className="mt-3 border-b-2 border-teal pb-4">
+        <div className="mb-3"><DocLogo /></div>
         <span className="font-mono text-[10.5px] uppercase tracking-[.15em] text-dim">
           Kickoff Pack · document {idx + 1} of {PACK_DOC_ORDER.length}
         </span>
@@ -64,7 +104,7 @@ export default async function PackDoc({
 
       <div className="mt-5">{renderPackDoc(doc, d)}</div>
 
-      <div className="mt-8 flex items-center justify-between border-t border-line pt-4">
+      <div className="mt-8 flex items-center justify-between border-t border-line pt-4 print:hidden">
         {prev ? (
           <Link href={base + "/" + prev.slug + qs} className="text-[13px] font-bold text-tealb underline-offset-2 hover:underline">
             &larr; {prev.title}

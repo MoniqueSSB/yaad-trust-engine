@@ -56,6 +56,7 @@ import { recordAccepted, type SendMeta, withMessagingService, withStatusCallback
 import { hasWorkerTemplateDecision, insideWindow, samePhoneDigits, templateVar, WINDOW_MS, workerTemplateSummary } from "./worker-template.ts";
 import { Image } from "jsr:@matmen/imagescript";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
+import { addonPdfUrl } from "./addon-link.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -70,7 +71,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -913,7 +914,7 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
     }
-    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
@@ -955,7 +956,7 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -978,6 +979,8 @@ Deno.serve(async (req: Request) => {
 
     let subject = "";
     let line = "";
+    // Set by completion_report_worker, for the template fallback below.
+    let reportSignLink = "";
     let photoUrls: EvidencePhoto[] = [];
     let attachPhotos: string[] = [];
     // Only quote_arrived has an approved WhatsApp Content Template
@@ -1456,8 +1459,10 @@ Deno.serve(async (req: Request) => {
       // the worker (dispute_raised_worker) and Monique (desk_alert) really
       // are told, and this says exactly that and no more.
       subject = `We have your dispute: ${job.title}`;
-      line = `Your message about ${job.title} has gone to the tradesperson, and Yaadly has a copy. ` +
-        `They answer first. If it cannot be sorted between you, press Escalate to Yaadly on the job. ` +
+      // Founder, 28 Sep 2026: a problem is raised with Yaadly, not with the
+      // worker first (raiseDispute now opens it escalated).
+      line = `Your message about ${job.title} has gone to Yaadly. A person at Yaadly looks at it against the ` +
+        `agreed scope and the evidence, and brings the tradesperson in; they have been told. ` +
         `Nothing on this job can be approved while it is open. See it and add anything here: ${roomLink}`;
     } else if (kind === "dispute_raised_worker") {
       // The worker's panel has always said "you hear it first". Until
@@ -1469,10 +1474,11 @@ Deno.serve(async (req: Request) => {
       if (!d) return json({ error: "No such dispute on this job." }, 404);
       recipientEmail = String(job.worker_email ?? "").trim();
       subject = `The client has raised something: ${job.title}`;
-      line = `On ${job.title}, the client has raised something with you, before anybody else:\n\n` +
+      line = `On ${job.title}, the client has raised something with Yaadly:\n\n` +
         `"${String(d.body ?? "").slice(0, 1000)}"\n\n` +
-        `Answer it, or say how you will put it right, here: ${roomLink}\n\n` +
-        `Nothing on the job is approved until it is sorted. If it cannot be sorted between you, the client can ask Yaadly to look at it.`;
+        `A person at Yaadly will look at it with you against the agreed scope and the evidence. ` +
+        `Give your side with Message Yaadly on the job: ${roomLink}\n\n` +
+        `Nothing on the job is approved until it is sorted, and nothing is taken off you in the meantime.`;
     } else if (kind === "desk_alert") {
       // Monique, not a party. Founder, 13 Sep 2026: a problem on a job
       // "comes directly to my whatsapp and email". Fired by the triggers in
@@ -1534,6 +1540,29 @@ Deno.serve(async (req: Request) => {
             (d.reply ? `The worker replied: "${clip(String(d.reply), limit)}"` : "The worker has not replied.") +
             `\n\nNothing on the job can be approved while it is open.`;
         }
+      } else if (event === "report_worker_raised") {
+        // The worker raised an issue instead of signing (20260928233000). The
+        // report is unsigned and waits; only sending it back answers it.
+        const { data: r } = await admin.from("completion_reports")
+          .select("worker_issue").eq("job_id", jobId).maybeSingle();
+        if (!r) return json({ error: "No report on this job." }, 404);
+        what = "a worker raised an issue on their Completion Report";
+        pushTitle = "Yaadly: a worker raised an issue on a report";
+        detail = (limit) => `The worker on ${title} raised an issue instead of signing the Completion Report:\n\n` +
+          `"${clip(String(r.worker_issue ?? ""), limit)}"\n\n` +
+          `The report waits and has not gone to the client. On the desk under Completion reports: send it back to the worker with your answer.`;
+      } else if (event === "report_held") {
+        // The automatic screen on a signed Completion Report found money or a
+        // word Yaadly never uses (yaad-completion-flow). It only holds; the
+        // words are the worker's and nothing has been changed.
+        const { data: r } = await admin.from("completion_reports")
+          .select("hold_reason, worker_signed_name").eq("job_id", jobId).maybeSingle();
+        if (!r) return json({ error: "No report on this job." }, 404);
+        what = "a Completion Report was held";
+        pushTitle = "Yaadly: a Completion Report was held";
+        detail = (limit) => `The Completion Report on ${title}, signed by ${r.worker_signed_name || "the worker"}, was held before it reached the client.\n\n` +
+          `The screen found: ${clip(String(r.hold_reason ?? ""), limit)}\n\n` +
+          `On the desk under Completion reports: release it unchanged, or send it back to the worker with your reason.`;
       } else {
         return json({ error: "Unknown desk alert." }, 400);
       }
@@ -1627,6 +1656,44 @@ Deno.serve(async (req: Request) => {
         (ask ? `What they want walked through: "${ask.slice(0, 600)}"\n\n` : "") +
         `Arrange the call with them over WhatsApp as usual, then paste the link into the job so it is on the record: ${roomLink}\n\n` +
         `This does not change the evidence you file or how the job is approved.`;
+    } else if (kind === "completion_report_worker") {
+      // The Completion Report is the worker's document (20260928210000). The
+      // link carries the signing code, read here by job, never passed in, so
+      // a stale trigger cannot send yesterday's code. A report sent back says
+      // why, signed as Yaadly, never a person's name.
+      const { data: r } = await admin.from("completion_reports")
+        .select("status, sign_code, return_reason").eq("job_id", jobId).maybeSingle();
+      if (!r || r.status !== "with_worker" || !r.sign_code) return json({ ok: true, skipped: "not with the worker" });
+      // The no-login page (20260928233000): the code is the key.
+      const signLink = `${APP_URL}/report/${encodeURIComponent(job.id)}?code=${encodeURIComponent(r.sign_code)}`;
+      reportSignLink = signLink;
+      subject = `Your Completion Report to sign: ${job.title}`;
+      line = r.return_reason
+        ? `Yaadly has sent the Completion Report for ${job.title} back to you:\n\n"${clip(String(r.return_reason), 600)}"\n\n` +
+          `It is your document. Use the buttons below, or open it here: ${signLink}`
+        : `The Completion Report for ${job.title} (${job.id}) is ready. It is your document. Read it here, no login needed: ${signLink}\n\n` +
+          `Then use the buttons below: Sign the report if it is right, Change my words to put it in your own words first, ` +
+          `or Raise an issue if something is wrong. It goes to the owner only when you sign.`;
+      // The Sign button follows, the same way the client's Approve button
+      // follows an evidence report: its payload is the job's code, which
+      // yaad-inbound signs through sign_completion_report_via_whatsapp().
+      // No template recorded means no button; the reply and the portal still work.
+      let signSid = Deno.env.get("TWILIO_CONTENT_SID_SIGN_REPORT") ?? "";
+      if (!signSid) {
+        const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_sign_report").maybeSingle();
+        try { signSid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { signSid = String(st?.value ?? ""); }
+      }
+      if (/^HX[0-9a-f]{32}$/i.test(signSid)) {
+        approveButton = { sid: signSid, vars: { "1": `${job.title ?? "your job"} (${job.id})`, "2": String(job.id) } };
+      }
+    } else if (kind === "completion_report_issued") {
+      const { data: r } = await admin.from("completion_reports")
+        .select("status, worker_signed_name").eq("job_id", jobId).maybeSingle();
+      if (!r || r.status !== "issued") return json({ ok: true, skipped: "not issued" });
+      subject = `Your Completion Report: ${job.title}`;
+      line = `The Completion Report for ${job.title} is ready, signed by ${r.worker_signed_name || "the worker"}. ` +
+        `Keep it with the house papers. If anything in it is wrong or missing, there is a button at the bottom to raise it: ` +
+        `${roomLink}/completion`;
     } else if (kind === "walkthrough_notes_ready") {
       subject = `Notes from your video walkthrough: ${job.title}`;
       line = `The worker has written up what came out of your video walkthrough on ${job.title}. ` +
@@ -1652,6 +1719,80 @@ Deno.serve(async (req: Request) => {
       subject = `A delay on your job: ${job.title}`;
       line = `There has been no update on ${job.title} for a few days, so we wanted you to hear it from us rather than notice the silence yourself. ` +
         `We are checking in with the worker directly. Nothing is wrong with the money held on this job, and you can raise anything here: ${roomLink}`;
+    } else if (kind.startsWith("addon_")) {
+      // Extra work on a booked job (20260928235000). The trigger sends only
+      // the add-on id and the revision it fired on; every word below is read
+      // from the row. If the row has moved on since (another edit, another
+      // answer), this message is stale and nothing is sent: the newer change
+      // fires its own. Founder, 28 Sep 2026: the client confirms on WhatsApp,
+      // "edits only done in portal", so the only thing a reply can do is the
+      // CONFIRM line, and every other move points at the Extra work tab.
+      const { data: a } = await admin.from("job_addons")
+        .select("id, rev, scope, amount_jmd, terms, status, last_edit_side, confirm_code, closed_reason")
+        .eq("id", String(meta.addonId ?? "")).eq("job_id", jobId).maybeSingle();
+      const wantStatus: Record<string, string[]> = {
+        addon_for_worker: ["with_worker"], addon_for_client: ["with_client"],
+        addon_agreed: ["agreed"], addon_agreed_worker: ["agreed"], addon_paid_worker: ["agreed"],
+        addon_closed: ["declined", "withdrawn"], addon_closed_worker: ["declined", "withdrawn"],
+      };
+      const revOk = meta.rev == null || Number(meta.rev) === Number(a?.rev);
+      if (!a || !revOk || !(wantStatus[kind] ?? []).includes(a.status)) {
+        root.setAttributes({ "yaadly.notify.outcome": "addon_moved_on" });
+        return json({ ok: true, kind, told: false, reason: "That add-on has changed since this message was triggered." });
+      }
+      const extraLink = `${roomLink}?tab=extra`;
+      const amount = Math.round(Number(a.amount_jmd) || 0);
+      const halves = a.terms === "half_now_half_on_signoff";
+      const first = halves ? Math.floor((amount + 1) / 2) : amount;
+      const second = amount - first;
+      const clientTotal = first + Math.round(first * 0.15) + (second ? second + Math.round(second * 0.15) : 0);
+      const workerPay = amount - Math.round(amount * 0.05);
+      const termsText = halves ? "half before the extra work starts and half once it is signed off" : "paid in full before the extra work starts";
+      const scope = String(a.scope ?? "").slice(0, 700);
+      const title = String(job.title ?? job.id);
+      const reason = a.closed_reason ? `\n\nThe reason given: "${String(a.closed_reason).slice(0, 300)}"` : "";
+
+      if (kind === "addon_for_worker") {
+        subject = `Extra work asked for: ${title}`;
+        line = `On ${title}, the client has ${a.rev === 1 ? "asked for extra work" : "changed the extra work they asked for"} (version ${a.rev}):\n\n"${scope}"\n\n` +
+          `They are offering ${money(amount)} for it, ${termsText}. You would be paid ${money(workerPay)}, after Yaadly's 5%.\n\n` +
+          `Accept it, change it or turn it down on the job's Extra work tab: ${extraLink}\n\nDo not start the extra work until it is agreed and paid.`;
+      } else if (kind === "addon_for_client") {
+        subject = `Your tradesperson changed the extra work: ${title}`;
+        const pdf = await addonPdfUrl(SUPABASE_URL, a.id, Number(a.rev), SERVICE_KEY);
+        attachPhotos = [pdf];
+        line = `On ${title}, your tradesperson has changed the extra work (version ${a.rev}):\n\n"${scope}"\n\n` +
+          `For the work: ${money(amount)}. With Yaadly's 15% Guarantee & Support on top you pay ${money(clientTotal)}, ${termsText}. The PDF with this message shows it in full: ${pdf}\n\n` +
+          `To accept this version, reply:\nCONFIRM ${a.confirm_code}\n\n` +
+          `To change it or turn it down, use the Extra work tab on your job, where all changes are made: ${extraLink}`;
+        html = `<p>On ${escHtml(title)}, your tradesperson has changed the extra work (version ${a.rev}):</p><blockquote>${escHtml(scope)}</blockquote>` +
+          `<p>For the work: ${money(amount)}. With Yaadly's 15% Guarantee &amp; Support on top you pay <b>${money(clientTotal)}</b>, ${termsText}.</p>` +
+          `<p><a href="${pdf}">Open it as a PDF</a></p>` +
+          `<p>To accept this version, reply on WhatsApp: <b>CONFIRM ${escHtml(a.confirm_code)}</b>, or accept it on your job.</p>` +
+          `<p>To change it or turn it down, use the Extra work tab on your job: <a href="${extraLink}">${extraLink}</a></p>`;
+      } else if (kind === "addon_agreed") {
+        subject = `Extra work agreed: ${title}`;
+        line = `On ${title}, you and your tradesperson have agreed the extra work: "${scope.slice(0, 200)}".\n\n` +
+          `Yaadly will send you its invoice for ${money(first + Math.round(first * 0.15))}${halves ? ", the first half" : ""}. Once it is paid the extra work can start. Your original job bill does not change.\n\n${extraLink}`;
+      } else if (kind === "addon_agreed_worker") {
+        subject = `Extra work agreed: ${title}`;
+        line = `On ${title}, the extra work is agreed: "${scope.slice(0, 200)}".\n\n` +
+          `You will be paid ${money(workerPay)} once it is done and signed off. Do not start it until Yaadly tells you it is paid. File photos of it on the Extra work tab: ${extraLink}`;
+      } else if (kind === "addon_paid_worker") {
+        subject = `Extra work paid, you can start: ${title}`;
+        line = `On ${title}, the client has paid for the extra work, so you can start it: "${scope.slice(0, 200)}".\n\n` +
+          `File photos of it on the Extra work tab as you go. Yaadly signs it off on those photos, then pays you ${money(workerPay)}: ${extraLink}`;
+      } else if (kind === "addon_closed") {
+        subject = `Extra work not going ahead: ${title}`;
+        line = a.status === "declined"
+          ? `On ${title}, your tradesperson has turned down the extra work: "${scope.slice(0, 200)}".${reason}\n\nNothing has been booked or charged. You can write it differently on the Extra work tab: ${extraLink}`
+          : `On ${title}, your tradesperson has withdrawn their change to the extra work: "${scope.slice(0, 200)}".${reason}\n\nNothing has been booked or charged. ${extraLink}`;
+      } else {
+        subject = `Extra work not going ahead: ${title}`;
+        line = a.status === "declined"
+          ? `On ${title}, the client has turned down your change to the extra work: "${scope.slice(0, 200)}".${reason}\n\nNothing has been booked. ${extraLink}`
+          : `On ${title}, the client has withdrawn the extra work they asked for: "${scope.slice(0, 200)}".${reason}\n\nNothing has been booked. ${extraLink}`;
+      }
     } else if (kind === "kickoff_pack_ready") {
       // The worker READS the Kickoff Pack via the link, the same page the
       // client already reads (parties_read_approved_packs covers both).
@@ -1725,7 +1866,10 @@ Deno.serve(async (req: Request) => {
         const last = (seen ?? []).find((r: { from_addr: string }) => samePhoneDigits(r.from_addr, recipientPhone));
         if (!insideWindow(last?.seen_at ?? null)) {
           // A job the worker is not booked on opens nothing for them, so those two go to the portal itself.
-          const link = kind === "worker_requested" || kind === "quote_not_selected" ? `${APP_URL}/portal` : roomLink;
+          // The Completion Report link carries its signing code, or the
+          // worker lands on a page that will not let them sign.
+          const link = kind === "worker_requested" || kind === "quote_not_selected" ? `${APP_URL}/portal`
+            : kind === "completion_report_worker" ? (reportSignLink || roomLink) : roomLink;
           workerTemplate = { sid, vars: { "1": templateVar(`${job.title ?? "your job"} (${job.id})`), "2": templateVar(summary, 300), "3": link } };
         }
       }

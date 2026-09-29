@@ -152,7 +152,7 @@ export default async function WorkerPortal() {
   // are left out because a worker never sees one.
   const { data: myInvoices } = await supabase
     .from("invoices")
-    .select("id,job_id,stage,period_label,total_pence,status,sent_at,paid_at,paid_method,paid_reference")
+    .select("id,job_id,stage,period_label,total_pence,status,sent_at,paid_at,paid_method,paid_reference,worker_labour_jmd,worker_fee_jmd")
     .eq("payable_to", "worker")
     .ilike("worker_email", email.replace(/[\\%_]/g, "\\$&"))
     .not("status", "in", "(void,draft)")
@@ -183,6 +183,8 @@ export default async function WorkerPortal() {
       paidAt: inv.paid_at,
       paidMethod: inv.paid_method,
       paidRef: inv.paid_reference,
+      labourJmd: inv.worker_labour_jmd,
+      feeJmd: inv.worker_fee_jmd,
     });
     invoicesByJob.set(inv.job_id!, list);
   }
@@ -217,7 +219,7 @@ export default async function WorkerPortal() {
       case "evidence":
         return { label: "Your evidence is with the client", href: jobHref(j.id, "?tab=evidence#stage-evidence") };
       case "complete":
-        return { label: "See what you were paid", href: jobHref(j.id, "?tab=approvals#invoices") };
+        return { label: "See what you were paid", href: jobHref(j.id, "?tab=money#invoices") };
       default:
         return null;
     }

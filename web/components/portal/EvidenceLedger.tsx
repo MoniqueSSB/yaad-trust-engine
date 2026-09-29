@@ -19,8 +19,7 @@
  */
 
 import type { ReactNode } from "react";
-import Link from "next/link";
-import { EvidenceItemComment } from "./EvidenceItemComment";
+import { CorrectEvidence } from "./CorrectEvidence";
 import { whenDateTime } from "@/lib/date";
 import { phaseBadge, sectionsOf, stageLock, updatesOf } from "@/lib/portal/evidence-sections";
 
@@ -44,6 +43,12 @@ export type EvidenceItem = {
   item_code?: string | null;
   /** Shared by everything confirmed together in one WhatsApp batch. See 20260917190100. */
   batch_id?: string | null;
+  /** Who filed it, by email. Decides who may correct it. */
+  uploaded_by?: string | null;
+  /** When the worker last corrected its words or part (20260929040000). */
+  corrected_at?: string | null;
+  /** The words as first filed, when they have since been corrected. */
+  first_label?: string | null;
 };
 
 type StageState = "done" | "now" | "todo";
@@ -63,7 +68,14 @@ export function EvidenceLedger({
   jobId,
   upload = null,
   startsWhen = null,
+  me = null,
+  closed = false,
 }: {
+  /** The signed-in worker's email. Their own items on the stage being worked
+      get a "Correct this" control. Null for a client. */
+  me?: string | null;
+  /** A closed job's evidence is fixed. */
+  closed?: boolean;
   /** The upload forms, drawn inside the one stage card that is open. Null
       when nothing may be filed (before stage 1, or once the job is done). */
   upload?: ReactNode;
@@ -97,6 +109,10 @@ export function EvidenceLedger({
   );
   const filed = items.length;
   const checked = items.filter((e) => e.ok === true).length;
+  /* The headline is about the stage being worked, so it counts that stage's
+     items. It counted the whole job until 28 Sep 2026: "Stage 2 is under
+     way, with 6 items filed so far" when all six were stage 1's. */
+  const filedNow = items.filter((e) => (e.stage ?? 0) === currentStage).length;
 
   /* One sentence, before any list, answering the question the page is open
      for. Everything below it is the supporting detail. */
@@ -109,14 +125,14 @@ export function EvidenceLedger({
      urgent fact than which stage number the job happens to be on. */
   const headline = awaitingApproval
     ? role === "client"
-      ? "Photos are in and waiting on you. This stage closes when you approve them."
+      ? "Photos are in for this stage. Approving them is on the Approvals tab."
       : "Photos are in. The client has been asked to approve them."
     : currentStage === 0
       ? "Nothing filed yet. Evidence starts when the first stage does."
-      : filed === 0
+      : filedNow === 0
         ? stageTitle(currentStage) + " is under way. No photos filed against it yet."
-        : stageTitle(currentStage) + " is under way, with " + filed +
-          " item" + (filed === 1 ? "" : "s") + " filed so far.";
+        : stageTitle(currentStage) + " is under way, with " + filedNow +
+          " item" + (filedNow === 1 ? "" : "s") + " filed so far.";
 
   function stageTitle(n: number): string {
     const name = stageNames[n - 1];
@@ -174,18 +190,23 @@ export function EvidenceLedger({
             now, next to the money it releases. Client only: a worker
             approving his own work is the thing this whole ledger exists to
             rule out. */}
-        {awaitingApproval && role === "client" && jobId && (
-          <Link
-            href="?tab=approvals"
-            className="mt-3.5 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13.5px] font-bold text-onbrand transition hover:brightness-110"
-          >
-            Go to Approvals to sign off &rarr;
-          </Link>
-        )}
+        {/* No sign-off button here since 28 Sep 2026 (founder: this tab is
+            an overview, with nothing to act on). Approving lives on
+            Approvals; the headline says so in words. */}
       </div>
 
       <ul className="mt-3 grid gap-2.5">
-        {stages.map((n) => {
+        {/* Founder, 28 Sep 2026: the stage being worked at the top, the
+            stages still to come under it, finished stages at the bottom. */}
+        {[...stages]
+          .sort((a, b) => {
+            const rank = (n: number) => {
+              const l = stageLock(n, currentStage);
+              return l === "now" ? 0 : l === "done" ? 2 : 1;
+            };
+            return rank(a) - rank(b) || a - b;
+          })
+          .map((n) => {
           const mine = items.filter((e) => (e.stage ?? 1) === n);
           /* Founder, 14 Sep 2026: only the stage being worked is open, and
              the rest are blacked out until each stage before them is signed
@@ -303,6 +324,11 @@ export function EvidenceLedger({
                               answeredBy={answered.get(group[0].id)}
                               role={role}
                               jobId={jobId}
+                              canCorrect={
+                                role === "worker" && !closed && !!me && !!jobId &&
+                                (group[0].uploaded_by ?? "").toLowerCase() === me &&
+                                (group[0].stage ?? 0) === currentStage
+                              }
                             />
                           ) : (
                             <EvidenceUpdateCard
@@ -339,13 +365,27 @@ export function EvidenceLedger({
                             ? " · " + phaseBadge(e.phase, e.kind)
                             : ""}
                           {e.created_at ? " · " + stamp(e.created_at) : ""}
+                          {e.first_label && e.first_label !== e.label && (
+                            <span className="mt-0.5 block text-[10.5px]">
+                              first filed as &ldquo;{e.first_label}&rdquo;, corrected by the worker
+                            </span>
+                          )}
                           {e.sha256 ? (
                             <span className="mt-0.5 block break-all font-mono text-[9.5px] leading-relaxed">
                               sha256 · {e.sha256}
                             </span>
-                          ) : (
+                          ) : e.img ? (
                             <span className="mt-0.5 block text-[10.5px] italic">
                               filed before fingerprinting, no hash on record
+                            </span>
+                          ) : (
+                            /* A worker's typed or spoken WhatsApp update is
+                               filed as evidence with no file at all. Until
+                               28 Sep 2026 it read "filed before
+                               fingerprinting", which was untrue of one filed
+                               that morning and made the record look broken. */
+                            <span className="mt-0.5 block text-[10.5px] italic">
+                              a written update, no file to fingerprint
                             </span>
                           )}
                         </li>
@@ -373,8 +413,6 @@ export function EvidenceLedger({
 function EvidenceUpdateCard({
   group,
   answers,
-  role,
-  jobId,
 }: {
   group: EvidenceItem[];
   answers?: EvidenceItem;
@@ -434,9 +472,6 @@ function EvidenceUpdateCard({
             {answers.label ? ", " + answers.label : ""}
           </p>
         )}
-        {role === "client" && jobId && (
-          <EvidenceItemComment jobId={jobId} evidenceId={first.id} />
-        )}
       </div>
     </li>
   );
@@ -451,9 +486,10 @@ function EvidenceCard({
   e,
   answers,
   answeredBy,
-  role,
   jobId,
+  canCorrect = false,
 }: {
+  canCorrect?: boolean;
   e: EvidenceItem;
   /** The before this after answers, if it names one. */
   answers?: EvidenceItem;
@@ -480,7 +516,7 @@ function EvidenceCard({
         />
       ) : (
         <div className="grid h-16 w-full place-items-center bg-panel2 text-[11.5px] text-dim">
-          Filed without an image
+          A written update, no photo
         </div>
       )}
       <div className="p-3">
@@ -517,6 +553,14 @@ function EvidenceCard({
             </span>
           )}
         </div>
+        {e.corrected_at && (
+          <p className="mt-0.5 text-[10.5px] text-mango">
+            Corrected by the worker{" · " + stamp(e.corrected_at)}
+          </p>
+        )}
+        {canCorrect && jobId && (
+          <CorrectEvidence id={e.id} jobId={jobId} label={e.label} phase={e.phase} kind={e.kind} />
+        )}
         {/* The comparison, shown rather than described. An after carries a
             thumbnail of the before it answers, so a client sees the two
             together without leaving the section; a before that has been
@@ -549,9 +593,6 @@ function EvidenceCard({
             worker commenting on their own photo is not what this exists for,
             and the RLS insert policy would refuse it anyway if a stray call
             ever got this far. */}
-        {role === "client" && jobId && (
-          <EvidenceItemComment jobId={jobId} evidenceId={e.id} />
-        )}
       </div>
     </li>
   );

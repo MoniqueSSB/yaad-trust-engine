@@ -1,0 +1,11 @@
+-- The invoice no longer says "Not VAT registered" (28 Sep 2026, Monique's
+-- instruction: "remove the not vat registered and just leave it blank").
+-- The VAT line on the invoice, email and PDF, shows nothing, and the footer
+-- sentence starts at the company name. yaad-invoice skips the sentence when
+-- this is empty, so apply this only once that version is deployed, or live
+-- invoices print a stray full stop at the start of the line.
+--
+-- Yaadly is still not VAT registered and vat_pence is still 0. Registering
+-- for VAT is a real change (a rate, a VAT number, VAT on every line), not a
+-- matter of putting words back here.
+update public.app_settings set value = '' where key = 'invoice_vat_status';

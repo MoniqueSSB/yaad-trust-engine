@@ -2,6 +2,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { pickTextProvider, providerAttrs, chatWithFailover, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 import { payLinkToken } from "./stripe.ts";
+import { invoicePdf, workerFeeBreakdown, type JobWork } from "./pdf.ts";
+import { LOGO } from "./logo.ts";
+import { encodeBase64 } from "jsr:@std/encoding/base64";
 
 // yaad-invoice
 //
@@ -76,6 +79,47 @@ async function db(req: Request, path: string, init: RequestInit = {}) {
   });
 }
 
+/** The job's own invoices, main work and additional work apart, for a client
+ *  invoice on a job that has add-ons (28 Sep 2026). Read under the caller's
+ *  token like everything else here, so a client sees only their own. Drafts
+ *  are left out, except the invoice being drawn itself. Null when the job has
+ *  no add-on invoice, so an ordinary invoice looks exactly as it always has. */
+async function jobWorkFor(req: Request, inv: Record<string, any>): Promise<JobWork | null> {
+  if (!inv?.job_id || inv.payable_to === "worker") return null;
+  try {
+    const r = await db(req, `invoices?select=id,status,total_pence,addon_id,period_label,currency&job_id=eq.${encodeURIComponent(inv.job_id)}&payable_to=eq.yaadly&status=neq.void&order=id`);
+    if (!r.ok) return null;
+    const all = ((await r.json()) as Record<string, any>[]).filter((i) => i.status !== "draft" || i.id === inv.id);
+    const addonInvs = all.filter((i) => i.addon_id);
+    if (!addonInvs.length) return null;
+    const ids = addonInvs.map((i) => i.id).join(",");
+    const addonIds = [...new Set(addonInvs.map((i) => i.addon_id))].join(",");
+    const [lR, aR] = await Promise.all([
+      db(req, `invoice_lines?select=invoice_id,line_total_pence,is_fee&invoice_id=in.(${encodeURIComponent(ids)})`),
+      db(req, `job_addons?select=id,scope&id=in.(${encodeURIComponent(addonIds)})`),
+    ]);
+    const lines = lR.ok ? (await lR.json()) as Record<string, any>[] : [];
+    const scope = new Map(((aR.ok ? await aR.json() : []) as Record<string, any>[]).map((a) => [a.id, String(a.scope ?? "")]));
+    const rows = all.map((i) => {
+      const own = lines.filter((l) => l.invoice_id === i.id);
+      const fee = own.filter((l) => l.is_fee).reduce((t, l) => t + Number(l.line_total_pence || 0), 0);
+      const work = own.filter((l) => !l.is_fee).reduce((t, l) => t + Number(l.line_total_pence || 0), 0);
+      const sc = (scope.get(i.addon_id) ?? "").replace(/\s+/g, " ").trim();
+      return {
+        id: i.id,
+        kind: (i.addon_id ? "addon" : "main") as "main" | "addon",
+        label: i.addon_id ? (sc.length > 70 ? sc.slice(0, 70) + "…" : sc) || "Additional work" : (!i.period_label || i.period_label === "Job" ? "Job bill" : String(i.period_label)),
+        work: i.addon_id ? work : null,
+        fee: i.addon_id ? fee : null,
+        total: Number(i.total_pence || 0),
+        status: String(i.status),
+        current: i.id === inv.id,
+      };
+    });
+    return { rows, total: rows.reduce((t, x) => t + x.total, 0), currency: String(inv.currency || "JMD") };
+  } catch (_) { return null; }
+}
+
 async function isAdmin(req: Request): Promise<boolean> {
   try {
     const r = await db(req, "rpc/is_admin", { method: "POST", body: "{}" });
@@ -144,6 +188,7 @@ function renderInvoice(inv: Record<string, any>, lines: Record<string, any>[], s
          border-bottom:3px solid var(--teal);padding-bottom:22px}
   .mark{font-family:'Anton',Impact,sans-serif;font-size:34px;letter-spacing:.5px;line-height:1}
   .mark span{color:var(--teal)}
+  .mark .logo{width:34px;height:34px;vertical-align:-4px;margin-right:10px}
   .issuer{font-size:13px;color:var(--mute);margin-top:8px;white-space:pre-line}
   .title{text-align:right}
   .title h1{font-family:'Anton',Impact,sans-serif;font-weight:400;font-size:30px;margin:0;letter-spacing:1px}
@@ -165,6 +210,18 @@ function renderInvoice(inv: Record<string, any>, lines: Record<string, any>[], s
   tr.unpriced td{color:#8A5A00;background:#FFFBF2}
   .flag{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;
         background:#FFE9B8;color:#8A5A00;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+  .wfee{margin-top:18px;padding:12px 16px;background:#F4F7F6;border-radius:8px;font-size:14px}
+  .wfee h2{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--mute);margin:0 0 6px}
+  .wfee div{display:flex;justify-content:space-between;padding:3px 0}
+  .wfee .r{font-weight:700;border-top:1px solid var(--line);margin-top:4px;padding-top:7px}
+  .jobwork{margin-top:26px;border-top:1px solid var(--line);padding-top:14px}
+  .jobwork h2{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:0 0 4px}
+  .jobwork p{font-size:12px;color:var(--mute);margin:0 0 10px}
+  .jobwork h3{font-size:12px;margin:12px 0 4px}
+  .jobwork .jw{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .jobwork .jw small{display:block;color:var(--mute);font-size:11.5px;margin-top:2px}
+  .jobwork .cur{font-weight:600}
+  .jobwork .jwt{display:flex;justify-content:space-between;padding-top:10px;font-weight:700}
   .totals{margin-top:18px;margin-left:auto;width:min(300px,100%)}
   .totals div{display:flex;justify-content:space-between;padding:7px 0}
   .totals .grand{border-top:2px solid var(--deep);margin-top:6px;padding-top:12px;
@@ -181,7 +238,7 @@ function renderInvoice(inv: Record<string, any>, lines: Record<string, any>[], s
 <body><div class="sheet">
   <header>
     <div>
-      <div class="mark">YAADLY<span>.</span></div>
+      <div class="mark"><img src="${LOGO}" alt="" class="logo">YAADLY<span>.</span></div>
       <div class="issuer">${esc(settings.invoice_issuer_name)}
 Company number ${esc(settings.invoice_issuer_number)}
 ${esc(settings.invoice_issuer_address)}
@@ -216,11 +273,40 @@ ${esc(inv.client_email)}${inv.client_address ? "\n" + esc(inv.client_address) : 
     <tbody>${rows}</tbody>
   </table>
 
+  ${(() => {
+    /* Yaadly's worker fee, on a worker's pay invoice raised since 28 Sep 2026
+       (pdf.ts workerFeeBreakdown; the PDF draws the same three lines). */
+    const wf = workerFeeBreakdown(inv);
+    return wf ? `<div class="wfee"><h2>How this pay is worked out</h2>
+      <div><span>Quoted labour</span><span>${money(wf.labour, "JMD")}</span></div>
+      <div><span>Less Yaadly's worker fee (${wf.pct}%)</span><span>-${money(wf.fee, "JMD")}</span></div>
+      <div class="r"><span>Agreed rate, paid to you</span><span>${money(wf.rate, "JMD")}</span></div></div>` : "";
+  })()}
+
   <div class="totals">
     <div><span>Subtotal</span><span>${money(inv.subtotal_pence, inv.currency)}</span></div>
     <div><span>VAT</span><span>${esc(settings.invoice_vat_status)}</span></div>
     <div class="grand"><span>Total</span><span>${money(inv.total_pence, inv.currency)}</span></div>
   </div>
+
+  ${(() => {
+    /* The job's main work and additional work, apart (28 Sep 2026). The PDF
+       draws the same rows (pdf.ts, inv._jobWork). */
+    const jw = inv._jobWork as JobWork | null | undefined;
+    if (!jw || !jw.rows.length) return "";
+    const rowHtml = (r: JobWork["rows"][number]) =>
+      `<div class="jw${r.current ? " cur" : ""}"><span><b>${esc(r.id)}</b>${r.current ? " (this invoice)" : ""} · ${esc(r.label)}` +
+      (r.work != null && r.fee != null ? `<small>The work ${money(r.work, jw.currency)} · Guarantee &amp; Support, 15% ${money(r.fee, jw.currency)} · ${r.status === "paid" ? "Paid" : "Not paid yet"}</small>` : `<small>${r.status === "paid" ? "Paid" : "Not paid yet"}</small>`) +
+      `</span><span>${money(r.total, jw.currency)}</span></div>`;
+    const part = (title: string, kind: "main" | "addon") => {
+      const rs = jw.rows.filter((r) => r.kind === kind);
+      return rs.length ? `<h3>${title}</h3>${rs.map(rowHtml).join("")}` : "";
+    };
+    return `<div class="jobwork"><h2>This job: main work and additional work</h2>
+      <p>Each is billed on its own invoice. The additional work is extra work agreed after the job was booked; it does not change the main work.</p>
+      ${part("Main work", "main")}${part("Additional work", "addon")}
+      <div class="jwt"><span>The job in total, main and additional work</span><span>${money(jw.total, jw.currency)}</span></div></div>`;
+  })()}
 
   ${unpriced.length ? `<div class="warn"><strong>Not ready to send.</strong> ${unpriced.length} line${unpriced.length > 1 ? "s have" : " has"} no price. The agent will not guess one. Price ${unpriced.length > 1 ? "them" : "it"} or remove ${unpriced.length > 1 ? "them" : "it"} first.</div>` : ""}
 
@@ -247,7 +333,10 @@ ${esc(inv.client_email)}${inv.client_address ? "\n" + esc(inv.client_address) : 
         + (settings.invoice_bank_details
           ? `Bank transfer: ${esc(settings.invoice_bank_details)}. Use ${esc(inv.id)} as the reference.<br>`
           : "")}
-    ${esc(settings.invoice_vat_status)}. ${esc(settings.invoice_issuer_name)} is registered in England and Wales, company number ${esc(settings.invoice_issuer_number)}.<br>
+    ${/* Blank since 28 Sep 2026 on Monique's instruction: the VAT line shows
+         nothing and this sentence starts at the company name. A value in
+         app_settings.invoice_vat_status still prints, in both places. */
+      settings.invoice_vat_status ? esc(settings.invoice_vat_status) + ". " : ""}${esc(settings.invoice_issuer_name)} is registered in England and Wales, company number ${esc(settings.invoice_issuer_number)}.<br>
     Services are project management, observation and documentation. They are not a survey, a valuation, a legal opinion or a quantity surveyor's estimate.
   </footer>
 </div></body></html>`;
@@ -277,8 +366,43 @@ Deno.serve(async (req) => {
       root.setAttributes({ "yaadly.auth.outcome": "rejected" });
       return fail("Sign in required.", 401);
     }
-    // Invoicing is the founder's desk. Clients read their own invoices
-    // through the portal and RLS, never through this function.
+    // The one thing a client or worker may ask of this function (28 Sep
+    // 2026, founder: "invoice download as pdf also"): the PDF of an invoice
+    // they can already read in the portal. The invoice and its lines are read
+    // under THEIR token, so row level security decides, exactly as it does on
+    // the portal page: a client gets only their own sent or paid invoices, a
+    // worker only their own pay, and a draft never. The issuer settings (the
+    // company details and bank line printed on every invoice) are admin-only
+    // in RLS, so only those keys are read with the service role. The file is
+    // the same invoicePdf() the email attaches, so it cannot differ from what
+    // was sent. It changes nothing.
+    const peek = await req.clone().json().catch(() => ({}));
+    if (String(peek?.action ?? "") === "pdf") {
+      root.setAttributes({ "yaadly.invoice.action": "pdf" });
+      const id = String(peek.invoice_id || "");
+      if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) return fail("No invoice was chosen.", 400);
+      const [iR, lR] = await Promise.all([
+        db(req, `invoices?select=*&id=eq.${encodeURIComponent(id)}`),
+        db(req, `invoice_lines?select=*&invoice_id=eq.${encodeURIComponent(id)}&order=sort,id`),
+      ]);
+      const inv = iR.ok ? (await iR.json())[0] : null;
+      if (!inv || inv.status === "draft") return fail("That invoice is not one you can open.", 404);
+      const lines = lR.ok ? await lR.json() : [];
+      const settings: Record<string, string> = {};
+      const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+      if (svc) {
+        const sR = await fetch(`${env().url}/rest/v1/app_settings?select=key,value&key=like.invoice_*`, {
+          headers: { apikey: svc, Authorization: `Bearer ${svc}` },
+        });
+        if (sR.ok) for (const r of await sR.json()) settings[r.key] = r.value;
+      }
+      const payUrl = inv.status === "sent" && inv.payable_to !== "worker" ? await payLinkUrlFor(inv.id) : "";
+      const pdf = await invoicePdf({ ...inv, _payUrl: payUrl, _jobWork: await jobWorkFor(req, inv) }, lines, settings, money);
+      return done(JSON.stringify({ filename: `${inv.id}.pdf`, pdf: encodeBase64(pdf) }), 200);
+    }
+
+    // Everything else is the founder's desk. Clients read their own invoices
+    // through the portal and RLS; the PDF above is the one exception.
     if (!(await isAdmin(req))) {
       root.setAttributes({ "yaadly.auth.outcome": "not_admin" });
       return fail("Admin only.", 403);
@@ -341,7 +465,20 @@ Deno.serve(async (req) => {
       // Found on INV-2026-0021, 14 Sep 2026. If the email fails, the row
       // below is never updated and stays a draft, as before.
       const payUrl = inv.payable_to === "worker" ? "" : await payLinkUrlFor(inv.id);
-      const html = renderInvoice({ ...inv, status: "sent", _payUrl: payUrl }, lines, settings);
+      const html = renderInvoice({ ...inv, status: "sent", _payUrl: payUrl, _jobWork: await jobWorkFor(req, inv) }, lines, settings);
+
+      // The same invoice as a PDF, attached (28 Sep 2026). Drawn here from
+      // the same rows, stamped sent like the email. If it cannot be made,
+      // nothing is emailed and the invoice stays a draft: an invoice that
+      // arrives without the attachment the client was told to expect is
+      // worse than one that is held back with the reason on the desk.
+      let pdf: Uint8Array;
+      try {
+        pdf = await invoicePdf({ ...inv, status: "sent", _payUrl: payUrl, _jobWork: await jobWorkFor(req, inv) }, lines, settings, money);
+      } catch (e) {
+        root.recordError(`invoice pdf: ${String(e).slice(0, 200)}`);
+        return fail(`The PDF of ${id} could not be made, so nothing was emailed and it is still a draft: ${String(e).slice(0, 200)}`, 500);
+      }
 
       const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
       if (!resendKey) return fail("RESEND_API_KEY is not set, so this cannot email anybody yet. Render and send it by hand instead.", 500);
@@ -356,6 +493,7 @@ Deno.serve(async (req) => {
             reply_to: settings.invoice_issuer_email || undefined,
             subject: `Invoice ${inv.id}${inv.period_label ? ", " + inv.period_label : ""} — ${money(inv.total_pence, inv.currency)}`,
             html,
+            attachments: [{ filename: `${inv.id}.pdf`, content: encodeBase64(pdf) }],
           }),
           signal: AbortSignal.timeout(15000),
         });
@@ -398,7 +536,14 @@ Deno.serve(async (req) => {
       if (sR.ok) for (const r of await sR.json()) settings[r.key] = r.value;
 
       const payUrl = inv.status === "sent" && inv.payable_to !== "worker" ? await payLinkUrlFor(inv.id) : "";
-      const html = renderInvoice({ ...inv, _payUrl: payUrl }, lines, settings);
+      const html = renderInvoice({ ...inv, _payUrl: payUrl, _jobWork: await jobWorkFor(req, inv) }, lines, settings);
+      // pdf: true adds the PDF, base64, for the desk's Preview. It is the
+      // same function as the email attachment, so what the desk shows for a
+      // whole invoice is the file the client gets (the email stamps it sent).
+      if (body.pdf === true && body.as === "json") {
+        const pdf = await invoicePdf({ ...inv, _payUrl: payUrl, _jobWork: await jobWorkFor(req, inv) }, lines, settings, money);
+        return done(JSON.stringify({ invoice: inv, lines, html, pdf: encodeBase64(pdf) }), 200);
+      }
       return body.as === "json"
         ? done(JSON.stringify({ invoice: inv, lines, html }), 200)
         : done(html, 200, "text/html; charset=utf-8");

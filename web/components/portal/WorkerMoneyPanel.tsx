@@ -63,7 +63,7 @@ function MoneyRow({ job }: { job: MoneyJob }) {
             it opens on the job's pay invoices, the same place the job list's
             "See what you were paid" lands, not the top of the job. */}
         <Link
-          href={`/portal/jobs/${encodeURIComponent(job.id)}?tab=approvals#invoices`}
+          href={`/portal/jobs/${encodeURIComponent(job.id)}?tab=money#invoices`}
           className="group min-w-[180px] flex-1"
         >
           <b className="block text-[14.5px] group-hover:underline">{job.title ?? "Untitled job"}</b>

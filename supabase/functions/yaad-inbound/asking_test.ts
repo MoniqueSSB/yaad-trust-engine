@@ -36,7 +36,11 @@ const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
  *  the fourth time nobody looks. Bounded by the next top-level declaration
  *  instead, so it grows with the function. */
 function fnBody(name: string): string {
-  const at = src.indexOf(`async function ${name}(`);
+  // Either shape. It took only `async function` until 20 Sep 2026, so the
+  // first plain one checked here failed as "gone or renamed" while sitting in
+  // the file, which is the same wrong-reason red the comment above is about.
+  const at = [`async function ${name}(`, `function ${name}(`]
+    .map((d) => src.indexOf(d)).find((i) => i >= 0) ?? -1;
   if (at < 0) throw new Error(`${name} is gone or renamed`);
   const rest = src.slice(at + 10);
   const next = rest.search(/\n(?:async function |function |const [A-Z_]+ =|Deno\.serve)/);
@@ -441,4 +445,180 @@ Deno.test("askPhase reads the Messaging Service the same way it reads the templa
   const body = src.slice(at, at + 1200);
   assert(body.includes("TWILIO_MESSAGING_SERVICE_SID"), "the secret is no longer read");
   assert(body.includes("twilio_messaging_service_sid"), "the app_settings row is no longer read");
+});
+
+/* ── a template id that is not a template id never goes on the wire ───────
+   20 Sep 2026. The TWILIO_CONTENT_SID_PHASE secret was set on 15 September to
+   the literal text "HX...", off the copy-paste line in RUNBOOK.md, which had
+   the placeholder still in it. Because the secret wins over the desk setting,
+   every section menu send for the next five days carried "HX..." as its
+   ContentSid and was refused by Twilio with 20422, while the correct id sat
+   in app_settings unused. The typed question covered for it so completely
+   that two investigations went past it, one at the template and one at the
+   Messaging Service.
+
+   The fix is the shape check yaad-twilio-setup has always had, and the rule
+   that the FIRST VALUE THAT IS AN ID wins, not the first value that is set.
+   Both halves matter: without the second, junk in the secret still hides a
+   good id on the desk, which is the whole fault. */
+
+Deno.test("askPhase will not send a template id that is not shaped like one", () => {
+  const at = src.indexOf("const askPhase =");
+  const body = src.slice(at, at + 1200);
+  assert(body.includes("firstTemplateSid("),
+    "askPhase no longer checks the shape of the template id, so a placeholder can go on the wire again");
+  assert(!/Deno\.env\.get\("TWILIO_CONTENT_SID_PHASE"\)\s*\|\|/.test(body),
+    "the secret is being taken on truthiness again, so junk in it hides the id on the desk");
+});
+
+Deno.test("firstTemplateSid takes the first id, not the first value that is set", () => {
+  const body = fnBody("firstTemplateSid");
+  assert(/HX\[0-9a-f\]\{32\}/.test(body), "the ContentSid shape is no longer checked");
+  assert(body.includes("find("),
+    "firstTemplateSid no longer scans its candidates, so a bad first one wins again");
+});
+
+/* ── the typed question offers words, not letters ─────────────────────────
+   Founder, 15 Sep 2026: "the letters would be confusing and not clear". Again
+   on 20 Sep, having had them for five days because the menu was being
+   refused: "the letter needs to go".
+
+   The letters stay ACCEPTED, because the menu's own row ids are the letters
+   and a worker who learnt them should not be told they are wrong. They are
+   only no longer what a worker is asked for. And the fallback stays a real
+   question: the session is already waiting on a section answer, so a worker
+   asked nothing says something else and the evidence files unmarked. */
+
+Deno.test("the typed section question asks for words, not single letters", () => {
+  const at = src.indexOf("const PHASE_QUESTION");
+  assert(at > 0, "PHASE_QUESTION is gone or renamed");
+  const q = src.slice(at, src.indexOf(";", at));
+  assert(!/\bReply [BDAPNS] for\b/.test(q), "the single letters are back in the question");
+  for (const word of ["Before", "During", "After", "Problem", "New", "Skip"]) {
+    assert(q.includes(word), `the question no longer offers "${word}"`);
+  }
+});
+
+Deno.test("every word the typed question offers is a word readPhaseAnswer accepts", () => {
+  const at = src.indexOf("function readPhaseAnswer");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  // Skip is deliberately absent: an unrecognised answer files the evidence
+  // unmarked and says so, which is exactly what skipping means here.
+  for (const word of ["before", "during", "after", "problem", "new"]) {
+    assert(body.includes(word), `the question offers "${word}" but readPhaseAnswer no longer reads it`);
+  }
+});
+
+Deno.test("askPhase still falls back to a real question when the menu is refused", () => {
+  const at = src.indexOf("const askPhase =");
+  const body = src.slice(at, at + 1200);
+  assert(body.includes("PHASE_QUESTION"),
+    "the fallback question is gone, so a refused menu leaves the worker asked nothing "
+    + "while the session waits for their answer and files whatever they say next unmarked");
+});
+
+/* ── a worker may comment on what they just sent (20 Sep 2026) ────────────
+   Founder: a worker should be TOLD they can say something about their
+   photographs, not merely allowed to. The invitation goes on the filing
+   confirmation, because that is the only point in the evidence lane where a
+   worker's free text is not already the answer to a question: before it, it
+   is the job code, then the caption, then the section.
+
+   The note that answers it is held and read back like any other typed
+   update. The 1 is still the gate. The realistic regression here is somebody
+   filing the note on arrival, because the worker was invited so it "must" be
+   wanted, and that is the 17 September rule going out of the building. */
+
+Deno.test("the filing confirmation invites a comment", () => {
+  const at = src.indexOf("const invite =");
+  assert(at > 0, "the invitation on the filing confirmation is gone");
+  const line = src.slice(at, src.indexOf("\n", at));
+  assert(/Type it now/.test(line), "the invitation no longer tells the worker what to do");
+  const body = src.slice(src.indexOf("let body = phase"), src.indexOf("let body = phase") + 700);
+  assert((body.match(/\$\{invite\}/g) ?? []).length === 2,
+    "the invitation is on one wording of the confirmation and not the other, so whether a "
+    + "worker is told they can comment depends on whether the section answer was understood");
+});
+
+Deno.test("a note is held and read back, never filed on arrival", () => {
+  const at = src.indexOf("const justFiled = found ?");
+  assert(at > 0, "the note lane is gone or renamed");
+  const branch = src.slice(at, at + 1600);
+  assert(branch.includes('_lane: "update_draft"'),
+    "the note no longer goes through the draft lane, so it is not waiting for a 1");
+  assert(branch.includes("draftReadBack("),
+    "the note is no longer read back to the worker before it is filed");
+  assert(!branch.includes('from("evidence").insert'),
+    "the note lane inserts evidence directly, which files a worker's words without the 1 "
+    + "they have had to give since 17 September 2026");
+});
+
+Deno.test("only a note carries a batch id onto a typed update", () => {
+  const at = src.indexOf("const notesBatch =");
+  assert(at > 0, "the note's batch link is gone");
+  const branch = src.slice(at, at + 500);
+  assert(/batch_id: notesBatch/.test(branch), "the insert no longer carries the batch");
+  assert(/a\.notes_batch/.test(branch),
+    "the batch is no longer read off the draft, so it is being guessed at filing time");
+});
+
+Deno.test("the window a note may arrive in is not renewed by notes", () => {
+  const body = fnBody("recentFiledBatch");
+  assert(/storage_path/.test(body),
+    "recentFiledBatch no longer requires an actual file, so a note renews its own window "
+    + "and an unrelated update half an hour later joins old photographs");
+  assert(/uploaded_by/.test(body), "the batch is no longer scoped to the worker who sent it");
+});
+
+Deno.test("every filed batch gets a batch id, including a single photo", () => {
+  const at = src.indexOf("const batchId =");
+  assert(at > 0, "the batch id is gone");
+  const line = src.slice(at, src.indexOf("\n", at));
+  assert(!/length > 1/.test(line),
+    "a single photograph is back to having no batch id, so it is the one kind of evidence "
+    + "a worker cannot attach a note to");
+  assert(/crypto\.randomUUID\(\)/.test(line), "the batch id is no longer minted");
+});
+
+/* ── a half-finished session is not for ever (23 Sep 2026) ────────────────
+   The evidence session had no age at all. The stale drop written for exactly
+   that case sits AFTER the evidence block, and that block returns on every
+   path it has, so the one lane whose comment promised an orphaned photo would
+   be dropped was the one lane it could never run on.
+
+   Live effect, which is how it was found: three photographs staged on 20
+   September were still waiting for a section answer on the 23rd, and the next
+   thing the founder typed, about anything at all, would have been read as
+   that answer and filed them under it.
+
+   The guard is load bearing because of the ORDER, so the order is asserted
+   here too. Move the drop above the block and the guard stops mattering;
+   remove the guard and the drop stops running. Either alone is a silent
+   return to filing days-old photographs under a stray word. */
+
+Deno.test("an evidence session goes stale, the same as a typed draft", () => {
+  const at = src.indexOf("const evSession =");
+  assert(at > 0, "evSession is gone or renamed");
+  const decl = src.slice(at, src.indexOf(";", at));
+  assert(decl.includes("SESSION_STALE_MS"),
+    "the evidence session has no age again, so a message days later is read as the answer "
+    + "to a question nobody remembers being asked");
+  assert(/updated_at/.test(decl), "the age is no longer measured against the session's own clock");
+});
+
+Deno.test("the stale drop still sits after the evidence block, which is why the guard is needed", () => {
+  const block = src.indexOf("if (!evidenceHeld && evSession) {");
+  const drop = src.indexOf("A stale evidence session is dropped");
+  assert(block > 0 && drop > 0, "one of the two is gone or renamed");
+  assert(drop > block,
+    "the stale drop has moved above the evidence block. That is not wrong in itself, but the "
+    + "age guard on evSession was added because it was below, so check both together");
+});
+
+Deno.test("one staleness number, not a copy per lane", () => {
+  assert(/const SESSION_STALE_MS = 48 \* 3600_000;/.test(src), "SESSION_STALE_MS is gone or changed");
+  const copies = (src.match(/48 \* 3600_000/g) ?? []).length;
+  assert(copies === 1,
+    `48 hours is written out ${copies} times. It was three, and they drift: put every lane on `
+    + "SESSION_STALE_MS so a change to one is a change to all");
 });

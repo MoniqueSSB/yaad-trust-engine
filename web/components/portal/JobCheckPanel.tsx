@@ -60,6 +60,18 @@ function PriceTag({ p }: { p: CheckPrice | null }) {
   return <>{gbp(p.full_pence)}</>;
 }
 
+/** Who attends, as a client or worker should read it. check_assigned_to is
+ *  typed freehand on the desk, and on 28 Sep 2026 it put the founder's own
+ *  first name, lower case, in front of a worker. Standing rule: client and
+ *  worker screens say Yaadly, never her name. Anybody else is shown as typed,
+ *  first letter raised. */
+export function attendeeLabel(raw: string | null): string | null {
+  const v = (raw ?? "").trim();
+  if (!v) return null;
+  if (/^(monique|monique sewell[- ]bennett|yaadly|me|admin)$/i.test(v) || /moniquessb16/i.test(v)) return "Yaadly";
+  return v.charAt(0).toUpperCase() + v.slice(1);
+}
+
 export function JobCheckPanel({
   jobId,
   role,
@@ -85,6 +97,7 @@ export function JobCheckPanel({
   jmdPerGbp: number;
 }) {
   if (state === "not_yet") return null;
+  assignedTo = attendeeLabel(assignedTo);
 
   /* The worker's view is one sentence. They do not choose it, they do not
      pay for it, and it changes nothing about their evidence or what they are

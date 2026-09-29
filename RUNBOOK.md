@@ -2244,6 +2244,30 @@ select wa_id, answers->>'worker_email' as worker_email,
 
 **This was never fully proven with a real, signed inbound message during development**, because doing so requires `TWILIO_AUTH_TOKEN` to sign a test request, which nobody building this held. Every piece of logic underneath that signature check was verified directly against the live database; the signature check, the media fetch, and the reply mechanism are pre-existing code already handling real client messages on this same endpoint. The first real worker photo sent to the number is the genuine end-to-end proof. If it does not work as described here, that is the first place to look, not a reason to assume the whole design is wrong.
 
+## A half-finished WhatsApp session, and how long it waits
+
+**48 hours, every lane, one number (`SESSION_STALE_MS` in `yaad-inbound`).** Past that the row is deleted on the next message from that number and the message is read fresh, as though no session existed.
+
+**The evidence lane had no age at all until 23 September 2026.** The stale drop was written for exactly that case, and its comment says so, but it sits after the evidence block and that block returns on every path it has. So the one lane the comment names was the one lane it could never run on. An evidence session waited for ever.
+
+**What that does in practice**, which is how it was found: three photographs staged on 20 September were still waiting for a section answer on the 23rd. The next thing that number sent, about anything at all, would have been read as the answer to that question and filed all three under it. A photograph sent instead would have joined the three-day-old batch rather than starting a new one.
+
+**The fix is an age on `evSession`, not a delete.** Going stale is this lane letting go, not a decision about anybody's evidence. Once `evSession` is null the drop below is reachable and does what it always said it would.
+
+**The order matters and is asserted by a test.** Move the drop above the evidence block and the age guard stops mattering. Remove the guard and the drop stops running. Either one alone is a silent return to filing days-old photographs under a stray word.
+
+**The cost, stated plainly:** a worker who sends photographs on Friday evening and answers on Monday morning is past 48 hours, and their staged photographs are gone. They resend. That was already the written intent for this lane and is what the typed-update lane has always done. If it turns out to bite a real worker, the alternative is to keep the staged items and re-ask the question rather than dropping, which costs a round trip and is a bigger change.
+
+**To see what is staged right now:**
+
+```sql
+select wa_id, photo_count, updated_at, answers->>'_lane' as lane,
+       answers->>'confirmed_job' as job, answers->>'awaiting_phase' as awaiting
+from wa_intake_sessions order by updated_at desc;
+```
+
+A row older than 48 hours is already dead as far as the lanes are concerned; it is deleted the next time that number sends anything, not on a timer, because nothing sweeps this table.
+
 ## A worker's photo never files itself. It always waits for the job's code back.
 
 **Even with exactly one live job, nothing is filed until the worker replies with that job's own code.** This was a deliberate safety fix, 31 Aug 2026, replacing an earlier version that filed straight away when a worker's number matched only one active job. A photo is staged the moment it arrives either way, but staged is not filed: it sits in `wa_intake_sessions.answers->'pending'` until `pickJobChoice()` in `yaad-inbound` accepts the reply.
@@ -2253,6 +2277,32 @@ select wa_id, answers->>'worker_email' as worker_email,
 **To see a worker mid-confirmation**, same query as the general evidence-session lookup above: look at `answers->'job_choices'` for what they were shown and `answers->'pending'` for what is staged and waiting. Nothing in `evidence` or the job's own record changes until that row is deleted by a successful `finalizeEvidenceItem()` call, which only runs after a match.
 
 **If a worker seems stuck reprompting, check what they actually typed against `answers->'job_choices'` in that row first.** The most common real cause is a worker typing the bare digits ("0042") without the code's letters, which is deliberate, not a bug: the code match requires the string Twilio was shown, precisely so a worker cannot confirm a job by accident. Tell them to reply with the exact code shown in the message.
+
+## A worker's note on the photos they just sent, and where it goes
+
+**The filing confirmation invites one (20 Sep 2026).** "Filed 2 items against JOB-…, the after. **Anything to say about them? Type it now and it goes on the same update.**" Founder's instruction: a worker should be told they can comment, not merely allowed to. Before this the question only ever came up when a photograph arrived with no caption, so a worker who captioned theirs was never asked anything and had no way of knowing more was welcome.
+
+**Why it is offered there and nowhere earlier.** Every free-text reply before that point is already the answer to a question: first the job code, then "what do these show", then the section. An invitation anywhere earlier gets typed into the wrong slot. Once the batch is filed the evidence session is closed and the worker's words are free again, which is why this is the only place it fits.
+
+**The note is NOT filed when it arrives.** It goes through the same `update_draft` lane every typed update has used since 17 September: held, read back in full, filed only on a reply of 1. Being invited to comment buys no way past that gate, and a test in `asking_test.ts` fails if the note lane ever inserts into `evidence` directly.
+
+**What makes it a note rather than a separate line on the record:** it is filed sharing the photographs' `evidence.batch_id`, so `updatesOf()` draws the whole thing as one update in the portal instead of words sitting beside pictures nobody connected them to. Two things had to change for that to work:
+
+- **Every filed batch now gets a `batch_id`, including a batch of one.** It used to be null for a single photograph. The portal already draws a batch of one exactly as it drew a null, so nothing moved on the page, but without it a lone photograph was the only evidence a worker could not attach anything to.
+- **The window is 30 minutes** (`NOTE_WINDOW_MINUTES`), measured from when the pictures landed. `recentFiledBatch()` only looks at rows with a `storage_path`, which is what stops a note renewing its own window and sweeping a genuinely new update half an hour later onto old photographs.
+
+**With more than one job running it does not ask which one.** The worker filed on that job minutes ago, so the job is known, and asking would be asking them about photographs they have just sent. The read-back names the job ("Ready to go on JOB-… (title), with the photos you just sent") so they can still drop it with a "no".
+
+**If a note lands on its own instead of with the photos:** check the gap. Past 30 minutes it is an ordinary update and correctly stands alone. Inside it, look for a `batch_id` on the photo rows:
+
+```sql
+select id, label, phase, batch_id, storage_path is not null as has_file, created_at
+from evidence where job_id = 'JOB-…' order by created_at desc limit 10;
+```
+
+Photo rows with a null `batch_id` are from before 20 Sep 2026 and are not backfilled, by the same reasoning as `DECISIONS.md` gives for never backfilling it: a filing is a filing, and inferring a group after the fact would overstate the record.
+
+**Trace attributes:** `yaadly.worker_update.outcome` reads `held_for_confirm_as_note` when it was taken as a note and `filed_as_note` once the 1 lands. Plain `held_for_confirm` and `filed` mean it was read as an ordinary standalone update.
 
 ## Proving the Twilio signature check without a real Twilio secret
 
@@ -4403,6 +4453,24 @@ names the pack it refused rather than failing the set anonymously.
 Voiding deletes nothing. The row stays, marked void, and a void pack can be set
 back to draft later.
 
+## Printing a sketch pack, or saving it as a PDF
+
+On the desk, Sketch packs: press **PDF** on the pack's row in the list, or open
+the pack and press **Open as PDF**. The document opens in a new tab with a Print
+button in the top corner. Press it, then choose Save as PDF as the destination.
+The button does not appear on the printout.
+
+If nothing opens, the browser blocked the tab: allow pop-ups for
+`concierge.yaadly.co.uk` and press it again. A draft prints with "Not yet
+approved" in the sign-off box, on purpose; approve it first if that copy is
+going to anybody.
+
+The page is built by the `render` action of `yaad-sketch`, which only reads. A
+change to its layout means redeploying that one function from disk, keeping
+its platform check (no `--no-verify-jwt`), and then the desk if the desk
+changed too. To see a layout change without the desk, feed an invented pack
+through `renderPack` and print it with headless Chrome (`--print-to-pdf`).
+
 ## A sketch pack or a report was refused for a measurement, and the sentence looks innocent
 
 The rule is in one place now: `supabase/functions/_shared/measurements.ts`.
@@ -4660,7 +4728,7 @@ All four counts must be zero. They were, on all 8 open jobs, after the fix.
 
 `20260905a` redefines `open_jobs` **without** `board_descr()`. Applying it alone silently reopens the identifier leak above, and `20260907090000` will not re-run to undo it because its name is already in production's migration history.
 
-**So: apply `20260905a`, then immediately re-apply `20260909150000` (which redefines `open_jobs` with `board_descr()` AND the `is_test` clause, and builds the first-refusal clause conditionally so it lands once `20260905a` is in), then run the check query above.** The same warning is on the `open_jobs` comment in the database, where somebody investigating that view will meet it. Before 9 September the instruction here was to re-apply `20260907090000`; that would now bring the identifier leak fix back and drop the test-row filter, so it is superseded.
+**So: apply `20260905a`, then immediately re-apply `20260909150000` (which redefines `open_jobs` with `board_descr()` AND the `is_test` clause, and builds the first-refusal clause conditionally so it lands once `20260905a` is in), then run the check query above.** **From 28 Sep 2026, once `20260929010000` is applied, re-apply it too, straight after `20260909150000`:** that one also redefines `open_jobs` and would otherwise take test jobs away from test workers again. It builds the first-refusal clause conditionally in the same way, so order is 05a, 0909, 0929010000. The same warning is on the `open_jobs` comment in the database, where somebody investigating that view will meet it. Before 9 September the instruction here was to re-apply `20260907090000`; that would now bring the identifier leak fix back and drop the test-row filter, so it is superseded.
 
 **`20260905b` is in the same state.** Found 9 September 2026 while applying `20260909150000`: production has no `worker_showcase` table, no `worker_profiles.showcase_consent` and no `public_worker_showcase` view. The desk's Workers view and `web/app/workers/[slug]` both read those, and fail soft. `20260909150000` skips the showcase view when the table is absent, so it is safe to apply either side of `20260905b`; if `20260905b` is applied later, re-apply `20260909150000` after it for the same reason as above.
 
@@ -4819,6 +4887,8 @@ Applied 9 September 2026 and all of the above checked true. If the migration too
 Since 9 September 2026 (`20260909150000`) the public board at app.yaadly.co.uk/jobs and the worker directory beside it leave out any row a person has marked as a test. The mark is `jobs.is_test` and `worker_profiles.is_test`, false by default, set only by a person from the desk, and every press is written to `agent_actions` with who pressed it. Nothing is deleted and nothing else about the row changes: the conversation, the evidence, the quotes and the money are untouched, and the desk still shows the row with a grey "test" chip.
 
 **To take a test row off the board:** desk, Jobs, open the row, "That was me testing". For a worker: desk, Workers, open the row, same button. It leaves the public page the moment it saves. The automatic Quote Kickoff Pack trigger (`yaad-quote-pack-check`) also stops drafting for a marked job; a pack for a test job is requested from the desk instead.
+
+**Testing the worker side on a test job (from 20260929010000, once applied).** A job marked as a test still shows on the board to one kind of viewer: a signed-in worker whose own profile is marked as a test and is active. So mark the job as a test first, then sign in as a test worker (the seeded ones, such as "Test Worker (Monique, SEED)", all carry the mark) and it is there to quote. Visitors and real workers still never see it. Before that migration a test job reached nobody, so the only way to test quoting was to leave the job unmarked and on the public board. To prove it after applying: run `supabase/tests/test_workers_see_test_jobs.sql` in the SQL editor; it reads 0, 0, 1 and rolls itself back.
 
 **To put a real one back:** same drawer, "This one is real". If the job is open for quotes with no worker chosen it is on the board again straight away; a worker comes back to the directory if they are active.
 
@@ -5548,13 +5618,15 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 1. **Switching it on, in this order.** Apply `20260916120000`. From `main`: `supabase/functions/sync-shared.sh`, then `supabase functions deploy yaad-payout-send --project-ref leffyisvfvjwzilydlwf` (platform JWT check stays ON, no flag), `supabase functions deploy yaad-payout-setup --project-ref leffyisvfvjwzilydlwf` (same), `supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` (on the CLAUDE.md §12 list). Then the web app, then the desk.
 2. **Check it is behind the login:** `curl -s -o /dev/null -w "%{http_code}\n" -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-payout-send` must answer 401.
 3. **Money in first.** Stripe pays out of Yaadly's Global Payouts financial account, not the card balance. Stripe Dashboard, Payouts (left menu), **Add money**, by Faster Payments from the business bank; free. Pay with Stripe refuses when the GBP available is short and says how much is needed.
-4. **Test mode first.** With the test key set, the worker sets up on Stripe's test form (test bank numbers on Stripe's Global Payouts testing page), you press Pay with Stripe, and the confirm box says "Test mode: no real money moves." Check `select invoice_id, status, livemode, debited_value, fx_rate from stripe_payouts order by created_at desc limit 5;`.
+4. **There is no full rehearsal, only a partial one (tried 19 to 20 Sep 2026).** The account's legacy "Test mode" key refuses Global Payouts outright ("Please switch to an account created in a sandbox"). The **Yaadly LTD** sandbox (`acct_1U43aOKRGtW3lkJK`) accepts recipients, and Stripe's Jamaican test account (routing 111, branch 00000, account 000123456789) takes a worker all the way to **ready**, but that sandbox has **no financial account**, the list comes back empty, and `POST /v2/money_management/financial_accounts` answers 404, so nothing can be sent from it. Stripe support would have to switch payouts on for that sandbox. Until then the first real payout is the proof: small, live, to a real worker. If you run the partial rehearsal, the live key and the payouts switch are shared with card payments, so while the sandbox key is set the portal's Pay by card and the emailed pay link take nothing. Put the live key back the same evening, and clear any sandbox `stripe_recipient_id` from `worker_profiles` afterwards, because a live key cannot read a sandbox recipient.
 5. **Going live** is `STRIPE_PAYOUTS_ALLOW_LIVE=yes` with the live key, your terminal only. The confirm box then says "THIS IS LIVE MONEY." The first live payout should be small.
 6. **"Stripe would not quote this payout"** with a Stripe code: read the code. `outbound_payment_quote_missing` or a 404 on quotes means Stripe's quote endpoint is gated on the account; the desk then shows the published fees labelled as an estimate and asks you to accept that. `recipient_feature_not_active`: the worker has not finished Stripe setup. `insufficient_funds`: step 3.
 7. **"The payout WENT OUT ... but could not be recorded"** or **"... but the invoice could not be marked paid".** Money has moved. Do not press again: the function's idempotency key returns the same payout for the same invoice, but do not rely on it. Note the Stripe id in the message. The `stripe_payouts` row exists in the second case, so **Mark as paid** by Stripe on the desk is refused only until the row is there; if it is, mark it by hand with method stripe and that id.
 8. **A payout shows failed or returned** (red on Pay workers, after **Check**). The invoice stays paid, by design: paid records are frozen. Read the reason (usually the bank rejected the account), open the payout in Stripe, Payouts, and decide: fix the worker's details with them and pay again from Wise, or send again through Stripe once they have updated Stripe. The money comes back to the financial account. Write a note on the job.
 9. **A worker says nothing has arrived.** Posted means it left Stripe; the worker's bank can take up to 7 business days. Press **Check**: the message carries the Trace ID for them to quote to their bank.
 10. **Proving the gates hold:** `supabase/tests/worker_pay_guards.sql` still passes (bank transfer unchanged), and a hand `select mark_worker_paid('<sent worker invoice>', 'stripe', 'obp_made_up')` must be refused with "No Stripe payout with id ... is recorded", because paid-by-Stripe can only follow a real payout.
+
+**Setting a Stripe key without mangling it.** Three attempts on 19 to 20 Sep went in wrong: the placeholder word typed literally twice, then a truncated paste ("malformed API Key" in the `yaad-payout-setup` logs). What worked: copy the key in Stripe, then `supabase secrets set --project-ref leffyisvfvjwzilydlwf STRIPE_SECRET_KEY="$(pbpaste | tr -d '[:space:]')"`. Check it took by pressing Set up with Stripe on the worker page and reading the function logs; a live key opens Stripe's real form on the live account.
 
 ## A worker cannot be paid because the client has not paid (20260917180000, 20260919160000)
 
@@ -5609,15 +5681,42 @@ Since 19 Sep 2026 a blocked row carries no payment controls at all. It says **Wa
 
 ## The section menu: "which is this?" as rows a worker taps, not letters
 
-**Two things must be set or the question goes out as text with the letters: the template id AND a Messaging Service.** (The Messaging Service half was found the hard way on 19 Sep 2026, see below.)
+**✅ SOLVED, 20 September 2026. The cause was a placeholder pasted out of this file. Read this before anything below it.**
+
+The `TWILIO_CONTENT_SID_PHASE` function secret was set on 15 September at 08:31 UTC to the literal five characters `HX...`, straight off the `supabase secrets set` line further down this page, which carried the placeholder. That secret wins over the `twilio_content_sid_phase` row on the desk, so **every section menu `yaad-inbound` tried to send for the next five days carried `HX...` as its ContentSid** and was refused by Twilio with 20422 Invalid Parameter, while the correct id sat on the desk unused the whole time.
+
+Proved rather than guessed, because two investigations had already gone past it:
+
+```bash
+supabase secrets list --project-ref leffyisvfvjwzilydlwf   # digest for TWILIO_CONTENT_SID_PHASE
+printf 'HX...' | shasum -a 256                             # the same digest, f46a9c1d…37990
+```
+
+The function log had been saying so since 19 September, in the last field, which nobody read as a value: `sendPhaseMenu: Twilio refused the template: HTTP 400 | Twilio code 20422 | Invalid Parameter | … | ContentSid HX...`
+
+**The fix was to remove the secret**, after which the desk row is read and the menu sends. Nothing was redeployed for that; both are read on every request.
+
+```bash
+supabase secrets unset TWILIO_CONTENT_SID_PHASE --project-ref leffyisvfvjwzilydlwf
+```
+
+**And so it cannot happen again:** `askPhase` now runs both candidates through `firstTemplateSid()`, which takes the first value shaped like a real ContentSid (`HX` and thirty-two hex digits) rather than the first value that is set. That second half is the part that matters: a shape check alone would still have let junk in the secret hide the good id on the desk. `yaad-twilio-setup` had this check from the day it was written; `yaad-inbound` did not. Held by two tests in `asking_test.ts`.
+
+**What this also means:** the Messaging Service work of 19 September was never proven to be the cause and still is not. It stays because Twilio's documentation asks for it. It is not what was wrong.
+
+**Two things must be set or the question goes out as text: the template id AND a Messaging Service.** (The Messaging Service half was found the hard way on 19 Sep 2026, see below.)
 
 **Until `TWILIO_CONTENT_SID_PHASE` is set, the question goes out as text with the letters, exactly as before.** Founder, 15 Sep 2026: "the letters would be confusing and not clear", she wants separate words they can click. `askPhase()` in `yaad-inbound` is now the one place the question is asked: on WhatsApp it first tries `sendPhaseMenu()`, which sends a Twilio Content Template through the Messages API and answers the webhook with an empty response; if the secret is missing or Twilio refuses, it sends the typed question instead. The menu is an upgrade, never a gap.
+
+**The typed fallback asks for words, not letters (20 Sep 2026).** Founder, 15 Sep: "the letters would be confusing and not clear". Again on 20 Sep, having had them for five days while the menu was being refused: "the letter needs to go". It now reads *"Which is this? Reply Before, During, After, Problem for something wrong with the work, or New for something you found that was not in the job. Reply Skip to skip."* **The letters are still accepted**, by `readPhaseAnswer()`, because the menu's own row ids are the letters and a worker who learnt them should not be told they are wrong. They are only no longer what anybody is asked for. The pair hint changed with it, from `like "A P3"` to `like "After P3"`; both still parse.
+
+**The fallback is still a question, and must stay one.** It is tempting to send nothing once the menu works. Do not. By the time this runs the session already has `awaiting_phase` set, so the next thing the worker types is read as their section answer. A worker asked nothing says something else, and the evidence files unmarked with nobody the wiser, which is the failure this whole question exists to prevent. Held by a test.
 
 **Why a list and not buttons.** WhatsApp allows three Quick Reply buttons per message. This question has six answers. A List Picker shows one button ("Choose") that opens up to ten rows.
 
 **Why no Meta approval is needed here, unlike the daily check-in.** A worker has just sent a photo, so Yaadly is inside the 24 hour customer-service window and a Content Template can be sent without approval. The template still has to exist in Twilio.
 
-**Switched on 15 September 2026, from the server, not the console.** The Twilio key is a function secret nobody can read back, so `yaad-twilio-setup` creates the template from `supabase/functions/yaad-twilio-setup/content.ts` (the six rows, tested) and writes its ContentSid to `app_settings.twilio_content_sid_phase`, which `yaad-inbound` reads whenever the `TWILIO_CONTENT_SID_PHASE` secret is unset. Live template: `yaadly_section_menu_v1`, created that day, visible on the desk under Settings as `twilio_content_sid_phase`. To recreate it after a Twilio account change, run the function once with the cron secret (the same way the scheduled jobs present it) or from an admin session, `{"action":"create-section-menu"}`; it reuses an existing template of that name rather than making a second. `{"action":"list"}` shows every template on the account. **Blanking the `twilio_content_sid_phase` row on the desk turns the menu off** and the typed letters go out again; that is the switch.
+**Switched on 15 September 2026, from the server, not the console.** The Twilio key is a function secret nobody can read back, so `yaad-twilio-setup` creates the template from `supabase/functions/yaad-twilio-setup/content.ts` (the six rows, tested) and writes its ContentSid to `app_settings.twilio_content_sid_phase`, which `yaad-inbound` reads whenever the `TWILIO_CONTENT_SID_PHASE` secret is unset. Live template: `yaadly_section_menu_v1`, created that day, visible on the desk under Settings as `twilio_content_sid_phase`. To recreate it after a Twilio account change, run the function once with the cron secret (the same way the scheduled jobs present it) or from an admin session, `{"action":"create-section-menu"}`; it reuses an existing template of that name rather than making a second. `{"action":"list"}` shows every template on the account. **Blanking the `twilio_content_sid_phase` row on the desk turns the menu off** and the typed question goes out again; that is the switch. Since 20 Sep 2026 that typed question offers the words, not the letters.
 
 **Doing it by hand instead, in the Twilio console:** Messaging, Content Template Builder (Products and Services, then Templates, on the newer console), **Create new template**:
 
@@ -5643,11 +5742,14 @@ The six rows, in this order. **The Item ID column is the whole point: it must be
 
 Save. **Do not try to submit it for WhatsApp approval: a list picker cannot be approved, ever.** Twilio answers a submission with "Richest content type on template, twilio/list-picker, is not eligible for WhatsApp approval" (tried 19 Sep 2026, on the founder's instruction). Twilio's own documentation says the same: a list picker works on WhatsApp only, only inside a 24 hour session the worker opened, and can never start one. That is fine for this question, which is only ever asked after a worker has just sent a photo. This paragraph used to say submitting it as Utility cost nothing and would let it go out later outside the window; both halves were wrong. Copy its ContentSid (`HX...`) and either paste it into the `twilio_content_sid_phase` setting on the desk, or set it as a secret, which wins over the setting:
 
+⚠️ **Paste the real `HX…` id into the command below. Do not run it as written.** The line here used to end `=HX...`, somebody ran it exactly like that on 15 September 2026, and that placeholder went out as the ContentSid on every section menu for five days. See the SOLVED entry at the top of this section. Since 20 September `askPhase` checks the shape and ignores anything that is not a real id, so the same paste now leaves the menu working off the desk row instead of breaking it, but do not lean on that.
+
 ```bash
-supabase secrets set TWILIO_CONTENT_SID_PHASE=HX... --project-ref leffyisvfvjwzilydlwf
+# replace HXxxxx… with the ContentSid you copied. This command is not runnable as it stands.
+supabase secrets set TWILIO_CONTENT_SID_PHASE=HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx --project-ref leffyisvfvjwzilydlwf
 ```
 
-No redeploy needed; both are read on every request.
+The desk row is the easier of the two and needs no command at all. No redeploy either way; both are read on every request.
 
 **The job question asks for 1, not the code (19 Sep 2026).** With exactly one job on offer the message reads "Reply 1 to confirm it is that job, or tell us the right job." The ordinal was always accepted there, `pickJobChoice` has taken one inside an evidence session since 31 August; the message simply never said so. The full code still works for anyone who sends it, and so does a yes that points at the job ("yes for that job", "yes that one", "correct"), though a bare "yes" deliberately does not. **With more than one job the code is still the only thing asked for**, and the client approval reply (`matchApprovingJob`) is still code only and untouched, because that one releases money. The copy says confirm and never approve: approving is a named human deciding about money or a stage, and the two words must not blur in front of a worker.
 
@@ -5655,7 +5757,7 @@ No redeploy needed; both are read on every request.
 
 **If the menu never appears:** the function log line `sendPhaseMenu: Twilio refused the template:` carries Twilio's reason. Since 19 Sep 2026 it carries the HTTP status, Twilio's numbered error code, its message, its help link and the ContentSid that was tried; before that it carried the sentence alone, which is how four days went by on "Invalid Parameter" with nothing to look up. The typed question still went, so nothing was lost.
 
-**It has never yet sent, and here is where that stands (19 Sep 2026).** The founder filed a photo that morning and got the letters. At 09:33:16 UTC `yaad-inbound` logged `Twilio refused the template: Invalid Parameter` and fell back, exactly as designed. `message_deliveries` has no row of kind `section menu`, ever, so no section menu has been accepted by Twilio since the day it was switched on. What has been ruled out, by reading Twilio's own copy of the template back (`{"action":"describe-section-menu"}`, read only, added the same day): the ContentSid is right and matches the row on the desk, the template exists on the account (`yaadly_section_menu_v1`, created 15 Sep 08:36 UTC), its type is `twilio/list-picker`, its body takes exactly one variable, and all six row ids are the bare letters. So it is none of the three usual causes above. **The worker update template is approved and switched on (19 Sep 2026).** Meta approved `yaadly_worker_job_update_v1`, and `{"action":"worker-update-status"}` wrote `twilio_content_sid_worker_update`, which is the setting `yaad-notify-client` reads. Until 19 September the job notices sent to a worker who had not messaged in 24 hours were refused by Twilio with **63016**, outside the messaging window: on 19 September alone both "stage released" and "materials sent" failed that way. On its own the approval would have turned a 63016 into a 20422, because the template send had the Messaging Service fault below. Both were fixed the same afternoon, in that order.
+**Superseded by the SOLVED entry at the top of this section. It was the placeholder secret. Kept because the ruling out below is still sound and saved repeating it. It has never yet sent, and here is where that stands (19 Sep 2026).** The founder filed a photo that morning and got the letters. At 09:33:16 UTC `yaad-inbound` logged `Twilio refused the template: Invalid Parameter` and fell back, exactly as designed. `message_deliveries` has no row of kind `section menu`, ever, so no section menu has been accepted by Twilio since the day it was switched on. What has been ruled out, by reading Twilio's own copy of the template back (`{"action":"describe-section-menu"}`, read only, added the same day): the ContentSid is right and matches the row on the desk, the template exists on the account (`yaadly_section_menu_v1`, created 15 Sep 08:36 UTC), its type is `twilio/list-picker`, its body takes exactly one variable, and all six row ids are the bare letters. So it is none of the three usual causes above. **The worker update template is approved and switched on (19 Sep 2026).** Meta approved `yaadly_worker_job_update_v1`, and `{"action":"worker-update-status"}` wrote `twilio_content_sid_worker_update`, which is the setting `yaad-notify-client` reads. Until 19 September the job notices sent to a worker who had not messaged in 24 hours were refused by Twilio with **63016**, outside the messaging window: on 19 September alone both "stage released" and "materials sent" failed that way. On its own the approval would have turned a 63016 into a 20422, because the template send had the Messaging Service fault below. Both were fixed the same afternoon, in that order.
 
 **⚠️ CORRECTION, 19 Sep 2026, 14:01. The Messaging Service is NOT proven to be the cause. Read this before trusting the paragraph under it.** The menu now sends: `{"action":"test-send-section-menu"}` returned HTTP 201 and the message was delivered. But that probe sends `To`, `From`, `ContentSid` and `StatusCallback` and **no MessagingServiceSid** (Twilio's own response confirms `messaging_service_sid: null`), which is byte for byte the request that was refused with 20422 at 13:42:32 the same day. The same request now succeeds. So whatever changed was on Twilio's or Meta's side, not in the request, and the Messaging Service fix cannot be credited with it.
 
@@ -5834,3 +5936,364 @@ the answer is not to chop the statement into smaller pieces until it slips
 through. Write it to a file and run it from the Supabase SQL editor instead.
 Splitting it would also break the one property worth having, that a failure
 part way through rolls everything back.
+
+## The card buttons on the professional services, and whose account they pay (23 Sep 2026)
+
+**Done the same day.** The eight links below were built in HER account
+(`acct_1UIPus2B5v0diTai`, "Yaadly Founder", live mode) and are in
+`docs/services.html`. What follows is the history and what is still open, so
+that the next person reading this knows why the map was ever empty.
+
+The old Yaadly Ltd links were deactivated the same day, all eight, each with
+an inactive message pointing at yaadly.co.uk/services. Verified after: that
+account has no active payment links and no subscriptions at all, so nobody
+was left mid-billing on the old retainer. The second company account
+(`acct_1UGGbRS1wkpxla5u`) has none either.
+
+Her account's public business name reads "Yaadly Founder" and she is keeping
+it, so a card statement shows that rather than her own name. Rather than let
+the site promise something else, four places now name it in advance: the
+services note, the booking confirmation, the payments anti fraud block and
+the terms payee line. If the Stripe name is ever changed, those four have to
+change with it.
+
+### The history
+
+The eight links in `PAYMENT_LINKS` in `docs/services.html` were emptied on
+23 September 2026 because they paid Yaadly Ltd for services the site now says
+the founder sells. Nothing else was touched: with the map empty, a booking
+tells the client the scope and price are confirmed in writing and an invoice
+follows, which is the path the page already had.
+
+**A link is not finished when it takes money.** Each of the eight also
+collects, at checkout, the two things the old Yaadly Ltd links collected and
+that a plain new link does not:
+
+- a required tick accepting the 14 day cancellation terms, with the wording
+  shown on the page rather than only linked, and
+- a dropdown, "When should we start?", offering start now or wait the full
+  14 days.
+
+That dropdown is the client's express request to begin inside the
+cancellation period. It is what allows a proportionate charge for work
+already done if they cancel part way, and `docs/cancellation.html` is written
+on the assumption that it was asked. The links were built without it on
+23 Sep 2026 and it was added the same day. Any link rebuilt from scratch has
+to carry both, or the cancellation page is describing a consent nobody gave.
+
+How it was put back, and the order to repeat if it ever has to be done again:
+
+1. Her own Stripe account is activated, not just created. Identity, address and
+   a bank account for payouts, in her name, not the company's.
+2. Make eight payment links in THAT account: deposit £149, visual £95,
+   condition £249, signoff £245, care £45, care-large £70, care-villa £95, all
+   seven as a hold (manual capture), and retainer £495 a month as a monthly
+   subscription. The seven holds must stay under £500 or the hold is not
+   allowed at all, which is why the weekly retainer never gets a link.
+3. Paste them into `PAYMENT_LINKS`, keeping those exact keys, and restore the
+   two sentences the same commit changed, on `docs/services.html` (the booking
+   panel and the How you pay note) and on `docs/payments.html`.
+4. Deactivate the old Yaadly Ltd links in the company's Stripe account, or a
+   client with an old email still pays the wrong payee. The old URLs are in
+   git history and must never be pasted back.
+
+Check it the same way each time: book a service on the live site and read what
+the confirmation says. No button means the map is empty. A button means the
+receipt has to say her name, so click it and look.
+
+
+## The logo: where the master is, and how to remake the sizes (25 Sep 2026)
+
+The mark in the top left of every page on `yaadly.co.uk`, and the tab icon,
+used to be a rounded purple tile with the letter Y set in it, written inline
+into all twelve pages as a `data:` URI. It is now Monique's real logo.
+
+The master is `brand/yaadly-logo-master.png`, 832 by 832, transparent, exactly
+as she supplied it. It is outside `docs/` on purpose, so GitHub Pages does not
+publish a 117KB file nobody asked for. Everything served is generated from it.
+
+What is served, and why each size:
+
+| File | Size | What it is for |
+|---|---|---|
+| `docs/logo-v1.png` | 160px | The header mark. Drawn at 30px, so this covers a 5x screen. |
+| `docs/favicon-v1.png` | 48px | The browser tab. |
+| `docs/apple-touch-icon-v1.png` | 180px | Saved to a phone home screen. Flattened onto `#0D0D28`, because iOS puts black behind a transparent icon. |
+
+To remake them, crop the master to the mark first, then resample:
+
+1. Crop `brand/yaadly-logo-master.png` to the alpha bounding box, which is
+   x 140 to 705, y 127 to 692, then pad it back out to a 600 by 600 square
+   centred on that, so the mark keeps a small even margin.
+2. `sips -z 160 160 <that file> --out docs/logo-v2.png`
+3. `sips -z 48 48 <that file> --out docs/favicon-v2.png`
+4. For the touch icon, flatten the 600px file onto `#0D0D28` so nothing is
+   transparent, then `sips -z 180 180 <flattened> --out docs/apple-touch-icon-v2.png`.
+
+Two things to know before you touch any of it:
+
+- The master has about 130px of transparent border on each side. The served
+  logo was trimmed to the mark before resizing, so it fills its 30px box. Resizing
+  the master straight to 160px gives a mark that looks about a third too small
+  in the header, and the fix is to crop to the alpha bounding box first, not to
+  make the CSS box bigger.
+- There is one CSS rule, `.site-nav .brand .mark` in `docs/nav.css`, and one
+  line of markup repeated on all twelve pages. Change the header mark there,
+  not on a page. The rule deliberately sets no background and no border radius:
+  the logo is already a roundel and a rounded square behind it puts a box round
+  a circle.
+
+**The filenames carry a version number, and that is the whole point.** The
+site sits behind Cloudflare, which caches an asset for four hours, and it
+caches a 404 for four hours too. On 25 Sep 2026 these three files were first
+published as `logo.png`, `favicon.png` and `apple-touch-icon.png`, and they
+were requested once while the Pages build was still running. Cloudflare cached
+the 404 it got, and went on serving that 404 from the London edge after the
+real files existed at origin. The stored Cloudflare token has no `cache_purge`
+scope, so there was no way to clear it from here.
+
+So: **never replace one of these files in place. Add a new one.** Bump to
+`logo-v2.png`, repoint the twelve pages at it, and delete the old file in the
+same commit. A name Cloudflare has never seen cannot be serving a stale
+anything. Purging from the Cloudflare dashboard also works if you would rather
+keep the name, and it is under Caching, Configuration, Purge Everything.
+
+Check it by serving the site and looking at the top left:
+
+```bash
+python3 -m http.server 8932 --directory docs
+```
+
+`curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8932/logo-v1.png`
+must say 200. A 404 there is a header with a broken image icon in it on every
+page.
+
+On the live site, **do not request a new asset URL until the Pages build says
+`built`**, or you teach Cloudflare a 404 that outlives the mistake by four
+hours. `gh api repos/MoniqueSSB/yaad-trust-engine/pages/builds/latest --jq
+'.status'` is the thing to wait on.
+
+## 30. A client needs the document for a report, or a report will not issue because of a figure
+
+**The document.** Nothing in the database is the deliverable. The desk's **Open the document** builds it, and `scripts/render-report.mjs` builds the same thing on a laptop with no desk: it lifts the renderer out of `concierge/concierge.html` rather than keeping a copy, so the two cannot drift. It takes one JSON file holding the rows exactly as they are in Postgres, `{ "report": <reports row>, "findings": [<report_findings rows>] }`, and writes the HTML and, through headless Chrome, the PDF. It holds no model call on purpose. `scripts/report-example.json` is a worked example with invented data and every section filled. If the script says it could not find a piece of the desk, the renderer was renamed; update `PIECES` at the top of the script.
+
+```bash
+node scripts/render-report.mjs scripts/report-example.json --out ~/Desktop
+```
+
+`--no-pdf` stops at the HTML. If Chrome is missing the script says so and leaves the HTML, which prints to PDF from any browser. The header with the logo repeats on every page because it sits in a table `thead`, which Chrome repeats across page breaks; a `position: fixed` header overlaps page two onwards, which is why it is not one.
+
+**"A drafted finding on this report states a figure."** The issue gate is refusing because a finding still carries a sum of money or a grouped number (`has_figure()`, 20260925220000). Drafts made before 25 September 2026 can carry one, because the figure scrubber did not exist. Draft it again from the desk and the scrubber takes the figure out and lists it under "Measurements pulled". Do not edit the finding by hand to slip the number through: if the number belongs in the document, put it in the verdict, where it is your judgment and not the agent's.
+
+**Percentages are not figures.** "60 percent up front" passes the gate and is meant to. The shape of an arrangement is what the client needs told.
+
+## 31. Making a Deposit Protection Check, start to finish
+
+Desk, **Reports**. Service: Deposit Protection Check. Client name and property as they should read on the cover.
+
+1. **Attach the files.** The quote (a photo of the handwritten page, or a PDF), any receipt, screenshots of the messages, the site photographs. Up to eight images in one read; a PDF counts one per page. Press **Read the files**. The reader transcribes each document word for word and captions each photograph, then drops it into the notes box under a heading. The images go to Mistral in the EU (`pickVisionProvider("report")`), the same place as job photographs. Nothing is saved at this step.
+2. **Read the transcript and correct it.** This is the hold point, and it is the reason the reader and the drafter are two buttons and not one. A model reading handwriting gets a digit wrong, and a wrong digit in the notes becomes a wrong finding with a straight face. Add your own notes above or below it: who the client is, what you could and could not confirm about the contractor, and **when the next payment is due to move**, which is the line the agent cannot know unless you write it.
+3. **Draft the findings.** The agent returns the red flags with a why and a source on each, the quote line numbers each one rests on, the page one summary, the documents received, what you checked, when the next payment is asked for, the documents to get before paying, the next steps, what the builder proposed on each of the 11 payment terms (what to agree instead is the house standard, not the agent's), the scope in and out, the payment stages (never a share), the message to the builder, the checklist states against the fixed 25 lines, the referrals by profession and the omissions. Every sentence is screened for measurements, figures, rating words and banned language before it is saved. The transcript is kept on the report as `source_text`, unscreened, as the record of what the documents said.
+4. **Rate every finding** (Severe, Moderate, Low) and **Write the verdict**. Nothing drafts either. The database refuses to issue until both are done.
+5. **Issue it.** Mints the number. Refused while a finding is unrated, the verdict is empty, or a drafted sentence states a measurement or a figure.
+6. **Read it on the desk first.** Click the row and the report opens as a page: verdict, every finding with its rating, the payment stages, the message, the checklist, scope, referrals, what was scrubbed, and the transcript under a fold. The actions sit at the foot of that page. Teal is done, mango is yours to do, coral is a gap in the paperwork.
+7. **Open the document.** Builds the full report in a new tab: cover with the logo, header on every page, verdict, red flags, payment schedule, message to the builder, checklist, scope in and out, the variation rule, referrals. Press **Print** in the top right and choose **Save as PDF**. Before issue it opens with the blanks showing, which is useful for reading it whole before you rate.
+
+**A section in the document is a dashed box saying "Not drafted on this report".** The report was drafted before that section existed (anything drafted before 28 September 2026 has no payment terms, next steps, documents list or quote mark up). Draft it again: Read the files, correct the transcript, Draft. The old draft stays in the list; it is not deleted.
+
+**"No quote transcript on this report".** The quote is reproduced only when it went through Read the files, and the reader labelled it `DOCUMENT n (quote)`. If the reader called it `other`, edit that label in the notes box to `(quote)` before drafting.
+
+**Changing the payment terms standard or the checklist.** Both are fixed lists in `supabase/functions/yaad-report/index.ts` (`PAYMENT_TERMS`, `DEPOSIT_CHECKLIST`), each checked against the numbered list in the deposit brief when the function loads, so change both together or the deploy fails at start. Redeploy `yaad-report` from disk afterwards. Reports already drafted keep the wording they were drafted with.
+
+**"The browser blocked the new tab."** Allow pop-ups for `concierge.yaadly.co.uk` once. The document opens with `window.open`, and the first time a browser sees that from a site it asks.
+
+**Reading a PDF does nothing.** pdf.js is fetched on first use from `cdn.jsdelivr.net`, the CDN the desk already loads supabase-js from. If the browser console shows it blocked, the desk's script sources have been tightened since 25 September 2026 and jsdelivr needs re-allowing; a photograph of each page works in the meantime.
+
+**The reader misread a figure.** Correct it in the notes box before drafting. If the draft was already made, draft again from corrected notes: the quote reproduced in the document and the transcript in the appendix are the record of what the documents said and are deliberately not editable line by line.
+
+**Correcting one line of a drafted report.** Open the report on the desk and press **Edit** beside the line (a red flag, a payment term, a stage, the builder message, a checklist line, the scope, a referral, the page one summary, a document). The form opens prefilled; change it and press Save the change. **Add a stage**, **Add a step** and the other Add links put a new line at the end of a list. To remove a line, empty the first box and save. Every change is checked like a draft, then written by `edit_report()` (20260928190000) and logged in `report_edits`; the foot of the report page lists each one with what it said before, so the agent's wording is never lost. The rating and the verdict keep their own buttons. Refusals, and what they mean: "states a sum of money" (put a figure in the verdict instead), "states a measurement", "Yaadly does not use that wording" (the banned list, checked by `yaad-report` in screen mode, no model call), "This report is issued" (an issued report cannot change), "house standard and fixed in length" (payment terms and checklist lines can be reworded, not added or removed). "The wording could not be checked" means `yaad-report` did not answer: nothing was saved, try again.
+
+**A finding reads "[figure removed]".** The agent repeated a sum out of the notes and the scrubber took it out. The finding still reads; if the number belongs in the document, put it in the verdict, which is yours.
+
+**The document has no logo.** The logo is embedded in the desk as a small data URI (`RPT_LOGO` in `concierge.html`), made with `sips -Z 160 brand/yaadly-logo-master.png`. It was a link to the marketing site until 28 September 2026 and never once displayed, because the desk's Content-Security-Policy allows images from the desk itself, `data:` and `blob:` only. Anything the desk or the document loads from another host must be on the list in `concierge-deploy/src/index.ts` or it is refused silently.
+
+**The desk looks the same after a deploy.** A tab opened before the deploy keeps running the old page. Reload it. You are on the current desk if Reports shows a file chooser labelled "The quote, receipts, messages and photographs".
+
+**Testing the desk under its real policy.** Access answers every outside request, so the policy cannot be observed from the internet, and a plain local preview does not apply it. Serve a copy of `concierge.html` locally with the same `Content-Security-Policy` header the worker sets and test there. On 28 September that showed the photo path and the PDF path both working under the policy and the logo link blocked.
+
+## 32. An invoice preview or a Completion Report will not come out as a PDF (28 Sep 2026)
+
+1. **The invoice email and its PDF.** Since 28 Sep 2026 every invoice emailed from the desk carries `<invoice>.pdf`, drawn by `yaad-invoice` (`pdf.ts`). If Send says "The PDF of ... could not be made", nothing was emailed and the invoice is still a draft: read the reason, fix the line it names, send again. The desk's Preview of a whole invoice is that same file. A draft shows DRAFT on it; the emailed copy says SENT and carries the pay link. Changing the invoice's wording means changing `renderInvoice()` and `pdf.ts` together, then redeploying `yaad-invoice` from disk with its platform check kept (no `--no-verify-jwt`).
+   The VAT line is blank on purpose since 28 Sep 2026 (`app_settings.invoice_vat_status` is empty, migration 20260928140000). Whatever is typed in that setting prints on the VAT line and at the start of the company sentence, in the email and the PDF. Apply that migration only after this `yaad-invoice` is deployed, or the live footer starts with a stray full stop.
+2. **Desk, a highlighted part.** Under "What the client sees" the box says "Making the PDF..." for a second, then shows the PDF. If it says "The PDF could not be made (...)", the web page version is shown instead so the invoice can still be read. Most likely cause: jsdelivr was blocked or the file there changed, and the integrity hash refused it. Check the browser console. The pinned address and hash are `H2P_SRC` and `H2P_SRI` in `concierge/concierge.html`; change them only together, and copy the desk into `concierge-deploy/public/index.html` before deploying.
+3. **Portal, Completion Report.** Download PDF saves `Completion Report <job>.pdf`. If it fails, the page says so and opens the print dialog; choose Save as PDF. The light colours for both come from `html.pdf-render` and `@media print` in `web/app/globals.css`.
+4. **Checking the desk under its real policy.** Serve a copy with the same `Content-Security-Policy` header the desk worker sets (see 31 above), press Preview, and confirm the box shows a PDF, not a web page.
+
+## 33. "Pay the worker" on a pay invoice is greyed out (28 Sep 2026)
+
+1. Open the pay invoice on Invoices. Under the buttons it now says either "The client has paid for this work", or "Not payable yet" with the database's own reason and a button to open the client's bill that is holding it up.
+2. The rule behind it is `worker_pay_client_unpaid()`: a worker is paid only once the client's money for that work is marked paid. Any client bill on the job that is still a draft or sent and unpaid blocks it, including the unsent balance of a bill that was split into parts. Send and collect that bill, or void it if it should never go, then come back. Do not change the function to get one payment through: that is a decision about releasing money, and it is Monique's.
+3. When it can be paid, **Pay the worker** opens Pay workers with a card for that invoice at the top, offering only the way the worker asked to be paid: **Pay with Stripe** if they set up a Stripe payout account, **Pay by Wise** if they gave bank details in Wise from the portal, and Wise with "take them by phone" if they gave nothing. If nobody has phoned them to check their bank details yet, the card says so first, with **Call-back done**.
+4. On Pay workers, a row waiting on the client has a button that opens the client's bill holding it up (for example **Open INV-2026-0024**). It used to open the job's invoice list, whose Pay the worker came straight back to Pay workers, round and round.
+
+## 34. A Completion Report: it runs on its own, and when to step in (28 Sep 2026)
+
+It is the worker's document. Nothing on the desk edits it. When a job
+completes, the report opens for the worker with drafted care notes and they
+get a WhatsApp link; when they sign, an automatic check sends it to the client
+or holds it for you. Desk: **Documents & money, Completion reports**. The
+picture at the top counts only the ones that need you.
+
+**Red, "did not start".** The job completed but nothing opened. Press **Start
+it now**. Most likely `yaad-completion-flow` was not deployed, or the call from
+the trigger failed; `net._http_response` has the answer.
+
+**Red, "held for you".** The check found money or a banned word in what the
+worker signed; the row says which. Open the report and read it. If it is fine
+as it stands, **Release it unchanged** (your name goes on it as the person who
+released it). If the words need to change, **Send it back to the worker** with
+your reason. They get a new link automatically; the old one stops working.
+
+**Amber, "signed, checking" for more than a few minutes.** The check did not
+come back. **Screen it again**.
+
+**Red, "worker raised an issue".** The worker pressed Raise an issue instead of
+signing; the row shows what they said. It is not signed, so it cannot be
+released. **Send it back to the worker** with your answer as the reason. If
+the worker cannot open the link, it may be locked after ten wrong tries:
+sending it back makes a new link and unlocks it.
+
+**How the worker signs, changes or raises.** Buttons. On WhatsApp: Sign the
+report, Change my words (their next message becomes their account, unsigned),
+Raise an issue (their next message is the issue). From the link
+`app.yaadly.co.uk/report/<job>?code=<code>`, no login: Sign, Save my changes,
+Raise an issue. The template is `yaadly_sign_completion_report_v2`, made by
+`yaad-twilio-setup` action `create-sign-report`. If the
+button never appears, the template is not recorded: run `yaad-twilio-setup`
+with action `create-sign-report` (admin token or cron secret), which writes
+`app_settings.twilio_content_sid_sign_report`. Outside 24 hours of their last
+message WhatsApp drops the button; the link still works.
+
+**Nothing on the report or in the worker's messages carries a staff name.**
+The desk asks for your name for Yaadly's own record; it prints as "Yaadly".
+
+**Amber, "with the worker" and they say they never got it.** WhatsApp refuses
+outside 24 hours of their last message and falls back to the worker template,
+which carries the signing link. If that failed too, **Send the worker the link
+again** by email or from your own phone. The link must carry `?code=`.
+
+**The client raised a dispute on the report.** It is an ordinary dispute: the
+worker hears first and you are alerted. If the report must change, **Send it
+back to the worker**; the client stops seeing it until the worker signs again
+and it passes the check.
+
+**Deploying.** `yaad-completion-flow`, `yaad-notify-client` and `yaad-inbound`
+WITH `--no-verify-jwt`, as each runs; `yaad-twilio-setup` WITHOUT it. All from
+disk, after `supabase/functions/sync-shared.sh`.
+
+**Checking the rules still hold:** `supabase/tests/completion_report_guards.sql`,
+35 checks. Run it inside `begin; ... rollback;` with
+`supabase db query --linked --project-ref leffyisvfvjwzilydlwf -f <file>`. It
+switches the user triggers on jobs, completion_reports and disputes off for
+its own run, so nothing is messaged, which is why it must be inside a
+transaction.
+
+## 35. Finding what a worker is owed, and Yaadly's 5% (28 Sep 2026)
+
+1. **Invoices, Worker pay.** Every worker's pay invoice, grouped under its job, with what is owed and what is paid on that job. Jobs with money owed come first. The summary at the top counts real jobs only; your own tests are listed underneath and counted in none of the figures. **Pay the worker** on a row opens Pay workers on that invoice, with the way the worker asked to be paid.
+2. **Invoices, Worker fees.** Yaadly's 5% from each tradesperson, job by job. It is kept out of their pay, so it is never an invoice of its own. The figure is worked out from the accepted quote at today's rate, not read from an invoice. **Agency fees** now holds only the client side: the 15% and services.
+3. **The fee on a pay invoice.** Since 28 Sep 2026 each pay invoice records the quoted labour and Yaadly's worker fee as it is raised (`worker_labour_jmd`, `worker_fee_jmd`, migration 20260928230000), and the invoice, its PDF, the desk and the worker's portal show: quoted labour, less the fee, is the agreed rate. Pay raised before that has no figures and shows no breakdown, on purpose: the fee cannot be worked back exactly from the rate, and before 9 Sep 2026 it was 12%.
+
+## 36. The blank report templates: changing one, or the desk cannot load them (28 Sep 2026)
+
+1. Change the wording in `scripts/report-templates/services/<service>.js`. Never edit the PDF or Word file itself; the next build overwrites it.
+2. `cd scripts/report-templates && npm ci && node build.js` (add `--hub "<the YaadlyHub Report Templates folder>"` to refresh Monique's copies). It needs Google Chrome for the PDFs.
+3. If it stops with a list of problems, the gate is working: a template stated a measurement, used banned language or carried a dash. Reword it. Do not loosen `gate.js`.
+4. `cp concierge/concierge.html concierge-deploy/public/index.html` if the desk changed, then deploy the desk as usual. The templates travel in `concierge-deploy/public/templates`.
+5. "Could not load the templates" on the desk means `templates/index.json` was not deployed with the desk. Check `concierge-deploy/public/templates` has it, then redeploy.
+6. The Deposit Protection Check template's checklist and payment terms are a copy of `DEPOSIT_CHECKLIST` and `PAYMENT_TERMS` in `yaad-report`. Change one, change the other.
+
+## 37. A quote pack draft: reading it, correcting it, printing it (28 Sep 2026)
+
+1. **Where.** Desk, Documents & money, Quote Pack Drafts. Open a row: the track at the top shows where it stands, and the gold or red timer is how long a job has been unquotable because of it.
+2. **A flagged draft.** Press **Correct the wording**. The flagged words are listed at the top and every box still holding one is outlined in red. Fix those, check the stage total reads 100%, then **Save and check again**. It saves and re-checks; **Approve** is still a separate press.
+3. **The PDF.** **Open the pack as a PDF** opens a new tab. Press Print, then choose Save as PDF. If nothing opens, allow pop-ups for `concierge.yaadly.co.uk` once.
+
+## 38. Extra work on a booked job: add-ons (28 Sep 2026)
+
+1. **Deploy order matters.** Apply migration `20260928235000_add_on_work_on_a_booked_job.sql` first, then deploy the app, then the desk. The job page reads the add-on tables on their own, so an app deployed first shows an empty Extra work tab rather than breaking, but nothing works until the migration is in. Afterwards run `supabase/tests/job_addons_guards.sql`; every line should read PASS.
+2. **Where it lives.** The client and the booked worker use the **Extra work** tab on the job page. The desk uses **Add-ons** under Documents & money. The add-on's invoices appear on **Invoices** like any other, labelled "Add-on" (or "Add-on, first half" / "second half").
+3. **A client says they cannot add work.** The database only allows it while the job is under way (status in progress or evidence). Before the Guarantee & Support bill is paid it says "once the job has started"; on a complete job it says to post a new job. Both are correct.
+4. **Agreed, but no invoice to send.** Agreeing drafts the invoice on Invoices as a draft; look for period label "Add-on". Send it and mark it paid as usual. The worker cannot file photos on the add-on until it is marked paid.
+5. **Sign off is refused.** It needs the add-on's invoice marked paid and at least one photo filed on the add-on. The reason is shown as the database wrote it. Signing off raises the worker's pay (amount less 5%) on Pay workers and, on half-and-half terms, drafts the second invoice.
+6. **A job will not complete.** Open Add-ons and filter by the job. Any add-on waiting on a side, or agreed and not signed off, holds it. The side it waits on can turn it down, the other side can withdraw it, or sign it off once the work is done. Completion then follows on its own.
+7. **Who is told what.** The worker is told when the client writes or changes an add-on, and when its invoice is paid (they may start). The client is told when the worker changes it, with the PDF attached and a CONFIRM code. Both are told when it is agreed; the other side is told when it is turned down or withdrawn. A message that finds the add-on has moved on sends nothing, on purpose.
+8. **"CONFIRM ABC123" did not work.** The reply is refused unless it comes from the client's phone on the job, and the code is the latest one (every change makes a new code). The refusal is sent back to them as the database wrote it. They can always accept on the Extra work tab instead.
+9. **The PDF link says "not valid" or "replaced".** Not valid means the link was altered. Replaced means the add-on was changed after that message; the newer message has the current PDF.
+10. **Deploy.** `yaad-addon-pdf` is public (Twilio fetches the attachment with no session), so it is deployed with `--no-verify-jwt` and belongs on the CLAUDE.md §12 list. `yaad-notify-client` and `yaad-inbound` import the new `_shared/addon-link.ts` (notify) and `addon-confirm.ts` (inbound): run `supabase/functions/sync-shared.sh` first.
+11. **Cancelling an agreed add-on** (29 Sep 2026). Desk, Add-ons, open it, **Cancel add-on**, give the reason. A draft invoice is voided with it. If its invoice was already sent, void that on Invoices first. If anything was paid, it refuses: that is a refund, decided separately. Nobody is messaged, so tell both sides.
+
+## 39. A client posted a job and cannot see it in their portal (29 Sep 2026)
+
+1. Find the job: its reference is in the enquiry the form sent. If `jobs.client_email` is blank, nobody has claimed it yet. That is normal for a job posted by somebody who was not signed in.
+2. They can claim it with the "Set up your portal" link in their receipt email, which carries the job's code.
+3. A job posted while signed in, with the same email typed on the form, joins that portal on Send (`claim_my_posted_job`, 20260929000000). The enquiry says "signed in: it is already in their portal" when it did.
+4. If it did not join although they were signed in: a different email was typed on the form, the account's email is not confirmed, or the code attempt limit tripped (five failures in fifteen minutes, `portal_code_attempts`). The link still works once the limit clears.
+
+## 40. A report on the new services: will not draft, will not issue, or will not rate (28 Sep 2026)
+
+1. **"kind must be one of"** from the drafter: `yaad-report` on the server is older than `kinds.ts`. Deploy it from disk: `supabase functions deploy yaad-report --project-ref leffyisvfvjwzilydlwf` (it keeps the platform check; no `--no-verify-jwt`).
+2. **"violates check constraint reports_kind_check"**: migration `20260929001000` is not applied. It is Monique's call to apply it.
+3. **A Visual Check or Property Care visit refuses a rating.** That is the rule: they are records. Write the summary as the verdict and issue it.
+4. **"This report has no result"** or **"no overall status"**: use Type the result, or Rate the month, on the report row. Nothing drafts either.
+5. **"Results, status and money on a report are typed at the desk"**: something tried to write `reports.human` directly. Only Type the result, Rate the month and Type the money write it, through `set_report_human()`.
+6. Check the rules with `supabase/tests/report_kind_guards.sql` (seven tests) after applying the migration.
+
+## 41. A worker wants to correct evidence they filed (28 Sep 2026)
+
+On their own item, on the stage still being worked, the worker presses **Correct this** under the photo in Progress evidence. They can change the words and which part of the job it shows. The photo, its fingerprint, its stage and whether it is a materials item cannot change, by anybody.
+
+1. **"Correcting evidence is not switched on yet"**: migration `20260929040000_a_worker_can_correct_their_own_evidence.sql` is not applied. Apply it in the SQL editor.
+2. **"This stage has been signed off"**: correct. Approved evidence is fixed as approved. The worker adds a new item, or you handle it from the desk.
+3. **"Only the worker who filed this can correct it"**: the item was filed by somebody else (the client, or you from the desk).
+4. **What was changed:** `select * from evidence_corrections where job_id = '<job>' order by at;` shows every correction with the wording and part before and after. The client sees "Corrected by the worker" on the card and the first wording in the stage record.
+
+## 42. A document will not download as a PDF (28 Sep 2026)
+
+1. Every completed document in "Your documents" (Guidelines, Quote Pack, Kickoff Pack, Completion Report) has **Download PDF** at the top. The Kickoff Pack's front page also links "The whole pack on one page", which downloads as one file.
+2. If the button says the PDF could not be made, it opens the print dialog instead: choose Save as PDF. Same page, light colours.
+3. A document still "Not completed" has nothing to open, so nothing to download. That is correct.
+
+## 43. The client approves finished extra work; Money is its own tab (28 Sep 2026)
+
+1. **Apply in this order:** `20260929050000_the_client_approves_finished_extra_work.sql`, then `20260929060000_both_sides_see_who_has_been_paid.sql`. Then deploy the app, then redeploy `yaad-notify-client` and `yaad-checkout` from disk.
+2. **Before the migrations are in:** the client's Approve this extra work button says it is not switched on yet, and Money shows nothing paid out. Nothing breaks.
+3. **Who approves extra work:** the client, on Extra work or on Approvals, once it is agreed, its invoice is paid and a photo is filed. The desk's Sign off stays as the fallback. Either raises the worker's pay (amount less 5%) on Pay workers. Nobody is paid until a person marks it paid.
+4. **Approvals** shows only what is approved and what is not: stages, extra work, the independent check. **Money** holds what the job costs (extra work included), Where the money is, who has been paid stage by stage, and every invoice. A card payment returning to `?tab=approvals&card=...` opens Money.
+
+## 44. A client raises a problem: it goes to Yaadly (28 Sep 2026)
+
+Founder: "you raise this with Yaadly". The portal opens a new dispute already escalated, so it is with Yaadly from the start. The worker is told at once with what the client said and is asked to give their side with Message Yaadly. Disputes opened before this in the direct state still show Reply, That sorts it and Escalate as before. The client and worker messages change only once `yaad-notify-client` is redeployed; until then they still describe the worker-first route.
+
+## 45. The street address, and the Job details tab (28 Sep 2026)
+
+1. **Apply `20260929070000_the_client_adds_the_street_address.sql`**, then deploy the app. Before that, Add the address says it is not switched on yet.
+2. **Where it is:** the job page's **Job details** tab, with the portal link and access code, This job, and the job as agreed. None of it is on Overview any more.
+3. **Who:** the client adds or changes it while the job is open; the booked worker reads it; a worker who only quoted never sees it. Each change writes a line to `agent_actions` (who, added or changed), never the old address.
+4. **Nudges:** once a worker is booked and there is no address, the client's list says Add the street address and the worker's says Waiting on the street address.
+
+## 46. Extra work on the Money tab, and the worker cannot start it (28 Sep 2026)
+
+1. **Every piece of extra work** that is live or settled is listed in What this job costs under Additional work, with its work amount, Yaadly's fee and total, its state, and where its money stands. Only agreed or approved work is added into the totals; one still being agreed says so. Turned down or withdrawn work is not listed; cancelled work is listed only if its bill was paid.
+2. **A worker says the extra work is paid but their card still says it is waiting:** `job_addon_bill_state()` (20260929080000) is what tells the worker a bill was paid, because workers cannot read the client's invoices. Check it is present: `select * from job_addon_bill_state('<job>');` as the worker returns one row per add-on.
+
+## 47. Large uploads: limits, and when one fails (28 Sep 2026)
+
+**Limits now:** evidence photos and extra work photos 50MB, files on the job 100MB, evidence videos 500MB. Photos on the public job form are still 12MB (a separate route, `yaad-job-photo`).
+
+**How a file arrives:** the browser asks the app where to put it (`startUpload`), the app picks the path and signs a one-path upload URL as the signed-in user, the file goes from the phone straight to Storage, then the form's own action fingerprints what arrived by streaming it (`lib/portal/stored-object.ts`) and writes the row. Videos do the same through `yaad-evidence-video`, which also streams its fingerprint now.
+
+1. **"The upload could not start"**: Storage refused the signed URL, so this person is not the client or booked worker on the job, or the job is closed.
+2. **"That photo still carried its location data, so it was not kept"**: the browser strips a JPEG's Exif before upload; the server read the stored file's header and found it still there, so it deleted it. An old cached page is the likely cause; a reload fixes it.
+3. **"The file did not finish uploading"**: the connection dropped mid-upload. Nothing was filed; send again. A very large video on a weak signal is the usual case.
+4. **Bucket ceilings:** `evidence` 500MB, `job-files` 100MB (`20260929090000`). The app's caps sit just under them; `web/tests/job-files.test.mjs` holds that for job files.

@@ -68,3 +68,35 @@ export function workerUpdateContent() {
 /** What Meta is asked to approve it as. Utility: it is about a job the worker
  *  is already part of, never marketing. */
 export const WORKER_UPDATE_APPROVAL = { name: WORKER_UPDATE_NAME, category: "UTILITY" };
+
+/** The worker's Sign button on the Completion Report, 28 Sep 2026. Founder:
+ *  "it has to be a button the work presses, through whatsapp or the portal".
+ *  The button's id is the job's own code, so a tap reaches yaad-inbound as
+ *  that code and signs through sign_completion_report_via_whatsapp(), the
+ *  same way the client's Approve button works. It follows the message that
+ *  carries the link, inside the 24 hour window, which needs no Meta approval. */
+// v2, 28 Sep 2026: three buttons, after the founder found "no way to edit"
+// and asked for "raise an issue" too, as buttons. Content is immutable in
+// Twilio, so a change is a new name; v1 stays in the account unused.
+export const SIGN_REPORT_NAME = "yaadly_sign_completion_report_v2";
+
+export const SIGN_REPORT_BODY =
+  "{{1}}: your Completion Report is ready. Sign it as it stands, change your words first, or raise an issue if something is wrong.";
+
+export function signReportContent() {
+  return {
+    friendly_name: SIGN_REPORT_NAME,
+    language: "en",
+    variables: { "1": "Shower wall retiled (JOB-WEB-1789253807959)", "2": "JOB-WEB-1789253807959" },
+    types: {
+      "twilio/quick-reply": {
+        body: SIGN_REPORT_BODY,
+        actions: [
+          { title: "Sign the report", id: "{{2}}" },
+          { title: "Change my words", id: "EDIT {{2}}" },
+          { title: "Raise an issue", id: "ISSUE {{2}}" },
+        ],
+      },
+    },
+  };
+}
