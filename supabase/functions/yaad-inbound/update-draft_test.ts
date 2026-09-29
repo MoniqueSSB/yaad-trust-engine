@@ -7,7 +7,7 @@
 // Run: deno test --allow-read supabase/functions/
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { draftReadBack, readDraftReply, tooShortToBeAnUpdate } from "./update-draft.ts";
+import { draftReadBack, readDraftReply, saysWhatItShows, tooShortToBeAnUpdate } from "./update-draft.ts";
 import { isBareAcknowledgement } from "./worker-question.ts";
 
 const read = (t: string) => readDraftReply(t, isBareAcknowledgement);
@@ -78,4 +78,20 @@ Deno.test("a note is read exactly like any other draft", () => {
   assertEquals(read("1"), "file");
   assertEquals(read("no"), "discard");
   assertEquals(read("actually it was the joint, not the rail"), "replace");
+});
+
+Deno.test("a mistyped no still drops the waiting update", () => {
+  // 29 Sep 2026: "nno" was read back as the next update for the job.
+  for (const said of ["nno", "noo", "Nno.", "nnope", "canccel"]) assertEquals(read(said), "discard", said);
+  // One stroke away from "no" and a real update all the same.
+  for (const said of ["on site", "not done yet", "now fitting the rail"]) assertEquals(read(said), "replace", said);
+});
+
+Deno.test("a 1 or an ok is never what a photograph shows", () => {
+  for (const said of ["1", " 1 ", "ok", "yes", "2", "?", "", "thanks", "nno"]) {
+    assert(!saysWhatItShows(said, isBareAcknowledgement), `must not caption a photo: "${said}"`);
+  }
+  for (const said of ["fixing beam in place", "done", "after", "new rail"]) {
+    assert(saysWhatItShows(said, isBareAcknowledgement), `is a caption: ${said}`);
+  }
 });

@@ -6297,3 +6297,14 @@ Founder: "you raise this with Yaadly". The portal opens a new dispute already es
 2. **"That photo still carried its location data, so it was not kept"**: the browser strips a JPEG's Exif before upload; the server read the stored file's header and found it still there, so it deleted it. An old cached page is the likely cause; a reload fixes it.
 3. **"The file did not finish uploading"**: the connection dropped mid-upload. Nothing was filed; send again. A very large video on a weak signal is the usual case.
 4. **Bucket ceilings:** `evidence` 500MB, `job-files` 100MB (`20260929090000`). The app's caps sit just under them; `web/tests/job-files.test.mjs` holds that for job files.
+
+## 48. The WhatsApp assistant answered a worker's question, or should have (29 Sep 2026)
+
+A worker's question goes through four doors in order, in `yaad-inbound`: a fixed answer (`worker-question.ts`), the clock, the person-only rule, then the text model reading the approved facts (`off-script.ts`). Anything that falls through all four reaches the desk as "Worker question", as it always did.
+
+1. **To read what it has been saying:** the `yaad-inbound` function log, lines starting `off-script:`. Each carries the outcome, the question and what the model wrote, including the ones that were not sent.
+2. **It answered something wrongly:** the fact it read is in `faq.ts` or `WORKER_HOW_TO` in `off-script.ts`. Correct the fact, and `docs/faq.html` in the same commit if it is a FAQ one. If the subject should never have been answered at all, add a pattern to `PERSON_ONLY` and a line to `off-script_test.ts`.
+3. **It keeps sending a simple question to the desk:** the log says why. `not_covered` means the fact is missing, so write it into the facts. `promise`, `unpublished_figure` or `banned_language` means the screen dropped the reply, which is the screen working. If no `off-script:` line exists the person-only rule caught it before the model.
+4. **To turn it off:** the desk's agents paused switch (`app_settings.agents_paused`). Fixed answers and the desk hand-over carry on; the model is not called.
+5. **A worker asking to be paid** gets `PAY_REQUEST_ANSWER`, a fixed string. Its last two sentences are the pay sentence in `faq.ts`, word for word. Change one, change both.
+6. **Deploy:** `supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` from a branch that has `origin/main` merged in. It is already on the no-platform-auth list in CLAUDE.md section 12, so the flag preserves what is live.

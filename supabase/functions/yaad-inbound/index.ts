@@ -1,14 +1,14 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { chatWithFailover, pickTextProvider, providerAttrs } from "./textmodel.ts";
+import { answerText, chatWithFailover, pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
 import { checkTwilioSignature } from "./twilio-signature.ts";
 import { pickJobChoice } from "./job-match.ts";
 import { docExt, fileLabel, guessFileKind, isDocMime, isFileableStatus } from "./job-file-lane.ts";
 import { matchApprovingJob } from "./approval-match.ts";
 import { pickEvidenceItem } from "./evidence-item-match.ts";
-import { DRAFT_STILL_WAITING, draftReadBack, readDraftReply, tooShortToBeAnUpdate } from "./update-draft.ts";
+import { DRAFT_STILL_WAITING, draftReadBack, readDraftReply, saysWhatItShows, tooShortToBeAnUpdate } from "./update-draft.ts";
 import { visitorTokenOk, originAllowed, WEB_CHAT_MAX_CHARS, webReferenceIn, WEB_SAFE_FALLBACK } from "./web-chat.ts";
 import {
   ALERT_CONSENT_VERSION, ALERT_TERMS, ALERTS_PHRASE, ALERTS_STOP,
@@ -24,6 +24,7 @@ import { samePhone, digitsOf } from "./phone.ts";
 import { Deadline } from "./deadline.ts";
 import { inboundText, wasTapped } from "./button-tap.ts";
 import { answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith } from "./worker-question.ts";
+import { clockAnswer, needsAPerson, OFF_SCRIPT_CLOSE, OFF_SCRIPT_SYSTEM, screenOffScript } from "./off-script.ts";
 import { replyFromCard } from "./reply-from-card.ts";
 import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
 import { parseAddonConfirm } from "./addon-confirm.ts";
@@ -515,7 +516,9 @@ async function downloadAndStageEvidence(admin: any, url: string, mime: string, c
   if (error) return null;
 
   const sha256 = await evidenceSha256(got.bytes.buffer as ArrayBuffer);
-  const trimmed = caption.trim();
+  // A caption of "1" or "ok" is a reply to something else that happened to
+  // ride in on the photograph. Staged as uncaptioned, so it is asked about.
+  const trimmed = saysWhatItShows(caption, isBareAcknowledgement) ? caption.trim() : "";
   return { path, mime, bytes: got.bytes.byteLength, sha256, label: (trimmed || "Sent on WhatsApp").slice(0, 140), hasCaption: !!trimmed };
 }
 
@@ -1729,15 +1732,74 @@ async function pushToDesk(
 // silences every worker lane on it, which is the wrong price for asking how
 // to send a clip. Her reply from the desk will hold it, as any desk reply
 // does, and the desk hands it back.
+/** One grounded answer from the approved facts, or null for "a person's".
+ *  Null on every kind of failure: no provider, no time left, a bad status, a
+ *  reply that did not pass the screen. The caller's next step is the desk,
+ *  which is where this question went before this function existed. */
+async function answerOffScript(question: string, deadline: Deadline, trace: Trace): Promise<string | null> {
+  const prov = pickTextProvider();
+  if (!prov) return null;
+  // Leaves 2.5 seconds for the desk push and the reply if this comes back
+  // with nothing, because that push is what stops the question being lost.
+  const sig = deadline.signal(6_000, 2_500, 1_500);
+  if (!sig) return null;
+  try {
+    return await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
+      ...providerAttrs(prov), "gen_ai.operation.name": "chat", "yaadly.model.job": "off_script",
+    }, async (sp) => {
+      const { provider, res: r } = await chatWithFailover(prov, {
+        temperature: 0, max_tokens: 900,
+        messages: [
+          { role: "system", content: OFF_SCRIPT_SYSTEM },
+          { role: "user", content: question.trim().slice(0, 600) },
+        ],
+      }, { timeoutMs: 25000, signal: sig });
+      const raw = await r.text();
+      sp.setAttributes({ ...providerAttrs(provider), "http.response.status_code": r.status });
+      if (!r.ok) {
+        const m = `off-script: ${provider.name} http ${r.status}: ${raw.slice(0, 200)}`;
+        sp.recordError(m); console.error(m); return null;
+      }
+      let content = "";
+      try {
+        content = String((JSON.parse(raw) as { choices?: { message?: { content?: string } }[] })?.choices?.[0]?.message?.content ?? "");
+      } catch (e) {
+        console.error("off-script: response body was not JSON:", String(e).slice(0, 200)); return null;
+      }
+      const screened = screenOffScript(content);
+      sp.setAttributes({ "yaadly.off_script.outcome": screened.why });
+      // The function log is private to the project. This line is how the
+      // answers get read back by a person, and how a question that keeps
+      // coming back NOT_COVERED becomes the next fact written into faq.ts.
+      console.log(`off-script: ${screened.why}. Asked: "${question.trim().slice(0, 200)}". Model said: "${answerText(content).slice(0, 400)}"`);
+      return screened.text;
+    });
+  } catch (e) {
+    console.error("off-script: threw:", String(e).slice(0, 300)); return null;
+  }
+}
+
 async function answerOrRaiseWorkerQuestion(
   supabase: SettingsReader,
   msg: { text: string; from: string; channel: string },
   jobId: string,
   stillWanted: string,
   trace: Trace,
+  // Both optional so a caller that has neither still gets the old behaviour,
+  // fixed answer or the desk, and never a model call it could not time.
+  opts: { deadline?: Deadline; paused?: boolean } = {},
 ): Promise<string> {
   const canned = answerWorkerQuestion(msg.text);
   if (canned) return `${canned} ${stillWanted}`;
+  const clock = clockAnswer(msg.text);
+  if (clock) return `${clock} ${stillWanted}`;
+  // A simple question the fixed answers do not cover, 29 Sep 2026. See
+  // off-script.ts for the rule and where it came from. Money, a client, a
+  // decision about the work: never offered to the model, straight to a person.
+  if (opts.deadline && !opts.paused && !needsAPerson(msg.text)) {
+    const answered = await answerOffScript(msg.text, opts.deadline, trace);
+    if (answered) return `${answered} ${OFF_SCRIPT_CLOSE} ${stillWanted}`;
+  }
   await pushToDesk(supabase, {
     target: { channel: msg.channel, from_addr: msg.from || "unknown" },
     title: `Worker question${jobId ? `: ${jobId}` : ""}`,
@@ -2870,7 +2932,7 @@ Deno.serve(async (req: Request) => {
           return twiml(await answerOrRaiseWorkerQuestion(
             supabase as unknown as SettingsReader, msg, String(a.job_id ?? ""),
             "Your report to the client is still waiting: reply 1 to send it as drafted, or send your own words and those go instead.",
-            trace,
+            trace, { deadline, paused: agentsPaused },
           ));
         }
         const overrideText = said === "1" ? String(a.draft_text ?? "") : said;
@@ -3010,7 +3072,7 @@ Deno.serve(async (req: Request) => {
         if (said !== "1" && (looksLikeQuestion(said) || wantsHelpWith(said))) {
           root.setAttributes({ "yaadly.worker_update.outcome": "question_while_draft_waiting" });
           return twiml(await answerOrRaiseWorkerQuestion(
-            supabase as unknown as SettingsReader, msg, String(a.job_id ?? ""), DRAFT_STILL_WAITING, trace,
+            supabase as unknown as SettingsReader, msg, String(a.job_id ?? ""), DRAFT_STILL_WAITING, trace, { deadline, paused: agentsPaused },
           ));
         }
         const reply = readDraftReply(said, isBareAcknowledgement);
@@ -3158,7 +3220,7 @@ Deno.serve(async (req: Request) => {
             root.setAttributes({ "yaadly.evidence_intake.outcome": "question_while_awaiting_phase" });
             const lead = await answerOrRaiseWorkerQuestion(
               supabase as unknown as SettingsReader, msg, confirmedJob.id,
-              "Your photos are still waiting to be filed.", trace,
+              "Your photos are still waiting to be filed.", trace, { deadline, paused: agentsPaused },
             );
             return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, lead);
           }
@@ -3231,8 +3293,15 @@ Deno.serve(async (req: Request) => {
             root.setAttributes({ "yaadly.evidence_intake.outcome": "question_while_awaiting_context" });
             return twiml(await answerOrRaiseWorkerQuestion(
               supabase as unknown as SettingsReader, msg, confirmedJob.id,
-              "Your photos are still waiting to be filed. What do they show? A line on what was done is enough.", trace,
+              "Your photos are still waiting to be filed. What do they show? A line on what was done is enough.", trace, { deadline, paused: agentsPaused },
             ));
+          }
+          // Nor is a "1" or an "ok". The photos stay parked and the question
+          // is asked again, saying why, so a worker who has just replied 1 to
+          // the job question does not watch "1" become what their work shows.
+          if (!saysWhatItShows(msg.text, isBareAcknowledgement)) {
+            root.setAttributes({ "yaadly.evidence_intake.outcome": "not_a_caption_while_awaiting_context" });
+            return twiml(`The job is confirmed as ${confirmedJob.id}, so that part is done. Your photos are still waiting to be filed. What do they show? A line on what was done is enough.`);
           }
           const context = msg.text.trim().slice(0, 140);
           const described = context
@@ -3921,7 +3990,7 @@ Deno.serve(async (req: Request) => {
             root.setAttributes({ "yaadly.worker_update.outcome": "question_not_update" });
             return twiml(await answerOrRaiseWorkerQuestion(
               supabase as unknown as SettingsReader, msg, found.jobs.length === 1 ? found.jobs[0].id : "",
-              "Anything you send about the work itself still goes on the job record as normal.", trace,
+              "Anything you send about the work itself still goes on the job record as normal.", trace, { deadline, paused: agentsPaused },
             ));
           }
           // A lone "1" or a stray character is not an update. With a draft
