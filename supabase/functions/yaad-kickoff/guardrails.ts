@@ -67,6 +67,15 @@ const BANNED: [RegExp, string][] = [
   // true and unobjectionable.
   [/\bheld safely with a licensed\b/gi, HELD_GUIDANCE],
   [/\b(?:money|funds?|payments?|deposits?)\s+(?:is|are|was|were|will be)\s+held safely\b/gi, HELD_GUIDANCE],
+  // Added 29 September 2026. "Nothing is wrong with the money held on this
+  // job" was live in the delay message to clients. The passive patterns above
+  // need a verb ("is held"); this form has none, the money is simply "held
+  // on", "held for" or "held against" something, so it walked through.
+  //
+  // Narrow on purpose, like the others. It needs a preposition after "held",
+  // so "no money held back from you" and "documents held on file" are left
+  // alone.
+  [/\b(?:money|funds?|payments?|deposits?)\s+held\s+(?:on|for|against|in|by|with)\b/gi, HELD_GUIDANCE],
 ];
 
 /** Every banned-language hit in a block of outbound text. */

@@ -4940,3 +4940,23 @@ Monique: "the client should be informed on whatsapp of the job update", then "ma
 **What it does not change.** Email goes regardless, as it always has. A client approving on WhatsApp is a hold point and never a payment: a named person at Yaadly still signs the stage off.
 
 **Not built.** The job form still does not ask for a number. The client adds it in the portal after they have signed in, which is the first point at which Yaadly knows who they are.
+
+## 2026-09-29 · WhatsApp works for the client across the whole job, and the job's code alone no longer approves
+
+Monique: "the whatsapp should work well for the client also for the entire project not only the worker." A read of every client path in `yaad-inbound` and `yaad-notify-client` found six things, and this entry covers all six.
+
+**One. The code anywhere in a message approved the stage.** `matchApprovingJob` was `said.includes(code)`. "don't approve JOB-WEB-1 yet, the crack is back" approved the stage and raised the worker's pay. It was also how a price was accepted and a tradesperson booked. The code is now necessary and not enough: every other word in the message has to be on a short list of agreement and courtesy (`isCleanApproval` in `approval-match.ts`). An allowlist, because a list of ways to say no is never finished and the one that was missed moves money. A message that names the job without approving is answered "Nothing has been approved" and goes to Yaadly. This narrows what counts as an approval, which is hers to decide under CLAUDE.md section 10; it was built because every case it removes is one where the client did not approve.
+
+**Two. No client template could fire.** Both waited for the free text to fail with 63016, and `worker-template.ts` had recorded on 17 September that Twilio accepts such a send and fails it after the function has returned. The window is now read before sending, as it is for a worker.
+
+**Three. Fourteen kinds of client message had no template at all.** Outside the window they now go as `yaadly_worker_job_update_v1`, already approved by Meta, with one true line per kind. Its body names no role ("Yaadly update on your job"), so it is the template sending the sentence it was approved for. A test fails if that body ever names one. The stage report keeps its own template, pending at Meta, and uses the shared one until then.
+
+**Four. Anything a client typed was pushed to the tradesperson's phone.** With a report waiting, "thanks", "how do I pay" and "I am not happy" were all filed as comments on the evidence and sent on word for word. `client-lane.ts` now answers a greeting or a thank you with where the job stands, sends a problem to Yaadly (her rule of 28 September: a problem is raised with Yaadly, not with the worker first), and answers a question from a fixed answer, then the published facts, then a person. A plain remark about the evidence still goes to the tradesperson as before. It covers every live status, where it used to be only a job in review.
+
+**Five. Two sentences to clients were untrue.** The approval confirmation said "The worker is paid for it", corrected on the WhatsApp reply on 4 September and missed on this one. The delay message said "the money held on this job". Yaadly holds nobody's money, and no word in that sentence was banned, so the screen could not see it. Both are rewritten, and "money held on, for, against" is on the banned list in all three copies and asserted by both suites.
+
+**Six. Intake could put a live job back to the start.** A conversation that began a job, picked up again after the job had moved on, wrote stage 0 and a draft status over it. Intake now reads the job's status first and leaves alone anything that has left intake.
+
+**What it costs.** A client who writes "approve JOB-WEB-1 but fix the gate" is no longer approved and is told so; they reply with the code alone. A client's question that needs a person reaches the desk and her phone's push, and does not text her: the list of alerts that do is held at six by `asking_test.ts` and is hers to widen. Template messages outside the window are charged by WhatsApp as utility conversations.
+
+**Not done.** "Reply INTERESTED" in the conversion offer has no handler. A comment typed by a client whose number the desk is holding is still filed and sent to the tradesperson. One phone that is both the client and the tradesperson on a job can approve its own stage; that is only ever true of a test and is not guarded.

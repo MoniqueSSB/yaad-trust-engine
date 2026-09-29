@@ -62,6 +62,12 @@ BANNED_TERMS: dict[str, str] = {
     # true and unobjectionable.
     r"\bheld safely with a licensed\b": HELD_GUIDANCE,
     r"\b(?:money|funds?|payments?|deposits?)\s+(?:is|are|was|were|will be)\s+held safely\b": HELD_GUIDANCE,
+    # Added 29 September 2026. "Nothing is wrong with the money held on this
+    # job" was live in the delay message to clients. The passive patterns
+    # above need a verb ("is held"); this form has none, so it walked through.
+    # Narrow on purpose: it needs a preposition after "held", so "no money
+    # held back from you" and "documents held on file" are left alone.
+    r"\b(?:money|funds?|payments?|deposits?)\s+held\s+(?:on|for|against|in|by|with)\b": HELD_GUIDANCE,
 }
 
 # 3. AI assists and drafts. Humans decide anything involving money or trust.

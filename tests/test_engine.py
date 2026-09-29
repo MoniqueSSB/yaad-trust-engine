@@ -50,6 +50,8 @@ def client() -> LLMClient:
         # one claim the screen exists to stop.
         "Money is held safely with a licensed payment provider.",
         "Your payment is held safely until the work is signed off.",
+        # Added 29 Sep 2026, live in the delay message to clients until that day.
+        "Nothing is wrong with the money held on this job.",
     ],
 )
 def test_banned_language_is_caught(text: str) -> None:
