@@ -69,6 +69,33 @@ export function workerUpdateContent() {
  *  is already part of, never marketing. */
 export const WORKER_UPDATE_APPROVAL = { name: WORKER_UPDATE_NAME, category: "UTILITY" };
 
+// The client's stage report, 29 Sep 2026. Founder: "the client should be
+// informed on whatsapp of the job update." Goes to a client who has not
+// written in within 24 hours, so like the worker update it needs Meta's
+// approval and is switched on only once that comes back. The body is held
+// word for word against yaad-notify-client/client-template.ts by the test
+// next to this file.
+export const CLIENT_UPDATE_NAME = "yaadly_client_job_update_v1";
+
+export const CLIENT_UPDATE_BODY =
+  "Yaadly update on your job {{1}}. Your tradesperson reports: {{2}} The photographs and the full report are on the job in your Yaadly portal, where you can approve the work or ask for a change: {{3}} Reply here if you have a question.";
+
+export function clientUpdateContent() {
+  return {
+    friendly_name: CLIENT_UPDATE_NAME,
+    language: "en",
+    variables: {
+      "1": "Replace stair rails (JOB-WEB-1789253807959)",
+      "2": "The new rails are fixed along the full run of the stairs and the old fixings are made good.",
+      "3": "https://app.yaadly.co.uk/portal/jobs/JOB-WEB-1789253807959",
+    },
+    types: { "twilio/text": { body: CLIENT_UPDATE_BODY } },
+  };
+}
+
+/** Utility: it is about a job the client has already booked, never marketing. */
+export const CLIENT_UPDATE_APPROVAL = { name: CLIENT_UPDATE_NAME, category: "UTILITY" };
+
 /** The worker's Sign button on the Completion Report, 28 Sep 2026. Founder:
  *  "it has to be a button the work presses, through whatsapp or the portal".
  *  The button's id is the job's own code, so a tap reaches yaad-inbound as

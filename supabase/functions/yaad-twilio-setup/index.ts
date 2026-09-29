@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { recordAccepted, withStatusCallback } from "./twilio-status.ts";
-import { ON_SITE_APPROVAL, ON_SITE_NAME, onSiteContent, REPORT_DRAFT_NAME, reportDraftContent, SECTION_MENU_APPROVAL, SECTION_MENU_NAME, sectionMenuContent, SIGN_REPORT_NAME, signReportContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
+import { CLIENT_UPDATE_APPROVAL, CLIENT_UPDATE_NAME, clientUpdateContent, ON_SITE_APPROVAL, ON_SITE_NAME, onSiteContent, REPORT_DRAFT_NAME, reportDraftContent, SECTION_MENU_APPROVAL, SECTION_MENU_NAME, sectionMenuContent, SIGN_REPORT_NAME, signReportContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
 
 // A one-shot helper for creating Yaadly's WhatsApp content templates in
 // Twilio, 15 September 2026.
@@ -446,6 +446,49 @@ Deno.serve(async (req: Request) => {
     if (status === "approved") {
       const { error } = await admin.from("app_settings").upsert(
         { key: "twilio_content_sid_on_site", value: JSON.stringify(sid) },
+        { onConflict: "key" },
+      );
+      if (error) return json({ error: `Approved, but app_settings would not take it: ${error.message}` }, 500);
+      switchedOn = true;
+    }
+    return json({ sid, status, rejection_reason: wa.rejection_reason ?? null, switchedOn });
+  }
+
+  // The client's stage report template (29 Sep 2026). Same two steps as the
+  // worker update: create and submit, recorded as PENDING; switched on, by
+  // writing the setting yaad-notify-client reads, only once Meta approves.
+  if (action === "create-client-update") {
+    const existing = (await listAll()).find((c) => c.friendly_name === CLIENT_UPDATE_NAME);
+    let sid = existing?.sid ?? "";
+    if (!sid) {
+      const r = await call("/Content", { method: "POST", body: JSON.stringify(clientUpdateContent()) });
+      if (!r.ok) return json({ error: "Twilio refused the template.", twilio: r }, 502);
+      sid = String((r.body as { sid?: string })?.sid ?? "");
+    }
+    if (!/^HX[0-9a-f]{32}$/i.test(sid)) return json({ error: "No ContentSid came back." }, 502);
+    const approval = await call(`/Content/${sid}/ApprovalRequests/whatsapp`, {
+      method: "POST", body: JSON.stringify(CLIENT_UPDATE_APPROVAL),
+    });
+    const { error } = await admin.from("app_settings").upsert(
+      { key: "twilio_content_sid_client_update_pending", value: JSON.stringify(sid) },
+      { onConflict: "key" },
+    );
+    if (error) return json({ error: `Template ${sid} exists but app_settings would not take it: ${error.message}` }, 500);
+    return json({ ok: true, sid, reused: Boolean(existing), approval: { status: approval.status, body: approval.body } });
+  }
+
+  if (action === "client-update-status") {
+    const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_client_update_pending").maybeSingle();
+    let sid = "";
+    try { sid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { sid = String(st?.value ?? ""); }
+    if (!/^HX[0-9a-f]{32}$/i.test(sid)) return json({ error: "Nothing pending. Run create-client-update first." }, 400);
+    const r = await call(`/Content/${sid}/ApprovalRequests`);
+    const wa = (r.body as { whatsapp?: { status?: string; rejection_reason?: string } })?.whatsapp ?? {};
+    const status = String(wa.status ?? "unknown").toLowerCase();
+    let switchedOn = false;
+    if (status === "approved") {
+      const { error } = await admin.from("app_settings").upsert(
+        { key: "twilio_content_sid_client_update", value: JSON.stringify(sid) },
         { onConflict: "key" },
       );
       if (error) return json({ error: `Approved, but app_settings would not take it: ${error.message}` }, 500);
