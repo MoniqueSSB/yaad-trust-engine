@@ -6297,3 +6297,24 @@ Founder: "you raise this with Yaadly". The portal opens a new dispute already es
 2. **"That photo still carried its location data, so it was not kept"**: the browser strips a JPEG's Exif before upload; the server read the stored file's header and found it still there, so it deleted it. An old cached page is the likely cause; a reload fixes it.
 3. **"The file did not finish uploading"**: the connection dropped mid-upload. Nothing was filed; send again. A very large video on a weak signal is the usual case.
 4. **Bucket ceilings:** `evidence` 500MB, `job-files` 100MB (`20260929090000`). The app's caps sit just under them; `web/tests/job-files.test.mjs` holds that for job files.
+
+## 48. The report draft: buttons, the edit page, and the check-in read by the day (29 Sep 2026)
+
+**To switch it on, in this order.** Each step is safe without the next: with no migration there is no edit link and the message says to copy and paste; with no template there are no buttons and the typed replies still work.
+
+1. **Apply `20260929200000_a_worker_can_edit_the_draft_before_it_goes.sql`.** Check: `select count(*) from report_draft_links;` returns 0 and no error.
+2. **Deploy the functions from disk, from main:** `yaad-notify-client`, `yaad-inbound`, `yaad-daily-checkin`, `yaad-twilio-setup`. Read the live `verify_jwt` first and keep it: `yaad-notify-client` and `yaad-inbound` carry `--no-verify-jwt`, the other two do not.
+3. **Deploy the app**, which carries `/draft/[id]`.
+4. **Create the buttons:** call `yaad-twilio-setup` with `{"action":"create-report-draft"}`. It answers with a ContentSid and writes `twilio_content_sid_report_draft`. Used in session, so nothing goes to Meta.
+5. **The daily check-in button, separately and only when wanted:** `{"action":"create-on-site"}` submits it to Meta; `{"action":"on-site-status"}` switches it on once approved. The daily prompt also needs its cron job, which has never been scheduled.
+
+**What a correct result looks like.** File a photo with a caption from a worker's phone. Three things arrive: the draft alone; then what it was written from, what is missing and how to reply; then three buttons. Tap Edit it, open the link, change a word, press Send to the client. The page says "Sent to the client, in your words" and the client gets that wording.
+
+**When something is wrong.**
+
+1. **No buttons arrive:** `select value from app_settings where key = 'twilio_content_sid_report_draft';` is empty, or Twilio refused the send. The `approve button not sent` line in the function log carries Twilio's reason. Replying 1 still works.
+2. **"That draft is not waiting any more":** the button tapped belongs to a draft already sent or replaced. Working as designed. The newest draft's buttons work.
+3. **The link says it is not valid:** a newer draft replaced it and the code changed. `select job_id, drafted_at, sent_at, sent_via, code_failures from report_draft_links where job_id = '<job>';` shows which. Ten wrong codes lock it; a new draft resets the count.
+4. **The draft is the worker's own words in quotation marks:** the model's draft claimed more than he did, or the model call failed, and his words were offered instead. The span attribute `yaadly.notify.draft_unearned` names the words that were caught. Working as designed.
+5. **The draft still says nobody checked in:** the check reads the Jamaica day. `select stage, arrived_on from arrival_log where job_id = '<job>' order by arrived_at desc;` and compare with the day the evidence was filed. A check-in on any stage that day counts.
+
