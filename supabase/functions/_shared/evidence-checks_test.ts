@@ -96,14 +96,87 @@ Deno.test("the dropped before-and-after check is gone and stays gone", () => {
   assert(!checks.some((c) => /before/i.test(c.name)), "no label-sniffing check may come back");
 });
 
-Deno.test("sequence catches evidence timestamped before the arrival", () => {
-  const c = byName(runEvidenceChecks({
+// Rewritten 29 September 2026 because the RULE changed, on the founder's own
+// instruction, and not to make a failing change pass. This test used to assert
+// only that evidence before the arrival failed the check. It still does. What
+// changed is who is told and how loudly: a check-in may come before or after
+// the work, so the order is a note for the desk and never reaches a worker.
+Deno.test("a check-in sent after the evidence is noted for the desk and never shown to the worker", () => {
+  const checks = runEvidenceChecks({
     stage: 1,
-    evidence: [photo({ captured_at: "2026-09-04T09:00:00Z" })],
+    evidence: [photo({ captured_at: "2026-09-04T12:00:00Z" }), clip({ captured_at: "2026-09-04T12:05:00Z" })],
     arrivals: [arrival()],
     checklist: CHECKLIST,
-  }), "Sequence");
-  assertEquals(c.passed, false);
+  });
+  const c = byName(checks, "Sequence");
+  assertEquals(c.passed, false, "the order is still recorded honestly");
+  assertEquals(c.severity, "note");
+  assertEquals(c.audience, "desk");
+  assertEquals(workerGaps(checks), [], "a late check-in gives the worker nothing to fix");
+  assert(!workerNotes(checks).some((n) => /before|after the first/i.test(n)), "and is not shown to him as a note either");
+});
+
+// ── a check-in is read by the day, not by the stage ──────────────────────
+//
+// Founder's rule, 29 September 2026. Found on a real test: a check-in on
+// stage 2, the job moved to stage 3, and the stage 3 draft said nobody had
+// been on site.
+
+Deno.test("a check-in logged against another stage the same day counts for this one", () => {
+  const checks = runEvidenceChecks({
+    stage: 3,
+    evidence: [photo(), clip()],
+    // The caller now hands over every check-in on the job. This one was
+    // logged while the job was on stage 2.
+    arrivals: [arrival()],
+    checklist: null,
+  });
+  assertEquals(byName(checks, "Arrival").passed, true);
+});
+
+Deno.test("a check-in on a different day does not count, and the ask says once a day", () => {
+  const checks = runEvidenceChecks({
+    stage: 3,
+    evidence: [photo(), clip()],
+    arrivals: [arrival({ arrived_at: "2026-09-03T13:00:00Z", arrived_on: "2026-09-03" })],
+    checklist: null,
+  });
+  const a = byName(checks, "Arrival");
+  assertEquals(a.passed, false);
+  assert(/once|one check-in a day/i.test(a.detail), a.detail);
+  assert(/before or after/i.test(a.detail), a.detail);
+  const same = byName(checks, "Same day");
+  assertEquals(same.audience, "desk");
+  assert(same.detail.includes("1 day after"), same.detail);
+});
+
+Deno.test("the day is the Jamaica day, so late evening work is not pushed into tomorrow", () => {
+  // 02:30 UTC on the 5th is 21:30 on the 4th in Jamaica.
+  const checks = runEvidenceChecks({
+    stage: 1,
+    evidence: [photo({ captured_at: "2026-09-05T02:30:00Z", created_at: "2026-09-05T02:31:00Z" }), clip({ captured_at: "2026-09-05T02:30:00Z", created_at: "2026-09-05T02:31:00Z" })],
+    arrivals: [arrival()],
+    checklist: null,
+  });
+  assertEquals(byName(checks, "Arrival").passed, true);
+});
+
+Deno.test("a pin shared that day on another stage covers this one, and an old pin does not", () => {
+  const base = { stage: 3, evidence: [photo(), clip()], arrivals: [arrival()], checklist: null };
+  const today = runEvidenceChecks({ ...base, pins: [{ shared_at: "2026-09-04T18:00:00Z", far_from_site: false }] });
+  assertEquals(byName(today, "Location pin").passed, true);
+  const old = runEvidenceChecks({ ...base, pins: [{ shared_at: "2026-09-01T18:00:00Z", far_from_site: true }] });
+  assertEquals(byName(old, "Location pin").passed, false);
+  assert(!old.some((c) => c.name === "Pin distance"), "a pin from another day raises no distance flag here");
+});
+
+Deno.test("the distance flag survives the day rule: it is the one check on a pin sent from home", () => {
+  const checks = runEvidenceChecks({
+    stage: 3, evidence: [photo(), clip()], arrivals: [arrival({ far_from_site: true })], checklist: null, parish: "Kingston",
+  });
+  const site = byName(checks, "Site");
+  assertEquals(site.passed, false);
+  assertEquals(site.audience, "desk");
 });
 
 Deno.test("missing timestamps are a note to the desk, never a gap against the worker", () => {

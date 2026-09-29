@@ -43,6 +43,26 @@
 // accusation the data cannot support. It reports the flag to the desk, with
 // what else produces it said plainly, and never travels to the worker.
 
+// ── Arrival is read by the DAY, not by the stage (founder, 29 Sep 2026) ──
+//
+// Until 29 September 2026 an arrival only counted for the stage it was logged
+// against, and evidence timestamped before it was raised as a gap. Both were
+// wrong on a real site. A worker who checks in on stage 2 and carries on into
+// stage 3 the same visit was told nobody had been on site, and a worker with
+// no signal until the end of the day was told his order "does not hold".
+//
+// Her rule, and it is a decision about what counts as verified, so it is hers:
+// the check-in is asked once a day on site, it covers every stage worked that
+// day, and it may be sent before or after the work. The photographs and the
+// clip are what show the work, and a person reviews those. The order is kept
+// as a quiet note for the desk and is never shown to a worker.
+//
+// The 30km distance flag is unchanged and matters more now: with no order
+// required, distance is the one thing that tells a pin sent from site apart
+// from a pin sent from home. It stays desk-only, a glance and never a finding.
+//
+// "Day" is the Jamaica local day, the same one arrival_log.arrived_on uses.
+
 export type EvidenceRow = {
   label?: string | null;
   mime?: string | null;
@@ -90,6 +110,17 @@ export type ChecksInput = {
   parish?: string | null;
 };
 
+/** Jamaica keeps UTC-5 all year, no daylight saving. */
+const JAMAICA_OFFSET_MS = 5 * 3_600_000;
+
+/** The Jamaica local date of a timestamp, as YYYY-MM-DD, or null. */
+export function jamaicaDay(v: unknown): string | null {
+  if (!v) return null;
+  const n = Date.parse(String(v));
+  if (!Number.isFinite(n)) return null;
+  return new Date(n - JAMAICA_OFFSET_MS).toISOString().slice(0, 10);
+}
+
 const ts = (v: unknown): number | null => {
   if (!v) return null;
   const n = Date.parse(String(v));
@@ -102,8 +133,21 @@ const ts = (v: unknown): number | null => {
  * be told apart from a pack that never ran.
  */
 export function runEvidenceChecks(input: ChecksInput): Check[] {
-  const { stage, evidence, arrivals, checklist } = input;
+  const { stage, evidence, checklist } = input;
   const out: Check[] = [];
+
+  // The days this stage's evidence belongs to: the day each item was taken
+  // and the day it was filed. Arrivals and pins are given for the WHOLE JOB
+  // and narrowed to these days here, so a check-in logged against another
+  // stage on the same day still counts. With no usable timestamp on any
+  // evidence there is no day to narrow to, and nothing is filtered out.
+  const workDays = new Set<string>();
+  for (const e of evidence) {
+    for (const d of [jamaicaDay(e.captured_at), jamaicaDay(e.created_at)]) if (d) workDays.add(d);
+  }
+  const onWorkDay = (day: string | null) => workDays.size === 0 || (day !== null && workDays.has(day));
+  const allArrivals = input.arrivals ?? [];
+  const arrivals = allArrivals.filter((a) => onWorkDay(String(a.arrived_on ?? "") || jamaicaDay(a.arrived_at)));
 
   // ── 1. CHECKLIST ─────────────────────────────────────────────────────
   // The spine, and the only check that knows what THIS job actually agreed,
@@ -158,8 +202,8 @@ export function runEvidenceChecks(input: ChecksInput): Check[] {
     name: "Arrival",
     passed: arrived,
     detail: arrived
-      ? "An arrival is logged against this stage."
-      : "No arrival tap on this stage, so the record does not show anybody on site.",
+      ? "A check-in is logged for the day this work was filed."
+      : "No check-in for the day this was filed, so the record does not show anybody on site. One check-in a day covers every stage, and it can be sent before or after the work.",
     severity: "gap",
     audience: "worker",
   });
@@ -167,6 +211,10 @@ export function runEvidenceChecks(input: ChecksInput): Check[] {
   // ── 3. SEQUENCE ──────────────────────────────────────────────────────
   // Timestamps only, no interpretation. Uses captured_at where the file
   // carried one and falls back to created_at, which is when it was filed.
+  //
+  // A NOTE FOR THE DESK, never a gap and never shown to a worker, since 29
+  // September 2026. A check-in may come before or after the work. The order
+  // is still worth a glance to the person reading the pack, and that is all.
   const arrivalTimes = arrivals.map((a) => ts(a.arrived_at)).filter((n): n is number => n !== null);
   const evidenceTimes = evidence.map((e) => ts(e.captured_at) ?? ts(e.created_at)).filter((n): n is number => n !== null);
   if (arrivalTimes.length && evidenceTimes.length) {
@@ -175,10 +223,10 @@ export function runEvidenceChecks(input: ChecksInput): Check[] {
       name: "Sequence",
       passed: ordered,
       detail: ordered
-        ? "The arrival comes before the evidence, which is the order it should be in."
-        : "Evidence on this stage is timestamped before the arrival tap. That ordering does not hold.",
-      severity: "gap",
-      audience: "worker",
+        ? "The check-in comes before the evidence."
+        : "The check-in was sent after the first evidence on this stage. That is allowed, a check-in may come before or after the work.",
+      severity: "note",
+      audience: "desk",
     });
   } else {
     out.push({
@@ -208,17 +256,25 @@ export function runEvidenceChecks(input: ChecksInput): Check[] {
   // ── 5. SAME DAY ──────────────────────────────────────────────────────
   // A note, never a gap. Filing late is worth knowing and is not misconduct:
   // signal is bad on plenty of Jamaican sites and the work still happened.
-  const arrivalDay = arrivals.map((a) => a.arrived_on).find(Boolean);
+  //
+  // Reads EVERY check-in on the job, not only the ones on a work day, because
+  // its whole purpose is to say how far the nearest earlier one is when there
+  // is none on the day itself.
   const lastFiled = evidenceTimes.length ? Math.max(...evidenceTimes) : null;
-  if (arrivalDay && lastFiled !== null) {
+  const lastFiledDay = lastFiled !== null ? jamaicaDay(new Date(lastFiled).toISOString()) : null;
+  const arrivalDay = allArrivals
+    .map((a) => String(a.arrived_on ?? "") || jamaicaDay(a.arrived_at) || "")
+    .filter((d) => d && (!lastFiledDay || d <= lastFiledDay))
+    .sort().pop();
+  if (arrivalDay && lastFiledDay) {
     const dayMs = 86_400_000;
-    const days = Math.floor((lastFiled - Date.parse(String(arrivalDay))) / dayMs);
+    const days = Math.round((Date.parse(lastFiledDay) - Date.parse(arrivalDay)) / dayMs);
     out.push({
       name: "Same day",
       passed: days <= 0,
       detail: days <= 0
-        ? "Filed the same day as the arrival."
-        : `Filed ${days} day${days === 1 ? "" : "s"} after the arrival tap.`,
+        ? "Filed the same day as a check-in."
+        : `Filed ${days} day${days === 1 ? "" : "s"} after the last check-in on this job.`,
       severity: "note",
       audience: "desk",
     });
@@ -239,13 +295,15 @@ export function runEvidenceChecks(input: ChecksInput): Check[] {
   // same holds here without exception. A worker who shares nothing is not
   // penalised, delayed or blocked, and the wording below says what a pin is
   // FOR rather than telling anyone off for the absence of one.
-  const pins = input.pins ?? [];
+  // Read by the day too, since 29 September 2026: one location shared that
+  // day covers every stage worked that day, so the offer is not repeated.
+  const pins = (input.pins ?? []).filter((p) => onWorkDay(jamaicaDay(p.shared_at)));
   out.push({
     name: "Location pin",
     passed: pins.length > 0,
     detail: pins.length > 0
-      ? `A location was shared with this stage${pins[0]?.address ? ` (${pins[0].address})` : ""}, which strengthens the pack.`
-      : "No location shared on this stage. Sending your location on WhatsApp puts on record that you were there, which makes the pack harder to argue with. Entirely up to you and nothing waits on it.",
+      ? `A location was shared that day${pins[0]?.address ? ` (${pins[0].address})` : ""}, which strengthens the pack.`
+      : "No location shared that day. Sending your location on WhatsApp puts on record that you were there, which makes the pack harder to argue with. Entirely up to you and nothing waits on it.",
     severity: "note",
     audience: "worker",
   });
@@ -257,7 +315,7 @@ export function runEvidenceChecks(input: ChecksInput): Check[] {
     out.push({
       name: "Pin distance",
       passed: false,
-      detail: `A shared location on this stage sits over 30km from ${input.parish || "the job parish"}. `
+      detail: `A location shared that day sits over 30km from ${input.parish || "the job parish"}. `
         + "A materials run, a parish border or a bad fix all look identical to this, so it is worth a glance and nothing more on its own.",
       severity: "note",
       audience: "desk",
@@ -274,7 +332,7 @@ export function runEvidenceChecks(input: ChecksInput): Check[] {
     out.push({
       name: "Site",
       passed: false,
-      detail: `The arrival tap was over 30km from ${input.parish || "the job parish"}. `
+      detail: `The check-in was over 30km from ${input.parish || "the job parish"}. `
         + "A materials run, a parish border or a bad GPS fix all raise this the same way a wrong site would, "
         + "so it is worth a glance and nothing more on its own.",
       severity: "note",
@@ -284,7 +342,7 @@ export function runEvidenceChecks(input: ChecksInput): Check[] {
     out.push({
       name: "Site",
       passed: true,
-      detail: "No location on the arrival tap, so the site was not checked. Declining the prompt never blocks a check-in.",
+      detail: "No location on the check-in, so the site was not checked. Declining the prompt never blocks a check-in.",
       severity: "note",
       audience: "desk",
     });
