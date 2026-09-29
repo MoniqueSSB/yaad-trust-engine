@@ -88,6 +88,10 @@ export type ChecksInput = {
   quoteStages?: { stage?: string; evidence_note?: string }[] | null;
   pins?: PinRow[];
   parish?: string | null;
+  /** False where somebody is at home at the property day to day, and no
+   *  check-in is asked for (arrival-rule.ts, 29 Sep 2026). Left out means
+   *  expected, which is what every caller before that date meant. */
+  arrivalExpected?: boolean;
 };
 
 const ts = (v: unknown): number | null => {
@@ -154,15 +158,29 @@ export function runEvidenceChecks(input: ChecksInput): Check[] {
 
   // ── 2. ARRIVAL ───────────────────────────────────────────────────────
   const arrived = arrivals.length > 0;
-  out.push({
-    name: "Arrival",
-    passed: arrived,
-    detail: arrived
-      ? "An arrival is logged against this stage."
-      : "No arrival tap on this stage, so the record does not show anybody on site.",
-    severity: "gap",
-    audience: "worker",
-  });
+  if (input.arrivalExpected === false && !arrived) {
+    // Somebody is at home at the property, so the worker was never asked to
+    // check in and a missing arrival is not something they left undone. It
+    // is still written down, as a note for the desk, because a pack that
+    // drops a check without saying so cannot be told from one that never ran.
+    out.push({
+      name: "Arrival",
+      passed: true,
+      detail: "No check-in asked for on this job: somebody is at home at the property day to day.",
+      severity: "note",
+      audience: "desk",
+    });
+  } else {
+    out.push({
+      name: "Arrival",
+      passed: arrived,
+      detail: arrived
+        ? "An arrival is logged against this stage."
+        : "No arrival tap on this stage, so the record does not show anybody on site.",
+      severity: "gap",
+      audience: "worker",
+    });
+  }
 
   // ── 3. SEQUENCE ──────────────────────────────────────────────────────
   // Timestamps only, no interpretation. Uses captured_at where the file

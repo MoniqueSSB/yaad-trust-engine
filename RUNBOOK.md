@@ -6308,3 +6308,13 @@ A worker's question goes through four doors in order, in `yaad-inbound`: a fixed
 4. **To turn it off:** the desk's agents paused switch (`app_settings.agents_paused`). Fixed answers and the desk hand-over carry on; the model is not called.
 5. **A worker asking to be paid** gets `PAY_REQUEST_ANSWER`, a fixed string. Its last two sentences are the pay sentence in `faq.ts`, word for word. Change one, change both.
 6. **Deploy:** `supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` from a branch that has `origin/main` merged in. It is already on the no-platform-auth list in CLAUDE.md section 12, so the flag preserves what is live.
+
+## 49. The check-in question: a worker was asked, was not asked, or lost their photos (29 Sep 2026)
+
+1. **When it is asked:** the first photographs or typed update of the day on a job, once the job is known, if `arrival_log` has no row for that job and stage dated today in Jamaica. Once a day per stage, and never again that day after a check-in.
+2. **When it is not asked:** `jobs.access_type` says somebody lives there and is at home day to day (`_shared/arrival-rule.ts`). To see it: `select access_type from jobs where id = '<job>'`. Changing the answer on the job changes whether the worker is asked from the next message.
+3. **The answers a worker can give:** a location pin; "done" after tapping "I'm on site" on the portal's Evidence tab; skip, which files the evidence and tells them to check in before they leave site; or saying they cannot, which files it and puts a "Cannot check in" note on the desk.
+4. **"My photos disappeared":** the ask stands 24 hours (`ARRIVAL_HOLD_MS`). After that the batch is let go and the worker is told so on their next message. Nothing was on the job, so nothing came off it. They send the photos again.
+5. **A pin arrives but the reply says it did not save:** the message carries the database's own reason. "That number is not the worker on this job" means the phone on `worker_profiles` does not match the phone they are messaging from.
+6. **Trace attribute:** `yaadly.arrival_hold.outcome` on the `yaad-inbound` span: asked, checked_in, checked_in_on_portal, skipped, cannot_check_in, lapsed.
+7. **Deploy, both, from a branch with `origin/main` merged in, after `supabase/functions/sync-shared.sh`:** `supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` and `supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf --no-verify-jwt`. Both are already on the list in CLAUDE.md section 12.

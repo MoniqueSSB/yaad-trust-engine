@@ -272,3 +272,16 @@ Deno.test("neither source means no claim, said to the desk", () => {
   assertEquals(c.passed, true);
   assertEquals(c.audience, "desk");
 });
+
+Deno.test("a job with somebody at home is not marked down for a missing check-in", () => {
+  const base = { stage: 1, evidence: [], arrivals: [], checklist: null };
+  const asked = runEvidenceChecks(base).find((c) => c.name === "Arrival")!;
+  assertEquals(asked.passed, false);
+  assertEquals(asked.audience, "worker");
+  const notAsked = runEvidenceChecks({ ...base, arrivalExpected: false }).find((c) => c.name === "Arrival")!;
+  assertEquals(notAsked.passed, true);
+  assertEquals(notAsked.audience, "desk");
+  // A check-in that was made anyway still counts as one.
+  const made = runEvidenceChecks({ ...base, arrivalExpected: false, arrivals: [{ arrived_at: "2026-09-29T12:00:00Z" }] }).find((c) => c.name === "Arrival")!;
+  assertEquals(made.detail, "An arrival is logged against this stage.");
+});
