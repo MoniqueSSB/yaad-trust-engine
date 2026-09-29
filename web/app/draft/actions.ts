@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { scrub } from "@/lib/scrub";
+import { screenOwnWords } from "@/lib/own-words";
 
 /**
  * Sending a report draft from its edit page.
@@ -21,6 +22,10 @@ export async function sendReportDraft(_prev: DraftActionState, formData: FormDat
   // Scrubbed of contact details, the same as every other text that travels
   // between a worker and a client.
   const text = scrub(String(formData.get("text") ?? "").trim().slice(0, 2000)).clean;
+  // Screened against the same banned list as everything a model writes. The
+  // draft itself has already passed it, so this only ever stops words he added.
+  const screened = screenOwnWords(text);
+  if (!screened.ok) return { error: screened.message };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("send_report_draft_by_code", {
     p_job: jobId, p_code: String(formData.get("code") ?? ""), p_text: text,

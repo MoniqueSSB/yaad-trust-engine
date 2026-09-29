@@ -127,6 +127,26 @@ Deno.serve(async (req: Request) => {
     return json({ count: contents.length, contents: contents.map(({ types: _t, ...c }) => c) });
   }
 
+  // Where Meta's approval stands on every template in the account, 29 Sep
+  // 2026. Read only: it sends nothing and writes nothing. It exists because
+  // "is it approved" was being answered from memory and from code comments,
+  // and on 29 September both were wrong about the daily check-in.
+  if (action === "approvals") {
+    const r = await call("/ContentAndApprovals?PageSize=100");
+    type Row = { sid: string; friendly_name: string; date_created: string; types?: Record<string, { body?: string }>; approval_requests?: { status?: string; category?: string; rejection_reason?: string } };
+    const rows = ((r.body as { contents?: Row[] })?.contents ?? []).map((c) => ({
+      sid: c.sid,
+      name: c.friendly_name,
+      created: c.date_created,
+      kind: Object.keys(c.types ?? {})[0] ?? "",
+      status: String(c.approval_requests?.status ?? "not submitted"),
+      category: c.approval_requests?.category ?? null,
+      rejection_reason: c.approval_requests?.rejection_reason || null,
+      body: String(Object.values(c.types ?? {})[0]?.body ?? "").slice(0, 300),
+    }));
+    return json({ status: r.status, count: rows.length, templates: rows });
+  }
+
   // Create the section menu, or find the one already there, and record it.
   if (action === "create-section-menu") {
     const existing = (await listAll()).find((c) => c.friendly_name === SECTION_MENU_NAME);

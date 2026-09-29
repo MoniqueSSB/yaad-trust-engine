@@ -6306,7 +6306,8 @@ Founder: "you raise this with Yaadly". The portal opens a new dispute already es
 2. **Deploy the functions from disk, from main:** `yaad-notify-client`, `yaad-inbound`, `yaad-daily-checkin`, `yaad-twilio-setup`. Read the live `verify_jwt` first and keep it: `yaad-notify-client` and `yaad-inbound` carry `--no-verify-jwt`, the other two do not.
 3. **Deploy the app**, which carries `/draft/[id]`.
 4. **Create the buttons:** call `yaad-twilio-setup` with `{"action":"create-report-draft"}`. It answers with a ContentSid and writes `twilio_content_sid_report_draft`. Used in session, so nothing goes to Meta.
-5. **The daily check-in button, separately and only when wanted:** `{"action":"create-on-site"}` submits it to Meta; `{"action":"on-site-status"}` switches it on once approved. The daily prompt also needs its cron job, which has never been scheduled.
+5. **The daily check-in button:** `{"action":"create-on-site"}` was run on 29 Sep 2026 and Meta answered "received". `{"action":"on-site-status"}` switches it on once approved, by writing `twilio_content_sid_on_site`. Until then the daily prompt keeps sending its text template. The prompt itself is already scheduled, `0 21 * * *`, which is 4pm in Jamaica. (This line first said it had never been scheduled. It had. Corrected the same day.)
+6. **Where approval stands, for every template:** `{"action":"approvals"}`. Read only.
 
 **What a correct result looks like.** File a photo with a caption from a worker's phone. Three things arrive: the draft alone; then what it was written from, what is missing and how to reply; then three buttons. Tap Edit it, open the link, change a word, press Send to the client. The page says "Sent to the client, in your words" and the client gets that wording.
 
@@ -6317,4 +6318,4 @@ Founder: "you raise this with Yaadly". The portal opens a new dispute already es
 3. **The link says it is not valid:** a newer draft replaced it and the code changed. `select job_id, drafted_at, sent_at, sent_via, code_failures from report_draft_links where job_id = '<job>';` shows which. Ten wrong codes lock it; a new draft resets the count.
 4. **The draft is the worker's own words in quotation marks:** the model's draft claimed more than he did, or the model call failed, and his words were offered instead. The span attribute `yaadly.notify.draft_unearned` names the words that were caught. Working as designed.
 5. **The draft still says nobody checked in:** the check reads the Jamaica day. `select stage, arrived_on from arrival_log where job_id = '<job>' order by arrived_at desc;` and compare with the day the evidence was filed. A check-in on any stage that day counts.
-
+6. **A worker says his own words were refused:** the reply names the words. They are on the banned list in `_shared/guardrails.ts`. Nothing was sent and the draft is still waiting; he sends it again without them. A push titled "Report held" means a report reached the last check unscreened, which should not happen: find which route sent it.
