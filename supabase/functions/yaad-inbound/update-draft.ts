@@ -13,9 +13,13 @@
  *
  *  Pure on purpose, so the rule is tested without a webhook. */
 
+import { alsoPressed, pressDoubledLetters } from "./worker-question.ts";
+
 export type DraftReply = "file" | "discard" | "keep" | "replace";
 
 const DISCARD = /^(?:no|nah|nope|cancel|delete|drop it|don'?t|do not|stop|scrap it|leave it)[.!]*$/i;
+// "nno" and "noo" are a no, 29 Sep 2026. See pressDoubledLetters.
+const DISCARD_PRESSED = alsoPressed(DISCARD);
 
 /** Not an update on its own, whether or not a draft is waiting: a lone
  *  character, a number, punctuation. "1" arriving after a report prompt has
@@ -25,13 +29,25 @@ export function tooShortToBeAnUpdate(text: string): boolean {
   return t.length <= 1 || /^[\d\W]+$/.test(t);
 }
 
+/** Do these words say what a photograph shows?
+ *
+ *  A "1" went on JOB-WEB-1789253807959 as the description of a photograph on
+ *  29 September 2026: the worker had just been told to reply 1 for the job,
+ *  and the next thing asked was what the picture showed. A lone character, a
+ *  number or an "ok" is an answer to some other question, never a caption, so
+ *  the photograph is treated as having none and the question is asked. */
+export function saysWhatItShows(text: string, isAcknowledgement: (t: string) => boolean): boolean {
+  const t = String(text ?? "").trim();
+  return !!t && !tooShortToBeAnUpdate(t) && !isAcknowledgement(t);
+}
+
 /** What a plain text reply means while an update is waiting.
  *  Questions are not decided here: the caller answers them first and keeps
  *  the draft, the same order every other worker lane uses. */
 export function readDraftReply(text: string, isAcknowledgement: (t: string) => boolean): DraftReply {
   const t = String(text ?? "").trim();
   if (t === "1") return "file";
-  if (DISCARD.test(t)) return "discard";
+  if (DISCARD.test(t) || DISCARD_PRESSED.test(pressDoubledLetters(t))) return "discard";
   if (tooShortToBeAnUpdate(t) || isAcknowledgement(t)) return "keep";
   return "replace";
 }

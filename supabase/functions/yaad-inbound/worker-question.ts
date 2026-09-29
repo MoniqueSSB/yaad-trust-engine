@@ -19,10 +19,13 @@
  * the session is kept, nothing is sent, nothing is filed, and the reply says
  * so and repeats what is still wanted.
  *
- * WHAT IT DOES NOT DO. It never routes a question to a model. The canned
- * answers are fixed strings about WhatsApp itself; a question about the job,
- * the money or the client goes to the desk as a high-priority note and is
- * answered by a named human. It also never hands the thread over: holding a
+ * WHAT IT DOES NOT DO. Nothing in THIS file routes a question to a model.
+ * The canned answers are fixed strings; a question about the job, the money
+ * or the client goes to the desk as a high-priority note and is answered by
+ * a named human. Since 29 September 2026 a simple question with no fixed
+ * answer, and nothing to do with money or a client, may be answered from the
+ * approved facts by off-script.ts, which is tried only after this file has
+ * returned null. It also never hands the thread over: holding a
  * number silences every worker lane on it (see the human_handling branch in
  * index.ts), which is the wrong price for asking how to send a video.
  *
@@ -77,9 +80,74 @@ export function looksLikeQuestion(text: string): boolean {
 const ACKNOWLEDGEMENT =
   /^(?:no|nah|nope|yes|yeah|yep|ya|yah|ok|okay|k|kk|alright|aright|right|sure|fine|cool|thanks|thank you|thx|ty|cheers|bless|respect|hi|hello|hey|morning|good morning|good afternoon|good evening|evening|noted|got it|seen|received|ok thanks|okay thanks|yes please|no thanks)[.!]*$/i;
 
-export function isBareAcknowledgement(text: string): boolean {
-  return ACKNOWLEDGEMENT.test(String(text ?? "").trim());
+/** A word with its doubled letters pressed together, so a thumb landing twice
+ *  on a key still reads as the word that was meant. On 29 September 2026 the
+ *  founder, testing as the worker, answered "reply no to drop it" with "nno"
+ *  and had "nno" read back to her as the next update for the job record.
+ *
+ *  Doubled letters only, on purpose. Anything looser (a missing letter, two
+ *  swapped) starts catching real words: "on" is one swap from "no" and opens
+ *  plenty of real updates. The pattern is tested against the pressed form as
+ *  well as the typed one, and the list is the same list either way. */
+export function pressDoubledLetters(text: string): string {
+  return String(text ?? "").trim().replace(/([a-z])\1+/gi, "$1");
 }
+
+/** The pattern with the same pressing applied to its own words, so "cool"
+ *  still matches once it has become "col". */
+export function alsoPressed(pattern: RegExp): RegExp {
+  return new RegExp(pattern.source.replace(/([a-z])\1+/gi, "$1"), pattern.flags);
+}
+
+const ACKNOWLEDGEMENT_PRESSED = alsoPressed(ACKNOWLEDGEMENT);
+
+export function isBareAcknowledgement(text: string): boolean {
+  const t = String(text ?? "").trim();
+  return ACKNOWLEDGEMENT.test(t) || ACKNOWLEDGEMENT_PRESSED.test(pressDoubledLetters(t));
+}
+
+/** A worker saying they want paying, or asking for the client to be told so.
+ *
+ *  "let the client know i am ready for payment", 29 September 2026. It is not
+ *  a question by shape and it is not a site update, and it was read back as
+ *  one, ready to go on the job record and from there into the client's
+ *  report. It gets the published pay answer and what has to happen first.
+ *
+ *  A REQUEST, never a mention. "paid for the cement, receipt coming" and
+ *  "client paid the deposit so i started" are reports and must keep filing,
+ *  so every pattern here needs the asking in it: ready for, waiting on, pay
+ *  me, send or release my money. Capped at fourteen words so a long update
+ *  that ends on the subject of money still files. */
+const PAY_REQUEST = new RegExp(
+  "\\b(?:" + [
+    "ready (?:for|fi|to (?:be|get)) (?:my |mi |the |di )?(?:pay(?:ment|ing)?|paid|money)",
+    "(?:waiting|wait) (?:for|on|pon|fi) (?:my |mi |the |di )?(?:pay(?:ment)?|money)",
+    "(?:want|need|looking for|collect) (?:my |mi |the |di )?(?:pay(?:ment)?|money)\\b(?! (?:for|fi) (?:the |di )?(?:material|cement|lumber|paint|tile|block|steel|sand))",
+    "pay (?:me|mi)\\b",
+    "(?:send|release|transfer) (?:me |mi )?(?:my |mi |the |di )?(?:pay(?:ment)?|money|funds)\\b(?! (?:for|fi) (?:the |di )?(?:material|cement|lumber|paint|tile|block|steel|sand))",
+    "request(?:ing)? (?:my |mi |the |di )?pay(?:ment)?",
+    "(?:tell|let|ask) (?:the |di )?(?:client|customer|owner)\\b.{0,30}\\b(?:pay|payment|paid|money)",
+  ].join("|") + ")\\b",
+  "i",
+);
+
+export function asksForPayment(text: string): boolean {
+  const t = String(text ?? "").trim();
+  if (!t || t.split(/\s+/).length > 14) return false;
+  return PAY_REQUEST.test(t);
+}
+
+/** What a worker asking for payment is told. Fixed, like every other answer
+ *  here. The last two sentences are the published pay sentence from faq.ts,
+ *  word for word; the first three are the order things happen in, which is
+ *  the hold point the whole product is built on. No amount, no date, and no
+ *  promise that this payment is coming. */
+export const PAY_REQUEST_ANSWER =
+  "That has not gone on the job record and nothing has gone to the client. " +
+  "Payment is not something the client is asked for by message. It follows the work being accepted: " +
+  "your update goes to the client once you have confirmed it, the client approves the stage, and a named person at Yaadly checks the evidence and signs it off. " +
+  "Paid by Yaadly, not by the client, within 7 days of a named person at Yaadly signing the stage off, by bank transfer. Yaadly does not pay in cash. " +
+  "If you have a question about a specific payment, say so and a person will answer it.";
 
 /** A short instruction to the app that names a thing it can explain.
  *
@@ -91,6 +159,7 @@ export function isBareAcknowledgement(text: string): boolean {
  *  filing. */
 export function wantsHelpWith(text: string): boolean {
   const t = String(text ?? "").trim();
+  if (asksForPayment(t)) return true;
   if (!t || t.split(/\s+/).length > 4) return false;
   return answerWorkerQuestion(t) !== null;
 }
@@ -105,6 +174,9 @@ export function wantsHelpWith(text: string): boolean {
  *  one the app answers", and the caller puts it in front of a person. */
 export function answerWorkerQuestion(text: string): string | null {
   const t = String(text ?? "").toLowerCase();
+  // First, because "ready for payment, photos sent" names two things and the
+  // one a worker is waiting on is the money.
+  if (asksForPayment(t)) return PAY_REQUEST_ANSWER;
   if (/\b(?:location|locashun|where i am|where mi deh|pin|gps|my position|check ?in|arriv|on site|reach)\b/.test(t)) {
     return "To share your location on WhatsApp: tap the plus sign (or the paperclip) next to the message box, choose Location, then Send your current location. It goes on the Arrival Log for this job as proof you were there. Nothing waits on it.";
   }

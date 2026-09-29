@@ -52,6 +52,7 @@ import { pickTextProvider, providerAttrs, chatWithFailover } from "./textmodel.t
 import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, type VisionProvider, visionAttrs } from "./visionmodel.ts";
 import * as guardrails from "./guardrails.ts";
 import { checkAttrs, deskPack, runEvidenceChecks, workerGaps, workerNotes } from "./evidence-checks.ts";
+import { checkInApplies } from "./arrival-rule.ts";
 import { recordAccepted, type SendMeta, withMessagingService, withStatusCallback } from "./twilio-status.ts";
 import { hasWorkerTemplateDecision, insideWindow, samePhoneDigits, templateVar, WINDOW_MS, workerTemplateSummary } from "./worker-template.ts";
 import { Image } from "jsr:@matmen/imagescript";
@@ -808,7 +809,7 @@ async function assembleEvidenceChecks(admin: any, jobId: string, stage: number) 
       // by the day since 29 Sep 2026, and runEvidenceChecks does the narrowing.
       admin.from("arrival_log").select("arrived_at, arrived_on, lat, far_from_site")
         .eq("job_id", jobId).order("arrived_at", { ascending: true }),
-      admin.from("jobs").select("parish").eq("id", jobId).maybeSingle(),
+      admin.from("jobs").select("parish, access_type").eq("id", jobId).maybeSingle(),
       admin.from("kickoff_packs").select("docs").eq("job_id", jobId).eq("status", "approved")
         .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
@@ -828,6 +829,7 @@ async function assembleEvidenceChecks(admin: any, jobId: string, stage: number) 
       quoteStages: qp?.docs?.payment_stages ?? null,
       pins: pins ?? [],
       parish: job?.parish ?? null,
+      arrivalExpected: checkInApplies(job?.access_type),
     });
   } catch (e) {
     // A failed check must never stop the report. Say so in the logs, which as

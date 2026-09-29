@@ -6321,5 +6321,24 @@ Founder: "you raise this with Yaadly". The portal opens a new dispute already es
 6. **A worker says his own words were refused:** the reply names the words. They are on the banned list in `_shared/guardrails.ts`. Nothing was sent and the draft is still waiting; he sends it again without them. A push titled "Report held" means a report reached the last check unscreened, which should not happen: find which route sent it.
 7. **Photographs were filed and no draft came:** `select id, stage, created_at, fired_at, notified_at from evidence_landed_pending where job_id = '<job>' order by created_at desc limit 5;`. A row with `fired_at` set and `notified_at` empty was cleared silently. The usual reason since `20260929210000` is that the client has already had today's report on that stage: `select stage, decided_at from draft_decisions where job_id = '<job>' order by decided_at desc limit 3;`. Working as designed. The next day's evidence gets a draft.
 8. **The daily check-in** runs at `0 13 * * *` (8am in Jamaica) since 29 Sep 2026. To move it: `select cron.alter_job(job_id := (select jobid from cron.job where jobname = 'yaad-daily-checkin'), schedule := '<cron>');`.
-9. **"The job is already confirmed, so that reply is not needed":** the worker sent a number or a one word reply when asked what the photographs show. They describe them, or reply SKIP.
 
+## 49. The WhatsApp assistant answered a worker's question, or should have (29 Sep 2026)
+
+A worker's question goes through four doors in order, in `yaad-inbound`: a fixed answer (`worker-question.ts`), the clock, the person-only rule, then the text model reading the approved facts (`off-script.ts`). Anything that falls through all four reaches the desk as "Worker question", as it always did.
+
+1. **To read what it has been saying:** the `yaad-inbound` function log, lines starting `off-script:`. Each carries the outcome, the question and what the model wrote, including the ones that were not sent.
+2. **It answered something wrongly:** the fact it read is in `faq.ts` or `WORKER_HOW_TO` in `off-script.ts`. Correct the fact, and `docs/faq.html` in the same commit if it is a FAQ one. If the subject should never have been answered at all, add a pattern to `PERSON_ONLY` and a line to `off-script_test.ts`.
+3. **It keeps sending a simple question to the desk:** the log says why. `not_covered` means the fact is missing, so write it into the facts. `promise`, `unpublished_figure` or `banned_language` means the screen dropped the reply, which is the screen working. If no `off-script:` line exists the person-only rule caught it before the model.
+4. **To turn it off:** the desk's agents paused switch (`app_settings.agents_paused`). Fixed answers and the desk hand-over carry on; the model is not called.
+5. **A worker asking to be paid** gets `PAY_REQUEST_ANSWER`, a fixed string. Its last two sentences are the pay sentence in `faq.ts`, word for word. Change one, change both.
+6. **Deploy:** `supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` from a branch that has `origin/main` merged in. It is already on the no-platform-auth list in CLAUDE.md section 12, so the flag preserves what is live.
+
+## 50. The check-in question: a worker was asked, was not asked, or lost their photos (29 Sep 2026)
+
+1. **When it is asked:** the first photographs or typed update of the day on a job, once the job is known, if `arrival_log` has no row for that job and stage dated today in Jamaica. Once a day per stage, and never again that day after a check-in.
+2. **When it is not asked:** `jobs.access_type` says somebody lives there and is at home day to day (`_shared/arrival-rule.ts`). To see it: `select access_type from jobs where id = '<job>'`. Changing the answer on the job changes whether the worker is asked from the next message.
+3. **The answers a worker can give:** a location pin; "done" after tapping "I'm on site" on the portal's Evidence tab; skip, which files the evidence and tells them to check in before they leave site; or saying they cannot, which files it and puts a "Cannot check in" note on the desk.
+4. **"My photos disappeared":** the ask stands 24 hours (`ARRIVAL_HOLD_MS`). After that the batch is let go and the worker is told so on their next message. Nothing was on the job, so nothing came off it. They send the photos again.
+5. **A pin arrives but the reply says it did not save:** the message carries the database's own reason. "That number is not the worker on this job" means the phone on `worker_profiles` does not match the phone they are messaging from.
+6. **Trace attribute:** `yaadly.arrival_hold.outcome` on the `yaad-inbound` span: asked, checked_in, checked_in_on_portal, skipped, cannot_check_in, lapsed.
+7. **Deploy, both, from a branch with `origin/main` merged in, after `supabase/functions/sync-shared.sh`:** `supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` and `supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf --no-verify-jwt`. Both are already on the list in CLAUDE.md section 12.

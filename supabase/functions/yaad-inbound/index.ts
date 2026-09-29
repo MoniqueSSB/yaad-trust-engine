@@ -1,14 +1,14 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { chatWithFailover, pickTextProvider, providerAttrs } from "./textmodel.ts";
+import { answerText, chatWithFailover, pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
 import { checkTwilioSignature } from "./twilio-signature.ts";
 import { pickJobChoice } from "./job-match.ts";
 import { docExt, fileLabel, guessFileKind, isDocMime, isFileableStatus } from "./job-file-lane.ts";
 import { matchApprovingJob } from "./approval-match.ts";
 import { pickEvidenceItem } from "./evidence-item-match.ts";
-import { DRAFT_STILL_WAITING, draftReadBack, readDraftReply, tooShortToBeAnUpdate } from "./update-draft.ts";
+import { DRAFT_STILL_WAITING, draftReadBack, readDraftReply, saysWhatItShows, tooShortToBeAnUpdate } from "./update-draft.ts";
 import { visitorTokenOk, originAllowed, WEB_CHAT_MAX_CHARS, webReferenceIn, WEB_SAFE_FALLBACK } from "./web-chat.ts";
 import {
   ALERT_CONSENT_VERSION, ALERT_TERMS, ALERTS_PHRASE, ALERTS_STOP,
@@ -24,12 +24,14 @@ import { samePhone, digitsOf } from "./phone.ts";
 import { Deadline } from "./deadline.ts";
 import { inboundText, wasTapped } from "./button-tap.ts";
 import { answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith } from "./worker-question.ts";
+import { ARRIVAL_HOLD_MS, arrivalAsk, arrivalAskLapsed, arrivalStillWanted, cannotCheckIn, CHECK_IN_BEFORE_YOU_LEAVE, isPin, isSkip, saysCheckedIn } from "./arrival-ask.ts";
+import { checkInApplies } from "./arrival-rule.ts";
+import { clockAnswer, needsAPerson, OFF_SCRIPT_CLOSE, OFF_SCRIPT_SYSTEM, screenOffScript } from "./off-script.ts";
 import { replyFromCard } from "./reply-from-card.ts";
 import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
 import { parseAddonConfirm } from "./addon-confirm.ts";
 import { readDraftTap, readOnSiteTap, tapMatchesDraft } from "./report-tap.ts";
 import { screenOwnWords } from "./own-words.ts";
-import { canBeACaption } from "./report-draft.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -518,7 +520,9 @@ async function downloadAndStageEvidence(admin: any, url: string, mime: string, c
   if (error) return null;
 
   const sha256 = await evidenceSha256(got.bytes.buffer as ArrayBuffer);
-  const trimmed = caption.trim();
+  // A caption of "1" or "ok" is a reply to something else that happened to
+  // ride in on the photograph. Staged as uncaptioned, so it is asked about.
+  const trimmed = saysWhatItShows(caption, isBareAcknowledgement) ? caption.trim() : "";
   return { path, mime, bytes: got.bytes.byteLength, sha256, label: (trimmed || "Sent on WhatsApp").slice(0, 140), hasCaption: !!trimmed };
 }
 
@@ -623,6 +627,47 @@ async function fileWorkLogPin(
   } catch (e) {
     console.error("record_work_log_pin threw:", String(e).slice(0, 200));
     return false;
+  }
+}
+
+/** Should this worker be asked to check in before this goes on the job?
+ *  Only where the job is one a check-in is asked for at all (arrival-rule.ts)
+ *  and nobody has checked in on it today. A failed read answers no, for the
+ *  reason arrivedToday gives. */
+async function checkInOwed(supabase: any, jobId: string, stage: number): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.from("jobs").select("access_type").eq("id", jobId).maybeSingle();
+    if (error) { console.error("checkInOwed: read failed, not asking:", error.message); return false; }
+    if (!checkInApplies(data?.access_type)) return false;
+  } catch (e) {
+    console.error("checkInOwed: threw, not asking:", String(e).slice(0, 200));
+    return false;
+  }
+  return !(await arrivedToday(supabase, jobId, stage));
+}
+
+/** Has anybody checked in on this job today, Jamaica time?
+ *
+ *  By the day and not the stage, the founder's rule of 29 Sep 2026 that the
+ *  evidence check already follows: one check-in a day covers every stage.
+ *  The same reading of "today" that log_arrival() uses. `stage` is kept in
+ *  the signature for the callers and is not read.
+ *
+ *  A read that fails answers yes. The ask is there to prompt a worker for
+ *  something they have not done; it is not there to slow them down because
+ *  the database blinked, and the evidence check on the report still names a
+ *  missing arrival either way. */
+async function arrivedToday(supabase: any, jobId: string, _stage: number): Promise<boolean> {
+  try {
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Jamaica" }).format(new Date());
+    const { data, error } = await supabase.from("arrival_log")
+      .select("arrived_at").eq("job_id", jobId)
+      .eq("arrived_on", today).limit(1);
+    if (error) { console.error("arrivedToday: read failed, not holding:", error.message); return true; }
+    return (data ?? []).length > 0;
+  } catch (e) {
+    console.error("arrivedToday: threw, not holding:", String(e).slice(0, 200));
+    return true;
   }
 }
 
@@ -1732,15 +1777,74 @@ async function pushToDesk(
 // silences every worker lane on it, which is the wrong price for asking how
 // to send a clip. Her reply from the desk will hold it, as any desk reply
 // does, and the desk hands it back.
+/** One grounded answer from the approved facts, or null for "a person's".
+ *  Null on every kind of failure: no provider, no time left, a bad status, a
+ *  reply that did not pass the screen. The caller's next step is the desk,
+ *  which is where this question went before this function existed. */
+async function answerOffScript(question: string, deadline: Deadline, trace: Trace): Promise<string | null> {
+  const prov = pickTextProvider();
+  if (!prov) return null;
+  // Leaves 2.5 seconds for the desk push and the reply if this comes back
+  // with nothing, because that push is what stops the question being lost.
+  const sig = deadline.signal(6_000, 2_500, 1_500);
+  if (!sig) return null;
+  try {
+    return await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
+      ...providerAttrs(prov), "gen_ai.operation.name": "chat", "yaadly.model.job": "off_script",
+    }, async (sp) => {
+      const { provider, res: r } = await chatWithFailover(prov, {
+        temperature: 0, max_tokens: 900,
+        messages: [
+          { role: "system", content: OFF_SCRIPT_SYSTEM },
+          { role: "user", content: question.trim().slice(0, 600) },
+        ],
+      }, { timeoutMs: 25000, signal: sig });
+      const raw = await r.text();
+      sp.setAttributes({ ...providerAttrs(provider), "http.response.status_code": r.status });
+      if (!r.ok) {
+        const m = `off-script: ${provider.name} http ${r.status}: ${raw.slice(0, 200)}`;
+        sp.recordError(m); console.error(m); return null;
+      }
+      let content = "";
+      try {
+        content = String((JSON.parse(raw) as { choices?: { message?: { content?: string } }[] })?.choices?.[0]?.message?.content ?? "");
+      } catch (e) {
+        console.error("off-script: response body was not JSON:", String(e).slice(0, 200)); return null;
+      }
+      const screened = screenOffScript(content);
+      sp.setAttributes({ "yaadly.off_script.outcome": screened.why });
+      // The function log is private to the project. This line is how the
+      // answers get read back by a person, and how a question that keeps
+      // coming back NOT_COVERED becomes the next fact written into faq.ts.
+      console.log(`off-script: ${screened.why}. Asked: "${question.trim().slice(0, 200)}". Model said: "${answerText(content).slice(0, 400)}"`);
+      return screened.text;
+    });
+  } catch (e) {
+    console.error("off-script: threw:", String(e).slice(0, 300)); return null;
+  }
+}
+
 async function answerOrRaiseWorkerQuestion(
   supabase: SettingsReader,
   msg: { text: string; from: string; channel: string },
   jobId: string,
   stillWanted: string,
   trace: Trace,
+  // Both optional so a caller that has neither still gets the old behaviour,
+  // fixed answer or the desk, and never a model call it could not time.
+  opts: { deadline?: Deadline; paused?: boolean } = {},
 ): Promise<string> {
   const canned = answerWorkerQuestion(msg.text);
   if (canned) return `${canned} ${stillWanted}`;
+  const clock = clockAnswer(msg.text);
+  if (clock) return `${clock} ${stillWanted}`;
+  // A simple question the fixed answers do not cover, 29 Sep 2026. See
+  // off-script.ts for the rule and where it came from. Money, a client, a
+  // decision about the work: never offered to the model, straight to a person.
+  if (opts.deadline && !opts.paused && !needsAPerson(msg.text)) {
+    const answered = await answerOffScript(msg.text, opts.deadline, trace);
+    if (answered) return `${answered} ${OFF_SCRIPT_CLOSE} ${stillWanted}`;
+  }
   await pushToDesk(supabase, {
     target: { channel: msg.channel, from_addr: msg.from || "unknown" },
     title: `Worker question${jobId ? `: ${jobId}` : ""}`,
@@ -2592,14 +2696,28 @@ Deno.serve(async (req: Request) => {
       // Null here rather than deleted here. Going stale is not a decision
       // about anybody's evidence, it is this lane letting go, and the drop
       // below is then reachable and does what its comment always said.
-      const evSession = sess && String((sess.answers as any)?._lane ?? "") === "evidence"
+      // An ask for a check-in stands 24 hours and says so (arrival-ask.ts).
+      // Past that the waiting photographs or update are let go, the same way a
+      // stale session is: nulled here, deleted just below, and the message in
+      // hand is read fresh. Words alone get told what happened, because a
+      // worker replying "done" a day late must not have it read as an update.
+      const arrivalLapsed = !!sess && arrivalAskLapsed((sess.answers as any)?.arrival_asked_at);
+      if (arrivalLapsed) {
+        const wasPhotos = String((sess!.answers as any)?._lane ?? "") === "evidence";
+        await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+        root.setAttributes({ "yaadly.arrival_hold.outcome": "lapsed" });
+        if (!msg.media.length && !isPin(msg.lat, msg.lon)) {
+          return twiml(`${wasPhotos ? "The photos you sent were" : "The update you sent was"} waiting on a check-in for more than ${ARRIVAL_HOLD_MS / 3600_000} hours, so ${wasPhotos ? "they have" : "it has"} been let go and nothing went on the job. Check in first when you are next on site, then send ${wasPhotos ? "them" : "it"} again.`);
+        }
+      }
+      const evSession = !arrivalLapsed && sess && String((sess.answers as any)?._lane ?? "") === "evidence"
         && Date.now() - new Date(sess.updated_at as string).getTime() <= SESSION_STALE_MS ? sess : null;
       // A document (PDF or Word) waiting on "which job", from either side.
       const fileSession = sess && String((sess.answers as any)?._lane ?? "") === "job_file" ? sess : null;
       const reportSession = sess && String((sess.answers as any)?._lane ?? "") === "report_confirm" ? sess : null;
       const textUpdateSession = sess && String((sess.answers as any)?._lane ?? "") === "text_update" ? sess : null;
       // A worker's typed update, read back and waiting on a reply of 1. See update-draft.ts.
-      const draftSession = sess && String((sess.answers as any)?._lane ?? "") === "update_draft"
+      const draftSession = !arrivalLapsed && sess && String((sess.answers as any)?._lane ?? "") === "update_draft"
         && Date.now() - new Date(sess.updated_at as string).getTime() <= SESSION_STALE_MS ? sess : null;
 
       // ── the job alert list ──────────────────────────────────────────────
@@ -2924,7 +3042,7 @@ Deno.serve(async (req: Request) => {
           return twiml(await answerOrRaiseWorkerQuestion(
             supabase as unknown as SettingsReader, msg, String(a.job_id ?? ""),
             "Your report to the client is still waiting: tap Send as written or reply 1 to send the draft. To change it, tap Edit it, or type your own words and those go instead.",
-            trace,
+            trace, { deadline, paused: agentsPaused },
           ));
         }
         // His own words are screened against the same banned list a model's
@@ -3077,13 +3195,93 @@ Deno.serve(async (req: Request) => {
       // and replace the draft, so a stray message is never filed, only read
       // back. A voice note falls through the same way, because it carries
       // media and is transcribed there.
+      const CHECK_IN_TOLD = " A person at Yaadly has been told you could not check in today.";
+
+      // A worker who says they cannot share where they are. Their evidence is
+      // filed all the same, and a person is told, because a phone that cannot
+      // send a location is something Yaadly should know about on day one and
+      // not discover from a stage with no arrival on it.
+      const raiseCannotCheckIn = async (jobId: string, held: "photos" | "update") => {
+        root.setAttributes({ "yaadly.arrival_hold.outcome": "cannot_check_in" });
+        await pushToDesk(supabase as unknown as SettingsReader, {
+          target: { channel: msg.channel, from_addr: msg.from || "unknown" },
+          title: `Cannot check in${jobId ? `: ${jobId}` : ""}`,
+          priority: "default",
+          tags: "round_pushpin",
+          // Informational, so it carries no text for her phone: it goes to the desk and does not text
+          // her phone. The evidence is filed either way and nothing waits on her.
+          body: `${jobId ? `${jobId}: ` : ""}a worker says they cannot share their location today. Their ${held} went on the job without a check-in.`,
+        }, trace);
+      };
+
+      // Filing a typed update that has had its 1. One place, because since the
+      // check-in hold there are three ways to reach it: the 1 itself, "done"
+      // after checking in on the portal, and the pin arriving on its own.
+      const fileHeldDraft = async (a: any, skipCheckIn: false | "skip" | "cannot" = false): Promise<string> => {
+        // The job is read again rather than trusted from the draft: it may
+        // have moved stage, or closed, since the words were read back.
+        const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
+        const job = found?.jobs.find((j) => j.id === a.job_id);
+        if (!found || !job) {
+          await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+          root.setAttributes({ "yaadly.worker_update.outcome": "draft_job_not_open" });
+          return `${a.job_id} is not open for updates any more, so nothing was filed. If you need a person, just say so.`;
+        }
+        // Asked, never gated. The draft stays exactly as it is and keeps its
+        // 1 while the question is open; skip files it and says what is owed.
+        const owed = await checkInOwed(supabase, job.id, job.stage);
+        if (owed && !skipCheckIn) {
+          const first = !a.arrival_asked_at;
+          await supabase.from("wa_intake_sessions")
+            .update({ answers: { ...a, arrival_asked_at: a.arrival_asked_at ?? new Date().toISOString() }, updated_at: new Date().toISOString() })
+            .eq("wa_id", msg.from);
+          root.setAttributes({ "yaadly.worker_update.job": job.id, "yaadly.arrival_hold.outcome": first ? "asked" : "asked_again" });
+          if (!first) return `No check-in found for today yet. ${arrivalStillWanted("update")}`;
+          return arrivalAsk(job.id, await stageSaid(supabase, job.id, job.stage), "update", await mintPortalUploadLink(supabase, found.email, job.id));
+        }
+        await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+        // batch_id carries only when this draft was held as a note about a
+        // batch just filed. Null for every other update, which is what it
+        // has always been, and what makes the portal draw it on its own.
+        const notesBatch = String(a.notes_batch ?? "") || null;
+        const noteLabel = String(a.text ?? "").slice(0, 1000);
+        const { error } = await supabase.from("evidence").insert({
+          job_id: job.id, label: noteLabel, stage: job.stage,
+          kind: "work", uploaded_by: found.email, batch_id: notesBatch, sha256: await noteSha256(noteLabel, job.id),
+        });
+        root.setAttributes({
+          "yaadly.worker_update.job": job.id,
+          "yaadly.worker_update.outcome": error ? "insert_failed" : (notesBatch ? "filed_as_note" : "filed"),
+        });
+        const landed = notesBatch
+          ? `On record for ${job.id} (${job.title}), with the photos you sent.`
+          : `On record for ${job.id} (${job.title}).`;
+        return error
+          ? "That did not save properly. Reply 1 again in a moment."
+          : `${landed} The client hears about it once it is drafted.${owed ? (skipCheckIn === "cannot" ? CHECK_IN_TOLD : ` ${CHECK_IN_BEFORE_YOU_LEAVE}`) : ""} If you need a person instead, just say so.`;
+      };
+
       if (!evidenceHeld && draftSession && !msg.media.length && msg.text.trim()) {
         const a = draftSession.answers as any;
         const said = msg.text.trim();
+        // The update has had its 1 and is waiting on the check-in question.
+        // "skip", "done" after the portal, or anything short is an answer to
+        // that question and is never read back as a new update. Real words
+        // still replace the draft.
+        if (a.arrival_asked_at && said !== "1") {
+          if (isSkip(said)) return twiml(await fileHeldDraft(a, "skip"));
+          if (cannotCheckIn(said) || wantsAPerson(said)) {
+            await raiseCannotCheckIn(String(a.job_id ?? ""), "update");
+            return twiml(await fileHeldDraft(a, "cannot"));
+          }
+          if (saysCheckedIn(said) || isBareAcknowledgement(said) || tooShortToBeAnUpdate(said)) {
+            return twiml(await fileHeldDraft(a));
+          }
+        }
         if (said !== "1" && (looksLikeQuestion(said) || wantsHelpWith(said))) {
           root.setAttributes({ "yaadly.worker_update.outcome": "question_while_draft_waiting" });
           return twiml(await answerOrRaiseWorkerQuestion(
-            supabase as unknown as SettingsReader, msg, String(a.job_id ?? ""), DRAFT_STILL_WAITING, trace,
+            supabase as unknown as SettingsReader, msg, String(a.job_id ?? ""), DRAFT_STILL_WAITING, trace, { deadline, paused: agentsPaused },
           ));
         }
         const reply = readDraftReply(said, isBareAcknowledgement);
@@ -3096,36 +3294,7 @@ Deno.serve(async (req: Request) => {
           root.setAttributes({ "yaadly.worker_update.outcome": "draft_dropped" });
           return twiml("Dropped, nothing went on the job.");
         }
-        if (reply === "file") {
-          // The job is read again rather than trusted from the draft: it may
-          // have moved stage, or closed, since the words were read back.
-          const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
-          const job = found?.jobs.find((j) => j.id === a.job_id);
-          await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
-          if (!found || !job) {
-            root.setAttributes({ "yaadly.worker_update.outcome": "draft_job_not_open" });
-            return twiml(`${a.job_id} is not open for updates any more, so nothing was filed. If you need a person, just say so.`);
-          }
-          // batch_id carries only when this draft was held as a note about a
-          // batch just filed. Null for every other update, which is what it
-          // has always been, and what makes the portal draw it on its own.
-          const notesBatch = String(a.notes_batch ?? "") || null;
-          const noteLabel = String(a.text ?? "").slice(0, 1000);
-          const { error } = await supabase.from("evidence").insert({
-            job_id: job.id, label: noteLabel, stage: job.stage,
-            kind: "work", uploaded_by: found.email, batch_id: notesBatch, sha256: await noteSha256(noteLabel, job.id),
-          });
-          root.setAttributes({
-            "yaadly.worker_update.job": job.id,
-            "yaadly.worker_update.outcome": error ? "insert_failed" : (notesBatch ? "filed_as_note" : "filed"),
-          });
-          const landed = notesBatch
-            ? `On record for ${job.id} (${job.title}), with the photos you sent.`
-            : `On record for ${job.id} (${job.title}).`;
-          return twiml(error
-            ? "That did not save properly. Reply 1 again in a moment."
-            : `${landed} The client hears about it once it is drafted. If you need a person instead, just say so.`);
-        }
+        if (reply === "file") return twiml(await fileHeldDraft(a));
         // "replace": falls through to the general door below.
       }
 
@@ -3180,9 +3349,89 @@ Deno.serve(async (req: Request) => {
         const awaitingPhase: boolean = !!answers.awaiting_phase;
         const media = msg.media.filter((m) => m.mime.startsWith("image/") || m.mime.startsWith("video/"));
 
+        // What is asked once the job is known: what the photographs show, if
+        // any of them came without a caption, and then which part of the job
+        // they belong to. One place, because since 29 Sep 2026 it is reached
+        // two ways, straight from the job answer and after the check-in one.
+        const askWhatNext = async (base: any, job: { id: string; stage: number; title: string }, lead: string | null) => {
+          const items: PendingEvidence[] = base.pending ?? [];
+          const said = await stageSaid(supabase, job.id, job.stage);
+          if (items.some((p) => !p.hasCaption)) {
+            // Only asked once per batch, and only when something still needs
+            // it: an item that already carried a real caption keeps it exactly
+            // as sent, never overwritten by a later answer meant for the others.
+            await supabase.from("wa_intake_sessions")
+              .update({ answers: { ...base, confirmed_job: job.id, confirmed_stage: job.stage }, updated_at: new Date().toISOString() })
+              .eq("wa_id", msg.from);
+            return twiml(`${lead ?? `Got it, that's for ${job.id}, ${said}.`} Anything you send now files against that stage. What does this show? A line on what was done helps the client understand it faster. ${UNFILED_NOTICE_SHORT}`);
+          }
+          // Everything already carries a caption, so no context question is
+          // needed, but the section one still is: a worker who captioned their
+          // photograph has said what it shows, not which part of the job it
+          // belongs to. Same single question, same session, same rule that it
+          // never blocks.
+          await supabase.from("wa_intake_sessions")
+            .update({
+              answers: { ...base, confirmed_job: job.id, confirmed_stage: job.stage, awaiting_phase: true },
+              updated_at: new Date().toISOString(),
+            })
+            .eq("wa_id", msg.from);
+          root.setAttributes({ "yaadly.evidence_intake.outcome": "confirmed_asked_phase" });
+          return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, `${lead ?? `Got it, that's for ${job.id} (${job.title}), ${said}.`} Anything you send now files against that stage.${pairHint(await beforesOnJob(supabase, job.id))}`);
+        };
+
+        // ── the check-in question, waiting on its answer ─────────────────
+        //
+        // Asked when the job was confirmed and nobody had checked in on it
+        // today (arrival-ask.ts). Four answers move on: a pin, "done" after
+        // the portal, skip, and "I cannot". Anything else is asked again. It
+        // never gates: skip files the photographs like any others.
+        if (answers.awaiting_arrival && confirmedJob && !media.length) {
+          const job = { id: confirmedJob.id, stage: confirmedJob.stage, title: choices.find((c) => c.id === confirmedJob.id)?.title ?? "" };
+          const said = msg.text.trim();
+          const moveOn = { ...answers, awaiting_arrival: false, arrival_asked_at: null };
+          if (isPin(msg.lat, msg.lon)) {
+            const { data: logged, error } = await supabase.rpc("log_arrival_via_whatsapp", {
+              p_job: job.id, p_phone: msg.from, p_lat: msg.lat, p_lon: msg.lon,
+            });
+            if (error) return twiml(`That did not save: ${error.message} ${arrivalStillWanted("photos")}`);
+            const row = Array.isArray(logged) ? logged[0] : logged;
+            root.setAttributes({ "yaadly.arrival.job": job.id, "yaadly.arrival.outcome": row?.already_logged_today ? "already_today" : "logged", "yaadly.arrival_hold.outcome": "checked_in" });
+            return askWhatNext(moveOn, job, `Checked in on ${job.id}${msg.place ? ` from ${msg.place}` : ""}. That is on the Arrival Log now.`);
+          }
+          if (isSkip(said)) {
+            root.setAttributes({ "yaadly.arrival_hold.outcome": "skipped" });
+            return askWhatNext(moveOn, job, CHECK_IN_BEFORE_YOU_LEAVE);
+          }
+          if (cannotCheckIn(said) || wantsAPerson(said)) {
+            await raiseCannotCheckIn(job.id, "photos");
+            return askWhatNext(moveOn, job, `Understood, your photos go on the job without a check-in.${CHECK_IN_TOLD}`);
+          }
+          if (await arrivedToday(supabase, job.id, job.stage)) {
+            root.setAttributes({ "yaadly.arrival_hold.outcome": "checked_in_on_portal" });
+            return askWhatNext(moveOn, job, `You are checked in on ${job.id} today.`);
+          }
+          if (looksLikeQuestion(said) || wantsHelpWith(said)) {
+            return twiml(await answerOrRaiseWorkerQuestion(
+              supabase as unknown as SettingsReader, msg, job.id, arrivalStillWanted("photos"), trace, { deadline, paused: agentsPaused },
+            ));
+          }
+          root.setAttributes({ "yaadly.arrival_hold.outcome": saysCheckedIn(said) ? "said_done_but_no_arrival" : "not_an_answer" });
+          return twiml(`${saysCheckedIn(said) ? "No check-in found for today yet. " : ""}${arrivalStillWanted("photos")}`);
+        }
+
         if (media.length) {
           const items = (await Promise.all(media.map((m) => downloadAndStageEvidence(supabase, m.url, m.mime, msg.text, deadline)))).filter(Boolean) as PendingEvidence[];
           const next = [...pending, ...items];
+          // More photographs while the check-in question is open join the
+          // batch and the question stays asked. updated_at moves, the time
+          // the question was asked does not, so the 24 hours are not reset.
+          if (answers.awaiting_arrival && confirmedJob) {
+            await supabase.from("wa_intake_sessions")
+              .update({ answers: { ...answers, pending: next }, photo_count: next.length, updated_at: new Date().toISOString() })
+              .eq("wa_id", msg.from);
+            return twiml(`${items.length ? `Got that too, ${next.length} so far.` : "That one did not come through."} ${arrivalStillWanted("photos")}`);
+          }
           // A photograph arriving after the section question has gone out,
           // with nothing said about it, still needs the context question it
           // would have got had it come in with the others. So the batch steps
@@ -3231,7 +3480,7 @@ Deno.serve(async (req: Request) => {
             root.setAttributes({ "yaadly.evidence_intake.outcome": "question_while_awaiting_phase" });
             const lead = await answerOrRaiseWorkerQuestion(
               supabase as unknown as SettingsReader, msg, confirmedJob.id,
-              "Your photos are still waiting to be filed.", trace,
+              "Your photos are still waiting to be filed.", trace, { deadline, paused: agentsPaused },
             );
             return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, lead);
           }
@@ -3304,21 +3553,17 @@ Deno.serve(async (req: Request) => {
             root.setAttributes({ "yaadly.evidence_intake.outcome": "question_while_awaiting_context" });
             return twiml(await answerOrRaiseWorkerQuestion(
               supabase as unknown as SettingsReader, msg, confirmedJob.id,
-              "Your photos are still waiting to be filed. What do they show? A line on what was done is enough.", trace,
+              "Your photos are still waiting to be filed. What do they show? A line on what was done is enough.", trace, { deadline, paused: agentsPaused },
             ));
           }
-          // A stray "1" is not a description. On 29 Sep 2026 a second 1,
-          // sent after the job had already been confirmed, was filed as the
-          // caption of a photograph and reached the report draft as if it
-          // were an account of the work. It is asked about again. "skip" is
-          // the way out, so nobody is held in a loop for declining to write.
-          const typed = msg.text.trim();
-          const skipping = /^skip$/i.test(typed);
-          if (!skipping && !canBeACaption(typed)) {
-            root.setAttributes({ "yaadly.evidence_intake.outcome": "reply_not_a_caption" });
-            return twiml(`The job is already confirmed as ${confirmedJob.id}, so that reply is not needed. What do the photos show? A line on what was done is enough, or reply SKIP to file them without one.`);
+          // Nor is a "1" or an "ok". The photos stay parked and the question
+          // is asked again, saying why, so a worker who has just replied 1 to
+          // the job question does not watch "1" become what their work shows.
+          if (!saysWhatItShows(msg.text, isBareAcknowledgement)) {
+            root.setAttributes({ "yaadly.evidence_intake.outcome": "not_a_caption_while_awaiting_context" });
+            return twiml(`The job is confirmed as ${confirmedJob.id}, so that part is done. Your photos are still waiting to be filed. What do they show? A line on what was done is enough.`);
           }
-          const context = skipping ? "" : typed.slice(0, 140);
+          const context = msg.text.trim().slice(0, 140);
           const described = context
             ? pending.map((p) => p.hasCaption ? p : { ...p, label: context, hasCaption: true })
             : pending;
@@ -3337,29 +3582,22 @@ Deno.serve(async (req: Request) => {
           return twiml(`Sorry, that did not match a job. ${codePrompt(choices)} ${UNFILED_NOTICE}`);
         }
 
-        // Only asked once per batch, and only when something still needs
-        // it: an item that already carried a real caption keeps it exactly
-        // as sent, never overwritten by a later answer meant for the others.
-        if (pending.some((p) => !p.hasCaption)) {
+        // The first evidence of the day on a job nobody at the property is
+        // watching: ask for the check-in before anything else. See
+        // arrival-ask.ts. The photographs wait on the answer exactly as they
+        // were already waiting on the job one.
+        if (await checkInOwed(supabase, pick.id, pick.stage)) {
           await supabase.from("wa_intake_sessions")
-            .update({ answers: { ...answers, confirmed_job: pick.id, confirmed_stage: pick.stage }, updated_at: new Date().toISOString() })
+            .update({
+              answers: { ...answers, confirmed_job: pick.id, confirmed_stage: pick.stage, awaiting_arrival: true, arrival_asked_at: new Date().toISOString() },
+              updated_at: new Date().toISOString(),
+            })
             .eq("wa_id", msg.from);
-          return twiml(`Got it, that's for ${pick.id}, ${await stageSaid(supabase, pick.id, pick.stage)}. Anything you send now files against that stage. What does this show? A line on what was done helps the client understand it faster. ${UNFILED_NOTICE_SHORT}`);
+          root.setAttributes({ "yaadly.arrival_hold.outcome": "asked", "yaadly.evidence_intake.outcome": "confirmed_asked_check_in" });
+          return twiml(arrivalAsk(pick.id, await stageSaid(supabase, pick.id, pick.stage), "photos", await mintPortalUploadLink(supabase, workerEmail, pick.id)));
         }
 
-        // Everything already carries a caption, so no context question is
-        // needed, but the section one still is: a worker who captioned their
-        // photograph has said what it shows, not which part of the job it
-        // belongs to. Same single question, same session, same rule that it
-        // never blocks.
-        await supabase.from("wa_intake_sessions")
-          .update({
-            answers: { ...answers, confirmed_job: pick.id, confirmed_stage: pick.stage, awaiting_phase: true },
-            updated_at: new Date().toISOString(),
-          })
-          .eq("wa_id", msg.from);
-        root.setAttributes({ "yaadly.evidence_intake.outcome": "confirmed_asked_phase" });
-        return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, `Got it, that's for ${pick.id} (${pick.title}), ${await stageSaid(supabase, pick.id, pick.stage)}. Anything you send now files against that stage.${pairHint(await beforesOnJob(supabase, pick.id))}`);
+        return askWhatNext(answers, pick, null);
       }
 
       if (sess && Date.now() - new Date(sess.updated_at as string).getTime() > SESSION_STALE_MS) {
@@ -3413,6 +3651,11 @@ Deno.serve(async (req: Request) => {
               return twiml(filed
                 ? `Already checked in on ${job.id} (${job.title}) today, so I have put this on the job as where you were${where}. It strengthens the record and nothing waits on it.`
                 : `You are already checked in on ${job.id} (${job.title}) today, so nothing changed.`);
+            }
+            // A typed update that had its 1 and was waiting on this pin.
+            const heldDraft = draftSession?.answers as any;
+            if (heldDraft?.arrival_asked_at && heldDraft.job_id === job.id) {
+              return twiml(`Checked in on ${job.id}${where}. That is on the Arrival Log now. ${await fileHeldDraft(heldDraft)}`);
             }
             return twiml(`Checked in on ${job.id} (${job.title})${where}. That is on the Arrival Log now.`);
           }
@@ -4005,7 +4248,7 @@ Deno.serve(async (req: Request) => {
             root.setAttributes({ "yaadly.worker_update.outcome": "question_not_update" });
             return twiml(await answerOrRaiseWorkerQuestion(
               supabase as unknown as SettingsReader, msg, found.jobs.length === 1 ? found.jobs[0].id : "",
-              "Anything you send about the work itself still goes on the job record as normal.", trace,
+              "Anything you send about the work itself still goes on the job record as normal.", trace, { deadline, paused: agentsPaused },
             ));
           }
           // A lone "1" or a stray character is not an update. With a draft
