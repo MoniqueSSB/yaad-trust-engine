@@ -6348,3 +6348,10 @@ A worker's question goes through four doors in order, in `yaad-inbound`: a fixed
 3. **To send the draft that was missed:** `insert into evidence_landed_pending (job_id, stage, due_at) values ('<job>', <stage>, now()) on conflict (job_id, stage) where fired_at is null do update set due_at = excluded.due_at;` The check runs once a minute and sends it. This sends a WhatsApp message to the worker, so do it on purpose.
 4. **Whether it arrived:** `select kind, status, error_code, sent_at from message_deliveries where job_id = '<job>' order by sent_at desc limit 5;`
 5. **The reply to "thanks" or "hi"** is `acknowledgementReply` in `yaad-inbound/worker-question.ts`. The next step sentence on every filing is `WHAT_HAPPENS_NEXT` in `yaad-inbound/update-draft.ts`.
+
+## 52. A worker sent the report from the page and WhatsApp said nothing (29 Sep 2026)
+
+1. **What should happen:** within a few seconds of pressing Send on the draft page, the worker gets "Sent to the client, in your words..." on WhatsApp. Sent by `yaad-notify-client`, kind `report sent receipt` in `message_deliveries`.
+2. **Whether the client was reached, and how:** `select created, content from net._http_response order by created desc limit 20;` and find the row with `evidence_report_confirmed`. `emailed` and `whatsapp.sent` say which. A job with no client phone is reached by email only, and says `no recipient phone on the job`.
+3. **No receipt arrived:** `select sent_via, sent_at from report_draft_links where job_id = '<job>';` It must say `link`. Then `select status, error_code from message_deliveries where job_id = '<job>' and kind = 'report sent receipt';` Error 63016 means the worker was outside WhatsApp's 24 hour window.
+4. **The worker's next message was treated as a report:** the `report_confirm` row in `wa_intake_sessions` was not closed. Delete it by `wa_id`.

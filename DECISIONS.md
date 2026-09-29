@@ -4888,3 +4888,11 @@ Monique, testing as the worker on JOB-WEB-1789253807959: "no draft report sent t
 **Every filing confirmation now ends with the next step** (`WHAT_HAPPENS_NEXT` in `yaad-inbound/update-draft.ts`): what arrives, where, and the one reply that moves it on. It names no day or hour, and nothing about pay or the client's answer. A test holds it on all three confirmations.
 
 **A thank you is answered as one.** Every bare acknowledgement used to get the reply written for a stray "no", which told a worker who had just filed that nothing was filed and asked for another update. Thanks, a greeting, and a stray ok now each get their own line (`acknowledgementReply` in `worker-question.ts`), and "your update is on the job" is said only when the database shows one filed in the last ten minutes.
+
+## 2026-09-29 · A report sent from the edit page is answered on WhatsApp
+
+Monique edited a draft on `/draft/[id]`, pressed Send, and said "but whatsapp hasnt updated". The page said it was sent. The chat said nothing and still showed three live buttons, and the chat is where a worker is.
+
+`yaad-notify-client` now sends the worker a receipt when `report_draft_links.sent_via` is `link`: that it went, in their words, that the buttons above are finished with, and what happens next. It reads the row and takes nothing from the caller, so `relay_confirmed_report()` keeps its signature and the WhatsApp door, which answers in the chat already, gets no second receipt. If neither the email nor WhatsApp reached the client, the worker is told the report is saved and has not reached them, never that it was sent, and the desk is alerted. The waiting `report_confirm` session is closed at the same time, because left open the worker's next message would be read as their own version of a report that had already gone.
+
+**What it costs.** One more WhatsApp message per report sent from the page. It is free text inside the 24 hour window, which holds because a worker on the page tapped a button in the chat minutes earlier.
