@@ -26,6 +26,12 @@ import { recordAccepted, type SendMeta, withMessagingService, withStatusCallback
 // do. Until the secret is set, this function says so plainly and sends
 // nothing, rather than quietly doing half the job.
 //
+// Corrected 29 Sep 2026: the template has existed since 4 Sep 2026 and this
+// function has been sending on its schedule. The sentence above was true the
+// day it was written and was read as current three weeks later, which put a
+// wrong statement in front of the founder. Ask yaad-twilio-setup for
+// "approvals" rather than trusting a comment, this one included.
+//
 // A worker's reply lands back through yaad-inbound exactly like any other
 // WhatsApp message, and it already goes through the same draft, confirm and
 // relay loop a photo update gets. This comment used to say that was "the
@@ -57,7 +63,7 @@ const CORS = {
 // Same helper shape as yaad-job-health's own copy, kept separate rather
 // than shared: this repository's own house style for small per-function
 // helpers, called out by name in yaad-portal-code's header.
-async function sendTwilioTemplate(to: string, vars: Record<string, string>, trace: Trace, meta: SendMeta = { kind: "daily check-in" }) {
+async function sendTwilioTemplate(to: string, vars: Record<string, string>, trace: Trace, meta: SendMeta = { kind: "daily check-in" }, contentSid = CONTENT_SID) {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
@@ -72,7 +78,7 @@ async function sendTwilioTemplate(to: string, vars: Record<string, string>, trac
         method: "POST",
         headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
         body: withMessagingService(withStatusCallback(new URLSearchParams({
-          To: `whatsapp:+${digits}`, From: from, ContentSid: CONTENT_SID, ContentVariables: JSON.stringify(vars),
+          To: `whatsapp:+${digits}`, From: from, ContentSid: contentSid, ContentVariables: JSON.stringify(vars),
         }))),
         signal: AbortSignal.timeout(15000),
       });
@@ -141,11 +147,25 @@ Deno.serve(async (req: Request) => {
     }
     if (!allowed) return json({ error: "Not authorised." }, 403);
 
-    if (!CONTENT_SID) {
+    // The check-in button, 29 Sep 2026. yaad-twilio-setup writes this setting
+    // only once Meta has approved the template, so finding it here means it
+    // can be sent. It carries one button, "I am on site", whose tap reaches
+    // yaad-inbound as ONSITE and the job's code. The older text-only template
+    // named by the secret still works when that is what is configured.
+    let onSiteSid = "";
+    {
+      const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_on_site").maybeSingle();
+      try { onSiteSid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { onSiteSid = String(st?.value ?? ""); }
+      if (!/^HX[0-9a-f]{32}$/i.test(onSiteSid)) onSiteSid = "";
+    }
+    const useSid = onSiteSid || CONTENT_SID;
+    root.setAttributes({ "yaadly.daily_checkin.button": Boolean(onSiteSid) });
+
+    if (!useSid) {
       return json({
         ok: false,
-        error: "TWILIO_CONTENT_SID_DAILY_CHECKIN is not set. Nothing sent.",
-        detail: "This ping only ever sends through an approved WhatsApp Content Template. Submit one in the Twilio console, set the secret to its ContentSid, then re-run.",
+        error: "No approved check-in template. Nothing sent.",
+        detail: "This ping only ever sends through an approved WhatsApp Content Template. Run yaad-twilio-setup create-on-site, then on-site-status once Meta has approved it, then re-run.",
       }, 200);
     }
 
@@ -167,7 +187,10 @@ Deno.serve(async (req: Request) => {
       const { data: profile } = await admin.from("worker_profiles").select("phone").ilike("worker_email", j.worker_email).maybeSingle();
       if (!profile?.phone) { skippedNoPhone++; continue; }
 
-      const result = await sendTwilioTemplate(String(profile.phone), { "1": j.title ?? j.id }, trace, { kind: "daily check-in", job_id: j.id });
+      const vars: Record<string, string> = onSiteSid
+        ? { "1": `${j.title ?? "your job"} (${j.id})`, "2": j.id }
+        : { "1": j.title ?? j.id };
+      const result = await sendTwilioTemplate(String(profile.phone), vars, trace, { kind: "daily check-in", job_id: j.id }, useSid);
       // Logged once per job per day regardless of delivery, same reasoning
       // as mark_job_nudged: this is a once-a-day ask, not a retry queue,
       // and a Twilio outage should not turn into the same worker getting

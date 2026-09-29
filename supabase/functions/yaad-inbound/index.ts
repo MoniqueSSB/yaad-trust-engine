@@ -30,6 +30,8 @@ import { clockAnswer, needsAPerson, OFF_SCRIPT_CLOSE, OFF_SCRIPT_SYSTEM, screenO
 import { replyFromCard } from "./reply-from-card.ts";
 import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
 import { parseAddonConfirm } from "./addon-confirm.ts";
+import { readDraftTap, readOnSiteTap, tapMatchesDraft } from "./report-tap.ts";
+import { screenOwnWords } from "./own-words.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -644,21 +646,22 @@ async function checkInOwed(supabase: any, jobId: string, stage: number): Promise
   return !(await arrivedToday(supabase, jobId, stage));
 }
 
-/** Has anybody checked in on this job and stage today, Jamaica time?
+/** Has anybody checked in on this job today, Jamaica time?
  *
- *  The same pair, and the same reading of "today", that log_arrival() is
- *  unique on, so the hold in arrival-ask.ts and the Arrival Log can never
- *  disagree about whether a worker has arrived.
+ *  By the day and not the stage, the founder's rule of 29 Sep 2026 that the
+ *  evidence check already follows: one check-in a day covers every stage.
+ *  The same reading of "today" that log_arrival() uses. `stage` is kept in
+ *  the signature for the callers and is not read.
  *
  *  A read that fails answers yes. The ask is there to prompt a worker for
  *  something they have not done; it is not there to slow them down because
  *  the database blinked, and the evidence check on the report still names a
  *  missing arrival either way. */
-async function arrivedToday(supabase: any, jobId: string, stage: number): Promise<boolean> {
+async function arrivedToday(supabase: any, jobId: string, _stage: number): Promise<boolean> {
   try {
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Jamaica" }).format(new Date());
     const { data, error } = await supabase.from("arrival_log")
-      .select("arrived_at").eq("job_id", jobId).eq("stage", Math.max(Number(stage) || 0, 1))
+      .select("arrived_at").eq("job_id", jobId)
       .eq("arrived_on", today).limit(1);
     if (error) { console.error("arrivedToday: read failed, not holding:", error.message); return true; }
     return (data ?? []).length > 0;
@@ -2908,6 +2911,55 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // ── the buttons on a report draft and on the daily check-in ───────────
+      //
+      // 29 Sep 2026. Founder: "this should also all be buttons also that
+      // people tap instead of writing". A tap arrives as text, the button's
+      // id, so each is read here and handed to the lane a typed reply has
+      // always used. Ahead of the report lane on purpose: that lane takes any
+      // text that is not "1" as the worker's own version of the report, and a
+      // button id sent to a client as a status update is exactly the failure
+      // this ordering exists to prevent. See report-tap.ts.
+      const onSiteJob = !msg.media.length ? readOnSiteTap(msg.text) : null;
+      if (!evidenceHeld && onSiteJob) {
+        // The same RPC a location pin uses, with no coordinates: a tap carries
+        // a time and no place. It refuses a number that is not the worker on
+        // the job, so the code in the button cannot check anybody else in.
+        const { data: logged, error } = await supabase.rpc("log_arrival_via_whatsapp", { p_job: onSiteJob, p_phone: msg.from });
+        const row = Array.isArray(logged) ? logged[0] : logged;
+        root.setAttributes({
+          "yaadly.arrival.job": onSiteJob, "yaadly.arrival.by": "button",
+          "yaadly.arrival.outcome": error ? "refused" : (row?.already_logged_today ? "already_today" : "logged"),
+        });
+        if (error) return twiml(`That did not save: ${error.message}`);
+        const pinAsk = "To put on record where you are, tap the + or the paperclip in this chat, then Location, then Send your current location. It is up to you and nothing waits on it.";
+        return twiml(row?.already_logged_today
+          ? `You are already checked in on ${onSiteJob} today. One check in a day covers every stage. ${pinAsk}`
+          : `Checked in on ${onSiteJob}. That covers every stage you work today. ${pinAsk}`);
+      }
+
+      const draftTap = !msg.media.length ? readDraftTap(msg.text) : null;
+      if (!evidenceHeld && draftTap && !(reportSession && tapMatchesDraft(draftTap, (reportSession.answers as any)?.job_id))) {
+        root.setAttributes({ "yaadly.report_confirm.job": draftTap.jobId, "yaadly.report_confirm.outcome": "tap_on_a_draft_not_waiting" });
+        return twiml("That draft is not waiting any more. It has been sent already, or a newer one has replaced it. Use the buttons on the newest draft.");
+      }
+      if (!evidenceHeld && draftTap && reportSession && draftTap.kind !== "send") {
+        const a = reportSession.answers as any;
+        root.setAttributes({ "yaadly.report_confirm.job": a.job_id, "yaadly.report_confirm.outcome": `tap_${draftTap.kind}` });
+        if (draftTap.kind === "own") {
+          return twiml("Type what the client should be told about the work, in one message. Those words go to the client instead of the draft. Nothing is sent until you do.");
+        }
+        // The edit page. The code is read here by job, never passed in, and a
+        // draft with no link (the table not there yet, or the write failed)
+        // gets the way that needs no page at all.
+        const { data: link } = await supabase.from("report_draft_links")
+          .select("code, sent_at").eq("job_id", String(a.job_id ?? "")).maybeSingle();
+        if (link?.code && !link.sent_at) {
+          return twiml(`Open the draft here, with the words already in the box. Change what is not right and tap Send: ${Deno.env.get("YAADLY_APP_URL") ?? "https://app.yaadly.co.uk"}/draft/${encodeURIComponent(String(a.job_id))}?code=${link.code}`);
+        }
+        return twiml("Hold your finger on the draft above, tap Copy, paste it here, change what is not right, and send. Those words go to the client instead.");
+      }
+
       // ── the Completion Report: Change my words, Raise an issue ─────────────
       //
       // 28 Sep 2026 (20260928233000). Founder: "no way to edit", "or raise and
@@ -2972,7 +3024,9 @@ Deno.serve(async (req: Request) => {
       // worker to decide, not routed through anyone else first.
       if (!evidenceHeld && reportSession && !msg.media.length && msg.text.trim()) {
         const a = reportSession.answers as any;
-        const said = msg.text.trim();
+        // "Send as written" is a way of replying 1. It reached here only
+        // because its code matched the draft that is waiting.
+        const said = draftTap?.kind === "send" ? "1" : msg.text.trim();
         // A question is not their own version of the report. On 15 September
         // 2026 "how do i share my location" went to the client as the status
         // update. The draft stays waiting; see worker-question.ts.
@@ -2981,15 +3035,28 @@ Deno.serve(async (req: Request) => {
         // report reaching a client is confirmed with the one reply asked for.
         if (said !== "1" && isBareAcknowledgement(said)) {
           root.setAttributes({ "yaadly.report_confirm.job": a.job_id, "yaadly.report_confirm.outcome": "acknowledgement_not_report" });
-          return twiml("Nothing sent. Reply 1 to send the report as drafted, or send your own words and those go to the client instead.");
+          return twiml("Nothing sent. Tap Send as written or reply 1 to send the draft. To change it, tap Edit it, or type your own words and those go to the client instead.");
         }
         if (said !== "1" && (looksLikeQuestion(said) || wantsHelpWith(said))) {
           root.setAttributes({ "yaadly.report_confirm.job": a.job_id, "yaadly.report_confirm.outcome": "question_not_report" });
           return twiml(await answerOrRaiseWorkerQuestion(
             supabase as unknown as SettingsReader, msg, String(a.job_id ?? ""),
-            "Your report to the client is still waiting: reply 1 to send it as drafted, or send your own words and those go instead.",
+            "Your report to the client is still waiting: tap Send as written or reply 1 to send the draft. To change it, tap Edit it, or type your own words and those go instead.",
             trace, { deadline, paused: agentsPaused },
           ));
+        }
+        // His own words are screened against the same banned list a model's
+        // are. Nothing is rewritten: he is told which words and why, and the
+        // draft stays waiting for him to send it again. See own-words.ts.
+        if (said !== "1") {
+          const screened = screenOwnWords(said);
+          if (!screened.ok) {
+            root.setAttributes({
+              "yaadly.report_confirm.job": a.job_id, "yaadly.report_confirm.outcome": "own_words_screened",
+              "yaadly.guardrail.blocked": 1, "yaadly.guardrail.term_count": screened.terms.length,
+            });
+            return twiml(screened.message);
+          }
         }
         const overrideText = said === "1" ? String(a.draft_text ?? "") : said;
         const { error } = await supabase.rpc("relay_confirmed_report", {
@@ -3011,6 +3078,12 @@ Deno.serve(async (req: Request) => {
         // knows.
         if (!error) {
           const draftText = String(a.draft_text ?? "");
+          // The edit page's link is for this same draft. Close it, so the
+          // report cannot be sent a second time from the page.
+          await supabase.from("report_draft_links")
+            .update({ sent_at: new Date().toISOString(), sent_via: "whatsapp" })
+            .eq("job_id", String(a.job_id ?? "")).is("sent_at", null)
+            .then(() => {}, (e: unknown) => console.error("report_draft_links close failed:", String(e).slice(0, 160)));
           await supabase.from("draft_decisions").insert({
             job_id: a.job_id, stage: Number(a.stage) || 0, kind: "evidence_report",
             accepted: said === "1",

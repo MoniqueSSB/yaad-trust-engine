@@ -58,6 +58,8 @@ import { hasWorkerTemplateDecision, insideWindow, samePhoneDigits, templateVar, 
 import { Image } from "jsr:@matmen/imagescript";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 import { addonPdfUrl } from "./addon-link.ts";
+import { screenOwnWords } from "./own-words.ts";
+import { captionsLine, namedNextStep, plainDraft, unearnedClaims, usableCaptions } from "./report-draft.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -217,6 +219,10 @@ Return STRICT JSON only, exactly this shape:
 
 Rules you must not break:
 - Report only what the worker said. Never add detail, never estimate progress as a percentage, never guess a completion date the worker did not give.
+- Use the worker's own verbs. If they said "fixing", write fixing, not fixed, secured or installed. Never write completed, finished, secured, installed, fully, successfully or "all tasks" unless the worker used that word.
+- Never name a stage, a team or a crew the worker did not name. One person sending an update is "the tradesperson".
+- Some lines are not about the work at all, such as a note about the camera. Leave those out rather than explaining them.
+- what_happens_next is ONLY a next step the worker named. If they named none, return an empty string for it. Never write that the work moves to the next stage.
 - Never promise the work is good, finished, or that payment will be released. A human reviews the evidence and the client approves.
 - Never use the word escrow, and never describe the client's money as held.
   Yaadly is principal: the client buys the job from Yaadly at one agreed price,
@@ -246,7 +252,7 @@ function extractReportingJson(s: string): Record<string, string> | null {
   return null;
 }
 
-type ComposedReport = { message: string; nextStep: string };
+type ComposedReport = { message: string; nextStep: string; captions: string[]; rewritten: string[] };
 
 // Returns null on anything short of a clean, usable report, so the caller's
 // existing fixed sentence is what actually ships. Never throws. nextStep is
@@ -254,7 +260,7 @@ type ComposedReport = { message: string; nextStep: string };
 // later, so the follow-up mechanism (job_followups, below) acts on exactly
 // what the model said rather than a second reading of its own words.
 async function composeEvidenceReport(
-  admin: any, jobId: string, jobTitle: string, stage: number, trace: Trace,
+  admin: any, jobId: string, jobTitle: string, stage: number, trace: Trace, label = `stage ${stage}`,
 ): Promise<ComposedReport | null> {
   try {
     const prov = pickTextProvider();
@@ -265,8 +271,17 @@ async function composeEvidenceReport(
       .select("label, created_at")
       .eq("job_id", jobId).eq("stage", stage)
       .order("created_at", { ascending: true });
-    const labels = (items ?? []).map((e: any) => String(e.label ?? "").trim()).filter(Boolean);
+    // A bare "1" is a menu reply, not an account of the work. See report-draft.ts.
+    const labels = usableCaptions((items ?? []).map((e: any) => e.label));
     if (labels.length === 0) return null;
+    // What the worker is offered when the model's draft will not do: his own
+    // words, quoted. Used for a failed call as much as for an overstated one,
+    // so a model outage no longer tells him he sent no description.
+    // It quotes what he typed, so it is screened like anything else that can
+    // reach a client. A caption carrying a banned phrase is left out of the
+    // draft rather than offered to him to send.
+    const cleanLabels = labels.filter((l) => guardrails.scan(l).length === 0);
+    const plain: ComposedReport = { message: plainDraft(label, cleanLabels), nextStep: "", captions: labels, rewritten: [] };
 
     const { data: job } = await admin.from("jobs").select("trade").eq("id", jobId).maybeSingle();
     const context = `JOB REF: ${jobTitle || jobId}\nTRADE: ${job?.trade || "not given"}\n\nWORKER UPDATE:\n${labels.join("\n")}`;
@@ -286,17 +301,24 @@ async function composeEvidenceReport(
     });
 
     const data = extractReportingJson(String(raw));
-    if (!data) return null;
+    if (!data) return plain;
 
     const headline = String(data.headline ?? "").trim();
-    const plain = String(data.plain_english ?? "").trim();
-    const next = String(data.what_happens_next ?? "").trim();
+    const body = String(data.plain_english ?? "").trim();
+    // Only a next step the worker pointed at himself. Anything else is filler,
+    // and filler here used to create a follow-up on the job.
+    const next = namedNextStep(data.what_happens_next, labels);
     const action = String(data.client_action_needed ?? "nothing right now").trim();
-    if (!headline || !plain) return null;
+    if (!headline || !body) return plain;
 
-    const message = `${headline}\n\n${plain}\n\nNext: ${next}\nYou need to: ${action}`;
-    if (guardrails.scan(message).length > 0) return null;
-    return { message, nextStep: next };
+    const message = [`${headline}\n\n${body}`, next ? `Next: ${next}` : null, `You need to: ${action}`]
+      .filter(Boolean).join("\n\n");
+    if (guardrails.scan(message).length > 0) return plain;
+    // The instruction above is a request. This is the check. A draft that
+    // claims more than the worker did is not offered to him at all.
+    const rewritten = unearnedClaims(message, labels);
+    if (rewritten.length) return { ...plain, rewritten };
+    return { message, nextStep: next, captions: labels, rewritten: [] };
   } catch (_) {
     return null;
   }
@@ -783,8 +805,10 @@ async function assembleEvidenceChecks(admin: any, jobId: string, stage: number) 
     const [{ data: ev }, { data: arr }, { data: job }, { data: pack }] = await Promise.all([
       admin.from("evidence").select("label, mime, captured_at, created_at, kind, item_code")
         .eq("job_id", jobId).eq("stage", stage).order("created_at", { ascending: true }),
+      // Every check-in on the JOB, not only this stage's. A check-in is read
+      // by the day since 29 Sep 2026, and runEvidenceChecks does the narrowing.
       admin.from("arrival_log").select("arrived_at, arrived_on, lat, far_from_site")
-        .eq("job_id", jobId).eq("stage", stage).order("arrived_at", { ascending: true }),
+        .eq("job_id", jobId).order("arrived_at", { ascending: true }),
       admin.from("jobs").select("parish, access_type").eq("id", jobId).maybeSingle(),
       admin.from("kickoff_packs").select("docs").eq("job_id", jobId).eq("status", "approved")
         .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
@@ -796,7 +820,7 @@ async function assembleEvidenceChecks(admin: any, jobId: string, stage: number) 
       .order("approved_at", { ascending: false }).limit(1).maybeSingle();
     const { data: pins } = await admin.from("work_log_pins")
       .select("shared_at, far_from_site, address")
-      .eq("job_id", jobId).eq("stage", stage).order("shared_at", { ascending: false });
+      .eq("job_id", jobId).order("shared_at", { ascending: false });
     return runEvidenceChecks({
       stage,
       evidence: ev ?? [],
@@ -997,6 +1021,10 @@ Deno.serve(async (req: Request) => {
     // not be delivered. approveButton is an ADDITION: it follows a message
     // that was delivered, carrying the one thing free text cannot, a button.
     let approveButton: { sid: string; vars: Record<string, string> } | undefined;
+    // WhatsApp only: the first message when it differs from `line`, and what
+    // follows it as free text. Used by evidence_landed, where the draft travels alone.
+    let waLine = "";
+    let waFollowUps: string[] = [];
     // Set only by desk_alert. html replaces the default email body, because
     // that one puts line into HTML unescaped and a desk alert carries
     // somebody's own typed words. smsText replaces line on the SMS rung, so a
@@ -1316,13 +1344,13 @@ Deno.serve(async (req: Request) => {
       // point.
       photoUrls = await evidencePhotoUrls(admin, jobId, job.stage ?? 1, trace);
 
+      const evLandedLabel = await stageLabel(admin, jobId, job.stage ?? 1);
       const [composed, findings] = workerPhone
         ? await Promise.all([
-            composeEvidenceReport(admin, jobId, job.title, job.stage ?? 1, trace),
+            composeEvidenceReport(admin, jobId, job.title, job.stage ?? 1, trace, evLandedLabel),
             photoUrls.length ? reviewEvidencePhotos(photoUrls, job.title, trace) : Promise.resolve(null),
           ])
         : [null, null];
-      const evLandedLabel = await stageLabel(admin, jobId, job.stage ?? 1);
       const draftText = composed?.message
         || `Photos have come in for ${evLandedLabel}, with no description from you yet.`;
       // Two summaries, deliberately. The worker sees the desk one, severity
@@ -1371,9 +1399,15 @@ Deno.serve(async (req: Request) => {
         await admin.rpc("create_job_followup", { p_job: jobId, p_stage: job.stage ?? 1, p_reason: nextStep });
       }
 
+      // The code that opens the edit page for this draft, 29 Sep 2026. A new
+      // one for every draft, so a link to an older draft opens nothing. If the
+      // table is not there yet, or the write fails, there is simply no link:
+      // the buttons and the typed replies do not depend on it.
+      let editLink = "";
       if (workerPhone) {
+        const waId = workerPhone.startsWith("+") ? workerPhone : `+${workerPhone.replace(/\D/g, "")}`;
         await admin.from("wa_intake_sessions").upsert({
-          wa_id: workerPhone.startsWith("+") ? workerPhone : `+${workerPhone.replace(/\D/g, "")}`,
+          wa_id: waId,
           answers: {
             _lane: "report_confirm", job_id: jobId, stage: job.stage ?? 1,
             draft_text: draftText, ai_summary: aiSummary,
@@ -1381,24 +1415,76 @@ Deno.serve(async (req: Request) => {
           photo_count: 0,
           updated_at: new Date().toISOString(),
         });
+        const code = Array.from(crypto.getRandomValues(new Uint8Array(12)), (x) => x.toString(16).padStart(2, "0")).join("").toUpperCase();
+        const { error: linkErr } = await admin.from("report_draft_links").upsert({
+          job_id: jobId, stage: job.stage ?? 1, code, draft_text: draftText,
+          captions: composed?.captions ?? [], ai_summary: aiSummary, phone: waId,
+          code_failures: 0, drafted_at: new Date().toISOString(), sent_at: null, sent_via: null,
+        }, { onConflict: "job_id" });
+        if (linkErr) console.error("report_draft_links upsert failed:", String(linkErr.message).slice(0, 160));
+        else editLink = `${APP_URL}/draft/${encodeURIComponent(jobId)}?code=${code}`;
       }
 
+      // The buttons, 29 Sep 2026. Founder: "this should also all be buttons
+      // also that people tap instead of writing". No template recorded means
+      // no buttons, and the typed replies below still work.
+      let draftSid = Deno.env.get("TWILIO_CONTENT_SID_REPORT_DRAFT") ?? "";
+      if (!draftSid) {
+        const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_report_draft").maybeSingle();
+        try { draftSid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { draftSid = String(st?.value ?? ""); }
+      }
+      const hasButtons = /^HX[0-9a-f]{32}$/i.test(draftSid);
+      if (hasButtons && workerPhone) {
+        approveButton = { sid: draftSid, vars: { "1": templateVar(`${job.title ?? "your job"} (${job.id})`), "2": String(job.id) } };
+      }
+
+      // The typed way to do each thing a button does. Always sent, buttons or
+      // not: a button does not show on every phone, and "1" has to keep working.
+      const howTo = [
+        "Reply 1 to send the draft as written.",
+        editLink
+          ? `To change it, open it here with the words already in the box: ${editLink}`
+          : "To change it, hold your finger on the draft above, tap Copy, paste it here, change what is not right, and send.",
+        "Or just type your own words and those go to the client instead.",
+        "Nothing goes to the client until you choose.",
+      ].join(" ");
+
       subject = `Draft for the client: ${job.title}`;
-      line = [
-        `Here's what we'd tell the client about ${evLandedLabel} of ${job.title}:`,
-        `"${draftText}"`,
+      // TWO MESSAGES ON WHATSAPP, and that is the point. The draft goes alone,
+      // with nothing around it, so that a long press and Copy takes the draft
+      // and only the draft. When it sat inside one long message, copying it
+      // also copied the list of what is missing from the worker's own
+      // evidence, and one careless paste would have sent that to a client.
+      waLine = draftText;
+      const details = [
+        `That is what we would tell the client about ${evLandedLabel} of ${job.title}.`,
+        // His own words, next to the draft made from them, at the moment of
+        // the tap. Better information in front of the person making the call.
+        captionsLine(composed?.captions ?? []),
         aiSummaries?.desk ? `AI noticed: ${aiSummaries.desk}` : null,
         // The gaps sit BELOW the draft and ABOVE the reply instruction, so a
         // worker reads what the client would be told, then what is missing,
-        // then what to do. Nothing here stops him replying 1: the choice is
+        // then what to do. Nothing here stops him sending: the choice is
         // still his, and a stage is never blocked by this.
-        gaps.length ? `Still missing on this stage:\n${gaps.map((g) => "- " + g).join("\n")}` : null,
+        gaps.length ? `Still missing:\n${gaps.map((g) => "- " + g).join("\n")}` : null,
         notes.length ? notes.join("\n\n") : null,
         itemsLine,
-        `Reply 1 to send this as written, or reply with your own version and we'll send that instead.`,
+        howTo,
+      ].filter(Boolean).join("\n\n");
+      waFollowUps = [details];
+      // Email and the SMS fallback are one message, so they carry everything.
+      line = [
+        `Here's what we'd tell the client about ${evLandedLabel} of ${job.title}:`,
+        `"${draftText}"`,
+        details.split("\n\n").slice(1).join("\n\n"),
       ].filter(Boolean).join("\n\n");
       root.setAttributes({
         "yaadly.notify.evidence_report_composed": !!composed,
+        // How often the model's draft claimed more than the worker did and
+        // his own words were offered instead. Names of the claims only, never
+        // the draft, which carries what he typed.
+        "yaadly.notify.draft_rewritten": (composed?.rewritten.length ?? 0) > 0,
+        "yaadly.notify.draft_unearned": (composed?.rewritten ?? []).join(","),
         "yaadly.notify.ai_review_ran": findings !== null,
         "yaadly.notify.ai_finding_count": findings?.length ?? 0,
         "yaadly.notify.draft_sent_to_worker": !!workerPhone,
@@ -1413,6 +1499,23 @@ Deno.serve(async (req: Request) => {
       // has to know which one happened.
       const overrideText = String(meta.override_text ?? "").trim();
       const aiSummary = String(meta.ai_summary ?? "").trim();
+      // THE BACKSTOP. Every route to a client passes through here: a reply of
+      // 1, a typed version, a button, the edit page. yaad-inbound and the page
+      // both screen a worker's own words before they call this, so a hit here
+      // means something reached this door unscreened. It is not sent. The desk
+      // is told, because a person should know a door was left open, and the
+      // draft is reopened so the worker can send it again.
+      const screened = screenOwnWords(overrideText);
+      if (!screened.ok) {
+        await admin.from("report_draft_links").update({ sent_at: null, sent_via: null }).eq("job_id", jobId)
+          .then(() => {}, () => {});
+        await ntfyPush(admin, `Report held: ${job.title}`,
+          `${jobId}: a report was stopped before it reached the client because it used ${screened.terms.length} banned phrase${screened.terms.length === 1 ? "" : "s"}. `
+            + "It reached the last check unscreened, which should not happen. Nothing was sent.",
+          "no_entry");
+        root.setAttributes({ "yaadly.notify.outcome": "report_held_by_screen", "yaadly.guardrail.blocked": 1 });
+        return json({ ok: true, kind, told: false, reason: "The report used a banned phrase and was not sent." });
+      }
       subject = `Evidence to review: ${job.title}`;
       photoUrls = await evidencePhotoUrls(admin, jobId, job.stage ?? 1, trace);
       attachPhotos = photoUrls.map((p) => p.url);
@@ -1887,7 +1990,7 @@ Deno.serve(async (req: Request) => {
       // fact either way.
       wa = workerTemplate
         ? await sendTwilio(recipientPhone, "", "whatsapp", trace, [], workerTemplate, sendMeta)
-        : await sendTwilio(recipientPhone, line, "whatsapp", trace, attachPhotos, undefined, sendMeta);
+        : await sendTwilio(recipientPhone, waLine || line, "whatsapp", trace, attachPhotos, undefined, sendMeta);
       // The rich, scope-carrying message could not be delivered at all,
       // specifically because it landed outside WhatsApp's 24 hour window:
       // the approved template is the fallback for exactly that failure,
@@ -1916,6 +2019,16 @@ Deno.serve(async (req: Request) => {
       // Its failure is recorded and never propagated: the client already has
       // the report and the typed code still works, so a missing button is a
       // worse experience and not a lost message.
+      // What follows the first message, in order, before any button. Only
+      // when the first message really was the short one: a template or a
+      // fallback carried `line`, which already says all of it.
+      if (waLine && waFollowUps.length && !workerTemplate && wa.sent && wa.via === "twilio whatsapp") {
+        for (const more of waFollowUps) {
+          const f = await sendTwilio(recipientPhone, more, "whatsapp", trace, [], undefined, { ...sendMeta, kind: `${kind} details` });
+          if (!f.sent) console.error(`follow-up not sent for ${jobId}: ${f.reason ?? "unknown"}`);
+        }
+      }
+
       if (approveButton && wa.sent && wa.via === "twilio whatsapp") {
         const btn = await sendTwilio(recipientPhone, "", "whatsapp", trace, [], approveButton, { kind: "approve button", job_id: jobId });
         root.setAttributes({ "yaadly.notify.approve_button": btn.sent });

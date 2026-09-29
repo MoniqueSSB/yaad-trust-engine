@@ -6298,7 +6298,29 @@ Founder: "you raise this with Yaadly". The portal opens a new dispute already es
 3. **"The file did not finish uploading"**: the connection dropped mid-upload. Nothing was filed; send again. A very large video on a weak signal is the usual case.
 4. **Bucket ceilings:** `evidence` 500MB, `job-files` 100MB (`20260929090000`). The app's caps sit just under them; `web/tests/job-files.test.mjs` holds that for job files.
 
-## 48. The WhatsApp assistant answered a worker's question, or should have (29 Sep 2026)
+## 48. The report draft: buttons, the edit page, and the check-in read by the day (29 Sep 2026)
+
+**To switch it on, in this order.** Each step is safe without the next: with no migration there is no edit link and the message says to copy and paste; with no template there are no buttons and the typed replies still work.
+
+1. **Apply `20260929200000_a_worker_can_edit_the_draft_before_it_goes.sql`.** Check: `select count(*) from report_draft_links;` returns 0 and no error.
+2. **Deploy the functions from disk, from main:** `yaad-notify-client`, `yaad-inbound`, `yaad-daily-checkin`, `yaad-twilio-setup`. Read the live `verify_jwt` first and keep it: `yaad-notify-client` and `yaad-inbound` carry `--no-verify-jwt`, the other two do not.
+3. **Deploy the app**, which carries `/draft/[id]`.
+4. **Create the buttons:** call `yaad-twilio-setup` with `{"action":"create-report-draft"}`. It answers with a ContentSid and writes `twilio_content_sid_report_draft`. Used in session, so nothing goes to Meta.
+5. **The daily check-in button:** `{"action":"create-on-site"}` was run on 29 Sep 2026 and Meta answered "received". `{"action":"on-site-status"}` switches it on once approved, by writing `twilio_content_sid_on_site`. Until then the daily prompt keeps sending its text template. The prompt itself is already scheduled, `0 21 * * *`, which is 4pm in Jamaica. (This line first said it had never been scheduled. It had. Corrected the same day.)
+6. **Where approval stands, for every template:** `{"action":"approvals"}`. Read only.
+
+**What a correct result looks like.** File a photo with a caption from a worker's phone. Three things arrive: the draft alone; then what it was written from, what is missing and how to reply; then three buttons. Tap Edit it, open the link, change a word, press Send to the client. The page says "Sent to the client, in your words" and the client gets that wording.
+
+**When something is wrong.**
+
+1. **No buttons arrive:** `select value from app_settings where key = 'twilio_content_sid_report_draft';` is empty, or Twilio refused the send. The `approve button not sent` line in the function log carries Twilio's reason. Replying 1 still works.
+2. **"That draft is not waiting any more":** the button tapped belongs to a draft already sent or replaced. Working as designed. The newest draft's buttons work.
+3. **The link says it is not valid:** a newer draft replaced it and the code changed. `select job_id, drafted_at, sent_at, sent_via, code_failures from report_draft_links where job_id = '<job>';` shows which. Ten wrong codes lock it; a new draft resets the count.
+4. **The draft is the worker's own words in quotation marks:** the model's draft claimed more than he did, or the model call failed, and his words were offered instead. The span attribute `yaadly.notify.draft_unearned` names the words that were caught. Working as designed.
+5. **The draft still says nobody checked in:** the check reads the Jamaica day. `select stage, arrived_on from arrival_log where job_id = '<job>' order by arrived_at desc;` and compare with the day the evidence was filed. A check-in on any stage that day counts.
+6. **A worker says his own words were refused:** the reply names the words. They are on the banned list in `_shared/guardrails.ts`. Nothing was sent and the draft is still waiting; he sends it again without them. A push titled "Report held" means a report reached the last check unscreened, which should not happen: find which route sent it.
+
+## 49. The WhatsApp assistant answered a worker's question, or should have (29 Sep 2026)
 
 A worker's question goes through four doors in order, in `yaad-inbound`: a fixed answer (`worker-question.ts`), the clock, the person-only rule, then the text model reading the approved facts (`off-script.ts`). Anything that falls through all four reaches the desk as "Worker question", as it always did.
 
@@ -6309,7 +6331,7 @@ A worker's question goes through four doors in order, in `yaad-inbound`: a fixed
 5. **A worker asking to be paid** gets `PAY_REQUEST_ANSWER`, a fixed string. Its last two sentences are the pay sentence in `faq.ts`, word for word. Change one, change both.
 6. **Deploy:** `supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` from a branch that has `origin/main` merged in. It is already on the no-platform-auth list in CLAUDE.md section 12, so the flag preserves what is live.
 
-## 49. The check-in question: a worker was asked, was not asked, or lost their photos (29 Sep 2026)
+## 50. The check-in question: a worker was asked, was not asked, or lost their photos (29 Sep 2026)
 
 1. **When it is asked:** the first photographs or typed update of the day on a job, once the job is known, if `arrival_log` has no row for that job and stage dated today in Jamaica. Once a day per stage, and never again that day after a check-in.
 2. **When it is not asked:** `jobs.access_type` says somebody lives there and is at home day to day (`_shared/arrival-rule.ts`). To see it: `select access_type from jobs where id = '<job>'`. Changing the answer on the job changes whether the worker is asked from the next message.

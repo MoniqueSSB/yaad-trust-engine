@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { recordAccepted, withStatusCallback } from "./twilio-status.ts";
-import { SECTION_MENU_APPROVAL, SECTION_MENU_NAME, sectionMenuContent, SIGN_REPORT_NAME, signReportContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
+import { ON_SITE_APPROVAL, ON_SITE_NAME, onSiteContent, REPORT_DRAFT_NAME, reportDraftContent, SECTION_MENU_APPROVAL, SECTION_MENU_NAME, sectionMenuContent, SIGN_REPORT_NAME, signReportContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
 
 // A one-shot helper for creating Yaadly's WhatsApp content templates in
 // Twilio, 15 September 2026.
@@ -125,6 +125,26 @@ Deno.serve(async (req: Request) => {
   if (action === "list") {
     const contents = await listAll();
     return json({ count: contents.length, contents: contents.map(({ types: _t, ...c }) => c) });
+  }
+
+  // Where Meta's approval stands on every template in the account, 29 Sep
+  // 2026. Read only: it sends nothing and writes nothing. It exists because
+  // "is it approved" was being answered from memory and from code comments,
+  // and on 29 September both were wrong about the daily check-in.
+  if (action === "approvals") {
+    const r = await call("/ContentAndApprovals?PageSize=100");
+    type Row = { sid: string; friendly_name: string; date_created: string; types?: Record<string, { body?: string }>; approval_requests?: { status?: string; category?: string; rejection_reason?: string } };
+    const rows = ((r.body as { contents?: Row[] })?.contents ?? []).map((c) => ({
+      sid: c.sid,
+      name: c.friendly_name,
+      created: c.date_created,
+      kind: Object.keys(c.types ?? {})[0] ?? "",
+      status: String(c.approval_requests?.status ?? "not submitted"),
+      category: c.approval_requests?.category ?? null,
+      rejection_reason: c.approval_requests?.rejection_reason || null,
+      body: String(Object.values(c.types ?? {})[0]?.body ?? "").slice(0, 300),
+    }));
+    return json({ status: r.status, count: rows.length, templates: rows });
   }
 
   // Create the section menu, or find the one already there, and record it.
@@ -369,6 +389,69 @@ Deno.serve(async (req: Request) => {
     );
     if (error) return json({ error: `Template ${sid} exists but app_settings would not take it: ${error.message}` }, 500);
     return json({ ok: true, sid, reused: Boolean(existing) });
+  }
+
+  // The three buttons under a report draft, 29 Sep 2026. Created, or found,
+  // and recorded in app_settings, where yaad-notify-client reads it. Used in
+  // session only, so nothing is submitted to Meta.
+  if (action === "create-report-draft") {
+    const existing = (await listAll()).find((c) => c.friendly_name === REPORT_DRAFT_NAME);
+    let sid = existing?.sid ?? "";
+    if (!sid) {
+      const r = await call("/Content", { method: "POST", body: JSON.stringify(reportDraftContent()) });
+      if (!r.ok) return json({ error: "Twilio refused the template.", twilio: r }, 502);
+      sid = String((r.body as { sid?: string })?.sid ?? "");
+    }
+    if (!/^HX[0-9a-f]{32}$/i.test(sid)) return json({ error: "No ContentSid came back." }, 502);
+    const { error } = await admin.from("app_settings").upsert(
+      { key: "twilio_content_sid_report_draft", value: JSON.stringify(sid) },
+      { onConflict: "key" },
+    );
+    if (error) return json({ error: `Template ${sid} exists but app_settings would not take it: ${error.message}` }, 500);
+    return json({ ok: true, sid, reused: Boolean(existing) });
+  }
+
+  // The daily check-in button. It goes to people who may not have written in
+  // within 24 hours, so it IS submitted to Meta, and it is held as pending
+  // until on-site-status finds it approved. Same shape as the worker update.
+  if (action === "create-on-site") {
+    const existing = (await listAll()).find((c) => c.friendly_name === ON_SITE_NAME);
+    let sid = existing?.sid ?? "";
+    if (!sid) {
+      const r = await call("/Content", { method: "POST", body: JSON.stringify(onSiteContent()) });
+      if (!r.ok) return json({ error: "Twilio refused the template.", twilio: r }, 502);
+      sid = String((r.body as { sid?: string })?.sid ?? "");
+    }
+    if (!/^HX[0-9a-f]{32}$/i.test(sid)) return json({ error: "No ContentSid came back." }, 502);
+    const approval = await call(`/Content/${sid}/ApprovalRequests/whatsapp`, {
+      method: "POST", body: JSON.stringify(ON_SITE_APPROVAL),
+    });
+    const { error } = await admin.from("app_settings").upsert(
+      { key: "twilio_content_sid_on_site_pending", value: JSON.stringify(sid) },
+      { onConflict: "key" },
+    );
+    if (error) return json({ error: `Template ${sid} exists but app_settings would not take it: ${error.message}` }, 500);
+    return json({ ok: true, sid, reused: Boolean(existing), approval: { status: approval.status, body: approval.body } });
+  }
+
+  if (action === "on-site-status") {
+    const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_on_site_pending").maybeSingle();
+    let sid = "";
+    try { sid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { sid = String(st?.value ?? ""); }
+    if (!/^HX[0-9a-f]{32}$/i.test(sid)) return json({ error: "Nothing pending. Run create-on-site first." }, 400);
+    const r = await call(`/Content/${sid}/ApprovalRequests`);
+    const wa = (r.body as { whatsapp?: { status?: string; rejection_reason?: string } })?.whatsapp ?? {};
+    const status = String(wa.status ?? "unknown").toLowerCase();
+    let switchedOn = false;
+    if (status === "approved") {
+      const { error } = await admin.from("app_settings").upsert(
+        { key: "twilio_content_sid_on_site", value: JSON.stringify(sid) },
+        { onConflict: "key" },
+      );
+      if (error) return json({ error: `Approved, but app_settings would not take it: ${error.message}` }, 500);
+      switchedOn = true;
+    }
+    return json({ sid, status, rejection_reason: wa.rejection_reason ?? null, switchedOn });
   }
 
   return json({ error: "Unknown action." }, 400);
