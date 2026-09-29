@@ -6,6 +6,20 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-29 · A camera note is left out of the draft; the daily check-in goes in the morning with its button
+
+**Decided by Monique, 29 Sep 2026 ("fix all").**
+
+**1. A note about the camera is left out of the draft.** "changing focus" reached the model as an account of the work. `isCameraNote` drops a caption of four words or fewer that uses camera vocabulary. It is narrow on purpose, because reading meaning out of a caption is what the dropped before-and-after check got wrong, and the tests hold real work that uses the same words ("flashing fitted round the chimney", "angle bracket fixed"). It is dropped from the draft only. The caption stays on the evidence as typed.
+
+**2. The daily check-in goes at 8am in Jamaica, not 4pm.** `0 13 * * *`, changed with `cron.alter_job` on job 7. Meta approved `yaadly_on_site_checkin_v1` the same day and it is switched on, so the prompt now asks "are you on site today?" with a button, which is a morning question.
+
+**3. CLAUDE.md section 2 was amended, on her instruction,** to say the banned list has three copies. One sentence added, nothing removed.
+
+**4. Two things I built here were withdrawn, because another session had already done them and merged first.** A rule for when a stage gets a second draft: `20260929210000_new_evidence_on_a_stage_gets_its_own_draft` was already live, with her decision recorded in it, and it has no daily cap where mine did. Hers stands. And a fix for a stray "1" being filed as a caption: PR 349's `saysWhatItShows` is the one in the code. Two sessions working the same test conversation is how both happened. Neither of mine reached production.
+
+`report-draft.ts` moved to `_shared/`.
+
 ## 2026-09-29 · A worker's own words are screened before they reach a client
 
 **Decided by Monique, 29 Sep 2026.** Since 31 August a worker has been able to set the draft aside and send his own version. Those words went to the client exactly as typed. Everything a model writes passes `guardrails.scan`; the one thing a person typed did not, so "escrow" could reach a client as long as a worker, and not a model, wrote it. Found while building the edit page and flagged to her, not changed until she said so.
