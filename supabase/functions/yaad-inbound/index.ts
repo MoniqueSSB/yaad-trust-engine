@@ -6,7 +6,7 @@ import * as guardrails from "./guardrails.ts";
 import { checkTwilioSignature } from "./twilio-signature.ts";
 import { pickJobChoice } from "./job-match.ts";
 import { docExt, fileLabel, guessFileKind, isDocMime, isFileableStatus } from "./job-file-lane.ts";
-import { matchApprovingJob } from "./approval-match.ts";
+import { matchApprovingJob, namesWithoutApproving } from "./approval-match.ts";
 import { pickEvidenceItem } from "./evidence-item-match.ts";
 import { DRAFT_STILL_WAITING, draftReadBack, readDraftReply, saysWhatItShows, tooShortToBeAnUpdate, WHAT_HAPPENS_NEXT } from "./update-draft.ts";
 import { visitorTokenOk, originAllowed, WEB_CHAT_MAX_CHARS, webReferenceIn, WEB_SAFE_FALLBACK } from "./web-chat.ts";
@@ -26,6 +26,7 @@ import { inboundText, wasTapped } from "./button-tap.ts";
 import { acknowledgementReply, answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith } from "./worker-question.ts";
 import { ARRIVAL_HOLD_MS, arrivalAsk, arrivalAskLapsed, arrivalStillWanted, cannotCheckIn, CHECK_IN_BEFORE_YOU_LEAVE, isPin, isSkip, saysCheckedIn } from "./arrival-ask.ts";
 import { checkInApplies } from "./arrival-rule.ts";
+import { answerClientQuestion, CLIENT_LIVE_STATUSES, CLIENT_OFF_SCRIPT_SYSTEM, clientWord, clientWordReply, GONE_TO_YAADLY, type LiveJob, nothingApproved, readsAsProblem } from "./client-lane.ts";
 import { clockAnswer, needsAPerson, OFF_SCRIPT_CLOSE, OFF_SCRIPT_SYSTEM, screenOffScript } from "./off-script.ts";
 import { replyFromCard } from "./reply-from-card.ts";
 import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
@@ -1781,7 +1782,7 @@ async function pushToDesk(
  *  Null on every kind of failure: no provider, no time left, a bad status, a
  *  reply that did not pass the screen. The caller's next step is the desk,
  *  which is where this question went before this function existed. */
-async function answerOffScript(question: string, deadline: Deadline, trace: Trace): Promise<string | null> {
+async function answerOffScript(question: string, deadline: Deadline, trace: Trace, system: string = OFF_SCRIPT_SYSTEM, who = "worker"): Promise<string | null> {
   const prov = pickTextProvider();
   if (!prov) return null;
   // Leaves 2.5 seconds for the desk push and the reply if this comes back
@@ -1790,12 +1791,12 @@ async function answerOffScript(question: string, deadline: Deadline, trace: Trac
   if (!sig) return null;
   try {
     return await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
-      ...providerAttrs(prov), "gen_ai.operation.name": "chat", "yaadly.model.job": "off_script",
+      ...providerAttrs(prov), "gen_ai.operation.name": "chat", "yaadly.model.job": "off_script", "yaadly.off_script.asked_by": who,
     }, async (sp) => {
       const { provider, res: r } = await chatWithFailover(prov, {
         temperature: 0, max_tokens: 900,
         messages: [
-          { role: "system", content: OFF_SCRIPT_SYSTEM },
+          { role: "system", content: system },
           { role: "user", content: question.trim().slice(0, 600) },
         ],
       }, { timeoutMs: 25000, signal: sig });
@@ -1816,7 +1817,7 @@ async function answerOffScript(question: string, deadline: Deadline, trace: Trac
       // The function log is private to the project. This line is how the
       // answers get read back by a person, and how a question that keeps
       // coming back NOT_COVERED becomes the next fact written into faq.ts.
-      console.log(`off-script: ${screened.why}. Asked: "${question.trim().slice(0, 200)}". Model said: "${answerText(content).slice(0, 400)}"`);
+      console.log(`off-script (${who}): ${screened.why}. Asked: "${question.trim().slice(0, 200)}". Model said: "${answerText(content).slice(0, 400)}"`);
       return screened.text;
     });
   } catch (e) {
@@ -4091,6 +4092,80 @@ Deno.serve(async (req: Request) => {
       // that. Anything that does not contain a code it recognises falls
       // straight through to the ordinary pipeline below, unrecognised as
       // an approval rather than guessed at.
+      // ── a client on a live job, saying something that is not a code ───────
+      //
+      // 29 Sep 2026, client-lane.ts. Runs ahead of the approval and comment
+      // block below, and takes only what that block handled badly: a
+      // greeting or a thank you, the code inside a message that does not
+      // approve, a problem with the work, and a question. A clean approval
+      // and a plain remark about the evidence both pass straight through.
+      //
+      // A number that is a tradesperson on a live job is left to the worker
+      // lanes, the same order every lane above uses. Only ever both at once
+      // on a test.
+      if (!deskHasThisNumber && !msg.media.length && msg.text.trim() && !wantsAPerson(msg.text)
+          && !(await lookupWorkerWithActiveJobs(supabase, msg.from))) {
+        const { data: liveRows } = await supabase.from("jobs")
+          .select("id, title, stage, status, client_phone")
+          .in("status", CLIENT_LIVE_STATUSES)
+          .not("client_phone", "is", null);
+        const live: LiveJob[] = (liveRows ?? [])
+          .filter((j: any) => samePhone(j.client_phone, msg.from))
+          .map((j: any) => ({ id: String(j.id), title: String(j.title ?? ""), stage: Number(j.stage ?? 0), status: String(j.status) }));
+        const said = msg.text.trim();
+        const approves = live.length ? matchApprovingJob(said, live) : null;
+        if (live.length && !approves && !parseAddonConfirm(said) && !shouldEscapeLane(said)) {
+          const one = live.length === 1 ? live[0] : null;
+          const named = namesWithoutApproving(said, live);
+          const word = clientWord(said);
+
+          const tellYaadly = async (title: string, why: string) => {
+            // Informational for her phone, so it carries no text for it: the
+            // desk and the push are told. Which alerts text her is a list
+            // asking_test.ts holds at six, and adding to it is her decision.
+            await pushToDesk(supabase as unknown as SettingsReader, {
+              target: { channel: msg.channel, from_addr: msg.from || "unknown" },
+              title: `${title}${(named ?? one) ? `: ${(named ?? one)!.id}` : ""}`,
+              priority: "high",
+              tags: "speech_balloon",
+              body: `${(named ?? one) ? `${(named ?? one)!.id}: ` : ""}${why} Nothing was approved and nothing was sent to the tradesperson. Their words are on the desk thread for this number.`,
+            }, trace);
+          };
+
+          if (word) {
+            root.setAttributes({ "yaadly.client_lane.outcome": `word_${word}` });
+            return twiml(clientWordReply(word, live));
+          }
+          if (named) {
+            root.setAttributes({ "yaadly.client_lane.outcome": "named_without_approving", "yaadly.client_lane.job": named.id });
+            await tellYaadly("Client named a job without approving", "a client quoted the job's code in a message that does not approve it.");
+            return twiml(nothingApproved(named));
+          }
+          if (readsAsProblem(said)) {
+            root.setAttributes({ "yaadly.client_lane.outcome": "problem_to_yaadly" });
+            await tellYaadly("Client has a problem", "a client says something is wrong with the work.");
+            return twiml(GONE_TO_YAADLY);
+          }
+          if (looksLikeQuestion(said)) {
+            const fixed = answerClientQuestion(said, one) ?? clockAnswer(said);
+            if (fixed) {
+              root.setAttributes({ "yaadly.client_lane.outcome": "question_fixed_answer" });
+              return twiml(fixed);
+            }
+            if (!agentsPaused && !needsAPerson(said)) {
+              const answered = await answerOffScript(said, deadline, trace, CLIENT_OFF_SCRIPT_SYSTEM, "client");
+              if (answered) {
+                root.setAttributes({ "yaadly.client_lane.outcome": "question_answered_from_facts" });
+                return twiml(`${answered} ${OFF_SCRIPT_CLOSE}`);
+              }
+            }
+            root.setAttributes({ "yaadly.client_lane.outcome": "question_to_yaadly" });
+            await tellYaadly("Client question", "a client asked something the assistant does not answer.");
+            return twiml("That is one for a person. It has gone to Yaadly, and someone will answer you here. It has not been sent to your tradesperson.");
+          }
+        }
+      }
+
       if (!msg.media.length && msg.text.trim()) {
         const { data: awaiting } = await supabase.from("jobs")
           .select("id, title, stage, client_phone, worker_email")
@@ -4859,7 +4934,19 @@ Deno.serve(async (req: Request) => {
     // What follows from it: nothing spoken to a client may name a reference
     // unless writeJob is true. `reference` below is the single place that is
     // decided, so a new reply cannot quote a code that does not exist.
-    const writeJob = !!priorJobId || !justAsking;
+    // A job that has left intake is never rewritten by it. The row below
+    // carries stage 0 and a status of draft or awaiting_client_setup, and an
+    // update with it on a job that is quoted, booked or under way would put
+    // that job back to the start. Reached when a conversation that began a
+    // job is picked up again after the job has moved on. Read, never
+    // assumed, and a failed read writes nothing. 29 Sep 2026.
+    let pastIntake = false;
+    if (priorJobId) {
+      const { data: pj, error: pjErr } = await supabase.from("jobs").select("status").eq("id", priorJobId).maybeSingle();
+      pastIntake = !!pjErr || (!!pj && !["draft", "awaiting_client_setup"].includes(String(pj.status)));
+      if (pastIntake) root.setAttributes({ "yaadly.intake.left_live_job_alone": priorJobId });
+    }
+    const writeJob = (!!priorJobId || !justAsking) && !pastIntake;
     // The job code, or an empty string when there is no job to name. Every
     // client-facing sentence and every notification reads this, never jobId.
     const reference = writeJob ? jobId : "";

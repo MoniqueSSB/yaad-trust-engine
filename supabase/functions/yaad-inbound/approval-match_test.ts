@@ -7,7 +7,7 @@
 // Run: deno test supabase/functions/yaad-inbound/approval-match_test.ts
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { matchApprovingJob, type ApprovableJob } from "./approval-match.ts";
+import { isCleanApproval, matchApprovingJob, namesWithoutApproving, type ApprovableJob } from "./approval-match.ts";
 
 const ONE: ApprovableJob[] = [{ id: "JOB-WEB-1788006231445", title: "Kitchen sink pipe leak", stage: 2 }];
 const TWO: ApprovableJob[] = [
@@ -57,6 +57,43 @@ Deno.test("garbage input does not match", () => {
 
 Deno.test("a message naming two jobs at once approves neither", () => {
   assertEquals(matchApprovingJob("JOB-WEB-1788006231445 and JOB-WA-1787995411470 both please", TWO), null);
+});
+
+Deno.test("the code inside a message that says no approves nothing", () => {
+  // 29 Sep 2026. Every one of these approved a stage and raised the worker's
+  // pay until that day, because the code was anywhere in the message.
+  const code = "JOB-WEB-1788006231445";
+  for (const said of [
+    `don't approve ${code} yet, the crack is back`,
+    `do not approve ${code}`,
+    `not happy with ${code}`,
+    `${code} is not finished`,
+    `wait on ${code}`,
+    `${code} when will he finish`,
+    `is ${code} done?`,
+    `approve ${code}?`,
+    `mi nah approve ${code}`,
+    `${code} the tiles are cracked`,
+    `hold ${code} until I have seen it`,
+    `any news on ${code}`,
+    `I will approve ${code} once the door is hung`,
+    `never approve ${code}`,
+  ]) {
+    assertEquals(matchApprovingJob(said, ONE), null, said);
+    assertEquals(namesWithoutApproving(said, ONE)?.id, code, said);
+  }
+});
+
+Deno.test("the code with words of agreement still approves", () => {
+  const code = "JOB-WEB-1788006231445";
+  for (const said of [
+    code, ` ${code} `, `${code}.`, `yes ${code}`, `approve ${code}`, `I approve ${code}, thank you`,
+    `${code} approved`, `ok ${code} go ahead`, `yes approve ${code} thanks`, `Happy with it. ${code}`, `${code} looks good`,
+  ]) {
+    assertEquals(matchApprovingJob(said, ONE)?.id, code, said);
+    assertEquals(namesWithoutApproving(said, ONE), null, said);
+    assert(isCleanApproval(said, code), said);
+  }
 });
 
 /* ── the gate stays wired ─────────────────────────────────────────────────

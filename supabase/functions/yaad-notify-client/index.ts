@@ -53,7 +53,7 @@ import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, type VisionProvider, vi
 import * as guardrails from "./guardrails.ts";
 import { checkAttrs, deskPack, runEvidenceChecks, workerGaps, workerNotes } from "./evidence-checks.ts";
 import { checkInApplies } from "./arrival-rule.ts";
-import { clientUpdateVars } from "./client-template.ts";
+import { clientSummaryVars, clientTemplateSummary, clientUpdateVars } from "./client-template.ts";
 import { recordAccepted, type SendMeta, withMessagingService, withStatusCallback } from "./twilio-status.ts";
 import { hasWorkerTemplateDecision, insideWindow, samePhoneDigits, templateVar, WINDOW_MS, workerTemplateSummary } from "./worker-template.ts";
 import { Image } from "jsr:@matmen/imagescript";
@@ -1723,7 +1723,11 @@ Deno.serve(async (req: Request) => {
         .eq("job_id", jobId).order("approved_at", { ascending: false }).limit(1).maybeSingle();
       subject = `Confirmed: stage ${approval?.stage ?? ""} approved`;
       line = `You approved stage ${approval?.stage ?? ""} of ${job.title}. ` +
-        `The worker is paid for it, and the job now carries the record. Nothing else to do here: ${roomLink}`;
+        // "The worker is paid for it" until 29 Sep 2026, which was not true
+        // when it was sent: approving raises the worker's payable, and a
+        // named person at Yaadly pays it afterwards. The WhatsApp reply to
+        // the same approval was corrected on 4 Sep; this one was missed.
+        `Your approval is recorded and the worker's payment is raised with Yaadly. Nothing else to do here: ${roomLink}`;
 
       // Stage 7. Convert at handover, the founder's own words: offered at
       // the moment the client approves and feels relief, at the founding
@@ -1840,7 +1844,11 @@ Deno.serve(async (req: Request) => {
       // invented detail this repository's own agents are built to refuse.
       subject = `A delay on your job: ${job.title}`;
       line = `There has been no update on ${job.title} for a few days, so we wanted you to hear it from us rather than notice the silence yourself. ` +
-        `We are checking in with the worker directly. Nothing is wrong with the money held on this job, and you can raise anything here: ${roomLink}`;
+        // "Nothing is wrong with the money held on this job" until 29 Sep
+        // 2026. Yaadly holds nobody's money (CLAUDE.md section 8), and no
+        // single word in that sentence is on the banned list, so the screen
+        // could not see it.
+        `We are checking in with the worker directly. Nothing about what you have paid or what you owe has changed, and you can raise anything here: ${roomLink}`;
     } else if (kind.startsWith("addon_")) {
       // Extra work on a booked job (20260928235000). The trigger sends only
       // the add-on id and the revision it fired on; every word below is read
@@ -1998,6 +2006,41 @@ Deno.serve(async (req: Request) => {
       root.setAttributes({ "yaadly.notify.worker_template": Boolean(workerTemplate) });
     }
 
+    // The same for a client, 29 Sep 2026 (client-template.ts). The window is
+    // read before sending, because a send outside it is accepted and fails
+    // after this function has returned. Outside the window the client gets
+    // the template this kind set for itself (the stage report, a quote) when
+    // there is one, and otherwise the approved update template with one true
+    // line about what happened. Inside the window nothing changes.
+    let clientTemplate: { sid: string; vars: Record<string, string> } | undefined;
+    if (recipientPhone && job && recipientPhone !== workerPhone && !workerTemplate) {
+      // Only the kinds written for a client. A desk alert also sets a
+      // template and keeps the order it was given, untouched by this.
+      const summary = clientTemplateSummary(kind);
+      if (summary) {
+        const { data: seen } = await admin.from("wa_inbound_seen")
+          .select("from_addr, seen_at").eq("channel", "whatsapp")
+          .gte("seen_at", new Date(Date.now() - WINDOW_MS).toISOString())
+          .order("seen_at", { ascending: false }).limit(500);
+        const last = (seen ?? []).find((r: { from_addr: string }) => samePhoneDigits(r.from_addr, recipientPhone));
+        if (!insideWindow(last?.seen_at ?? null)) {
+          if (waTemplate) clientTemplate = waTemplate;
+          else if (summary) {
+            let sid = Deno.env.get("TWILIO_CONTENT_SID_WORKER_UPDATE") ?? "";
+            if (!sid) {
+              const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_worker_update").maybeSingle();
+              try { sid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { sid = String(st?.value ?? ""); }
+            }
+            if (/^HX[0-9a-f]{32}$/i.test(sid)) {
+              clientTemplate = { sid, vars: clientSummaryVars(String(job.title ?? ""), job.id, summary, roomLink) };
+            }
+          }
+        }
+      }
+      root.setAttributes({ "yaadly.notify.client_template": Boolean(clientTemplate) });
+    }
+    const firstTemplate = workerTemplate ?? clientTemplate;
+
     let wa: { sent: boolean; reason?: string; via?: string } = { sent: false, reason: "no recipient phone on the job" };
     if (recipientPhone) {
       // Photos ride only on the WhatsApp attempt. A fallback to Meta or SMS
@@ -2005,8 +2048,8 @@ Deno.serve(async (req: Request) => {
       // good for five minutes has likely aged past useful by the time a
       // second attempt runs; the text and the portal link still carry the
       // fact either way.
-      wa = workerTemplate
-        ? await sendTwilio(recipientPhone, "", "whatsapp", trace, [], workerTemplate, sendMeta)
+      wa = firstTemplate
+        ? await sendTwilio(recipientPhone, "", "whatsapp", trace, [], firstTemplate, sendMeta)
         : await sendTwilio(recipientPhone, waLine || line, "whatsapp", trace, attachPhotos, undefined, sendMeta);
       // The rich, scope-carrying message could not be delivered at all,
       // specifically because it landed outside WhatsApp's 24 hour window:
@@ -2039,14 +2082,17 @@ Deno.serve(async (req: Request) => {
       // What follows the first message, in order, before any button. Only
       // when the first message really was the short one: a template or a
       // fallback carried `line`, which already says all of it.
-      if (waLine && waFollowUps.length && !workerTemplate && wa.sent && wa.via === "twilio whatsapp") {
+      if (waLine && waFollowUps.length && !firstTemplate && wa.sent && wa.via === "twilio whatsapp") {
         for (const more of waFollowUps) {
           const f = await sendTwilio(recipientPhone, more, "whatsapp", trace, [], undefined, { ...sendMeta, kind: `${kind} details` });
           if (!f.sent) console.error(`follow-up not sent for ${jobId}: ${f.reason ?? "unknown"}`);
         }
       }
 
-      if (approveButton && wa.sent && wa.via === "twilio whatsapp") {
+      // Never after a template: the client outside the window has been sent
+      // a line and a link and no photographs, and a lone Approve button asks
+      // them to approve work they have not been shown.
+      if (approveButton && !firstTemplate && wa.sent && wa.via === "twilio whatsapp") {
         const btn = await sendTwilio(recipientPhone, "", "whatsapp", trace, [], approveButton, { kind: "approve button", job_id: jobId });
         root.setAttributes({ "yaadly.notify.approve_button": btn.sent });
         if (!btn.sent) console.error(`approve button not sent for ${jobId}: ${btn.reason ?? "unknown"}`);

@@ -6366,3 +6366,13 @@ A worker's question goes through four doors in order, in `yaad-inbound`: a fixed
 5. **To check approval and switch it on:** `{"action":"client-update-status"}`. When Meta says approved it writes the setting in step 3 and the next report uses it. If rejected, the reason comes back in the answer; the wording is in `supabase/functions/yaad-twilio-setup/content.ts` and a change needs a new name, because Twilio content cannot be edited.
 6. **The client wants it to stop:** they press Remove it on the same tab. Or `update jobs set client_phone = '' where id = '<job>';`
 7. **The same phone is the client and the tradesperson on one job:** updates arrive, but replies from that phone are read as the tradesperson's. Only ever true of a test.
+
+## 54. A client on WhatsApp: what they sent, what they were told, and where it went (29 Sep 2026)
+
+1. **Trace attribute:** `yaadly.client_lane.outcome` on the `yaad-inbound` span: `word_thanks`, `word_greeting`, `word_bare`, `named_without_approving`, `problem_to_yaadly`, `question_fixed_answer`, `question_answered_from_facts`, `question_to_yaadly`. No attribute means the message was a clean approval, a plain remark that went to the tradesperson, or the number is a tradesperson's.
+2. **"I approved it and nothing happened":** the message had the code and something else in it. Only the code, or the code with words of agreement, approves. They were told "Nothing has been approved" and it is on the desk as "Client named a job without approving". They reply with the code alone, tap Approve, or approve in the portal.
+3. **A word that should count as agreement does not:** add it to `AGREES` in `yaad-inbound/approval-match.ts` with a line in its test. Never add a word that can also refuse or delay.
+4. **A client's complaint reached the tradesperson:** `readsAsProblem` in `client-lane.ts` did not hear it as one. Add the word to `PROBLEM` and a line to the test.
+5. **What the model answered a client:** the `yaad-inbound` log, lines starting `off-script (client):`.
+6. **A client got no WhatsApp message for an update:** section 53 first. Then `yaadly.notify.client_template` on the `yaad-notify-client` span says whether a template was chosen. No summary for that kind in `CLIENT_SUMMARY` (`client-template.ts`) means email only.
+7. **Deploy:** the banned list changed, so every function that carries a copy goes: `yaad-inbound`, `yaad-notify-client`, `yaad-completion`, `yaad-completion-flow`, `yaad-kickoff`, `yaad-quote-pack`, `yaad-quote-pack-rescan`, `yaad-report`, `yaad-shortlist`, and the web app. Read each one's live `verify_jwt` first and keep it.
