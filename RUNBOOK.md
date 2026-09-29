@@ -6340,3 +6340,11 @@ A worker's question goes through four doors in order, in `yaad-inbound`: a fixed
 5. **A pin arrives but the reply says it did not save:** the message carries the database's own reason. "That number is not the worker on this job" means the phone on `worker_profiles` does not match the phone they are messaging from.
 6. **Trace attribute:** `yaadly.arrival_hold.outcome` on the `yaad-inbound` span: asked, checked_in, checked_in_on_portal, skipped, cannot_check_in, lapsed.
 7. **Deploy, both, from a branch with `origin/main` merged in, after `supabase/functions/sync-shared.sh`:** `supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` and `supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf --no-verify-jwt`. Both are already on the list in CLAUDE.md section 12.
+
+## 51. A worker filed evidence and no draft report came (29 Sep 2026)
+
+1. **Look at the timers:** `select created_at, due_at, fired_at, notified_at from evidence_landed_pending where job_id = '<job>' order by created_at desc limit 5;` A row with `fired_at` set and `notified_at` empty was cleared without sending.
+2. **Why it was cleared:** `select id, should_notify from due_evidence_landed_notifies();` while a timer is open. It is false when the job is not at status `evidence`, when the job has moved to another stage, or when nothing on the stage is newer than the last draft sent.
+3. **To send the draft that was missed:** `insert into evidence_landed_pending (job_id, stage, due_at) values ('<job>', <stage>, now()) on conflict (job_id, stage) where fired_at is null do update set due_at = excluded.due_at;` The check runs once a minute and sends it. This sends a WhatsApp message to the worker, so do it on purpose.
+4. **Whether it arrived:** `select kind, status, error_code, sent_at from message_deliveries where job_id = '<job>' order by sent_at desc limit 5;`
+5. **The reply to "thanks" or "hi"** is `acknowledgementReply` in `yaad-inbound/worker-question.ts`. The next step sentence on every filing is `WHAT_HAPPENS_NEXT` in `yaad-inbound/update-draft.ts`.

@@ -4872,3 +4872,19 @@ Monique tested as the worker and her own stage 3 came back with "No arrival tap 
 **What it cannot know.** The form asks who is at the house, not whether that person is the client. A relative at home while the client pays from abroad reads as somebody at home, and the check-in is not asked for. Closing that needs a question on the job form, which is a product decision and was not made here.
 
 **What it costs.** One more message in the worker's flow on the first evidence of each day. Photographs a worker never answers for are let go after 24 hours where they used to be kept 48. A worker who says they cannot share a location has their evidence filed and the desk is told, as a desk note that does not text her phone: the list of alerts that do is held at six by `asking_test.ts` and adding to it is her decision.
+
+## 2026-09-29 · New evidence on a stage gets its own draft, and every filing says what happens next
+
+Monique, testing as the worker on JOB-WEB-1789253807959: "no draft report sent to me", "there was no response on next steps, there should be", "a worker should never have to think what to do next it should be clear."
+
+**What had happened.** She filed on stage 3 at 13:50, got the draft, and accepted it at 14:03. At 15:57 she filed more on the same stage, was told the client would hear once it was drafted, and nothing was ever drafted. `due_evidence_landed_notifies()` allowed one notification per job and stage for good (`20260906015600`), written on her instruction of 5 September that the client's email "should only go ONCE not twice".
+
+**Why the old rule had stopped doing its job.** That instruction was about a client receiving the same sentence twice. Since `20260831zz` the notification is not the client's message: it is the draft sent to the worker, and the client hears only once the worker confirms. So the rule was silencing the worker's next step and everything the client would have been told about later work on the stage.
+
+**The rule now** (`20260929210000`): a notification is due when evidence exists on the stage that is newer than the last notification actually sent. The same evidence is never drafted twice, and nothing filed later goes unheard. The 90 second quiet timer is unchanged, so a burst is still one draft.
+
+**What it costs.** A stage worked over three days can produce three drafts, and three messages to the client if the worker sends them all. Each says something new.
+
+**Every filing confirmation now ends with the next step** (`WHAT_HAPPENS_NEXT` in `yaad-inbound/update-draft.ts`): what arrives, where, and the one reply that moves it on. It names no day or hour, and nothing about pay or the client's answer. A test holds it on all three confirmations.
+
+**A thank you is answered as one.** Every bare acknowledgement used to get the reply written for a stray "no", which told a worker who had just filed that nothing was filed and asked for another update. Thanks, a greeting, and a stray ok now each get their own line (`acknowledgementReply` in `worker-question.ts`), and "your update is on the job" is said only when the database shows one filed in the last ten minutes.

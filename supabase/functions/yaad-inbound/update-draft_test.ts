@@ -7,7 +7,7 @@
 // Run: deno test --allow-read supabase/functions/
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { draftReadBack, readDraftReply, saysWhatItShows, tooShortToBeAnUpdate } from "./update-draft.ts";
+import { draftReadBack, readDraftReply, saysWhatItShows, tooShortToBeAnUpdate, WHAT_HAPPENS_NEXT } from "./update-draft.ts";
 import { isBareAcknowledgement } from "./worker-question.ts";
 
 const read = (t: string) => readDraftReply(t, isBareAcknowledgement);
@@ -94,4 +94,18 @@ Deno.test("a 1 or an ok is never what a photograph shows", () => {
   for (const said of ["fixing beam in place", "done", "after", "new rail"]) {
     assert(saysWhatItShows(said, isBareAcknowledgement), `is a caption: ${said}`);
   }
+});
+
+Deno.test("after a filing the worker is told what arrives next and what to do with it", async () => {
+  assert(WHAT_HAPPENS_NEXT.startsWith("Next:"));
+  assert(WHAT_HAPPENS_NEXT.includes("Reply 1 to send it"));
+  assert(WHAT_HAPPENS_NEXT.includes("Nothing goes to the client until you do"));
+  // No day, no hour, nothing about pay or about what the client will decide.
+  assert(!/today|tomorrow|tonight|\bhours?\b|paid|payment|approve|guarantee/i.test(WHAT_HAPPENS_NEXT), WHAT_HAPPENS_NEXT);
+  assert(!/[\u2013\u2014]/.test(WHAT_HAPPENS_NEXT));
+  // Every confirmation that something went on the job carries it, and the
+  // sentence it replaced is gone.
+  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  assert(!src.includes("The client hears about it once it is drafted"), "the old ending is back");
+  assert((src.match(/\$\{WHAT_HAPPENS_NEXT\}/g) ?? []).length >= 3, "a filing confirmation lost its next step");
 });
