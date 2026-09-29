@@ -8,7 +8,7 @@ import { pickJobChoice } from "./job-match.ts";
 import { docExt, fileLabel, guessFileKind, isDocMime, isFileableStatus } from "./job-file-lane.ts";
 import { matchApprovingJob } from "./approval-match.ts";
 import { pickEvidenceItem } from "./evidence-item-match.ts";
-import { DRAFT_STILL_WAITING, draftReadBack, readDraftReply, saysWhatItShows, tooShortToBeAnUpdate } from "./update-draft.ts";
+import { DRAFT_STILL_WAITING, draftReadBack, readDraftReply, saysWhatItShows, tooShortToBeAnUpdate, WHAT_HAPPENS_NEXT } from "./update-draft.ts";
 import { visitorTokenOk, originAllowed, WEB_CHAT_MAX_CHARS, webReferenceIn, WEB_SAFE_FALLBACK } from "./web-chat.ts";
 import {
   ALERT_CONSENT_VERSION, ALERT_TERMS, ALERTS_PHRASE, ALERTS_STOP,
@@ -23,7 +23,7 @@ import { shouldEscapeLane, wantsAPerson } from "./escape-hatch.ts";
 import { samePhone, digitsOf } from "./phone.ts";
 import { Deadline } from "./deadline.ts";
 import { inboundText, wasTapped } from "./button-tap.ts";
-import { answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith } from "./worker-question.ts";
+import { acknowledgementReply, answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith } from "./worker-question.ts";
 import { ARRIVAL_HOLD_MS, arrivalAsk, arrivalAskLapsed, arrivalStillWanted, cannotCheckIn, CHECK_IN_BEFORE_YOU_LEAVE, isPin, isSkip, saysCheckedIn } from "./arrival-ask.ts";
 import { checkInApplies } from "./arrival-rule.ts";
 import { clockAnswer, needsAPerson, OFF_SCRIPT_CLOSE, OFF_SCRIPT_SYSTEM, screenOffScript } from "./off-script.ts";
@@ -3183,7 +3183,7 @@ Deno.serve(async (req: Request) => {
         root.setAttributes({ "yaadly.worker_update.job": pick.id, "yaadly.worker_update.outcome": error ? "insert_failed" : "filed" });
         return twiml(error
           ? "That did not save properly. Try again."
-          : `Got it, on record for ${pick.id} (${pick.title}). The client hears about it once it is drafted. If you need a person instead, just say so.`);
+          : `Got it, on record for ${pick.id} (${pick.title}). ${WHAT_HAPPENS_NEXT} If you need a person instead, just say so.`);
       }
 
       // ── a typed update waiting on a reply of 1 ────────────────────────────
@@ -3258,7 +3258,7 @@ Deno.serve(async (req: Request) => {
           : `On record for ${job.id} (${job.title}).`;
         return error
           ? "That did not save properly. Reply 1 again in a moment."
-          : `${landed} The client hears about it once it is drafted.${owed ? (skipCheckIn === "cannot" ? CHECK_IN_TOLD : ` ${CHECK_IN_BEFORE_YOU_LEAVE}`) : ""} If you need a person instead, just say so.`;
+          : `${landed} ${WHAT_HAPPENS_NEXT}${owed ? (skipCheckIn === "cannot" ? CHECK_IN_TOLD : ` ${CHECK_IN_BEFORE_YOU_LEAVE}`) : ""} If you need a person instead, just say so.`;
       };
 
       if (!evidenceHeld && draftSession && !msg.media.length && msg.text.trim()) {
@@ -3529,7 +3529,7 @@ Deno.serve(async (req: Request) => {
           // not already the answer to a question: before this it is the job
           // code, the caption, or the section.
           const them = filed === 1 ? "it" : "them";
-          const invite = ` Anything to say about ${them}? Type it now and it goes on the same update.`;
+          const invite = ` Anything to say about ${them}? Type it now and it goes on the same update. ${WHAT_HAPPENS_NEXT}`;
           let body = phase
             ? `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}, marked as ${PHASE_SAID[phase]}${answering}.${invite}`
             : `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}. I could not tell which part of the job that was, so it is on record unmarked.${invite}`;
@@ -4242,7 +4242,18 @@ Deno.serve(async (req: Request) => {
           // 15 September 2026.
           if (found && isBareAcknowledgement(text)) {
             root.setAttributes({ "yaadly.worker_update.outcome": "acknowledgement_not_update" });
-            return twiml("Noted, nothing filed. When you have a moment, send a few words on how the work went, a photo, or a voice note, and it goes on the job.");
+            // Answered as the word it was (worker-question.ts). Whether this
+            // worker filed anything in the last ten minutes is read, never
+            // assumed, so a thank you is only told "your update is on the job"
+            // when one is. A failed read says the shorter thing.
+            let justFiled = false;
+            try {
+              const { data: lately } = await supabase.from("evidence").select("id")
+                .eq("uploaded_by", found.email)
+                .gte("created_at", new Date(Date.now() - 10 * 60_000).toISOString()).limit(1);
+              justFiled = (lately ?? []).length > 0;
+            } catch (_) { /* the shorter reply */ }
+            return twiml(acknowledgementReply(text, justFiled));
           }
           if (found && (looksLikeQuestion(text) || wantsHelpWith(text))) {
             root.setAttributes({ "yaadly.worker_update.outcome": "question_not_update" });

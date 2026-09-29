@@ -8,7 +8,7 @@
 // Run: deno test --allow-read supabase/functions/
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { answerWorkerQuestion, asksForPayment, isBareAcknowledgement, looksLikeQuestion, PAY_REQUEST_ANSWER, wantsHelpWith } from "./worker-question.ts";
+import { acknowledgementReply, answerWorkerQuestion, asksForPayment, isBareAcknowledgement, looksLikeQuestion, PAY_REQUEST_ANSWER, wantsHelpWith } from "./worker-question.ts";
 
 Deno.test("a worker asking something is read as a question", () => {
   for (const said of [
@@ -162,4 +162,36 @@ Deno.test("the payment answer promises nothing and carries the published sentenc
   assert(!/£|J\$|tomorrow|today|on its way|already sent|will be paid|you will get/i.test(a), a);
   assert(!/escrow|100%|guarantee|zero fraud|held|fully covered/i.test(a), a);
   assert(!/[\u2013\u2014]/.test(a), "no dashes");
+});
+
+Deno.test("a thank you is answered as a thank you", () => {
+  // 29 Sep 2026: an update was filed, the worker said thanks, and was told
+  // nothing had been filed and asked for another.
+  for (const said of ["thanks", "Thanks!", "thank you", "cheers", "bless", "respect", "thankss"]) {
+    const after = acknowledgementReply(said, true);
+    assert(after.startsWith("You're welcome."), `${said}: ${after}`);
+    assert(after.includes("Your update is on the job"), after);
+    assert(!/nothing filed|send a few words/i.test(after), after);
+    // Nothing filed lately, so nothing is claimed.
+    assertEquals(acknowledgementReply(said, false), "You're welcome.");
+  }
+});
+
+Deno.test("a greeting and a stray ok each get their own reply", () => {
+  for (const said of ["hi", "hello", "good morning", "Hey!"]) {
+    assert(acknowledgementReply(said, false).startsWith("Hello."), said);
+    assert(acknowledgementReply(said, true).startsWith("Hello."), said);
+  }
+  for (const said of ["ok", "no", "yes", "got it", "nno", "seen"]) {
+    assertEquals(acknowledgementReply(said, true), "Nothing is waiting on a reply from you right now.", said);
+  }
+});
+
+Deno.test("no acknowledgement reply claims, promises or asks for anything it should not", () => {
+  for (const said of ["thanks", "hi", "ok", "no"]) for (const filed of [true, false]) {
+    const a = acknowledgementReply(said, filed);
+    assert(!/escrow|100%|guarantee|held|paid|payment|approved|client/i.test(a), a);
+    assert(!/[\u2013\u2014]/.test(a), a);
+    assert(!looksLikeQuestion(a), a);
+  }
 });

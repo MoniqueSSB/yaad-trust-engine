@@ -106,6 +106,40 @@ export function isBareAcknowledgement(text: string): boolean {
   return ACKNOWLEDGEMENT.test(t) || ACKNOWLEDGEMENT_PRESSED.test(pressDoubledLetters(t));
 }
 
+const THANKS = /^(?:thanks|thank you|thx|ty|cheers|bless|respect|ok thanks|okay thanks)[.!]*$/i;
+const GREETING = /^(?:hi|hello|hey|morning|good morning|good afternoon|good evening|evening)[.!]*$/i;
+const THANKS_PRESSED = alsoPressed(THANKS);
+const GREETING_PRESSED = alsoPressed(GREETING);
+
+/** What a bare acknowledgement is answered with, on its own with nothing
+ *  waiting.
+ *
+ *  Every word on the list used to get one reply, written for a stray "no":
+ *  "Noted, nothing filed. When you have a moment, send a few words on how the
+ *  work went". On 29 September 2026 the founder, testing as the worker, filed
+ *  an update, said thanks, and was told nothing had been filed and asked for
+ *  another. The update was on the job. The reply was answering a different
+ *  word.
+ *
+ *  Three kinds, three replies. `justFiled` is whether this worker put
+ *  something on a job in the last few minutes, and it changes only the thank
+ *  you: saying "your update is on the job" to somebody who filed nothing
+ *  would be the same mistake the other way round. Nothing here files, sends
+ *  or wakes anybody, exactly as before. */
+export function acknowledgementReply(text: string, justFiled: boolean): string {
+  const t = String(text ?? "").trim();
+  const pressed = pressDoubledLetters(t);
+  if (THANKS.test(t) || THANKS_PRESSED.test(pressed)) {
+    return justFiled
+      ? "You're welcome. Your update is on the job and nothing more is needed from you right now."
+      : "You're welcome.";
+  }
+  if (GREETING.test(t) || GREETING_PRESSED.test(pressed)) {
+    return "Hello. Send a photo, a few words or a voice note about the work and it goes on the job.";
+  }
+  return "Nothing is waiting on a reply from you right now.";
+}
+
 /** A worker saying they want paying, or asking for the client to be told so.
  *
  *  "let the client know i am ready for payment", 29 September 2026. It is not
