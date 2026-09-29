@@ -59,7 +59,7 @@ import { Image } from "jsr:@matmen/imagescript";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 import { addonPdfUrl } from "./addon-link.ts";
 import { screenOwnWords } from "./own-words.ts";
-import { captionsLine, namedNextStep, plainDraft, unearnedClaims, usableCaptions } from "./report-draft.ts";
+import { captionsLine, namedNextStep, plainDraft, reportSentReceipt, unearnedClaims, usableCaptions } from "./report-draft.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -2037,6 +2037,53 @@ Deno.serve(async (req: Request) => {
     }
 
     const told = emailed || wa.sent;
+
+    // The worker's receipt for a report sent from the edit page. A reply of 1
+    // on WhatsApp is answered in the chat by yaad-inbound; the page answered
+    // only on the page, and the chat was left showing a live draft. Read from
+    // the link row and never from the caller: send_report_draft_by_code()
+    // stamps sent_via 'link' in the same transaction that queued this call,
+    // so it is committed by the time this runs. The WhatsApp door stamps its
+    // own value afterwards and is never 'link', so it gets no second receipt.
+    //
+    // Never at the cost of the client's message, which has already gone:
+    // every failure here is logged and swallowed.
+    if (kind === "evidence_report_confirmed" && job.worker_email) {
+      try {
+        const { data: dl } = await admin.from("report_draft_links")
+          .select("sent_via").eq("job_id", jobId).maybeSingle();
+        if (dl?.sent_via === "link") {
+          const { data: w } = await admin.from("worker_profiles")
+            .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
+          const phone = String(w?.phone ?? "").trim();
+          if (phone) {
+            const receipt = await sendTwilio(phone, reportSentReceipt(job.id, String(job.title ?? ""), told), "whatsapp", trace, [], undefined, { kind: "report sent receipt", job_id: jobId });
+            root.setAttributes({ "yaadly.notify.worker_receipt": receipt.sent });
+            if (!receipt.sent) console.error(`worker receipt not sent for ${jobId}: ${receipt.reason ?? "unknown"}`);
+            // The draft has gone, so the chat stops waiting on it. Left in
+            // place, the next thing the worker typed would be read as their
+            // own version of a report that has already been sent.
+            const digits = phone.replace(/\D/g, "");
+            const { data: open } = await admin.from("wa_intake_sessions")
+              .select("wa_id, answers").in("wa_id", [`+${digits}`, digits, phone]);
+            for (const row of open ?? []) {
+              const a = (row as { answers?: Record<string, unknown> }).answers ?? {};
+              if (a._lane === "report_confirm" && String(a.job_id ?? "") === jobId) {
+                await admin.from("wa_intake_sessions").delete().eq("wa_id", (row as { wa_id: string }).wa_id);
+              }
+            }
+          }
+          if (!told) {
+            await ntfyPush(admin, `Report reached nobody: ${job.title}`,
+              `${jobId}: the worker sent their report from the edit page and neither the email nor WhatsApp reached the client. The report is saved on the job.`,
+              "warning");
+          }
+        }
+      } catch (e) {
+        console.error(`worker receipt failed for ${jobId}:`, String(e).slice(0, 200));
+      }
+    }
+
     root.setAttributes({ "yaadly.notify.kind": kind, "yaadly.notify.emailed": emailed, "yaadly.notify.whatsapp": wa.sent, "yaadly.notify.outcome": told ? "told" : "nobody_told" });
     return json({ ok: true, kind, told, emailed, emailReason: emailed ? "" : emailReason, whatsapp: wa });
   } catch (e) {

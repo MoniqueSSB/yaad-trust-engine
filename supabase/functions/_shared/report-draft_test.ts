@@ -1,5 +1,6 @@
+import * as guardrails from "./guardrails.ts";
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { canBeACaption, captionsLine, isCameraNote, isUsableCaption, namedNextStep, plainDraft, unearnedClaims, usableCaptions } from "./report-draft.ts";
+import { canBeACaption, captionsLine, isCameraNote, isUsableCaption, namedNextStep, plainDraft, unearnedClaims, usableCaptions, reportSentReceipt } from "./report-draft.ts";
 
 // The captions and the draft from the founder's own test, 29 September 2026.
 const FILED = ["1", "fixing beam in place", "changing focus", "the work is done for this stage"];
@@ -79,4 +80,26 @@ Deno.test("the plain draft is his words and nothing else", () => {
 Deno.test("the captions line is absent when there is nothing to show", () => {
   assertEquals(captionsLine([]), null);
   assert(captionsLine(["fixing beam in place"])!.startsWith("From what you sent:"));
+});
+
+Deno.test("a report sent from the page is answered on WhatsApp, with the next step", () => {
+  const a = reportSentReceipt("JOB-WEB-1", "Carpentry job", true);
+  assert(a.startsWith("Sent to the client, in your words, for JOB-WEB-1 (Carpentry job)."), a);
+  assert(a.includes("Next: the client reads it"), a);
+  assert(a.includes("Nothing more is needed from you"), a);
+});
+
+Deno.test("a report that reached nobody is never called sent", () => {
+  const a = reportSentReceipt("JOB-WEB-1", "", false);
+  assert(!/^Sent/.test(a) && a.includes("has not reached the client yet"), a);
+  assert(a.includes("A person at Yaadly has been told"), a);
+});
+
+Deno.test("the receipt promises nothing and passes the language screen", () => {
+  for (const reached of [true, false]) {
+    const a = reportSentReceipt("JOB-1", "Roof", reached);
+    assertEquals(guardrails.scan(a).length, 0, a);
+    assert(!/today|tomorrow|\bhours?\b|paid|payment|approved|will approve|guarantee/i.test(a), a);
+    assert(!/[\u2013\u2014]/.test(a), a);
+  }
 });

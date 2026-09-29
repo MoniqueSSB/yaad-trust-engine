@@ -121,3 +121,25 @@ export function captionsLine(captions: string[]): string | null {
   if (!captions.length) return null;
   return `From what you sent: ${captions.map((c) => `"${c}"`).join(", ")}`;
 }
+
+/** What the worker is told on WhatsApp once a report sent from the edit page
+ *  has gone.
+ *
+ *  Founder, 29 September 2026. She edited a draft on the page, pressed Send,
+ *  and then said "but whatsapp hasnt updated". The page said it was sent.
+ *  The chat, which is where a worker actually is, said nothing, and still
+ *  showed three live buttons for a draft that had already gone. A reply of 1
+ *  on WhatsApp has always been answered there; the page never was.
+ *
+ *  `reached` is whether the client was actually told, by email or WhatsApp.
+ *  When they were not, the worker is told that and not that it was sent: the
+ *  report is saved either way, and a person at Yaadly is alerted.
+ *
+ *  Says what happens next and what the worker has to do, which is nothing.
+ *  No day, no hour, nothing about pay or what the client will decide. */
+export function reportSentReceipt(jobId: string, title: string, reached: boolean): string {
+  const what = `${jobId}${title ? ` (${title})` : ""}`;
+  return reached
+    ? `Sent to the client, in your words, for ${what}. The buttons on the draft above are finished with. Next: the client reads it, looks at your photographs and decides. You hear here when they do. Nothing more is needed from you on this update.`
+    : `Your report for ${what} is saved, but it has not reached the client yet. A person at Yaadly has been told and is looking at why. Nothing more is needed from you on this update.`;
+}
