@@ -4910,3 +4910,15 @@ Monique edited a draft on `/draft/[id]`, pressed Send, and said "but whatsapp ha
 `yaad-notify-client` now sends the worker a receipt when `report_draft_links.sent_via` is `link`: that it went, in their words, that the buttons above are finished with, and what happens next. It reads the row and takes nothing from the caller, so `relay_confirmed_report()` keeps its signature and the WhatsApp door, which answers in the chat already, gets no second receipt. If neither the email nor WhatsApp reached the client, the worker is told the report is saved and has not reached them, never that it was sent, and the desk is alerted. The waiting `report_confirm` session is closed at the same time, because left open the worker's next message would be read as their own version of a report that had already gone.
 
 **What it costs.** One more WhatsApp message per report sent from the page. It is free text inside the 24 hour window, which holds because a worker on the page tapped a button in the chat minutes earlier.
+
+## 2026-09-29 · The location is to be shared before leaving site, and a check-in that carried one counts
+
+Monique read the note on her own draft as the worker: "No location shared that day... Entirely up to you and nothing waits on it", and said it "has to be done before leaving the site".
+
+**The wording now** says when and how: share your location before you leave site for the day, with the three taps in the sentence. It still says what the location is for. The line after a check-in by button says the same.
+
+**In code nothing gates.** It is still a note and never a gap, nothing blocks a filing, a draft or a stage, and whether a stage passes without a location is still a named person's call. The instruction is in the words, which is what she asked for. The test that required the ask to say it was optional now requires it to say when; that one assertion changed on her instruction, and the test that it must not read as a telling-off is unchanged and still passes.
+
+**A check-in that carried a location counts as one.** She had checked in that day and was still told no location was shared, because a pin sent after a check-in and a check-in that carried a position were read from two tables and only the first was counted. A check-in by button carries a time and no place, so it does not count and the location is still asked for.
+
+**Not asked where somebody is at home at the property**, the same rule as the check-in (`_shared/arrival-rule.ts`).

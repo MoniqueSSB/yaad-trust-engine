@@ -308,23 +308,61 @@ export function runEvidenceChecks(input: ChecksInput): Check[] {
   // performed now, where a photograph's metadata can come from a picture taken
   // last week at a different house.
   //
-  // It is a NOTE and never a gap, and that is the whole point. `arrival_log`'s
-  // own migration says GPS "strengthens the record, it never gates it"; the
-  // same holds here without exception. A worker who shares nothing is not
-  // penalised, delayed or blocked, and the wording below says what a pin is
-  // FOR rather than telling anyone off for the absence of one.
+  // It is a NOTE and never a gap. `arrival_log`'s own migration says GPS
+  // "strengthens the record, it never gates it", and in code that still
+  // holds: nothing here blocks a filing, a draft or a stage.
+  //
+  // THE WORDING CHANGED on 29 September 2026, on the founder's instruction.
+  // It used to end "Entirely up to you and nothing waits on it." She read it
+  // as the worker and said it "has to be done before leaving the site". So
+  // it now says that, as a plain instruction with the steps in it. It still
+  // says what the location is FOR, and it still tells nobody off.
+  //
   // Read by the day too, since 29 September 2026: one location shared that
-  // day covers every stage worked that day, so the offer is not repeated.
+  // day covers every stage worked that day, so the ask is not repeated.
+  //
+  // A check-in that carried a position counts. A worker who checked in by
+  // sending a pin, or from the portal with the browser's position, has
+  // shared where they were, and telling them "No location shared that day"
+  // was untrue. A check-in by button carries a time and no place, so it does
+  // not count and the location is still asked for.
   const pins = (input.pins ?? []).filter((p) => onWorkDay(jamaicaDay(p.shared_at)));
-  out.push({
-    name: "Location pin",
-    passed: pins.length > 0,
-    detail: pins.length > 0
-      ? `A location was shared that day${pins[0]?.address ? ` (${pins[0].address})` : ""}, which strengthens the pack.`
-      : "No location shared that day. Sending your location on WhatsApp puts on record that you were there, which makes the pack harder to argue with. Entirely up to you and nothing waits on it.",
-    severity: "note",
-    audience: "worker",
-  });
+  const placedArrival = arrivals.some((a) => a.lat !== null && a.lat !== undefined);
+  if (pins.length > 0) {
+    out.push({
+      name: "Location pin",
+      passed: true,
+      detail: `A location was shared that day${pins[0]?.address ? ` (${pins[0].address})` : ""}, which strengthens the pack.`,
+      severity: "note",
+      audience: "worker",
+    });
+  } else if (placedArrival) {
+    out.push({
+      name: "Location pin",
+      passed: true,
+      detail: "The check-in that day carried a location, so where the work happened is on record.",
+      severity: "note",
+      audience: "worker",
+    });
+  } else if (input.arrivalExpected === false) {
+    // Somebody is at home at the property (arrival-rule.ts). Not asked for,
+    // and written down as not asked for.
+    out.push({
+      name: "Location pin",
+      passed: true,
+      detail: "No location asked for on this job: somebody is at home at the property day to day.",
+      severity: "note",
+      audience: "desk",
+    });
+  } else {
+    out.push({
+      name: "Location pin",
+      passed: false,
+      detail: "No location shared that day. Share your location before you leave site for the day: tap the plus sign (or the paperclip) in this chat, choose Location, then Send your current location. It puts on record that you were there, which makes the pack harder to argue with.",
+      severity: "note",
+      audience: "worker",
+    });
+  }
 
   // A pin far from the parish is the desk's business, on exactly the same
   // terms as the arrival tap's own flag: a glance, never a finding.
