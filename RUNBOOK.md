@@ -6319,6 +6319,7 @@ Founder: "you raise this with Yaadly". The portal opens a new dispute already es
 4. **The draft is the worker's own words in quotation marks:** the model's draft claimed more than he did, or the model call failed, and his words were offered instead. The span attribute `yaadly.notify.draft_unearned` names the words that were caught. Working as designed.
 5. **The draft still says nobody checked in:** the check reads the Jamaica day. `select stage, arrived_on from arrival_log where job_id = '<job>' order by arrived_at desc;` and compare with the day the evidence was filed. A check-in on any stage that day counts.
 6. **A worker says his own words were refused:** the reply names the words. They are on the banned list in `_shared/guardrails.ts`. Nothing was sent and the draft is still waiting; he sends it again without them. A push titled "Report held" means a report reached the last check unscreened, which should not happen: find which route sent it.
+7. **The daily check-in** runs at `0 13 * * *` (8am in Jamaica) since 29 Sep 2026. To move it: `select cron.alter_job(job_id := (select jobid from cron.job where jobname = 'yaad-daily-checkin'), schedule := '<cron>');`.
 
 ## 49. The WhatsApp assistant answered a worker's question, or should have (29 Sep 2026)
 

@@ -1,6 +1,6 @@
 import * as guardrails from "./guardrails.ts";
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { captionsLine, isUsableCaption, namedNextStep, plainDraft, unearnedClaims, usableCaptions, reportSentReceipt } from "./report-draft.ts";
+import { canBeACaption, captionsLine, isCameraNote, isUsableCaption, namedNextStep, plainDraft, unearnedClaims, usableCaptions, reportSentReceipt } from "./report-draft.ts";
 
 // The captions and the draft from the founder's own test, 29 September 2026.
 const FILED = ["1", "fixing beam in place", "changing focus", "the work is done for this stage"];
@@ -18,7 +18,27 @@ Deno.test("a bare menu reply is not a description of the work", () => {
 
 Deno.test("usable captions keep the order filed and drop repeats", () => {
   assertEquals(usableCaptions([...FILED, "Fixing beam in place"]),
-    ["fixing beam in place", "changing focus", "the work is done for this stage"]);
+    ["fixing beam in place", "the work is done for this stage"]);
+});
+
+Deno.test("a note about the camera is not an account of the work", () => {
+  for (const c of ["changing focus", "retake", "bad lighting", "zoomed in", "Blurry one"]) assertEquals(isCameraNote(c), true, c);
+});
+
+Deno.test("the camera filter is narrow: real work that mentions those words is kept", () => {
+  for (const c of [
+    "fixing beam in place",
+    "the main focus today was getting the beam level and fixed",
+    "fitted the security camera bracket above the front door",
+    "flashing fitted round the chimney",
+    "angle bracket fixed to the wall plate and the joist",
+  ]) assertEquals(isCameraNote(c), false, c);
+});
+
+Deno.test("a stray 1 cannot stand as a caption, a sentence can", () => {
+  assertEquals(canBeACaption("1"), false);
+  assertEquals(canBeACaption("ok"), false);
+  assertEquals(canBeACaption("new door hung"), true);
 });
 
 Deno.test("the draft from the real test is caught, and it says which words", () => {
@@ -50,6 +70,7 @@ Deno.test("a next step the worker pointed at is kept", () => {
 
 Deno.test("the plain draft is his words and nothing else", () => {
   const d = plainDraft("stage 3", usableCaptions(FILED));
+  assert(!d.includes("changing focus"), d);
   assert(d.includes('"fixing beam in place"'), d);
   assertEquals(unearnedClaims(d, usableCaptions(FILED)), []);
   assert(!/[–—]/.test(d), "no dashes");

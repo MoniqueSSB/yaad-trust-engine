@@ -34,12 +34,37 @@ export function isUsableCaption(label: unknown): boolean {
   return /[a-z]/i.test(t);
 }
 
+/** A note about the photograph, not about the work: "changing focus",
+ *  "retake", "bad lighting". On 29 September 2026 "changing focus" reached the
+ *  model as if it were an account of the job.
+ *
+ *  Narrow on purpose, because reading meaning out of a caption is the move the
+ *  dropped before-and-after check made and got wrong. It fires only on a
+ *  caption of four words or fewer that uses camera vocabulary and names no
+ *  work. "focus" alone in a longer sentence is left alone. What it drops is
+ *  dropped from the DRAFT only: the caption stays on the evidence, where the
+ *  desk and the client still see it exactly as typed. */
+const CAMERA_WORDS = /\b(?:focus|refocus|refocusing|camera|lens|zoom|zoomed|blurry|blurred|blur|retake|retaking|flash|lighting|angle|selfie)\b/i;
+
+export function isCameraNote(label: unknown): boolean {
+  const t = String(label ?? "").trim();
+  if (!t) return false;
+  return t.split(/\s+/).length <= 4 && CAMERA_WORDS.test(t);
+}
+
+/** Whether a reply can stand as a description of a photograph. Used by
+ *  yaad-inbound at the moment a worker is asked what his photos show, so a
+ *  stray "1" is asked about again and never filed as the caption. */
+export function canBeACaption(text: unknown): boolean {
+  return isUsableCaption(text);
+}
+
 /** The captions worth showing anybody, in the order filed, without repeats. */
 export function usableCaptions(labels: unknown[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const l of labels ?? []) {
-    if (!isUsableCaption(l)) continue;
+    if (!isUsableCaption(l) || isCameraNote(l)) continue;
     const t = String(l).trim().replace(/\s+/g, " ");
     const k = t.toLowerCase();
     if (seen.has(k)) continue;
