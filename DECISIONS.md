@@ -4922,3 +4922,21 @@ Monique read the note on her own draft as the worker: "No location shared that d
 **A check-in that carried a location counts as one.** She had checked in that day and was still told no location was shared, because a pin sent after a check-in and a check-in that carried a position were read from two tables and only the first was counted. A check-in by button carries a time and no place, so it does not count and the location is still asked for.
 
 **Not asked where somebody is at home at the property**, the same rule as the check-in (`_shared/arrival-rule.ts`).
+
+## 2026-09-29 · The client is told of a job update on WhatsApp
+
+Monique: "the client should be informed on whatsapp of the job update", then "make that happen" and "build 1 2 3".
+
+**What was true that day.** No job in the database carried a client phone number, and no stage report had ever reached a client on WhatsApp. `yaad-notify-client` could always send one. It had never had a number to send to, because a job posted from the web is anonymous by design and nothing afterwards asked for one. Every client had been told by email alone.
+
+**One: the number.** `set_job_whatsapp_as_me()` (`20260929230000`) lets the job's client add, change or remove a WhatsApp number from the Job details tab. It writes `jobs.client_phone`, the column every sender already reads. An empty value removes it, so taking the number back needs nobody's help. The number is never written to `agent_actions`. The tradesperson is never shown it.
+
+**Two: the template.** `yaadly_client_job_update_v1`, submitted to Meta as Utility by `yaad-twilio-setup` (`create-client-update`), and switched on by `client-update-status` only once approved. WhatsApp takes free text only from a business somebody has written to within 24 hours, and a client who booked last week has not.
+
+**Three: the fallback.** Inside the window the client still gets the full message: the tradesperson's words, the photographs, and the approve button. The template goes only when that is refused for being outside the window. It carries the words and the link and no approve button, because a template cannot show the photographs and nobody should be asked to approve work they have not been shown.
+
+**What it costs.** Yaadly now asks a client for a phone number it did not ask for before. That is a data protection decision and it is hers; she made it on this date. The privacy notice should name the number and its one purpose. Each template message outside the window is charged by WhatsApp as a utility conversation; free text inside it is not.
+
+**What it does not change.** Email goes regardless, as it always has. A client approving on WhatsApp is a hold point and never a payment: a named person at Yaadly still signs the stage off.
+
+**Not built.** The job form still does not ask for a number. The client adds it in the portal after they have signed in, which is the first point at which Yaadly knows who they are.

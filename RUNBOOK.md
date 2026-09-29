@@ -6356,3 +6356,13 @@ A worker's question goes through four doors in order, in `yaad-inbound`: a fixed
 2. **Whether the client was reached, and how:** `select created, content from net._http_response order by created desc limit 20;` and find the row with `evidence_report_confirmed`. `emailed` and `whatsapp.sent` say which. A job with no client phone is reached by email only, and says `no recipient phone on the job`.
 3. **No receipt arrived:** `select sent_via, sent_at from report_draft_links where job_id = '<job>';` It must say `link`. Then `select status, error_code from message_deliveries where job_id = '<job>' and kind = 'report sent receipt';` Error 63016 means the worker was outside WhatsApp's 24 hour window.
 4. **The worker's next message was treated as a report:** the `report_confirm` row in `wa_intake_sessions` was not closed. Delete it by `wa_id`.
+
+## 53. A client is not getting job updates on WhatsApp (29 Sep 2026)
+
+1. **Is there a number on the job:** `select id, client_phone <> '' as has_number from jobs where id = '<job>';` No number means email only. The client adds one on the Job details tab of their portal, under Updates on WhatsApp.
+2. **What happened to the last report:** `select created, content from net._http_response order by created desc limit 20;` and find `evidence_report_confirmed`. `whatsapp.sent` and `whatsapp.reason` say what WhatsApp did; `emailed` says whether the email went.
+3. **"outside WhatsApp's 24 hour window":** the client has not written to Yaadly in 24 hours, so the template is needed. `select value from app_settings where key = 'twilio_content_sid_client_update';` Empty means Meta has not approved it yet, or nobody has asked.
+4. **To create the template and ask Meta:** call `yaad-twilio-setup` with `{"action":"create-client-update"}`. Once, and safe to repeat.
+5. **To check approval and switch it on:** `{"action":"client-update-status"}`. When Meta says approved it writes the setting in step 3 and the next report uses it. If rejected, the reason comes back in the answer; the wording is in `supabase/functions/yaad-twilio-setup/content.ts` and a change needs a new name, because Twilio content cannot be edited.
+6. **The client wants it to stop:** they press Remove it on the same tab. Or `update jobs set client_phone = '' where id = '<job>';`
+7. **The same phone is the client and the tradesperson on one job:** updates arrive, but replies from that phone are read as the tradesperson's. Only ever true of a test.

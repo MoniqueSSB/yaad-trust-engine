@@ -239,6 +239,25 @@ export async function moveDispute(
   revalidatePath("/portal/jobs/" + jobId);
 }
 
+/** The client adds, changes or removes the WhatsApp number their updates go
+ *  to (20260929230000). An empty string removes it. Returned, never thrown,
+ *  so the database's own sentence reaches them. */
+export async function setJobWhatsApp(jobId: string, phone: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_job_whatsapp_as_me", { p_job: jobId, p_phone: phone.trim().slice(0, 24) });
+  if (error) {
+    return {
+      ok: false,
+      error: /could not find the function|does not exist/i.test(error.message)
+        ? "Adding a number here is not switched on yet. Send it to Yaadly with Message Yaadly on the Help tab."
+        : error.message,
+    };
+  }
+  revalidatePath("/portal/jobs/" + jobId);
+  return { ok: true };
+}
+
 /** The client adds or corrects the street address (20260929070000). Returned,
  *  never thrown, so the database's own sentence reaches them. */
 export async function setJobAddress(jobId: string, addr: string): Promise<{ ok: true } | { ok: false; error: string }> {

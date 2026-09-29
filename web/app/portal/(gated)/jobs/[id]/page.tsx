@@ -29,6 +29,7 @@ import { AddOnPanel, AddonApprove, type AddonInvoice, type AddonPhoto, type Addo
 import { addonClientBill, addonStateLine, addonWorkerPay, waitingOn } from "@/lib/jobs/addon";
 import { MoneyTrail, type TrailWorkerPay } from "@/components/portal/MoneyTrail";
 import { JobAddress } from "@/components/portal/JobAddress";
+import { JobWhatsApp } from "@/components/portal/JobWhatsApp";
 import { EvidenceLedger } from "@/components/portal/EvidenceLedger";
 import { GoLive, type Gate } from "@/components/portal/GoLive";
 import { Outstanding, type OutItem } from "@/components/portal/Outstanding";
@@ -275,12 +276,16 @@ export default async function JobRoom({
      reading their name and phone number, and there is no reason for a booked
      worker's session to fetch either. */
   let boardDescr: string | null = null;
+  /* The client's own WhatsApp number, for the Job details tab. Read with the
+     client's session and never set for a worker, who is not shown it. */
+  let ownPhone: string | null = null;
   if (role === "client") {
     const { data: own } = await supabase
       .from("jobs")
       .select("client_name,client_phone")
       .eq("id", id)
       .maybeSingle();
+    ownPhone = own?.client_phone ?? null;
     const { data: scrubbed } = await supabase.rpc("board_descr", {
       p_descr: job.descr,
       p_client_name: own?.client_name ?? null,
@@ -2146,6 +2151,9 @@ export default async function JobRoom({
         booked={!!job.worker_email}
         closed={job.status === "complete"}
       />
+      {role === "client" && (
+        <JobWhatsApp jobId={job.id} phone={ownPhone} closed={job.status === "complete"} />
+      )}
       {role === "client" && (
         <PortalCard
           reference={job.id}

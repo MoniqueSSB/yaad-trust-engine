@@ -53,6 +53,7 @@ import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, type VisionProvider, vi
 import * as guardrails from "./guardrails.ts";
 import { checkAttrs, deskPack, runEvidenceChecks, workerGaps, workerNotes } from "./evidence-checks.ts";
 import { checkInApplies } from "./arrival-rule.ts";
+import { clientUpdateVars } from "./client-template.ts";
 import { recordAccepted, type SendMeta, withMessagingService, withStatusCallback } from "./twilio-status.ts";
 import { hasWorkerTemplateDecision, insideWindow, samePhoneDigits, templateVar, WINDOW_MS, workerTemplateSummary } from "./worker-template.ts";
 import { Image } from "jsr:@matmen/imagescript";
@@ -1530,6 +1531,22 @@ Deno.serve(async (req: Request) => {
         ? `Reply with the code ${job.id} to approve, or just say what you think and we will pass it to the worker.`
         : "Review it and reply from your portal.";
       line = [workerSays, aiSays, itemsLine, `${actionHint} ${roomLink}`].filter(Boolean).join("\n\n");
+
+      // For a client outside WhatsApp's 24 hour window (client-template.ts).
+      // Read from the setting that is written only once Meta has approved,
+      // so an unapproved template is never tried. Used by the send further
+      // down only when the free text was refused for that reason.
+      if (clientPhone) {
+        let clientSid = Deno.env.get("TWILIO_CONTENT_SID_CLIENT_UPDATE") ?? "";
+        if (!clientSid) {
+          const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_client_update").maybeSingle();
+          try { clientSid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { clientSid = String(st?.value ?? ""); }
+        }
+        if (/^HX[0-9a-f]{32}$/i.test(clientSid)) {
+          waTemplate = { sid: clientSid, vars: clientUpdateVars(String(job.title ?? ""), job.id, workerSays, roomLink) };
+        }
+        root.setAttributes({ "yaadly.notify.client_template_ready": Boolean(waTemplate) });
+      }
 
       // ── the approve button, 4 September 2026 ──────────────────────────
       //

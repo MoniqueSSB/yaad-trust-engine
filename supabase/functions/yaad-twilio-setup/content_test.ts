@@ -20,7 +20,7 @@ Deno.test("the section menu's row ids are the letters the typed question accepts
 });
 
 import { SECTION_MENU_APPROVAL, SECTION_MENU_NAME } from "./content.ts";
-import { WORKER_UPDATE_APPROVAL, WORKER_UPDATE_BODY, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
+import { CLIENT_UPDATE_APPROVAL, CLIENT_UPDATE_BODY, CLIENT_UPDATE_NAME, clientUpdateContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_BODY, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
 
 Deno.test("the section menu is submitted for approval as itself, as Utility", () => {
   assertEquals(SECTION_MENU_APPROVAL.name, SECTION_MENU_NAME);
@@ -40,4 +40,16 @@ Deno.test("the worker update template is the one yaad-notify-client fills", asyn
   assert(/^[a-z0-9_]+$/.test(WORKER_UPDATE_APPROVAL.name), "Meta template names are lowercase, digits and underscores");
   assertEquals(WORKER_UPDATE_APPROVAL.category, "UTILITY");
   assert(!/[–—]/.test(WORKER_UPDATE_BODY));
+});
+
+Deno.test("the client update template is the one yaad-notify-client fills", async () => {
+  const other = await Deno.readTextFile(new URL("../yaad-notify-client/client-template.ts", import.meta.url));
+  assert(other.includes(JSON.stringify(CLIENT_UPDATE_BODY)), "the body drifted from yaad-notify-client/client-template.ts");
+  assert(other.includes(`"${CLIENT_UPDATE_NAME}"`), "the template name drifted");
+  const c = clientUpdateContent();
+  assertEquals(c.types["twilio/text"].body, CLIENT_UPDATE_BODY);
+  assertEquals(Object.keys(c.variables), ["1", "2", "3"]);
+  assert(/^[a-z0-9_]+$/.test(CLIENT_UPDATE_APPROVAL.name), "Meta template names are lowercase, digits and underscores");
+  assertEquals(CLIENT_UPDATE_APPROVAL.category, "UTILITY");
+  assert(!/[\u2013\u2014]/.test(CLIENT_UPDATE_BODY));
 });
