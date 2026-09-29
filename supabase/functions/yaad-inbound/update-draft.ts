@@ -84,3 +84,17 @@ export function draftReadBack(jobId: string, title: string, text: string, joinsB
 }
 
 export const DRAFT_STILL_WAITING = "Your update is still waiting. Reply 1 to put it on the job, send different words to replace it, or reply no to drop it.";
+
+/** What a worker is told after anything goes on the job.
+ *
+ *  Founder, 29 September 2026: "a worker should never have to think what to
+ *  do next, it should be clear." The confirmation used to end "The client
+ *  hears about it once it is drafted", which names something that will
+ *  happen and nothing the worker will see or do. This names both: what
+ *  arrives, where, and the one reply that moves it on.
+ *
+ *  "In a few minutes" is the 90 second quiet timer plus a check that runs
+ *  once a minute. No hour, no day, and nothing about the client's answer or
+ *  about pay, which are not this message's to promise. */
+export const WHAT_HAPPENS_NEXT =
+  "Next: a draft of what the client will be told comes to you here in a few minutes. Reply 1 to send it, or send your own words instead. Nothing goes to the client until you do.";
