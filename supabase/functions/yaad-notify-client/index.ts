@@ -57,6 +57,7 @@ import { hasWorkerTemplateDecision, insideWindow, samePhoneDigits, templateVar, 
 import { Image } from "jsr:@matmen/imagescript";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 import { addonPdfUrl } from "./addon-link.ts";
+import { screenOwnWords } from "./own-words.ts";
 import { captionsLine, namedNextStep, plainDraft, unearnedClaims, usableCaptions } from "./report-draft.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -275,7 +276,11 @@ async function composeEvidenceReport(
     // What the worker is offered when the model's draft will not do: his own
     // words, quoted. Used for a failed call as much as for an overstated one,
     // so a model outage no longer tells him he sent no description.
-    const plain: ComposedReport = { message: plainDraft(label, labels), nextStep: "", captions: labels, rewritten: [] };
+    // It quotes what he typed, so it is screened like anything else that can
+    // reach a client. A caption carrying a banned phrase is left out of the
+    // draft rather than offered to him to send.
+    const cleanLabels = labels.filter((l) => guardrails.scan(l).length === 0);
+    const plain: ComposedReport = { message: plainDraft(label, cleanLabels), nextStep: "", captions: labels, rewritten: [] };
 
     const { data: job } = await admin.from("jobs").select("trade").eq("id", jobId).maybeSingle();
     const context = `JOB REF: ${jobTitle || jobId}\nTRADE: ${job?.trade || "not given"}\n\nWORKER UPDATE:\n${labels.join("\n")}`;
@@ -1492,6 +1497,23 @@ Deno.serve(async (req: Request) => {
       // has to know which one happened.
       const overrideText = String(meta.override_text ?? "").trim();
       const aiSummary = String(meta.ai_summary ?? "").trim();
+      // THE BACKSTOP. Every route to a client passes through here: a reply of
+      // 1, a typed version, a button, the edit page. yaad-inbound and the page
+      // both screen a worker's own words before they call this, so a hit here
+      // means something reached this door unscreened. It is not sent. The desk
+      // is told, because a person should know a door was left open, and the
+      // draft is reopened so the worker can send it again.
+      const screened = screenOwnWords(overrideText);
+      if (!screened.ok) {
+        await admin.from("report_draft_links").update({ sent_at: null, sent_via: null }).eq("job_id", jobId)
+          .then(() => {}, () => {});
+        await ntfyPush(admin, `Report held: ${job.title}`,
+          `${jobId}: a report was stopped before it reached the client because it used ${screened.terms.length} banned phrase${screened.terms.length === 1 ? "" : "s"}. `
+            + "It reached the last check unscreened, which should not happen. Nothing was sent.",
+          "no_entry");
+        root.setAttributes({ "yaadly.notify.outcome": "report_held_by_screen", "yaadly.guardrail.blocked": 1 });
+        return json({ ok: true, kind, told: false, reason: "The report used a banned phrase and was not sent." });
+      }
       subject = `Evidence to review: ${job.title}`;
       photoUrls = await evidencePhotoUrls(admin, jobId, job.stage ?? 1, trace);
       attachPhotos = photoUrls.map((p) => p.url);

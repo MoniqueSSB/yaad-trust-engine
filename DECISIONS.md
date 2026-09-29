@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-29 · A worker's own words are screened before they reach a client
+
+**Decided by Monique, 29 Sep 2026.** Since 31 August a worker has been able to set the draft aside and send his own version. Those words went to the client exactly as typed. Everything a model writes passes `guardrails.scan`; the one thing a person typed did not, so "escrow" could reach a client as long as a worker, and not a model, wrote it. Found while building the edit page and flagged to her, not changed until she said so.
+
+**What it does.** `_shared/own-words.ts` checks a worker's words against the same banned list and nothing else. It rewrites nothing: a report that goes out under his name says what he said or it does not go. He is told which words and why, and the draft stays waiting. It runs in three places: `yaad-inbound` before a typed version is relayed, the edit page's action before it calls the database, and `yaad-notify-client` as a backstop at the one door every route passes through. A hit at the backstop means something arrived unscreened, so it is not sent, the draft is reopened, and the desk is told. A plain draft, which quotes his captions, leaves out any caption that fails the screen.
+
+**What it deliberately does not do.** It does not screen for promises. `promises.ts` exists to stop a model committing Yaadly to a date; a worker saying he is back Tuesday is telling the client his own plan. It does not judge the work, approve anything or block a stage.
+
+**A third copy of the banned list, and why that is tolerable.** The app cannot import from `supabase/functions`, so `web/lib/guardrails.ts` is a byte for byte copy and `web/tests/own-words.test.mjs` fails if it drifts. CLAUDE.md section 2 says change a pattern in one runtime, change it in the other, in the same commit. That is now three files: `yaad/guardrails.py`, `_shared/guardrails.ts`, `web/lib/guardrails.ts`. **CLAUDE.md is hers and has not been edited to say so.**
+
+**`approvals`, a read only action on `yaad-twilio-setup`.** It lists every template with where Meta's approval stands. It exists because "is it approved" was being answered from memory and from a code comment, and both were wrong.
+
 ## 2026-09-29 · A check-in is read by the day, the draft is held to the worker's own words, and he can edit it before it goes
 
 **Decided by Monique, 29 Sep 2026, after testing stage 3 of a carpentry job from her own phone.** Three things were wrong in one message, and they are recorded together because they were found together.
@@ -18,7 +30,7 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **What did not change, and section 3 is why this paragraph exists.** Nothing reaches a client until the worker sends it. "Send as written" is a way of replying 1: it arrives as text, carries the job's code, and is refused unless that code matches the draft actually waiting, so a button on a week old message cannot send anything. The page sends through `relay_confirmed_report()`, the door a reply of 1 has always used. A draft can be sent once, from one place. None of this approves a stage, releases money or touches a Yaad Score. The buttons make the right thing easier to reach; they decide nothing.
 
-**The daily check-in button** ("I am on site") is defined and wired, and is not live. It goes to people who may not have written in within 24 hours, so unlike the draft buttons it needs Meta's approval, and the daily prompt it rides on has never been switched on because its template never existed. A tap logs a check-in with a time and no place, then asks for a location pin as an offer.
+**The daily check-in button** ("I am on site") is defined and wired, and is not live. It goes to people who may not have written in within 24 hours, so unlike the draft buttons it needs Meta's approval. **Corrected the same day:** this paragraph first said the daily prompt had never been switched on because its template never existed. That was wrong, and it was read off a comment in `yaad-daily-checkin/index.ts` instead of off the system. The prompt is scheduled (`0 21 * * *`, 4pm in Jamaica), active, and last logged a send on 28 Sep, through a text template created on 4 Sep. The button is a NEW template, `yaadly_on_site_checkin_v1`, submitted to Meta on 29 Sep; the text one keeps sending until it is approved. A tap logs a check-in with a time and no place, then asks for a location pin as an offer.
 
 **Cost.** Two WhatsApp messages and a button message where there was one. Pennies per report, but it is a spend and it was named to her.
 

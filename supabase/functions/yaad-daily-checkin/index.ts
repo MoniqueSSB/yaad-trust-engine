@@ -26,6 +26,12 @@ import { recordAccepted, type SendMeta, withMessagingService, withStatusCallback
 // do. Until the secret is set, this function says so plainly and sends
 // nothing, rather than quietly doing half the job.
 //
+// Corrected 29 Sep 2026: the template has existed since 4 Sep 2026 and this
+// function has been sending on its schedule. The sentence above was true the
+// day it was written and was read as current three weeks later, which put a
+// wrong statement in front of the founder. Ask yaad-twilio-setup for
+// "approvals" rather than trusting a comment, this one included.
+//
 // A worker's reply lands back through yaad-inbound exactly like any other
 // WhatsApp message, and it already goes through the same draft, confirm and
 // relay loop a photo update gets. This comment used to say that was "the

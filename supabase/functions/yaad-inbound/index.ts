@@ -28,6 +28,7 @@ import { replyFromCard } from "./reply-from-card.ts";
 import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
 import { parseAddonConfirm } from "./addon-confirm.ts";
 import { readDraftTap, readOnSiteTap, tapMatchesDraft } from "./report-tap.ts";
+import { screenOwnWords } from "./own-words.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -2924,6 +2925,19 @@ Deno.serve(async (req: Request) => {
             "Your report to the client is still waiting: tap Send as written or reply 1 to send the draft. To change it, tap Edit it, or type your own words and those go instead.",
             trace,
           ));
+        }
+        // His own words are screened against the same banned list a model's
+        // are. Nothing is rewritten: he is told which words and why, and the
+        // draft stays waiting for him to send it again. See own-words.ts.
+        if (said !== "1") {
+          const screened = screenOwnWords(said);
+          if (!screened.ok) {
+            root.setAttributes({
+              "yaadly.report_confirm.job": a.job_id, "yaadly.report_confirm.outcome": "own_words_screened",
+              "yaadly.guardrail.blocked": 1, "yaadly.guardrail.term_count": screened.terms.length,
+            });
+            return twiml(screened.message);
+          }
         }
         const overrideText = said === "1" ? String(a.draft_text ?? "") : said;
         const { error } = await supabase.rpc("relay_confirmed_report", {
