@@ -8,7 +8,7 @@
 // Run: deno test --allow-read supabase/functions/
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith } from "./worker-question.ts";
+import { answerWorkerQuestion, asksForPayment, isBareAcknowledgement, looksLikeQuestion, PAY_REQUEST_ANSWER, wantsHelpWith } from "./worker-question.ts";
 
 Deno.test("a worker asking something is read as a question", () => {
   for (const said of [
@@ -109,4 +109,57 @@ Deno.test("a short instruction naming something the app explains is a help reque
   for (const said of ["receipt for the cement is coming tomorrow", "photos of the finished frame are next", "took the video but the light was bad so redoing it"]) {
     assert(!wantsHelpWith(said), `must stay an update: ${said}`);
   }
+});
+
+// ── 29 September 2026, JOB-WEB-1789253807959 again ─────────────────────────
+
+Deno.test("a doubled letter is still the word that was meant", () => {
+  for (const said of ["nno", "noo", "Noo.", "okk", "yess", "thankss", "nnope"]) {
+    assert(isBareAcknowledgement(said), `should be an acknowledgement: ${said}`);
+  }
+  // Pressing doubled letters must not turn a real update into an "ok".
+  for (const said of ["on site now", "noon finish", "book the inspection", "too wet to paint", "all good, wall is up", "door fitted"]) {
+    assert(!isBareAcknowledgement(said), `must stay an update: ${said}`);
+  }
+});
+
+Deno.test("a worker asking to be paid is answered, never filed as an update", () => {
+  for (const said of [
+    "let the client know i am ready for payment",
+    "ready for payment",
+    "mi ready fi mi money",
+    "tell the client to pay me",
+    "pay me",
+    "waiting on my payment",
+    "please release the payment",
+    "i need my money",
+    "requesting payment for stage 3",
+  ]) {
+    assert(asksForPayment(said), `should read as asking for payment: ${said}`);
+    assert(wantsHelpWith(said), `should be held off the record: ${said}`);
+    assertEquals(answerWorkerQuestion(said), PAY_REQUEST_ANSWER);
+  }
+});
+
+Deno.test("mentioning money in a report is still a report", () => {
+  for (const said of [
+    "paid for the cement, receipt coming",
+    "client paid the deposit so i started",
+    "bought the hinges with the materials money",
+    "need money for the cement before i can carry on",
+    "done, second coat tomorrow",
+    "the work is done for this stage",
+    "finished the frame and sent the receipt for the lumber, everything that was paid for is on site and stacked in the living room",
+  ]) {
+    assert(!asksForPayment(said), `must stay an update: ${said}`);
+  }
+});
+
+Deno.test("the payment answer promises nothing and carries the published sentence", () => {
+  const a = PAY_REQUEST_ANSWER;
+  assert(a.includes("Paid by Yaadly, not by the client, within 7 days of a named person at Yaadly signing the stage off, by bank transfer."));
+  assert(a.includes("nothing has gone to the client"));
+  assert(!/£|J\$|tomorrow|today|on its way|already sent|will be paid|you will get/i.test(a), a);
+  assert(!/escrow|100%|guarantee|zero fraud|held|fully covered/i.test(a), a);
+  assert(!/[\u2013\u2014]/.test(a), "no dashes");
 });
