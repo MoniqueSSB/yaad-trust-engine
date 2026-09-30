@@ -178,10 +178,23 @@ export function reportDraftContent() {
  *  within 24 hours, so it needs Meta's approval before it is any use, and the
  *  setting that switches it on is written only once that approval comes back,
  *  the same as the worker update template. */
-export const ON_SITE_NAME = "yaadly_on_site_checkin_v1";
+// v2, 30 Sep 2026, founder: "split this into two messages are you on site
+// with a add location button then the other stuff in a 1.2.3". This is the
+// first message: the question, the button, and how to add the location.
+// WhatsApp has no button that attaches a location through Twilio, so the
+// location is the three taps in words. The 1.2.3 goes as a second message
+// through the approved worker update template (yaad-daily-checkin). v1
+// stays in the account; Meta approval starts again for v2.
+export const ON_SITE_NAME = "yaadly_on_site_checkin_v2";
 
 export const ON_SITE_BODY =
-  "Yaadly, your job {{1}}: are you on site today? Tap the button to check in. One check in a day covers every stage, before or after the work. Then send photos, a short clip or a voice note of the work in this chat. Sending your location as well puts on record where you were.";
+  "Yaadly, your job {{1}}.\n\nAre you on site today?\nTap I am on site.\nThen add your location: tap +, Location, Send current location.";
+
+/** The second message, one line, through the approved worker update
+ *  template: "Yaadly update on your job {{1}}: {{2}}. The full details are on
+ *  the job in your Yaadly portal: {{3}} Reply here if you have a question." */
+export const ON_SITE_STEPS =
+  "1. Photos and videos before, during and after. 2. One line on what each shows. 3. Send them here before you leave";
 
 export const ON_SITE_TAP = "ONSITE";
 
