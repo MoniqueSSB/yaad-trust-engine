@@ -94,11 +94,7 @@ export function joinedReply(reference: string, link: string, photoFiled: boolean
     "4. We message you here, either way. Then say your price in writing. It is free.",
     "5. Win a job and we show you how it runs.",
     "",
-    "How you get paid:",
-    "You finish the work. You send photos and videos.",
-    "The client approves. A person at Yaadly checks.",
-    "Yaadly pays you by bank transfer within 7 days. Never cash.",
-    "You get a message here when the money is sent.",
+    "Pay: the client approves, a person at Yaadly checks, and you are paid by bank transfer within 7 days. Never cash.",
     "",
     "Questions? Ask here.",
   ].filter((l) => l !== "").join("\n");

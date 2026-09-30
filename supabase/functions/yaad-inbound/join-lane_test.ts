@@ -116,7 +116,7 @@ Deno.test("the final reply is warm, five points, and promises nothing", () => {
   const r = joinedReply("APP-ABC123", link, true);
   assert(r.includes("You are in") && r.includes("APP-ABC123") && r.includes(link));
   assert((r.match(/^\d\. /gm) ?? []).length === 5, "five points");
-  assert(/How you get paid:/.test(r) && /bank transfer within 7 days/.test(r) && /Never cash/.test(r) && /when the money is sent/.test(r), "when they are paid and what happens then is said at joining");
+  assert(/^Pay: /m.test(r) && /bank transfer within 7 days/.test(r) && /Never cash/.test(r), "when they are paid and what happens then is said at joining");
   assert(/An AI agent reads your form/.test(r) && /A person decides/.test(r) && /either way/i.test(r), "the agent is named and a person still decides");
   assert(!/[–—]/.test(r));
   assert(!/guarantee|100%|escrow|approved|accepted|you will get work/i.test(r), r);
