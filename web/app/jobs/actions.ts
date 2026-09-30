@@ -84,6 +84,24 @@ export async function submitQuote(formData: FormData): Promise<SubmitQuoteResult
   });
   if (error) {
     console.error("submitQuote refused:", error.code, error.message);
+    /* Founder, 30 Sep 2026: a person reviews a worker's file only once the
+       worker wants to quote, the check is complete, and the AI agent has
+       read it. So a refusal from a not-yet-published worker is the moment
+       their application goes on the desk's queue (mark_wants_to_quote,
+       20260930140000), and the message tells them exactly what is left. */
+    if (/row-level security|violates|permission/i.test(error.message)) {
+      const { data: mark } = await supabase.rpc("mark_wants_to_quote");
+      const m = (Array.isArray(mark) ? mark[0] : mark) as { application_id?: string; upload_token?: string; app_id?: string; complete?: boolean; ai_read?: boolean } | null;
+      if (m?.application_id) {
+        const link = `/apply?app=${encodeURIComponent(m.application_id)}&token=${encodeURIComponent(String(m.upload_token ?? ""))}&ref=${encodeURIComponent(String(m.app_id ?? ""))}`;
+        return {
+          ok: false,
+          error: m.complete
+            ? "Your file is complete and is with a person at Yaadly now. You hear on WhatsApp once you are cleared, then you can quote."
+            : `To quote you need to finish your check first: your ID, your TRN, and sign the Guidelines. Finish it here: ${link}`,
+        };
+      }
+    }
     return {
       ok: false,
       error: /row-level security|violates|permission/i.test(error.message)
