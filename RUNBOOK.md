@@ -6393,6 +6393,15 @@ A worker's question goes through four doors in order, in `yaad-inbound`: a fixed
 1. **The read-back arrives as plain text with no buttons:** `select value from app_settings where key = 'twilio_content_sid_update_draft';` is empty, there is no Messaging Service, or Twilio refused the send. The function log line `sendReadBackButtons: Twilio refused the template` carries Twilio's code. Replying 1 still works.
 2. **"That update is not waiting any more":** the button tapped belongs to an update already filed, dropped or replaced. Working as designed.
 3. **The worker's words are cut short in the read-back with buttons:** a template variable is one line and at most 600 characters. What is filed is the full text held in the session, never the clipped copy.
+## A client cannot see the Visual Check tick box on a quote
+
+Added 29 September 2026.
+
+1. **Signed in, on the job in the portal.** The tick box shows above "Accept this price" only while no worker is booked and no check is already set. If the job is booked, the check is on the Approvals tab instead.
+2. **On the quote link, no account.** The price comes from `job_check_prices_for_code()`. If that function is missing the page shows no tick box and nothing else changes. Check it is live: `select count(*) from pg_proc where proname = 'job_check_prices_for_code';` should return 1. If it returns 0, migration `20260929233000` has not been applied.
+3. **The catalogue row.** `select id, active, full_pence, founding_pence from service_catalogue where id = 'job-visual-check';` The row must be active. The price is changed there, never in the code.
+4. **The client ticked it but the job shows no check.** The booking stands either way. The check is refused if the final stage's evidence is already in. Add it for them from the desk, or they add it from the Approvals tab.
+
 
 ## 56. Joining on WhatsApp, the welcome screen, and the "you are cleared" message (30 Sep 2026)
 
