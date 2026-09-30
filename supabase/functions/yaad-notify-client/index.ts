@@ -1908,8 +1908,13 @@ Deno.serve(async (req: Request) => {
         `On ${platform}${when ? `, preferred time: ${when}` : ""}.`,
         ask ? `They want to see: "${ask.slice(0, 600)}"` : null,
         ``,
-        `Set up the call with them here on WhatsApp.`,
-        `Then paste the link on the job: ${roomLink}`,
+        // Neither side has the other's number. Yaadly is in the middle, on
+        // purpose, so the worker is never told to "arrange it with them".
+        // Founder, 30 Sep 2026: "they dont have their whatsapp to arrange
+        // the call". A reply here reaches the desk like any worker reply.
+        `Reply here with a day and time you can do.`,
+        `A person at Yaadly confirms it with the client.`,
+        `Google Meet or Zoom: make the link and paste it on the job: ${roomLink}`,
         ``,
         `Your evidence and the sign off do not change.`,
       ].filter((l) => l !== null).join("\n");
