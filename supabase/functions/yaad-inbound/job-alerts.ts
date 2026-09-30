@@ -31,13 +31,15 @@
  *  alerts-v1, 6 Sep 2026: told over WhatsApp when a job opens in the trades and
  *  parishes they name, quoting free, vetting still required before they can
  *  quote, STOP at any time. */
-export const ALERT_CONSENT_VERSION = "alerts-v1";
+// alerts-v2, 30 Sep 2026, founder: "this is too long". Asks permission and
+// promises nothing about when: the send itself is not wired yet (yaad-match).
+export const ALERT_CONSENT_VERSION = "alerts-v2";
 
 /** The sentence ALERT_CONSENT_VERSION refers to. Said at the moment somebody
  *  joins, so what they agreed to is a thing they actually read rather than a
  *  policy page nobody opened. */
 export const ALERT_TERMS =
-  "We will message this number when a job opens in your trades and parishes. Quoting is free and always will be. Send STOP any time and it ends.";
+  "OK to message this number when a job opens in your trades and parishes? It is free. Send STOP to end it.";
 
 /** "ALERTS" on its own, and the openers a click-to-WhatsApp link puts in
  *  somebody's box. Always read as joining. */

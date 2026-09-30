@@ -53,7 +53,7 @@ export const Q_NAME =
 
 export function leadTrades(name: string, alertTerms: string): string {
   const first = firstName(name);
-  return `Thanks${first ? `, ${first}` : ""}. Jobs will come to you here. ${alertTerms} 2 of 6:`;
+  return `Thanks${first ? `, ${first}` : ""}. ${alertTerms} 2 of 6:`;
 }
 
 export const LEAD_PARISHES = "3 of 6:";

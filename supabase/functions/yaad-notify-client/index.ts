@@ -1242,38 +1242,31 @@ Deno.serve(async (req: Request) => {
         .eq("job_id", jobId).eq("status", "accepted")
         .order("updated_at", { ascending: false }).limit(1).maybeSingle();
       const l = Math.round(Number(q?.labour_jmd ?? 0));
-      const pay = l - Math.round(l * 0.05) + Math.round(Number(q?.materials_jmd ?? 0));
+      const m = Math.round(Number(q?.materials_jmd ?? 0));
+      const labourPay = l - Math.round(l * 0.05);
+      const pay = labourPay + m;
       subject = `You are booked: ${job.title}`;
-      // Rewritten 30 Sep 2026 as five short points, founder instruction:
-      // "there needs to be a checklist of what is require of them", "this is
-      // only given once the person wins the quote", "maximum 5 points",
-      // "less words", "videos to be sent also this is important". Every fact
-      // was already in the paragraph this replaces or in the approved facts
-      // the assistant answers from; nothing new is promised.
+      // Three points and the exact figures, founder instruction 30 Sep 2026:
+      // "let the know the exact amount they will be paid they should not need
+      // to calculate and make this 3 points and shorter". Labour is their
+      // quote less the 5% worker fee; materials pass through at cost.
       line = [
         `You are booked: ${job.title} (${job.id}), ${job.parish ?? "Jamaica"}.`,
-        `Yaadly owes you ${money(pay)}: your labour less 5%, plus materials at cost.`,
+        ``,
+        `Your pay: ${money(labourPay)} for labour.${m ? ` Materials ${money(m)} at cost.` : ""} Total ${money(pay)}.`,
         ``,
         `1. Do not start yet.`,
-        `The job goes live once the client has paid. You get a message here.`,
+        `You get a message here when the client has paid.`,
         ``,
-        `2. On site, check in first, every day.`,
-        `Tap +, then Location, then Send current location.`,
-        `That is your Arrival Log. Day one opens the first stage.`,
+        `2. On site, check in first, every day. Tap +, Location, Send current location.`,
+        `Photos and videos before, during and after. Send them here or in your portal: ${APP_URL}/portal/jobs/${encodeURIComponent(job.id)}`,
         ``,
-        `3. Photos and videos before, during and after.`,
-        `Send them here or in your portal: ${APP_URL}/portal/jobs/${encodeURIComponent(job.id)}`,
-        `One line on what each shows.`,
-        `Send the day's photos and videos before you leave.`,
-        ``,
-        `4. Paid by bank transfer, never cash.`,
-        `Within 7 days of a person signing off each stage.`,
+        `3. Paid by bank transfer within 7 days of each stage signing off. Never cash.`,
         `Bank details here, never in this chat: ${APP_URL}/portal/worker/payouts`,
-        `Materials money comes at cost once the client has paid. Send the receipt back.`,
+        m ? `Materials money is sent once the client has paid. Send the receipt back.` : null,
         ``,
-        `5. Questions? Type them here.`,
-        `Money and client questions go to a person.`,
-      ].join("\n");
+        `Questions? Type them here.`,
+      ].filter((x) => x !== null).join("\n");
     } else if (kind === "job_live_worker") {
       // 17 Sep 2026, founder instruction. booked_worker tells the worker not
       // to start and promises a message on this number once the client's
