@@ -6426,3 +6426,37 @@ Added 29 September 2026.
 4. **The link says nothing on the site:** it needs `app`, `token` and `ref` all present and well formed; the page cleans the address bar on arrival, so a copied address afterwards has none of them. Send the WhatsApp message again with JOIN to get a fresh one, which makes a second application, so tell the desk.
 5. **No reminder went out:** `select jobname, schedule, active from cron.job where jobname = 'yaad-check-reminders';` must show `7 15 * * *`. `select app_id, check_reminders, check_reminded_at from applications where status = 'received' order by created_at;` shows who has had which. Two at most, ever; after that it is a person's call.
 6. **The review did not run on a WhatsApp application:** they answered NO to the sixth question, or never answered it. `ai_review_consent` on the row says which; the version `ai-review-wa-v1` is the WhatsApp sentence.
+
+## 57. HubSpot: the Partnerships pipeline, the worker stage, and the partner intro message (30 Sep 2026)
+
+**What exists in the portal, created 30 September 2026 through the API on Monique's instruction.**
+
+- A second deal pipeline, **Partnerships** (id `4197500138`), five stages: Inbound Lead, Founder Review, Introduction Scheduled, Active Collaboration, Not Proceeding. IDs are in `web/lib/hubspotConfig.ts` as `PARTNER_STAGES`. Rename in the UI if a label needs to change; never delete and recreate.
+- Four contact properties: `yaadly_worker_stage` (Application Initiated, Vetting In Progress, Identity Confirmed, Vetting Cleared, Active Supplier, Engaged on Active Job, Not Cleared), `yaadly_worker_parish` (the fourteen parishes), `partner_category` (Investor, Corporate Partner, Diaspora Community Group, Ground Vendor, Media / Press), `partner_operational_country` (United Kingdom, United States, Canada, Jamaica).
+- `trade_specialization` now carries the eighteen trades from `data/job-taxonomy.js` instead of five old names. If the taxonomy changes, change the property to match.
+
+**What is NOT in HubSpot, on purpose.** No identity document, TRN, bank detail, property address, job description, evidence link or check-in time. A worker's Vetting Cleared stage is set by hand by a named person on the desk; Persona confirming identity is "Identity Confirmed" and nothing more. No HubSpot workflow moves a worker's stage.
+
+**The partner sync.** Somebody who picks "Press, partnership or investment" on `yaadly.co.uk/contact` becomes a contact and a deal at Inbound Lead on the Partnerships pipeline. `yaad-enquiry` signs a payload (enquiry id, name, email or number, source) and posts it to `/api/hubspot/partner`, which shares `HUBSPOT_LEAD_WEBHOOK_SECRET` with the lead route. The message does not leave. Category and country are set by hand at Founder Review. Idempotent on `yaadly_job_id = ENQ-<enquiry id>`. Off until the secret is set, which it already is in both places; on once `yaad-enquiry` is redeployed and the app is rebuilt:
+
+```bash
+supabase functions deploy yaad-enquiry --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+```
+
+Failures are log lines in `yaad-enquiry` starting `hubspot partner:`. The enquiry is on the desk regardless.
+
+**The intro message, for a HubSpot email template or sequence, not WhatsApp.** Partners write in by form or email, so an email answers them. A WhatsApp template would need Meta approval and numbered variables, and HubSpot tokens do not pass through Twilio. Paste this into Sales > Templates:
+
+> Subject: Your message reached Yaadly
+>
+> Hi {{ contact.firstname }},
+>
+> Thank you for getting in touch about working with Yaadly.
+> Your note is with Monique, who reads every partnership enquiry herself.
+> If a call would help, pick a time here: https://cal.com/yaadly/15min
+>
+> Yaadly
+
+No "team", no "main desk": there is one person and the copy says so. Use the bare booking link; `?overlayCalendar=true` is a Cal.com display flag.
+
+**Reports.** The deal count on the Sales Pipeline is the pipeline number. Filter any deal report by pipeline, or partner enquiries inflate it.

@@ -26,6 +26,35 @@
 export const PIPELINE_ID = "default";
 
 /**
+ * The Partnerships pipeline. Created live on 30 September 2026 through the
+ * API with the token in the main checkout's .env, on Monique's instruction,
+ * so that press, partnership and investment contacts never sit on the same
+ * board as jobs: the Sales Pipeline's deal count is the one number a January
+ * funding conversation turns on, and a journalist is not a job.
+ *
+ * These IDs are real and were read back from the create response. Same rule
+ * as the Sales Pipeline: relabel in the UI if a name needs to change, never
+ * delete and recreate, because the id is what the code matches on.
+ */
+export const PARTNER_PIPELINE_ID = "4197500138";
+
+export const PARTNER_STAGES = {
+  INBOUND: "6163002590",
+  FOUNDER_REVIEW: "6163002591",
+  INTRO_SCHEDULED: "6163002592",
+  ACTIVE: "6163002593",
+  NOT_PROCEEDING: "6163002594",
+} as const;
+
+export const PARTNER_STAGE_LABELS: Record<(typeof PARTNER_STAGES)[keyof typeof PARTNER_STAGES], string> = {
+  "6163002590": "Inbound Lead",
+  "6163002591": "Founder Review",
+  "6163002592": "Introduction Scheduled",
+  "6163002593": "Active Collaboration",
+  "6163002594": "Not Proceeding",
+};
+
+/**
  * Yaadly's deal lifecycle, mapped onto HubSpot's real stage IDs.
  *
  * FUNDS_HELD WAS RENAMED TO CLIENT_PAID on 4 September 2026, and the label
@@ -148,6 +177,34 @@ export const CONTACT_PROPERTIES = {
   parishOfProperty: { name: "parish_of_property", label: "Parish of property", type: "dropdown", options: PARISHES },
   relationshipToProperty: { name: "relationship_to_property", label: "Relationship to property", type: "dropdown", options: ["Owner", "Family home", "Inherited", "Building new"] },
   howTheyFoundUs: { name: "how_they_found_us", label: "How they found us", type: "dropdown", options: ["WhatsApp", "Referral", "Instagram", "Word of mouth", "Search", "Other"] },
+} satisfies Record<string, PropertyDef>;
+
+/**
+ * Created live on 30 September 2026, all four, as contact properties. Unlike
+ * most of CONTACT_PROPERTIES above, these ARE a record of what exists in the
+ * portal, not a specification. None of them carries a document, a bank detail,
+ * an address or anything typed by the person: a stage label, a parish, a
+ * category, a country. That is the whole list and widening it is Monique's.
+ *
+ * The worker stage is set BY HAND from the desk for now. "Identity Confirmed"
+ * means Persona confirmed who they are. "Vetting Cleared" means a named person
+ * on the desk cleared them, and nothing else ever moves a contact into it.
+ */
+export const WORKER_CONTACT_PROPERTIES = {
+  stage: { name: "yaadly_worker_stage", label: "Worker stage", type: "dropdown", options: [
+    "Application Initiated", "Vetting In Progress", "Identity Confirmed",
+    "Vetting Cleared", "Active Supplier", "Engaged on Active Job", "Not Cleared",
+  ] },
+  parish: { name: "yaadly_worker_parish", label: "Worker parish", type: "dropdown", options: PARISHES },
+} satisfies Record<string, PropertyDef>;
+
+export const PARTNER_CONTACT_PROPERTIES = {
+  category: { name: "partner_category", label: "Partner category", type: "dropdown", options: [
+    "Investor", "Corporate Partner", "Diaspora Community Group", "Ground Vendor", "Media / Press",
+  ] },
+  country: { name: "partner_operational_country", label: "Partner country", type: "dropdown", options: [
+    "United Kingdom", "United States", "Canada", "Jamaica",
+  ] },
 } satisfies Record<string, PropertyDef>;
 
 export const DEAL_PROPERTIES = {

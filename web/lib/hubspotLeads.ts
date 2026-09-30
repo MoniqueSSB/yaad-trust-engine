@@ -36,7 +36,7 @@
  */
 
 import { hubspotFetch, HubSpotError } from "./hubspotPipeline";
-import { PIPELINE_ID, DEAL_STAGES, DEAL_PROPERTIES } from "./hubspotConfig";
+import { PIPELINE_ID, DEAL_STAGES, DEAL_PROPERTIES, PARTNER_PIPELINE_ID, PARTNER_STAGES } from "./hubspotConfig";
 
 /* ── ONE CUSTOM PROPERTY, AND EVERYTHING ELSE STANDARD ────────────────────
  *
@@ -253,5 +253,124 @@ export async function upsertLead(lead: Lead): Promise<LeadResult> {
     }
   }
 
+  return { contactId, dealId, created: true };
+}
+
+/* ── PARTNERSHIPS ──────────────────────────────────────────────────────────
+ *
+ * Somebody picks "Press, partnership or investment" on the contact form. That
+ * is the one enquiry topic that belongs in a CRM rather than on the desk, and
+ * it goes to its own pipeline so that a journalist or an investor is never
+ * counted as a job. Set up on Monique's instruction, 30 September 2026, with
+ * the same boundary as the lead sync: what they typed does NOT leave. The
+ * message box on that form is free text and people put anything in it. Name,
+ * the address or number they gave, the enquiry's own id and the door. That is
+ * the list.
+ *
+ * Category and country are NOT set here. The form does not ask, and reading
+ * them out of the message would mean sending the message. She sets both by
+ * hand at Founder Review, which is the stage where she reads it anyway.
+ *
+ * Idempotent on the enquiry id, carried in the same `yaadly_job_id` property
+ * the job sync uses, as `ENQ-<id>`. A second custom property would be a
+ * second setup step and a second thing to fail a write, for a value that is
+ * still just "the Yaadly record this deal came from". */
+
+export type Partner = {
+  /** The enquiries row id. The idempotency key, and never optional. */
+  enquiryId: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  /** form, email. */
+  source?: string;
+};
+
+async function findContactByEmail(email: string): Promise<string | null> {
+  const body = await hubspotFetch("/crm/v3/objects/contacts/search", {
+    method: "POST",
+    body: JSON.stringify({
+      filterGroups: [{ filters: [{ propertyName: "email", operator: "EQ", value: email.toLowerCase() }] }],
+      properties: ["email"],
+      limit: 1,
+    }),
+  }) as SearchResult | null;
+  return body?.results?.[0]?.id ?? null;
+}
+
+export async function upsertPartner(partner: Partner): Promise<LeadResult> {
+  if (!partner.enquiryId?.trim()) {
+    throw new HubSpotError("A partner lead needs the enquiry id. It is the only thing that stops a second sync making a second deal.");
+  }
+  const key = `ENQ-${partner.enquiryId.trim()}`;
+
+  // Same order as upsertLead, for the same reason: nothing is written until
+  // the thing that prevents duplicates is known to work.
+  let existing: string | null;
+  try {
+    existing = await findDealByJobId(key);
+  } catch (e) {
+    throw new HubSpotError(
+      `The deal property "${DEAL_PROPERTIES.jobId.name}" does not exist in this HubSpot portal, so a partner `
+      + `enquiry cannot be synced without risking a duplicate deal. See RUNBOOK.md, "Turning the HubSpot lead sync on". `
+      + `Underlying error: ` + (e instanceof Error ? e.message : String(e)),
+    );
+  }
+
+  let contactId: string | null = null;
+  if (partner.email || partner.phone) {
+    contactId = partner.email
+      ? await findContactByEmail(partner.email)
+      : await findContactByPhone(partner.phone as string);
+    const contactProps = present({
+      email: partner.email?.toLowerCase(),
+      phone: partner.phone,
+      firstname: partner.name,
+    });
+    if (contactId) {
+      await hubspotFetch(`/crm/v3/objects/contacts/${encodeURIComponent(contactId)}`, {
+        method: "PATCH", body: JSON.stringify({ properties: contactProps }),
+      });
+    } else {
+      const made = await hubspotFetch("/crm/v3/objects/contacts", {
+        method: "POST", body: JSON.stringify({ properties: contactProps }),
+      }) as { id?: string } | null;
+      contactId = made?.id ?? null;
+    }
+  }
+
+  const dealProps = present({
+    dealname: `Partnership enquiry, ${partner.name || "name not given"}`,
+    pipeline: PARTNER_PIPELINE_ID,
+    description: `Picked "Press, partnership or investment" on the contact form. Arrived by ${SOURCE_LABEL[partner.source ?? ""] ?? partner.source ?? "the website"}. Enquiry ${partner.enquiryId}. What they wrote is on the desk, not here.`,
+    [DEAL_PROPERTIES.jobId.name]: key,
+  });
+
+  if (existing) {
+    // No stage on an update, same as the job sync: a redelivery must not drag
+    // a partner she has already moved to Founder Review back to Inbound.
+    await hubspotFetch(`/crm/v3/objects/deals/${encodeURIComponent(existing)}`, {
+      method: "PATCH", body: JSON.stringify({ properties: dealProps }),
+    });
+    return { contactId, dealId: existing, created: false };
+  }
+
+  const made = await hubspotFetch("/crm/v3/objects/deals", {
+    method: "POST",
+    body: JSON.stringify({ properties: { ...dealProps, dealstage: PARTNER_STAGES.INBOUND } }),
+  }) as { id?: string } | null;
+  const dealId = made?.id;
+  if (!dealId) throw new HubSpotError("HubSpot created a partner deal and did not return its id.");
+
+  if (contactId) {
+    try {
+      await hubspotFetch(
+        `/crm/v4/objects/contacts/${encodeURIComponent(contactId)}/associations/default/deals/${encodeURIComponent(dealId)}`,
+        { method: "PUT", body: JSON.stringify([]) },
+      );
+    } catch (e) {
+      console.error(`hubspot partner: deal ${dealId} was created but not linked to contact ${contactId}:`, e);
+    }
+  }
   return { contactId, dealId, created: true };
 }

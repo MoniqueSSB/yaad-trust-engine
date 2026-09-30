@@ -106,6 +106,38 @@ async function callerKey(req: Request): Promise<string> {
 const esc = (t: string) =>
   t.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c] as string));
 
+/** Sign and post a partnership enquiry to the app's /api/hubspot/partner
+ *  route. Hex HMAC-SHA256 over `${timestamp}.${rawBody}`, the scheme
+ *  web/lib/webhookSignature.ts verifies and yaad-inbound already uses for the
+ *  lead sync. Never throws: the enquiry has been recorded and answered before
+ *  this runs, and a CRM that missed a partner is a worse day, not a lost
+ *  enquiry. */
+async function syncPartnerToHubspot(
+  partner: { enquiryId: string; name: string; email: string; phone: string; source: string },
+): Promise<void> {
+  const secret = Deno.env.get("HUBSPOT_LEAD_WEBHOOK_SECRET") ?? "";
+  const base = Deno.env.get("YAADLY_APP_URL") ?? "https://app.yaadly.co.uk";
+  if (!secret) return;
+  try {
+    const body = JSON.stringify(partner);
+    const ts = Math.floor(Date.now() / 1000);
+    const key = await crypto.subtle.importKey(
+      "raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+    );
+    const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${ts}.${body}`));
+    const sig = Array.from(new Uint8Array(mac)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const r = await fetch(`${base}/api/hubspot/partner`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-yaadly-signature": sig, "x-yaadly-timestamp": String(ts) },
+      body,
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!r.ok) console.error(`hubspot partner: ${partner.enquiryId} not synced, ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  } catch (e) {
+    console.error("hubspot partner: threw, carrying on:", String(e).slice(0, 200));
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -348,6 +380,23 @@ with this address. If that was not you, ignore it. Nothing else happens.`;
 
   // ── count it, tell Monique, both after the fact ─────────────────────────
   const after = (async () => {
+    // ── the CRM, for one topic only ───────────────────────────────────────
+    //
+    // "Press, partnership or investment" goes to the Partnerships pipeline in
+    // HubSpot, on Monique's instruction, 30 September 2026. Nothing else on
+    // this form does: a complaint, a job, a tradesperson wanting work all
+    // belong on the desk. Same boundary as the WhatsApp lead sync in
+    // yaad-inbound: name and the way to reach them leave, the MESSAGE does
+    // not, because it is whatever they typed into a public box. The receiving
+    // route is idempotent on the enquiry id, so a retry updates rather than
+    // duplicates. Off unless HUBSPOT_LEAD_WEBHOOK_SECRET is set, and every
+    // failure is a log line: the enquiry is already recorded and on the desk.
+    if (topic === "Press, partnership or investment" && row?.id) {
+      await syncPartnerToHubspot({
+        enquiryId: String(row.id), name, email, phone: phone ? `+${phone}` : "", source: "form",
+      });
+    }
+
     try {
       await admin.from("enquiry_attempts").insert({ caller_key: key, emailed });
       // Housekeeping on a fraction of requests, same as the post-job sweep.
