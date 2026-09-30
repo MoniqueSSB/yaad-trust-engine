@@ -365,3 +365,20 @@ export function joinAlertsContent() {
   };
 }
 
+
+/** The WhatsApp job alert, 30 Sep 2026. Goes to people who have not written
+ *  in within 24 hours, so it needs Meta's approval before it is any use, and
+ *  the setting yaad-match reads is written only once that comes back. Trade
+ *  and parish only; nothing personal; the way out in every message. */
+export const JOB_ALERT_NAME = "yaadly_job_alert_v1";
+export const JOB_ALERT_BODY =
+  "Yaadly: a {{1}} job is open in {{2}}. {{3}} Reply STOP to end these alerts.";
+export function jobAlertContent() {
+  return {
+    friendly_name: JOB_ALERT_NAME,
+    language: "en",
+    variables: { "1": "Plumbing", "2": "St Catherine", "3": "Price it in your portal: https://app.yaadly.co.uk/portal/sign-in" },
+    types: { "twilio/text": { body: JOB_ALERT_BODY } },
+  };
+}
+export const JOB_ALERT_APPROVAL = { name: JOB_ALERT_NAME, category: "UTILITY" };
