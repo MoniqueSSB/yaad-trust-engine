@@ -18,7 +18,7 @@ export function workerClearedText(name: string, email: string, appUrl: string): 
     `You are cleared${first ? `, ${first}` : ""}. Welcome to Yaadly.`,
     ``,
     `What happens now:`,
-    `1. Jobs in your trades and parishes come here.`,
+    `1. Jobs are on the board in your portal. New jobs in your trades and parishes are sent here too.`,
     `2. Say your price in writing. It is free.`,
     `3. Win a job and we show you how it runs.`,
     ``,
