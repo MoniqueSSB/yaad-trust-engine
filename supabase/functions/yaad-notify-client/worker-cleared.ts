@@ -20,7 +20,6 @@ export function workerClearedText(name: string, email: string, appUrl: string): 
     ``,
     `Jobs are on the board: ${appUrl}/portal/sign-in`,
     `Log in with ${email || "your email"}. We send you a code.`,
-    `New jobs in your area come here too.`,
     ``,
     `Pay: bank transfer within 7 days of sign off. Never cash.`,
   ].join("\n");

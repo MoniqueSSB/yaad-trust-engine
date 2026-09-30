@@ -6,7 +6,8 @@ Deno.test("the cleared message fits one phone screen, names the board and the pa
   assert(t.startsWith("You are cleared, Marcus."));
   assert(t.includes("https://app.yaadly.co.uk/portal/sign-in"), "the board is not linked");
   assert(t.includes("marcus@example.com"), "which email to sign in with is not said");
-  assert(/come here too/.test(t), "the alerts are not named");
+  // No alert promise until the send is wired: the list fills and nothing goes out (job-alerts.ts).
+  assert(!/come here too|are sent here/.test(t), "the message must not promise alerts that are not sent");
   assert(/^Pay: /m.test(t) && /bank transfer within 7 days/.test(t), "how pay works is not said");
   assert(t.split("\n").length <= 8, "one phone screen");
   for (const line of t.split("\n")) assert(line.length <= 80, `long line: ${line}`);
