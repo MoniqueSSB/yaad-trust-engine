@@ -54,16 +54,17 @@ import * as guardrails from "./guardrails.ts";
 import { checkAttrs, deskPack, runEvidenceChecks, workerGaps, workerNotes } from "./evidence-checks.ts";
 import { checkInApplies } from "./arrival-rule.ts";
 import { clientSummaryVars, clientTemplateSummary, clientUpdateVars } from "./client-template.ts";
-import { recordAccepted, type SendMeta, withMessagingService, withStatusCallback } from "./twilio-status.ts";
+import { recordAccepted, recordNotSent, type SendMeta, withMessagingService, withStatusCallback } from "./twilio-status.ts";
 import { hasWorkerTemplateDecision, insideWindow, samePhoneDigits, templateVar, WINDOW_MS, workerTemplateSummary } from "./worker-template.ts";
+import { approvedTemplateSid, lastInboundInWindow } from "./wa-window.ts";
 import { Image } from "jsr:@matmen/imagescript";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 import { addonPdfUrl } from "./addon-link.ts";
 import { screenOwnWords } from "./own-words.ts";
-import { captionsLine, namedNextStep, plainDraft, reportSentReceipt, unearnedClaims, usableCaptions } from "./report-draft.ts";
+import { captionsLine, namedNextStep, noCaptionPrompt, plainDraft, reportSentReceipt, unearnedClaims, usableCaptions } from "./report-draft.ts";
 import { acceptedForClient, acceptedForWorker, offerForClient, PLATFORM_LABEL as WALK_PLATFORM } from "./walkthrough-offer.ts";
 import { DISPUTE_DAYS, problemForWorker, replyForClient } from "./dispute-lane.ts";
-import { applyLink, CHECK_REMINDER_SUBJECT, checkReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
+import { applyLink, CHECK_REMINDER_SUBJECT, checkReminderText, jobDelayedWorkerText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -78,7 +79,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "stage_signed_off_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -268,7 +269,6 @@ async function composeEvidenceReport(
 ): Promise<ComposedReport | null> {
   try {
     const prov = pickTextProvider();
-    if (!prov) return null;
 
     const { data: items } = await admin
       .from("evidence")
@@ -286,6 +286,10 @@ async function composeEvidenceReport(
     // draft rather than offered to him to send.
     const cleanLabels = labels.filter((l) => guardrails.scan(l).length === 0);
     const plain: ComposedReport = { message: plainDraft(label, cleanLabels), nextStep: "", captions: labels, rewritten: [] };
+    // No model configured: his own words, rather than a draft that tells the
+    // client there were none. Until 30 Sep 2026 this returned null before the
+    // captions were read, and the caller's fallback said "no description".
+    if (!prov) return plain;
 
     const { data: job } = await admin.from("jobs").select("trade").eq("id", jobId).maybeSingle();
     const context = `JOB REF: ${jobTitle || jobId}\nTRADE: ${job?.trade || "not given"}\n\nWORKER UPDATE:\n${labels.join("\n")}`;
@@ -854,6 +858,73 @@ async function workerHasNoBankDetails(admin: any, email: string): Promise<boolea
   return !w.wise_recipient_set_at && !stripeDone;
 }
 
+/** Plain text email through Resend, for the worker fallbacks. Never throws. */
+async function sendPlainEmail(to: string, subject: string, text: string, trace: Trace): Promise<boolean> {
+  if (!RESEND_KEY || !/@/.test(to)) return false;
+  return await trace.span("resend.send", SpanKind.CLIENT, { "server.address": "api.resend.com", "messaging.system": "resend" }, async (s) => {
+    try {
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: `Yaadly <${FROM_EMAIL}>`, to: [to], reply_to: REPLY_TO, subject, text }),
+        signal: AbortSignal.timeout(15000),
+      });
+      s.setAttributes({ "http.response.status_code": r.status });
+      if (!r.ok) s.recordError(`resend ${r.status}`);
+      return r.ok;
+    } catch (e) {
+      s.recordError(String(e).slice(0, 160));
+      return false;
+    }
+  });
+}
+
+/** One message to a worker's phone, read against WhatsApp's 24 hour window
+ *  BEFORE sending, because free text outside it is accepted by Twilio and
+ *  fails afterwards (63016) where nothing here can see it. 30 Sep 2026.
+ *
+ *    inside the window (or it could not be read): the free text, as before.
+ *    outside, with an approved template written for this message (passed in
+ *      by the caller, who read its setting): the template.
+ *    outside, with no approved template: WhatsApp is NOT tried,
+ *      and it is recorded as not sent on the desk's "Did it arrive" page.
+ *  Whatever WhatsApp did not carry, a text message (SMS) is tried, which has
+ *  no window, when TWILIO_SMS_FROM is set. Email is the caller's, as before. */
+async function sendToWorker(
+  admin: any, phone: string, text: string, trace: Trace, meta: SendMeta,
+  template?: { sid: string; vars: Record<string, string> },
+): Promise<{ sent: boolean; via?: string; reason?: string; outsideWindow: boolean }> {
+  const inWindow = await lastInboundInWindow(admin, phone);
+  let wa: { sent: boolean; reason?: string } = { sent: false, reason: "" };
+  if (inWindow !== false) {
+    wa = await sendTwilio(phone, text, "whatsapp", trace, [], undefined, meta);
+    if (wa.sent) return { sent: true, via: "twilio whatsapp", outsideWindow: false };
+  } else {
+    if (template?.sid) {
+      wa = await sendTwilio(phone, "", "whatsapp", trace, [], template, meta);
+      if (wa.sent) return { sent: true, via: "twilio whatsapp template", outsideWindow: true };
+    } else {
+      await recordNotSent(phone, "whatsapp", meta);
+      wa = { sent: false, reason: "outside WhatsApp's 24 hour window and no approved template fits, so not sent on WhatsApp" };
+    }
+  }
+  const sms = await sendTwilio(phone, text, "sms", trace, [], undefined, meta);
+  if (sms.sent) return { sent: true, via: "twilio sms", outsideWindow: inWindow === false };
+  return { sent: false, reason: wa.reason || sms.reason, outsideWindow: inWindow === false };
+}
+
+/** Whether a daily check-in is asked for on this job (arrival-rule.ts). Read
+ *  on its own, not in the job select above, so a missing column costs only
+ *  this line: a failed read means asked, the safe reading of a blank. */
+async function checkInAsked(admin: any, jobId: string): Promise<boolean> {
+  try {
+    const { data } = await admin.from("jobs").select("access_type").eq("id", jobId).maybeSingle();
+    return checkInApplies(data?.access_type);
+  } catch (_) {
+    return true;
+  }
+}
+
 /** The bank details ask, a message of its own. 30 Sep 2026. */
 function bankDetailsAsk(name: string, appUrl: string, reminder = false): string {
   const first = (name ?? "").trim().split(/\s+/)[0] ?? "";
@@ -933,8 +1004,19 @@ Deno.serve(async (req: Request) => {
       const text = workerClearedText(String(w.name ?? ""), String(w.worker_email ?? ""), APP_URL);
       const phone = String(w.phone ?? "").trim();
       const meta: SendMeta = { kind: "worker cleared" };
-      let wa = phone ? await sendTwilio(phone, text, "whatsapp", trace, [], undefined, meta) : { sent: false, reason: "no phone on the profile" };
-      if (!wa.sent && phone) wa = await sendTwilio(phone, text, "sms", trace, [], undefined, meta);
+      // Read against the 24 hour window first (sendToWorker). No approved
+      // template says "you are cleared", so outside it this goes by text
+      // message and email, and the desk sees the WhatsApp was not sent.
+      // yaadly_worker_cleared_v1 (yaad-twilio-setup, META_WORKER_TEMPLATES):
+      // used outside the window once Meta has approved it and the setting is
+      // written. Until then, text message and email.
+      const clearedSid = await approvedTemplateSid(admin, "TWILIO_CONTENT_SID_WORKER_CLEARED", "twilio_content_sid_worker_cleared");
+      const clearedFirst = String(w.name ?? "").trim().split(/\s+/)[0] ?? "";
+      const wa = phone
+        ? await sendToWorker(admin, phone, text, trace, meta, clearedSid
+          ? { sid: clearedSid, vars: { "1": templateVar(clearedFirst || "friend", 60), "2": `${APP_URL}/portal/sign-in` } }
+          : undefined)
+        : { sent: false, reason: "no phone on the profile", outsideWindow: false };
       let emailed = false;
       if (w.worker_email && RESEND_KEY) {
         try {
@@ -948,7 +1030,7 @@ Deno.serve(async (req: Request) => {
         } catch (_) { emailed = false; }
       }
       root.setAttributes({ "yaadly.notify.outcome": "worker_cleared", "yaadly.notify.wa_sent": wa.sent, "yaadly.notify.emailed": emailed });
-      return json({ ok: true, kind, told: wa.sent || emailed, whatsapp: wa.sent, emailed });
+      return json({ ok: true, kind, told: wa.sent || emailed, whatsapp: wa.sent, via: "via" in wa ? wa.via ?? "" : "", reason: wa.sent ? "" : wa.reason ?? "", emailed });
     }
 
     // The reminder to finish the check, 30 Sep 2026 (worker-cleared.ts).
@@ -967,8 +1049,23 @@ Deno.serve(async (req: Request) => {
       const text = checkReminderText(String(app.name ?? ""), applyLink(APP_URL, String(app.id), String(app.upload_token), String(app.app_id)), Number(app.check_reminders ?? 1));
       const phone = String(app.phone ?? "").trim();
       const meta: SendMeta = { kind: "check reminder" };
-      let wa = phone ? await sendTwilio(phone, text, "whatsapp", trace, [], undefined, meta) : { sent: false, reason: "no phone on the application" };
-      if (!wa.sent && phone) wa = await sendTwilio(phone, text, "sms", trace, [], undefined, meta);
+      // Sent days after they last wrote, so almost always outside the window.
+      // No approved template fits; text message and email carry it, and the
+      // desk sees the WhatsApp was not sent (sendToWorker).
+      // yaadly_worker_check_reminder_v1, once approved; {{2}} is the line that
+      // changes between the first reminder and the last.
+      const reminderSid = await approvedTemplateSid(admin, "TWILIO_CONTENT_SID_WORKER_CHECK_REMINDER", "twilio_content_sid_worker_check_reminder");
+      const reminderFirst = String(app.name ?? "").trim().split(/\s+/)[0] ?? "";
+      const nth = Number(app.check_reminders ?? 1);
+      const wa = phone
+        ? await sendToWorker(admin, phone, text, trace, meta, reminderSid
+          ? { sid: reminderSid, vars: {
+              "1": templateVar(reminderFirst || "there", 60),
+              "2": nth >= 2 ? "Last reminder from us. Your check is still waiting." : "Your check is still waiting.",
+              "3": applyLink(APP_URL, String(app.id), String(app.upload_token), String(app.app_id)),
+            } }
+          : undefined)
+        : { sent: false, reason: "no phone on the application", outsideWindow: false };
       let emailed = false;
       if (app.email && RESEND_KEY) {
         try {
@@ -982,7 +1079,7 @@ Deno.serve(async (req: Request) => {
         } catch (_) { emailed = false; }
       }
       root.setAttributes({ "yaadly.notify.outcome": "check_reminder", "yaadly.notify.wa_sent": wa.sent, "yaadly.notify.emailed": emailed });
-      return json({ ok: true, kind, told: wa.sent || emailed, whatsapp: wa.sent, emailed });
+      return json({ ok: true, kind, told: wa.sent || emailed, whatsapp: wa.sent, via: "via" in wa ? wa.via ?? "" : "", reason: wa.sent ? "" : wa.reason ?? "", emailed });
     }
 
     // A service kind reads services and never touches jobs; job stays null
@@ -1041,7 +1138,7 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
     }
-    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "stage_signed_off_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
@@ -1060,15 +1157,12 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", kickoffWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    // quote_awaiting_worker_confirm fires the moment a quote is submitted,
-    // long before any job.worker_email exists: the worker to tell is
-    // whoever wrote this specific quote, the same "read it off the quote,
-    // not the job" shape kickoff_pack_ready already needed above.
+    // quote_awaiting_worker_confirm used to be read here. Removed 30 Sep
+    // 2026: its trigger was dropped on 10 Sep (20260910130000), the worker
+    // confirm step it described is gone (the client's acceptance alone books
+    // the job since 9 Sep 2026), and a dead kind carrying that workflow's
+    // wording would tell a worker something untrue if it were ever re-wired.
     let quoteWorkerEmail = "";
-    if (kind === "quote_awaiting_worker_confirm" && quoteId) {
-      const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
-      quoteWorkerEmail = q?.worker_email ?? "";
-    }
     // quote_not_selected goes to the worker who wrote this quote, read off the
     // quote for the same reason: jobs.worker_email is now the worker who WAS
     // chosen. Only while the quote is still declined, so a trigger that fires
@@ -1078,12 +1172,12 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email, status").eq("id", quoteId).eq("job_id", jobId).maybeSingle();
       if (q?.status === "declined") quoteWorkerEmail = q.worker_email ?? "";
     }
-    if ((kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected") && quoteWorkerEmail) {
+    if (kind === "quote_not_selected" && quoteWorkerEmail) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "stage_signed_off_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -1132,6 +1226,16 @@ Deno.serve(async (req: Request) => {
     // text to her phone is one or two segments, not fourteen.
     let html = "";
     let smsText = "";
+    // The bank details ask, when one is due (booked_worker and the two
+    // signed-off kinds). Carried in waFollowUps for WhatsApp; kept here too so
+    // that when WhatsApp cannot carry a follow-up (a template went first, or
+    // the worker is outside the 24 hour window) it goes by email instead of
+    // quietly nowhere. 30 Sep 2026.
+    let bankAsk = "";
+    // A short text message for a worker whose WhatsApp was held back outside
+    // the 24 hour window, where the full message is too long for SMS or asks
+    // for a WhatsApp reply. Set by evidence_landed.
+    let heldBackSms = "";
 
     if (kind === "service_booked") {
       // Fires the moment an enquiry is converted in the desk. A receipt with
@@ -1276,6 +1380,11 @@ Deno.serve(async (req: Request) => {
       // "let the know the exact amount they will be paid they should not need
       // to calculate and make this 3 points and shorter". Labour is their
       // quote less the 5% worker fee; materials pass through at cost.
+      // The check-in line only where a check-in is asked for (arrival-rule.ts):
+      // where somebody is at home, that person is the record and the worker is
+      // not asked. Worded as an ask, because it is one: a check-in never gates
+      // anything and it can be skipped (founder, 29 Sep 2026).
+      const askCheckIn = await checkInAsked(admin, jobId);
       line = [
         `You are booked: ${job.title} (${job.id}), ${job.parish ?? "Jamaica"}.`,
         ``,
@@ -1284,8 +1393,10 @@ Deno.serve(async (req: Request) => {
         `1. Do not start yet.`,
         `You get a message here when the client has paid.`,
         ``,
-        `2. On site, check in first, every day. Tap +, Location, Send current location.`,
-        `Photos and videos before, during and after. Send them here or in your portal: ${APP_URL}/portal/jobs/${encodeURIComponent(job.id)}`,
+        `2. On site, photos before, during and after. A short video helps too.`,
+        `Say what each one shows, in a line or a voice note.`,
+        `Send them here or in your portal: ${APP_URL}/portal/jobs/${encodeURIComponent(job.id)}`,
+        askCheckIn ? `Each day you get there, please share your location here: tap +, Location, Send current location.` : null,
         ``,
         `3. Paid by bank transfer within 7 days of each stage signing off. Never cash.`,
         `Bank details here, never in this chat: ${APP_URL}/portal/worker/payouts`,
@@ -1299,7 +1410,8 @@ Deno.serve(async (req: Request) => {
       // WhatsApp, as a follow-up to the booking message; email carries the
       // booking message which already names the page.
       if (workerPhone && await workerHasNoBankDetails(admin, String(job.worker_email ?? ""))) {
-        waFollowUps = [bankDetailsAsk(String(q?.worker_name ?? ""), APP_URL)];
+        bankAsk = bankDetailsAsk(String(q?.worker_name ?? ""), APP_URL);
+        waFollowUps = [bankAsk];
       }
     } else if (kind === "job_live_worker") {
       // (bank details follow-up is on booked_worker, above)
@@ -1316,18 +1428,20 @@ Deno.serve(async (req: Request) => {
         return json({ ok: true, kind, told: false, reason: "That job is not live with a worker on it." });
       }
       const firstStage = Math.max(Number(job.stage ?? 0), 1);
+      const askCheckIn = await checkInAsked(admin, jobId);
       subject = `The job is live: ${job.title}`;
       line = [
         `${job.id} (${job.title}) is live. The client has paid Yaadly.`,
         `Start with ${await stageLabel(admin, jobId, firstStage)}.`,
         ``,
-        `On site, check in first, every day.`,
-        `Tap +, then Location, then Send current location.`,
-        `That is your Arrival Log.`,
-        ``,
-        `Send photos, videos and a few words here as you go.`,
+        // An ask, never a gate (arrival-rule.ts), and only where it is asked.
+        askCheckIn ? `Each day you get there, please share your location here.` : null,
+        askCheckIn ? `Tap +, then Location, then Send current location.` : null,
+        askCheckIn ? `` : null,
+        `Send photos as you go, and a short video if you can.`,
+        `Say what each one shows, in a line or a voice note.`,
         `Your job: ${roomLink}`,
-      ].join("\n");
+      ].filter((x) => x !== null).join("\n");
     } else if (kind === "quote_accepted") {
       // Fired once, from the jobs row itself (notify_client_on_job_change,
       // 20260831zzzz), the moment worker_email is first set, whichever of
@@ -1354,18 +1468,6 @@ Deno.serve(async (req: Request) => {
         `You pay Yaadly, not the worker: Yaadly engages and pays them. ` +
         `Your invoice for the job is on its way separately, one price covering the work, materials at cost and Yaadly's Guarantee & Support fee. ` +
         `The job goes live once that is paid. Yaadly pays the worker under our own agreement with him, so he never waits on you. Your approval is what closes each stage with us, once you have seen the evidence. ${roomLink}`;
-    } else if (kind === "quote_awaiting_worker_confirm") {
-      // Fires once, the moment the worker's own quote lands (job_quotes
-      // AFTER INSERT WHEN status = 'submitted'). Writing the quote is not
-      // the same as confirming it: the client confirms too, and only once
-      // both sides have replied does it become bookable. Free text only,
-      // this kind has no approved template and job.id doubles as the code
-      // to reply with, the same shape every other WhatsApp-reply kind uses.
-      subject = `Confirm your price: ${job.title}`;
-      line = `Your price on ${job.id} (${job.title}) is in. ` +
-        `Reply with the code ${job.id} to confirm it. ` +
-        `The client is being asked to confirm the same price; once you have both replied, ` +
-        `they can book you straight away, or ask for a fuller Kickoff Pack first if they want one.`;
     } else if (kind === "quote_not_selected") {
       // Founder, 13 Sep 2026: a worker whose quote closed because somebody
       // else was booked still sees the job, and this tells them so rather
@@ -1410,14 +1512,68 @@ Deno.serve(async (req: Request) => {
       // drifting from whatever the money page actually shows if either
       // changes independently.
       subject = `${job.title} is signed off`;
+      // 30 Sep 2026: says the 7 days the booking message promised, and no
+      // longer "owes you your labour and materials", which counted materials
+      // money already sent by materials_sent_worker a second time. Each
+      // stage's pay is raised when that stage is approved; this is the last.
       line = [
-        `${job.title} (${job.id}) is signed off. Every stage approved.`,
-        `Yaadly owes you your labour and materials.`,
-        `Yaadly pays you for the work.`,
-        `Your figure is in your portal.`,
+        `${job.title} (${job.id}) is signed off. Every stage is approved.`,
+        `Yaadly pays you for the last stage by bank transfer within 7 days. Never cash.`,
+        `Your figures are in your portal: ${roomLink}`,
       ].join("\n");
       if (workerPhone && await workerHasNoBankDetails(admin, String(job.worker_email ?? ""))) {
-        waFollowUps = [bankDetailsAsk("", APP_URL, true)];
+        bankAsk = bankDetailsAsk("", APP_URL, true);
+        waFollowUps = [bankAsk];
+      }
+    } else if (kind === "stage_signed_off_worker") {
+      // 30 Sep 2026. booked_worker promises pay "within 7 days of each stage
+      // signing off", and until now the worker heard nothing when a stage did:
+      // only the client was told (stage_released), and the worker only at the
+      // very end. This is that message. It is a NOTICE of a decision a person
+      // already made (the client's approval, recorded in stage_approvals, which
+      // raises the worker's pay invoice for the stage). It moves no money and
+      // decides nothing: paying that invoice is still mark_worker_paid, a named
+      // person at the desk. Read off the rows, never off the caller.
+      //
+      // The last stage is not told here: the job goes complete on it, and
+      // stage_released_worker says the whole thing once.
+      if (job.status === "complete") {
+        root.setAttributes({ "yaadly.notify.outcome": "last_stage_told_by_stage_released_worker" });
+        return json({ ok: true, kind, told: false, reason: "The job is complete; stage_released_worker tells the worker." });
+      }
+      const nextStage = Number(job.stage ?? 0);
+      const { data: approval } = await admin.from("stage_approvals")
+        .select("stage").eq("job_id", jobId).eq("stage", nextStage - 1).limit(1).maybeSingle();
+      if (!approval || !job.worker_email || nextStage < 2) {
+        root.setAttributes({ "yaadly.notify.outcome": "no_stage_approval" });
+        return json({ ok: true, kind, told: false, reason: "No recorded approval for the stage before this one." });
+      }
+      const doneLabel = await stageLabel(admin, jobId, nextStage - 1);
+      const nextLabel = await stageLabel(admin, jobId, nextStage);
+      // On a job billed by stage, the next stage is worked only once its bill
+      // is paid (20260929100000, evidence_on_the_working_stage). Say so rather
+      // than tell him to start.
+      const { data: bq } = await admin.from("job_quotes").select("billing_mode")
+        .eq("job_id", jobId).eq("status", "accepted").limit(1).maybeSingle();
+      let nextPaid = true;
+      if (bq?.billing_mode === "by_stage") {
+        const { data: inv } = await admin.from("invoices").select("id")
+          .eq("job_id", jobId).eq("stage", nextStage).eq("status", "paid").is("addon_id", null)
+          .or("payable_to.is.null,payable_to.eq.yaadly").limit(1).maybeSingle();
+        nextPaid = Boolean(inv);
+      }
+      subject = `${doneLabel} is signed off: ${job.title}`;
+      line = [
+        `${doneLabel} on ${job.id} (${job.title}) is signed off by the client.`,
+        `You are paid for it by bank transfer within 7 days. Never cash.`,
+        ``,
+        nextPaid
+          ? `Next: ${nextLabel}. Send photos as you go, here or on the job: ${roomLink}`
+          : `Next: ${nextLabel}. Do not start it yet: the client pays for it first. The job shows when it is paid: ${roomLink}`,
+      ].join("\n");
+      if (workerPhone && await workerHasNoBankDetails(admin, String(job.worker_email ?? ""))) {
+        bankAsk = bankDetailsAsk("", APP_URL, false);
+        waFollowUps = [bankAsk];
       }
     } else if (kind === "worker_paid") {
       // 14 Sep 2026. Fires when a person on the desk marks a worker's pay
@@ -1489,8 +1645,11 @@ Deno.serve(async (req: Request) => {
             photoUrls.length ? reviewEvidencePhotos(photoUrls, job.title, trace) : Promise.resolve(null),
           ])
         : [null, null];
-      const draftText = composed?.message
-        || `Photos have come in for ${evLandedLabel}, with no description from you yet.`;
+      // The client's text, whichever way it was made: "Send as written" sends
+      // exactly this. The fallback is plainDraft's, worded to the client; what
+      // the worker is told about the missing words goes in the details below.
+      const draftText = composed?.message || plainDraft(evLandedLabel, []);
+      const noWords = !(composed?.captions ?? []).length;
       // Two summaries, deliberately. The worker sees the desk one, severity
       // and escalation included, because they are standing in front of the
       // thing and can look again. What gets STORED is the client-safe one,
@@ -1589,6 +1748,7 @@ Deno.serve(async (req: Request) => {
       ].join("\n");
 
       subject = `Draft for the client: ${job.title}`;
+      heldBackSms = `Yaadly: your update on ${job.title} (${job.id}) is drafted for the client. Nothing goes to them until you choose. Read it here: ${editLink || roomLink}`;
       // TWO MESSAGES ON WHATSAPP, and that is the point. The draft goes alone,
       // with nothing around it, so that a long press and Copy takes the draft
       // and only the draft. When it sat inside one long message, copying it
@@ -1609,7 +1769,7 @@ Deno.serve(async (req: Request) => {
       // His own words, next to the draft made from them, at the moment of
       // the tap. Better information in front of the person making the call.
       const extras = [
-        captionsLine(composed?.captions ?? []),
+        noWords ? noCaptionPrompt() : captionsLine(composed?.captions ?? []),
         aiSummaries?.desk ? `AI noticed: ${aiSummaries.desk}` : null,
         notes.length ? notes.join("\n\n") : null,
         itemsLine,
@@ -2022,6 +2182,14 @@ Deno.serve(async (req: Request) => {
       const signLink = `${APP_URL}/report/${encodeURIComponent(job.id)}?code=${encodeURIComponent(r.sign_code)}`;
       reportSignLink = signLink;
       subject = `Your Completion Report to sign: ${job.title}`;
+      // Read first, so the words can say "the buttons below" only when there
+      // are buttons, and otherwise say what to tap on the page.
+      let signSid = Deno.env.get("TWILIO_CONTENT_SID_SIGN_REPORT") ?? "";
+      if (!signSid) {
+        const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_sign_report").maybeSingle();
+        try { signSid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { signSid = String(st?.value ?? ""); }
+      }
+      const hasSignButtons = /^HX[0-9a-f]{32}$/i.test(signSid);
       line = r.return_reason
         ? [
             `Yaadly sent the Completion Report for ${job.title} back to you:`,
@@ -2029,28 +2197,25 @@ Deno.serve(async (req: Request) => {
             `"${clip(String(r.return_reason), 600)}"`,
             ``,
             `It is your document.`,
-            `Use the buttons below, or open it: ${signLink}`,
+            hasSignButtons ? `Use the buttons below, or open it: ${signLink}` : `Open it here, no login: ${signLink}`,
           ].join("\n")
         : [
             `Your Completion Report for ${job.title} (${job.id}) is ready.`,
             `It is your document. Read it here, no login: ${signLink}`,
+            // The buttons that follow say the three choices; without them the
+            // page does, so they are named once, here.
+            ...(hasSignButtons ? [] : [
+              ``,
+              `On that page: sign it if it is right, change the words to say it your way, or raise an issue if something is wrong.`,
+            ]),
             ``,
-            `Sign the report if it is right.`,
-            `Change my words to say it your way first.`,
-            `Raise an issue if something is wrong.`,
-            ``,
-            `It goes to the owner only when you sign.`,
+            `It goes to the client only when you sign.`,
           ].join("\n");
       // The Sign button follows, the same way the client's Approve button
       // follows an evidence report: its payload is the job's code, which
       // yaad-inbound signs through sign_completion_report_via_whatsapp().
       // No template recorded means no button; the reply and the portal still work.
-      let signSid = Deno.env.get("TWILIO_CONTENT_SID_SIGN_REPORT") ?? "";
-      if (!signSid) {
-        const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_sign_report").maybeSingle();
-        try { signSid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { signSid = String(st?.value ?? ""); }
-      }
-      if (/^HX[0-9a-f]{32}$/i.test(signSid)) {
+      if (hasSignButtons) {
         approveButton = { sid: signSid, vars: { "1": `${job.title ?? "your job"} (${job.id})`, "2": String(job.id) } };
       }
     } else if (kind === "completion_report_issued") {
@@ -2089,12 +2254,40 @@ Deno.serve(async (req: Request) => {
       // reason, and guessing at one here would be exactly the kind of
       // invented detail this repository's own agents are built to refuse.
       subject = `A delay on your job: ${job.title}`;
+      // The worker first, 30 Sep 2026. This message used to tell the client
+      // "we are checking in with the worker directly" while nothing went to
+      // the worker (yaad-job-health only pushed the desk). Now the check-in is
+      // sent, and the client's sentence says what actually happened: sent, or,
+      // if it did not go, that Yaadly is following it up, which is true
+      // because the desk is told at the same moment. Supportive, not a
+      // warning: a quiet job is not misconduct.
+      let workerReached = false;
+      if (job.worker_email) {
+        const { data: wp } = await admin.from("worker_profiles")
+          .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
+        const wPhone = String(wp?.phone ?? "").trim();
+        if (wPhone) {
+          // Outside the window: the approved worker update template, whose
+          // second slot is built for one true line about the job.
+          const updSid = await approvedTemplateSid(admin, "TWILIO_CONTENT_SID_WORKER_UPDATE", "twilio_content_sid_worker_update");
+          const r = await sendToWorker(admin, wPhone, jobDelayedWorkerText(String(job.id), String(job.title ?? "")), trace,
+            { kind: "job delayed, worker check-in", job_id: jobId },
+            updSid ? { sid: updSid, vars: {
+              "1": templateVar(`${job.title ?? "your job"} (${job.id})`),
+              "2": "the client has been told the job is running late. Is anything holding you up? Reply here and a person will help",
+              "3": roomLink,
+            } } : undefined);
+          workerReached = r.sent;
+          root.setAttributes({ "yaadly.notify.worker_checkin_sent": r.sent });
+        }
+      }
       line = `There has been no update on ${job.title} for a few days, so we wanted you to hear it from us rather than notice the silence yourself. ` +
         // "Nothing is wrong with the money held on this job" until 29 Sep
         // 2026. Yaadly holds nobody's money (CLAUDE.md section 8), and no
         // single word in that sentence is on the banned list, so the screen
         // could not see it.
-        `We are checking in with the worker directly. Nothing about what you have paid or what you owe has changed, and you can raise anything here: ${roomLink}`;
+        (workerReached ? `We have messaged the worker directly to check in. ` : `Yaadly is following it up with the worker. `) +
+        `Nothing about what you have paid or what you owe has changed, and you can raise anything here: ${roomLink}`;
     } else if (kind.startsWith("addon_")) {
       // Extra work on a booked job (20260928235000). The trigger sends only
       // the add-on id and the revision it fired on; every word below is read
@@ -2156,7 +2349,7 @@ Deno.serve(async (req: Request) => {
           `On ${title}, extra work is agreed:`,
           `"${scope.slice(0, 200)}"`,
           ``,
-          `You get ${money(workerPay)} once it is done and signed off.`,
+          `You get ${money(workerPay)} once it is done and the client approves it.`,
           `Do not start until Yaadly says it is paid.`,
           `Photos go on the Extra work tab: ${extraLink}`,
         ].join("\n");
@@ -2167,7 +2360,10 @@ Deno.serve(async (req: Request) => {
           `"${scope.slice(0, 200)}"`,
           ``,
           `Photos on the Extra work tab as you go: ${extraLink}`,
-          `Yaadly signs it off on those photos, then pays you ${money(workerPay)}.`,
+          // The client approves finished extra work on the Extra work tab
+          // (20260929050000); the desk only does it for a client who cannot
+          // be reached. It used to say Yaadly signs it off.
+          `The client approves it from those photos. Then Yaadly pays you ${money(workerPay)} by bank transfer within 7 days. Never cash.`,
         ].join("\n");
       } else if (kind === "addon_closed") {
         subject = `Extra work not going ahead: ${title}`;
@@ -2238,29 +2434,43 @@ Deno.serve(async (req: Request) => {
     // the setup function writes the setting then, and not before. See
     // worker-template.ts. 17 Sep 2026.
     let workerTemplate: { sid: string; vars: Record<string, string> } | undefined;
+    // Outside the window with no template that fits: WhatsApp is not tried at
+    // all (30 Sep 2026). Before, the free text went anyway and failed after
+    // this function returned. Now it is recorded as not sent, where the desk
+    // sees it, and the text message and email rungs carry it instead.
+    let workerHeldBack = false;
     if (recipientPhone && recipientPhone === workerPhone && job && hasWorkerTemplateDecision(kind)) {
       const summary = workerTemplateSummary(kind);
-      let sid = Deno.env.get("TWILIO_CONTENT_SID_WORKER_UPDATE") ?? "";
-      if (!sid) {
-        const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_worker_update").maybeSingle();
-        try { sid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { sid = String(st?.value ?? ""); }
-      }
-      if (summary && /^HX[0-9a-f]{32}$/i.test(sid)) {
-        const { data: seen } = await admin.from("wa_inbound_seen")
-          .select("from_addr, seen_at").eq("channel", "whatsapp")
-          .gte("seen_at", new Date(Date.now() - WINDOW_MS).toISOString())
-          .order("seen_at", { ascending: false }).limit(500);
-        const last = (seen ?? []).find((r: { from_addr: string }) => samePhoneDigits(r.from_addr, recipientPhone));
-        if (!insideWindow(last?.seen_at ?? null)) {
+      const inWindow = await lastInboundInWindow(admin, recipientPhone);
+      // A template written for this exact message, once Meta has approved it
+      // (yaad-twilio-setup, META_WORKER_TEMPLATES), comes before the general
+      // update template. The draft report never goes as a template: the one
+      // for it only says a draft is waiting.
+      const dedicated: { key: string; env: string; vars: Record<string, string> } | null = inWindow !== false ? null
+        : kind === "completion_report_worker"
+          ? { key: "twilio_content_sid_worker_completion_report", env: "TWILIO_CONTENT_SID_WORKER_COMPLETION_REPORT",
+              vars: { "1": templateVar(`${job.title ?? "your job"} (${job.id})`), "2": reportSignLink || roomLink } }
+          : kind === "evidence_landed"
+            ? { key: "twilio_content_sid_worker_draft_waiting", env: "TWILIO_CONTENT_SID_WORKER_DRAFT_WAITING",
+                vars: { "1": templateVar(`${job.title ?? "your job"} (${job.id})`) } }
+            : null;
+      const dedicatedSid = dedicated ? await approvedTemplateSid(admin, dedicated.env, dedicated.key) : "";
+      if (dedicated && dedicatedSid) {
+        workerTemplate = { sid: dedicatedSid, vars: dedicated.vars };
+      } else if (inWindow === false) {
+        const sid = summary ? await approvedTemplateSid(admin, "TWILIO_CONTENT_SID_WORKER_UPDATE", "twilio_content_sid_worker_update") : "";
+        if (summary && sid) {
           // A job the worker is not booked on opens nothing for them, so those two go to the portal itself.
           // The Completion Report link carries its signing code, or the
           // worker lands on a page that will not let them sign.
           const link = kind === "worker_requested" || kind === "quote_not_selected" ? `${APP_URL}/portal`
             : kind === "completion_report_worker" ? (reportSignLink || roomLink) : roomLink;
           workerTemplate = { sid, vars: { "1": templateVar(`${job.title ?? "your job"} (${job.id})`), "2": templateVar(summary, 300), "3": link } };
+        } else {
+          workerHeldBack = true;
         }
       }
-      root.setAttributes({ "yaadly.notify.worker_template": Boolean(workerTemplate) });
+      root.setAttributes({ "yaadly.notify.worker_template": Boolean(workerTemplate), "yaadly.notify.worker_held_back": workerHeldBack });
     }
 
     // The same for a client, 29 Sep 2026 (client-template.ts). The window is
@@ -2299,15 +2509,21 @@ Deno.serve(async (req: Request) => {
     const firstTemplate = workerTemplate ?? clientTemplate;
 
     let wa: { sent: boolean; reason?: string; via?: string } = { sent: false, reason: "no recipient phone on the job" };
+    let bankAskSent = false;
     if (recipientPhone) {
       // Photos ride only on the WhatsApp attempt. A fallback to Meta or SMS
       // means the WhatsApp send itself failed, and a signed URL that was
       // good for five minutes has likely aged past useful by the time a
       // second attempt runs; the text and the portal link still carry the
       // fact either way.
-      wa = firstTemplate
-        ? await sendTwilio(recipientPhone, "", "whatsapp", trace, [], firstTemplate, sendMeta)
-        : await sendTwilio(recipientPhone, waLine || line, "whatsapp", trace, attachPhotos, undefined, sendMeta);
+      if (workerHeldBack) {
+        await recordNotSent(recipientPhone, "whatsapp", sendMeta);
+        wa = { sent: false, reason: "outside WhatsApp's 24 hour window and no approved template fits, so not sent on WhatsApp" };
+      } else {
+        wa = firstTemplate
+          ? await sendTwilio(recipientPhone, "", "whatsapp", trace, [], firstTemplate, sendMeta)
+          : await sendTwilio(recipientPhone, waLine || line, "whatsapp", trace, attachPhotos, undefined, sendMeta);
+      }
       // The rich, scope-carrying message could not be delivered at all,
       // specifically because it landed outside WhatsApp's 24 hour window:
       // the approved template is the fallback for exactly that failure,
@@ -2319,10 +2535,12 @@ Deno.serve(async (req: Request) => {
         wa = await sendTwilio(recipientPhone, "", "whatsapp", trace, [], waTemplate, sendMeta);
       }
       if (!wa.sent) {
-        const metaResult = await sendMetaWhatsApp(recipientPhone, line, trace);
+        // Meta's API has the same 24 hour rule, so it is not tried for a
+        // message held back for exactly that reason.
+        const metaResult = workerHeldBack ? { sent: false } : await sendMetaWhatsApp(recipientPhone, line, trace);
         if (metaResult.sent) wa = { ...metaResult, via: "meta whatsapp" };
         else {
-          const sms = await sendTwilio(recipientPhone, smsText || line, "sms", trace, [], undefined, sendMeta);
+          const sms = await sendTwilio(recipientPhone, smsText || (workerHeldBack && heldBackSms) || line, "sms", trace, [], undefined, sendMeta);
           if (sms.sent) wa = { ...sms, via: "twilio sms" };
         }
       }
@@ -2336,13 +2554,40 @@ Deno.serve(async (req: Request) => {
       // Its failure is recorded and never propagated: the client already has
       // the report and the typed code still works, so a missing button is a
       // worse experience and not a lost message.
-      // What follows the first message, in order, before any button. Only
-      // when the first message really was the short one: a template or a
-      // fallback carried `line`, which already says all of it.
-      if (waLine && waFollowUps.length && !firstTemplate && wa.sent && wa.via === "twilio whatsapp") {
+      // What follows the first message, in order, before any button: only
+      // after the first message went as WhatsApp free text, inside the window,
+      // so the follow-ups land inside it too. A template or a fallback went
+      // instead of it otherwise.
+      //
+      // Until 30 Sep 2026 this also required waLine, which only
+      // evidence_landed sets, so the bank details ask on booked_worker and on
+      // the signed-off kinds never sent. waLine still decides what the FIRST
+      // message is (the draft alone, for evidence_landed); it no longer
+      // decides whether anything follows it.
+      if (waFollowUps.length && !firstTemplate && wa.sent && wa.via === "twilio whatsapp") {
         for (const more of waFollowUps) {
           const f = await sendTwilio(recipientPhone, more, "whatsapp", trace, [], undefined, { ...sendMeta, kind: `${kind} details` });
           if (!f.sent) console.error(`follow-up not sent for ${jobId}: ${f.reason ?? "unknown"}`);
+          if (more === bankAsk) bankAskSent = f.sent;
+        }
+      }
+
+      // The worker's email, where WhatsApp could not carry it (30 Sep 2026).
+      // Worker kinds send no email by default (recipientEmail is blanked for
+      // them above: WhatsApp is the worker's surface). Two cases change that:
+      //   the whole message was held back outside the window: it goes by email
+      //     in full, alongside whatever the text message rung managed;
+      //   the bank details ask could not follow on WhatsApp (a template went
+      //     first, or the message went by text): the ask goes by email, and the
+      //     desk sees the WhatsApp follow-up as not sent.
+      const workerEmail = String(job?.worker_email ?? "").trim();
+      if (recipientPhone && recipientPhone === workerPhone && workerEmail && RESEND_KEY) {
+        if (workerHeldBack) {
+          emailed = await sendPlainEmail(workerEmail, subject, line, trace) || emailed;
+        }
+        if (bankAsk && !bankAskSent) {
+          if (!workerHeldBack) await recordNotSent(recipientPhone, "whatsapp", { ...sendMeta, kind: `${kind} bank details ask` });
+          await sendPlainEmail(workerEmail, `Add your bank details: ${job.title ?? job.id}`, bankAsk, trace);
         }
       }
 

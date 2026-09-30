@@ -12,9 +12,18 @@
  *  A worker with a walkthrough waiting was asked for one, but they may also
  *  be sending an ordinary update on the same job. Only words about when go
  *  to the client. */
+// Tightened 30 Sep 2026. "Finished the second coat this morning" carries a
+// time word and is an update, and it went to the client as the walkthrough
+// time while nothing reached the job record. An offer is short and says when,
+// and nothing else: no work done, no materials, no photos.
+const WORK_WORDS =
+  /\b(?:finish(?:ed|ing)?|done|did|complete(?:d)?|start(?:ed)?|paint(?:ed|ing)?|coat|fix(?:ed)?|install(?:ed)?|fitted|laid|til(?:e|ed|es|ing)|plaster(?:ed)?|pour(?:ed)?|dug|buil[td]|wall|roof|floor|pipe|block|cement|steel|rain(?:ed)?|photo|photos|pic|pics|video|receipt|material|materials)\b/i;
+
 export function looksLikeATime(text: string): boolean {
   const t = (text ?? "").trim();
-  if (!t || t.length > 300) return false;
+  if (!t || t.length > 120) return false;
+  if (t.replace(/https?:\/\/\S+/g, "").trim().split(/\s+/).length > 12) return false;
+  if (WORK_WORDS.test(t.replace(/https?:\/\/\S+/g, ""))) return false;
   return /\b(mon|tue|wed|thu|fri|sat|sun)[a-z]*\b|\b(today|tomorrow|tonight|weekend|morning|afternoon|evening|midday|noon)\b|\b\d{1,2}(:\d{2})?\s*(am|pm)\b|\bo'?clock\b|\b\d{1,2}(st|nd|rd|th)\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/i.test(t);
 }
 

@@ -1,4 +1,4 @@
-// Joining as a tradesperson over WhatsApp: the five short questions.
+// Joining as a tradesperson over WhatsApp: the six short questions.
 //
 // The join form at app.yaadly.co.uk/apply has carried a button since 17 Sep
 // 2026 reading "Rather do this on WhatsApp? Five short questions in the chat",
@@ -8,8 +8,11 @@
 // join was asked which parish their property was in. Founder: "fix this so
 // it aligns to what is stated on the site".
 //
-// What it does. Name, trades, parishes, email, one photo of finished work,
-// one question a message. At the end it writes the same applications row the
+// What it does. Name, the job alert question, trades, parishes, email, one
+// photo of finished work: six questions, one a message, and every one of
+// them says "of 6" (30 Sep 2026: the reprompts said "of 7" and this header
+// said five). STOP or cancel ends it, and asking for a person ends it and
+// tells the desk (index.ts). At the end it writes the same applications row the
 // site's step 1 writes, files the photo the way the site files a portfolio
 // upload, puts the number on the job alert list with the consent sentence
 // said to them word for word, and sends the link that opens the same
@@ -51,7 +54,7 @@ export const SKIP = /^(skip|no|none|later|not now|nah)[.!]*$/i;
 export const Q_NAME =
   "Welcome to Yaadly. Good to have you.\n\nSix quick questions, then you are in.\n\n1 of 6: What is your full name?";
 
-/** 2 of 7: the job alert consent, a question of its own. Founder, 30 Sep
+/** 2 of 6: the job alert consent, a question of its own. Founder, 30 Sep
  *  2026: "split this into two questions". YES puts the number on the alert
  *  list with alertTerms as the recorded consent; NO skips the list and the
  *  joining carries on. */

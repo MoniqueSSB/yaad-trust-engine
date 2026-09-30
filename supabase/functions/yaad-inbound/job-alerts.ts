@@ -21,7 +21,11 @@
 //
 // NOTHING HERE, OR IN THE LANE IN index.ts, SENDS AN ALERT. Joining is built
 // cold on purpose so a mistake in matching cannot message the whole list while
-// it is still being found. Alerting is yaad-match's job and is not wired up.
+// it is still being found. Alerting is yaad-match's job: since 30 Sep 2026 it
+// sends a WhatsApp alert, capped a day, when a person sends a job out, and
+// only once the alert template is approved. So nothing said here promises an
+// alert, or when one comes: the joining reply says only what is true of
+// being on the list, and that quoting waits for the check.
 
 /** Bump this whenever the wording of ALERT_TERMS changes. A consent is worth
  *  exactly what the sentence that earned it said, so an old version must never
@@ -32,7 +36,7 @@
  *  parishes they name, quoting free, vetting still required before they can
  *  quote, STOP at any time. */
 // alerts-v2, 30 Sep 2026, founder: "this is too long". Asks permission and
-// promises nothing about when: the send itself is not wired yet (yaad-match).
+// promises nothing about when: yaad-match sends only on a person's press.
 export const ALERT_CONSENT_VERSION = "alerts-v2";
 
 /** The sentence ALERT_CONSENT_VERSION refers to. Said at the moment somebody

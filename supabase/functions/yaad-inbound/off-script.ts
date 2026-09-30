@@ -113,14 +113,14 @@ export function needsAPerson(text: string): boolean {
 /** How things are done on WhatsApp, the same facts as the fixed answers in
  *  worker-question.ts. Keep the two saying the same thing. */
 export const WORKER_HOW_TO = `How a tradesperson uses Yaadly on WhatsApp:
-- Location: tap the plus sign or the paperclip next to the message box, choose Location, then Send your current location. It goes on the Arrival Log for the job as proof of being on site. Nothing waits on it.
+- Location: tap the plus sign or the paperclip next to the message box, choose Location, then Send your current location. It checks the tradesperson in on the job for that day. On jobs where nobody is at home, the first photos or update of the day ask for it: they can reply skip and the evidence still files, but they must check in before leaving site. The ask waits 24 hours, then the waiting photos or update are let go and must be sent again.
 - Photos and video: send them here from the camera or the gallery, several at once is fine. A video under about a minute sends on WhatsApp; a longer one is uploaded in the portal at app.yaadly.co.uk.
 - After sending a photo the assistant asks which job it is for, what it shows, and which section it belongs to: Before (the state before starting), During (mid-work), After (the finished work), a Problem (something wrong with work already in the job), or Something new (a thing found that was never in the job). Skip files it without a section.
 - A typed update or a voice note is read back first and goes on the job only when the tradesperson replies 1. Reply no to drop it. Voice notes in Patois or English are fine.
 - Receipts: send a photo of the receipt and say it is the receipt. It is filed against the job.
 - A job is made of stages. Each stage has its own evidence and is signed off on its own.
 - What happens after an update: it is written up as a short report, the tradesperson is shown it and replies 1 to send it or sends their own words instead, and only then does the client see it.
-- The Arrival Log is the record of being on site. The Midnight Work-Log is the end of day entry of what was done, with before and after photographs. The Completion Report is the signed summary at the end of the job, which the tradesperson signs first.
+- The check-in is the record of being on site that day. The Midnight Work-Log is the end of day entry of what was done, with before and after photographs. The Completion Report is the signed summary at the end of the job, which the tradesperson signs first.
 - To speak to a person at any point, say so here and the conversation is handed to someone at Yaadly.
 - The portal is at app.yaadly.co.uk and shows the same job, evidence and messages as WhatsApp.`;
 

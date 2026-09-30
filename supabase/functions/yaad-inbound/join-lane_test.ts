@@ -1,4 +1,4 @@
-// Proves the five joining questions: the opener the site's button sends is
+// Proves the six joining questions: the opener the site's button sends is
 // recognised, each question is short, the order holds, the application row
 // matches what the site writes, and nothing here decides, alerts or asks for
 // an ID. See join-lane.ts.
@@ -47,7 +47,7 @@ Deno.test("the AI read is automatic on every application, granted with its own v
   assertEquals(row.ai_review_consent, "granted");
   assertEquals(row.ai_review_consent_version, AI_CONSENT_WA_VERSION);
   assert(AI_CONSENT_WA_VERSION.includes("auto"), "the version must say the read was not asked for");
-  const lane = src.slice(src.indexOf("joining as a tradesperson: the five questions"), src.indexOf("── the job alert list"));
+  const lane = src.slice(src.indexOf("joining as a tradesperson: the six questions"), src.indexOf("── the job alert list"));
   assert(!lane.includes("join_consent") && !lane.includes("Q_CONSENT"), "the question is gone");
   const read = lane.indexOf("functions/v1/yaad-vetting-review");
   assert(read > 0, "the read no longer starts from the chat");
@@ -57,7 +57,7 @@ Deno.test("the AI read is automatic on every application, granted with its own v
 
 Deno.test("the consent sentence is said, word for word, before the number goes on the alert list", () => {
   assert(qAlerts("Marcus Brown", ALERT_TERMS).includes(ALERT_TERMS));
-  const lane = src.slice(src.indexOf("joining as a tradesperson: the five questions"), src.indexOf("── the job alert list"));
+  const lane = src.slice(src.indexOf("joining as a tradesperson: the six questions"), src.indexOf("── the job alert list"));
   assert(lane.length > 0, "the join lane is gone or moved");
   const asked = lane.indexOf("qAlerts(name, ALERT_TERMS)");
   const subscribed = lane.indexOf('rpc("subscribe_to_job_alerts"');
@@ -67,7 +67,7 @@ Deno.test("the consent sentence is said, word for word, before the number goes o
 });
 
 Deno.test("nothing in the lane sends an alert, checks an identity or asks for bank details", () => {
-  const lane = src.slice(src.indexOf("joining as a tradesperson: the five questions"), src.indexOf("── the job alert list"));
+  const lane = src.slice(src.indexOf("joining as a tradesperson: the six questions"), src.indexOf("── the job alert list"));
   assert(!/invoke\(\s*["'`]yaad-match/.test(lane) && !/match_workers_for_job/.test(lane), "the join lane must not run the matcher");
   assert(!/sendWhatsAppTo\(|api\.twilio\.com/.test(lane), "the join lane replies, it does not send to anybody else");
   assert(!/photo_id|selfie|face_video|persona/i.test(lane), "identity is Persona's, on the site");
@@ -76,7 +76,7 @@ Deno.test("nothing in the lane sends an alert, checks an identity or asks for ba
 });
 
 Deno.test("the lane sits ahead of the alert list, and a held desk number is held for it", () => {
-  const join = src.indexOf("joining as a tradesperson: the five questions");
+  const join = src.indexOf("joining as a tradesperson: the six questions");
   const alerts = src.indexOf("── the job alert list");
   assert(join > 0 && alerts > join, "the join lane must come before the alert list");
   assert(src.slice(join, alerts).includes("!deskHasThisNumber &&"), "a number the desk is holding must not be walked through the questions");
@@ -125,7 +125,7 @@ Deno.test("the final reply fits one phone screen and promises nothing", () => {
 
 
 Deno.test("a WhatsApp application reaches the desk the way a site one does", () => {
-  const lane = src.slice(src.indexOf("joining as a tradesperson: the five questions"), src.indexOf("── the job alert list"));
+  const lane = src.slice(src.indexOf("joining as a tradesperson: the six questions"), src.indexOf("── the job alert list"));
   assert(lane.includes('from("worker_profiles").upsert('), "no hidden profile row, so the desk has nobody to publish");
   assert(/active:\s*false/.test(lane), "the profile must be created hidden");
   assert(lane.includes('onConflict: "application_id"'), "a second go must update, not duplicate");
@@ -143,4 +143,16 @@ Deno.test("the YES or NO button carries the same words as the typed question, an
     assert(CONSENT_YES.test(ids[0]) && CONSENT_NO.test(ids[1]), "a tap must read exactly as the typed word");
     for (const a of c.types["twilio/quick-reply"].actions) assert(a.title.length <= 20, a.title);
   }
+});
+
+Deno.test("every question in the lane counts to six, and there is a way out", () => {
+  const lane = src.slice(src.indexOf("joining as a tradesperson: the six questions"), src.indexOf("── the job alert list"));
+  assert(!/\d of 7/.test(lane), "a question in the lane still counts to seven");
+  assert(lane.includes('"I could not place that as a trade. 3 of 6:"') && lane.includes('"I could not place that as a parish. 4 of 6:"'));
+  const out = lane.indexOf("wantsToStopJoining(joinSaid) || wantsAPerson(joinSaid)");
+  assert(out > 0, "STOP or asking for a person no longer ends the questions");
+  assert(out < lane.indexOf('lane === "join_name"'), "the way out must be read before any question takes the words as an answer");
+  const exit = lane.slice(out, lane.indexOf('lane === "join_name"'));
+  assert(exit.includes('.from("wa_intake_sessions").delete()'), "the session is not ended");
+  assert(exit.includes("Send JOIN to start again"), "they are not told what happens next");
 });

@@ -108,11 +108,23 @@ export function namedNextStep(next: unknown, captions: string[]): string {
 }
 
 /** The draft offered when the model's own will not do: the worker's words,
- *  quoted, and nothing added. */
+ *  quoted, and nothing added.
+ *
+ *  It is the CLIENT's text. A worker who taps "Send as written" sends exactly
+ *  this, so it is written to the client. Until 30 Sep 2026 the no-caption
+ *  version said "with no description from you yet", which read to the client
+ *  as if they owed the description. What the worker is told about the missing
+ *  words is noCaptionPrompt(), shown to him beside the draft, never in it. */
 export function plainDraft(stageLabel: string, captions: string[]): string {
-  if (!captions.length) return `Photos have come in for ${stageLabel}, with no description from you yet.`;
+  if (!captions.length) return `Photos have come in for ${stageLabel}. They came with no description of the work.`;
   const quoted = captions.map((c) => `"${c}"`).join(", ");
   return `Update on ${stageLabel}, in the tradesperson's own words: ${quoted}.`;
+}
+
+/** For the worker only, beside a draft built with none of his words. Says
+ *  what the client would get and how to add a line, and leaves the choice his. */
+export function noCaptionPrompt(): string {
+  return "You have not said what the photos show, so the draft only tells the client that photos came in. Better: type your own line on what they show, and that goes to the client instead. Or send it as it is.";
 }
 
 /** Shown under the draft so the words and what they came from are on the

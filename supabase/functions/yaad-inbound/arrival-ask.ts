@@ -47,26 +47,30 @@ const HOW =
   "tap the plus sign (or the paperclip) next to the message box, choose Location, then Send your current location";
 
 /** The ask, in full. Sent once, when the job is known and nobody has checked
- *  in on it today. */
+ *  in on it today.
+ *
+ *  Shortened 30 Sep 2026, one thing a line, after a review found it ran to
+ *  four paragraphs and a sign-in link. It also used to say the photos "go on
+ *  the job as soon as you reply", which was not true: after the reply they
+ *  are still asked what they show and which section. They wait until the
+ *  reply; that is what it says now. `portalLink` is optional and index.ts no
+ *  longer passes a sign-in link, for the reason given at the filing reply. */
 export function arrivalAsk(jobId: string, stageSaid: string, held: Held, portalLink: string | null): string {
-  const kept = held === "photos"
-    ? "Your photos are kept and go on the job as soon as you reply."
-    : "Your update is kept and goes on the job as soon as you reply.";
-  const again = held === "photos" ? "the photos are let go and you would need to send them again" : "the update is let go and you would need to send it again";
-  const portal = portalLink
-    ? `2. In the portal: open ${portalLink} and tap "I'm on site" on the Evidence tab, then come back here and reply done.`
-    : `2. In the portal: sign in at app.yaadly.co.uk, open the job, and tap "I'm on site" on the Evidence tab, then come back here and reply done.`;
+  const kept = held === "photos" ? "Your photos are kept until you reply." : "Your update is kept until you reply.";
+  const again = held === "photos" ? "the photos are let go and you send them again" : "the update is let go and you send it again";
+  const where = portalLink ? portalLink : "app.yaadly.co.uk";
   return [
-    `That is for ${jobId}, ${stageSaid}. First, confirm you are on site today. ${kept}`,
-    `Two ways, either one:\n1. Here: ${HOW}.\n${portal}`,
-    `Or reply skip to file now and check in later. You need to check in before you leave site today.`,
-    `This waits 24 hours. After that ${again}. If you cannot share your location, say so and a person at Yaadly will help.`,
+    `That is for ${jobId}, ${stageSaid}.\nFirst, check in for today. ${kept}`,
+    `Here: tap the plus sign (or the paperclip), choose Location, then Send your current location.\n` +
+      `Or on the portal: tap "I'm on site" on the job at ${where}, then reply done.\n` +
+      `Or reply skip to file now. You need to check in before you leave site today.`,
+    `This waits 24 hours. After that ${again}.\nIf you cannot share your location, say so and a person at Yaadly will help.`,
   ].join("\n\n");
 }
 
 /** The ask again, short, for a reply that was none of the answers. */
 export function arrivalStillWanted(held: Held): string {
-  return `Your ${held === "photos" ? "photos are" : "update is"} waiting on one reply. Send your location here (${HOW}), or check in on the portal and reply done, or reply skip to file now and check in before you leave site. If you cannot share your location, say so.`;
+  return `Your ${held === "photos" ? "photos are" : "update is"} waiting on one reply. Send your location here (${HOW}), or reply done after checking in on the portal, or reply skip to file now. If you cannot share your location, say so.`;
 }
 
 /** Said when a worker skips. The evidence is filed; the check-in is still

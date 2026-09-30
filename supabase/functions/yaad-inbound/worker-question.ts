@@ -137,7 +137,7 @@ export function acknowledgementReply(text: string, justFiled: boolean): string {
   if (GREETING.test(t) || GREETING_PRESSED.test(pressed)) {
     return "Hello. Send a photo, a few words or a voice note about the work and it goes on the job.";
   }
-  return "Nothing is waiting on a reply from you right now.";
+  return "Nothing is waiting on a reply from you right now. Send a photo, a few words or a voice note when you have an update.";
 }
 
 /** A worker saying they want paying, or asking for the client to be told so.
@@ -212,10 +212,10 @@ export function answerWorkerQuestion(text: string): string | null {
   // one a worker is waiting on is the money.
   if (asksForPayment(t)) return PAY_REQUEST_ANSWER;
   if (/\b(?:location|locashun|where i am|where mi deh|pin|gps|my position|check ?in|arriv|on site|reach)\b/.test(t)) {
-    return "To share your location on WhatsApp: tap the plus sign (or the paperclip) next to the message box, choose Location, then Send your current location. It goes on the Arrival Log for this job as proof you were there. Nothing waits on it.";
+    return "To share your location on WhatsApp: tap the plus sign (or the paperclip) next to the message box, choose Location, then Send your current location. It checks you in on the job for today. With your first photos or update of the day you are asked for it: reply skip and they still file, but check in before you leave site.";
   }
   if (/\b(?:video|vid|clip|record|recording|walk ?through|walkthrough|film)\b/.test(t)) {
-    return "To send a video: tap the camera or the plus sign next to the message box and record a short clip, or pick one from your gallery. Under about a minute sends fine on WhatsApp. For anything longer, ask for the portal link and upload it there.";
+    return "To send a video: tap the camera or the plus sign next to the message box and record a short clip, or pick one from your gallery. Under about a minute sends fine on WhatsApp. For anything longer, upload it on the job at app.yaadly.co.uk.";
   }
   if (/\b(?:photo|photos|pic|pics|picture|pictures|foto|image|images|snap)\b/.test(t)) {
     return "To send photos: tap the camera or the plus sign next to the message box and pick them from your gallery, several at once is fine. Add a line saying what they show, then answer which section they belong to: before, during, after, a problem, or something new you found.";

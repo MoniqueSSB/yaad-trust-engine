@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { recordAccepted, type SendMeta, withMessagingService, withStatusCallback } from "./twilio-status.ts";
+import { checkInApplies } from "./arrival-rule.ts";
 
 // The daily worker prompt. Founder's own instruction, 1 Sep 2026: "when a
 // job is live and has been accepted by a worker, there should be a ping
@@ -170,6 +171,22 @@ Deno.serve(async (req: Request) => {
       try { workerUpdateSid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { workerUpdateSid = String(st?.value ?? ""); }
       if (!/^HX[0-9a-f]{32}$/i.test(workerUpdateSid)) workerUpdateSid = "";
     }
+    // The day's steps as a template of their own (yaadly_daily_steps_v1,
+    // yaad-twilio-setup META_WORKER_TEMPLATES), once Meta has approved it:
+    // it asks for photos and videos and says the words can be a voice note,
+    // so it agrees with the first message. Until then, the steps ride in the
+    // worker update template as before.
+    let dailyStepsSid = Deno.env.get("TWILIO_CONTENT_SID_DAILY_STEPS") ?? "";
+    if (!dailyStepsSid) {
+      const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_daily_steps").maybeSingle();
+      try { dailyStepsSid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { dailyStepsSid = String(st?.value ?? ""); }
+    }
+    if (!/^HX[0-9a-f]{32}$/i.test(dailyStepsSid)) dailyStepsSid = "";
+    const stepsMessage = (j: { id: string; title: string | null }): { sid: string; vars: Record<string, string> } | null => dailyStepsSid
+      ? { sid: dailyStepsSid, vars: { "1": `${j.title ?? "your job"} (${j.id})` } }
+      : workerUpdateSid
+        ? { sid: workerUpdateSid, vars: { "1": `${j.title ?? "your job"} (${j.id})`, "2": ON_SITE_STEPS, "3": `https://app.yaadly.co.uk/portal/jobs/${encodeURIComponent(j.id)}` } }
+        : null;
     root.setAttributes({ "yaadly.daily_checkin.button": Boolean(onSiteSid) });
 
     if (!useSid) {
@@ -180,16 +197,33 @@ Deno.serve(async (req: Request) => {
       }, 200);
     }
 
+    // Live work is in_progress AND evidence (30 Sep 2026). 'evidence' means
+    // something is filed on the working stage and waiting on the client, and
+    // the worker is still on the job: the same two statuses job_live_worker
+    // treats as live. Until then a job went quiet on this ping the moment its
+    // first photo landed.
+    //
+    // access_type decides whether the check-in question is asked at all
+    // (arrival-rule.ts): where somebody is at home, that person is the record
+    // and the worker is not asked to prove he turned up. Read separately, so
+    // a missing column costs the rule and not the whole run.
     const { data: live, error: liveErr } = await admin
       .from("jobs")
       .select("id, title, worker_email")
-      .eq("status", "in_progress")
+      .in("status", ["in_progress", "evidence"])
       .not("worker_email", "is", null);
     if (liveErr) { root.recordError(liveErr.message); return json({ error: liveErr.message }, 500); }
 
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Jamaica" }); // YYYY-MM-DD, Jamaica-local
 
-    let sent = 0, skippedAlready = 0, skippedNoPhone = 0, failed = 0;
+    const accessById = new Map<string, unknown>();
+    if ((live ?? []).length) {
+      const { data: acc, error: accErr } = await admin.from("jobs").select("id, access_type")
+        .in("id", (live ?? []).map((j: { id: string }) => j.id));
+      if (!accErr) for (const r of (acc ?? []) as { id: string; access_type: unknown }[]) accessById.set(r.id, r.access_type);
+    }
+
+    let sent = 0, skippedAlready = 0, skippedNoPhone = 0, failed = 0, atHome = 0, skippedAtHome = 0;
 
     for (const j of (live ?? []) as { id: string; title: string | null; worker_email: string }[]) {
       const { data: already } = await admin.from("daily_checkin_log").select("id").eq("job_id", j.id).eq("sent_on", today).maybeSingle();
@@ -198,6 +232,20 @@ Deno.serve(async (req: Request) => {
       const { data: profile } = await admin.from("worker_profiles").select("phone").ilike("worker_email", j.worker_email).maybeSingle();
       if (!profile?.phone) { skippedNoPhone++; continue; }
 
+      // Somebody at home: no check-in question (arrival-rule.ts). The day's
+      // ask for photos still goes, through the worker update template, or the
+      // older text-only template, which asks how the day went and never for a
+      // location. With neither approved, nothing goes to this job today.
+      if (!checkInApplies(accessById.get(j.id))) {
+        atHome++;
+        const steps: { sid: string; vars: Record<string, string> } | null = stepsMessage(j) ?? (CONTENT_SID ? { sid: CONTENT_SID, vars: { "1": j.title ?? j.id } } : null);
+        if (!steps) { skippedAtHome++; continue; }
+        const r = await sendTwilioTemplate(String(profile.phone), steps.vars, trace, { kind: "daily update ask", job_id: j.id }, steps.sid);
+        await admin.from("daily_checkin_log").insert({ job_id: j.id, sent_on: today });
+        if (r.sent) sent++; else failed++;
+        continue;
+      }
+
       const vars: Record<string, string> = onSiteSid
         ? { "1": `${j.title ?? "your job"} (${j.id})`, "2": j.id }
         : { "1": j.title ?? j.id };
@@ -205,12 +253,9 @@ Deno.serve(async (req: Request) => {
       // The second message, 30 Sep 2026: the 1.2.3 of what to send today,
       // through the approved worker update template, only after the
       // question went. Founder: "then the other stuff in a 1.2.3".
-      if (result.sent && onSiteSid && workerUpdateSid) {
-        await sendTwilioTemplate(String(profile.phone), {
-          "1": `${j.title ?? "your job"} (${j.id})`,
-          "2": ON_SITE_STEPS,
-          "3": `https://app.yaadly.co.uk/portal/jobs/${encodeURIComponent(j.id)}`,
-        }, trace, { kind: "daily check-in steps", job_id: j.id }, workerUpdateSid);
+      const steps = stepsMessage(j);
+      if (result.sent && onSiteSid && steps) {
+        await sendTwilioTemplate(String(profile.phone), steps.vars, trace, { kind: "daily check-in steps", job_id: j.id }, steps.sid);
       }
       // Logged once per job per day regardless of delivery, same reasoning
       // as mark_job_nudged: this is a once-a-day ask, not a retry queue,
@@ -226,8 +271,10 @@ Deno.serve(async (req: Request) => {
       "yaadly.daily_checkin.failed": failed,
       "yaadly.daily_checkin.skipped_already": skippedAlready,
       "yaadly.daily_checkin.skipped_no_phone": skippedNoPhone,
+      "yaadly.daily_checkin.at_home": atHome,
+      "yaadly.daily_checkin.skipped_at_home": skippedAtHome,
     });
-    return json({ ok: true, candidates: (live ?? []).length, sent, failed, skippedAlready, skippedNoPhone });
+    return json({ ok: true, candidates: (live ?? []).length, sent, failed, skippedAlready, skippedNoPhone, atHome, skippedAtHome });
   } catch (e) {
     root.recordError(e);
     return json({ error: String(e).slice(0, 200) }, 500);

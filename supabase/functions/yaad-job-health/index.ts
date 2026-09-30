@@ -1,7 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
+import { recordAccepted, recordNotSent, type SendMeta, withMessagingService, withStatusCallback } from "./twilio-status.ts";
+import { approvedTemplateSid, lastInboundInWindow } from "./wa-window.ts";
 
 // The daily stall check. Founder's own framing, 31 Aug 2026: "prompt to the
 // workers ensuring he does this so the client is updated... if there is
@@ -32,6 +33,21 @@ const APP_URL = Deno.env.get("YAAD_APP_URL") ?? "https://app.yaadly.co.uk";
 // fix: the founder is told directly and the client is told there is a
 // delay, honestly, before they have to notice the silence themselves.
 const NUDGE_HOURS = 72;
+
+/** The nudge, as free text inside the window. An ask, never a gate: the
+ *  check-in is optional (arrival-rule.ts), so it asks for what the client is
+ *  waiting on, a photo or a line, and says where a reply goes. */
+function nudgeText(title: string): string {
+  return `Yaadly here. Nothing has come in on ${title} for a few days. When you can, send a photo or a line on how it is going. The client is waiting to see progress. Reply here if something is holding you up.`;
+}
+
+/** The same ask for the approved worker update template's second slot:
+ *  "Yaadly update on your job {{1}}: {{2}}. The full details are...". No full
+ *  stop at the end, the template adds one. */
+const NUDGE_SUMMARY =
+  "nothing has come in for a few days. When you can, send a photo or a line on how it is going, the client is waiting to see progress";
+
+const oneLine = (s: string, n: number) => (s.replace(/\s+/g, " ").trim().slice(0, n) || "your job");
 const ESCALATE_HOURS = 168;
 
 const CORS = {
@@ -43,7 +59,10 @@ const CORS = {
 // Same shape as yaad-notify-client's own copy. Kept separate rather than
 // shared, matching this repository's own house style for small per-function
 // helpers: yaad-portal-code's header calls this out by name as deliberate.
-async function sendTwilioWhatsApp(to: string, body: string, trace: Trace, meta: SendMeta = { kind: "job health nudge" }) {
+async function sendTwilioWhatsApp(
+  to: string, body: string, trace: Trace, meta: SendMeta = { kind: "job health nudge" },
+  template?: { sid: string; vars: Record<string, string> },
+) {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
@@ -57,7 +76,9 @@ async function sendTwilioWhatsApp(to: string, body: string, trace: Trace, meta: 
       const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
         method: "POST",
         headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
-        body: withStatusCallback(new URLSearchParams({ To: `whatsapp:+${digits}`, From: from, Body: body })),
+        body: withStatusCallback(withMessagingService(template
+          ? new URLSearchParams({ To: `whatsapp:+${digits}`, From: from, ContentSid: template.sid, ContentVariables: JSON.stringify(template.vars) })
+          : new URLSearchParams({ To: `whatsapp:+${digits}`, From: from, Body: body }))),
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
@@ -202,12 +223,43 @@ Deno.serve(async (req: Request) => {
 
         const { data: profile } = await admin.from("worker_profiles").select("phone").ilike("worker_email", c.worker_email).maybeSingle();
         if (profile?.phone) {
-          await sendTwilioWhatsApp(
-            String(profile.phone),
-            `Yaadly here. Nothing has come in on ${c.title} for a few days. Send a photo or check in on site when you can, the client is waiting to see progress.`,
-            trace,
-            { kind: "worker nudge, job quiet", job_id: c.job_id },
-          );
+          // Three days of silence on the job usually means three days of
+          // silence in the chat too, so this is read against WhatsApp's 24
+          // hour window BEFORE sending (30 Sep 2026). Until then it always
+          // went as free text, which outside the window Twilio accepts and
+          // then fails as 63016, after this run had counted it as nudged.
+          // Outside the window it goes through the approved worker update
+          // template, whose second slot is built for one true line about the
+          // job; with no approved template it is not sent and the desk's
+          // "Did it arrive" page shows it.
+          const phone = String(profile.phone);
+          const meta: SendMeta = { kind: "worker nudge, job quiet", job_id: c.job_id };
+          const inWindow = await lastInboundInWindow(admin, phone);
+          if (inWindow === false) {
+            // yaadly_worker_job_quiet_v1, written for this nudge, once Meta has
+            // approved it (yaad-twilio-setup, META_WORKER_TEMPLATES); until
+            // then the general worker update template.
+            const quietSid = await approvedTemplateSid(admin, "TWILIO_CONTENT_SID_WORKER_JOB_QUIET", "twilio_content_sid_worker_job_quiet");
+            const sid = quietSid ? "" : await approvedTemplateSid(admin, "TWILIO_CONTENT_SID_WORKER_UPDATE", "twilio_content_sid_worker_update");
+            if (quietSid) {
+              await sendTwilioWhatsApp(phone, "", trace, meta, {
+                sid: quietSid, vars: { "1": oneLine(`${c.title ?? "your job"} (${c.job_id})`, 200) },
+              });
+            } else if (sid) {
+              await sendTwilioWhatsApp(phone, "", trace, meta, {
+                sid,
+                vars: {
+                  "1": oneLine(`${c.title ?? "your job"} (${c.job_id})`, 200),
+                  "2": NUDGE_SUMMARY,
+                  "3": `${APP_URL}/portal/jobs/${encodeURIComponent(c.job_id)}`,
+                },
+              });
+            } else {
+              await recordNotSent(phone, "whatsapp", meta);
+            }
+          } else {
+            await sendTwilioWhatsApp(phone, nudgeText(String(c.title ?? c.job_id)), trace, meta);
+          }
         }
       }
     }

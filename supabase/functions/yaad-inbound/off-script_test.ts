@@ -112,3 +112,9 @@ Deno.test("an answer that names a day, or says something is settled, is a promis
     assertEquals(screenOffScript(said).why, "ok", said);
   }
 });
+
+Deno.test("the facts say what the check-in ask actually does", async () => {
+  const { WORKER_HOW_TO } = await import("./off-script.ts");
+  assert(!WORKER_HOW_TO.includes("Nothing waits on it"), "the facts say nothing waits on a location, while the check-in ask holds photos 24 hours");
+  assert(WORKER_HOW_TO.includes("24 hours") && WORKER_HOW_TO.includes("skip"), "the facts do not say how the check-in ask works");
+});

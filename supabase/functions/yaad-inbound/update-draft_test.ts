@@ -111,7 +111,15 @@ Deno.test("after a filing the worker is told what arrives next and what to do wi
   // sentence it replaced is gone.
   const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
   assert(!src.includes("The client hears about it once it is drafted"), "the old ending is back");
-  assert((src.match(/\$\{WHAT_HAPPENS_NEXT\}/g) ?? []).length >= 3, "a filing confirmation lost its next step");
+  // Two sites since 30 Sep 2026, and each is named: the several-jobs update
+  // no longer files on its job answer with a confirmation of its own, it is
+  // read back and goes through fileHeldDraft like every other typed update.
+  assert((src.match(/\$\{WHAT_HAPPENS_NEXT\}/g) ?? []).length >= 2, "a filing confirmation lost its next step");
+  const held = src.slice(src.indexOf("const fileHeldDraft = async"), src.indexOf("const fileHeldDraft = async") + 3000);
+  assert(held.includes("${WHAT_HAPPENS_NEXT}"), "a typed update filed with its 1 lost its next step");
+  const photos = src.slice(src.indexOf("const invite = "), src.indexOf("const invite = ") + 200);
+  assert(photos.includes("${WHAT_HAPPENS_NEXT}"), "a photo filing lost its next step");
+  assert(!/from\("evidence"\)\.insert\(\{\s*job_id: pick\.id/.test(src), "an update is filed somewhere with no next step");
 });
 
 /* ── the two buttons under the read-back (29 Sep 2026) ────────────────────

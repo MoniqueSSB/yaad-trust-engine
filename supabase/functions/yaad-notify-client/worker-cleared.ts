@@ -58,3 +58,11 @@ export function applyLink(appUrl: string, applicationId: string, uploadToken: st
   u.searchParams.set("ref", reference);
   return u.toString();
 }
+
+/** The worker's side of job_delayed, 30 Sep 2026. The client is told the job
+ *  has gone quiet and that the worker has been checked in with; this is that
+ *  check-in. Supportive, not a warning, and it says what happens next: a reply
+ *  reaches a person. */
+export function jobDelayedWorkerText(jobId: string, title: string): string {
+  return `${jobId}${title ? ` (${title})` : ""}: the client has been told the job is running late. Is anything holding you up? Reply here and a person will help.`;
+}

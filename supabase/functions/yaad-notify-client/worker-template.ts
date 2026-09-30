@@ -31,9 +31,9 @@ const SUMMARY: Record<string, string | null> = {
   evidence_comment: "the client has left a note on your evidence",
   evidence_landed: null,
   kickoff_pack_ready: "your Kickoff Pack is ready to read and confirm",
-  quote_awaiting_worker_confirm: "your price is waiting for you to confirm it",
   quote_not_selected: "another tradesperson was booked for this one, so it is closed for you",
-  stage_released_worker: "the client has signed off the work",
+  stage_released_worker: "the client has signed off the work. Yaadly pays you for the last stage by bank transfer within 7 days",
+  stage_signed_off_worker: "the client has signed off a stage. You are paid for it by bank transfer within 7 days. The next stage is on the job",
   worker_requested: "a client has asked for you by name",
   dispute_raised_worker: "the client has raised something about the work",
   materials_sent_worker: "Yaadly has sent you the materials money",
@@ -58,24 +58,10 @@ export function workerTemplateSummary(kind: string): string | null {
   return SUMMARY[kind] ?? null;
 }
 
-/** Two numbers are the same phone when their digits agree on the last ten.
- *  wa_inbound_seen holds "+44…" and "1876…" side by side. */
-export function samePhoneDigits(a: string, b: string): boolean {
-  const x = String(a ?? "").replace(/\D/g, "");
-  const y = String(b ?? "").replace(/\D/g, "");
-  if (x.length < 7 || y.length < 7) return false;
-  return x.slice(-10) === y.slice(-10);
-}
-
-/** Inside WhatsApp's window, with an hour's margin so a send that takes a
- *  moment is not the one that lands a minute late. */
-export const WINDOW_MS = 23 * 3600_000;
-
-export function insideWindow(lastInboundIso: string | null, now = Date.now()): boolean {
-  if (!lastInboundIso) return false;
-  const t = new Date(lastInboundIso).getTime();
-  return Number.isFinite(t) && now - t < WINDOW_MS;
-}
+// The window rule now lives in wa-window.ts, shared with yaad-job-health, so
+// both read it the same way. Re-exported so nothing that imports it from here
+// changes.
+export { insideWindow, samePhoneDigits, WINDOW_MS } from "./wa-window.ts";
 
 /** Twilio's variables must not be empty, carry a newline, or run long. */
 export function templateVar(s: string, max = 200): string {

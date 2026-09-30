@@ -14,7 +14,9 @@ const ask = arrivalAsk("JOB-WEB-1", "stage 3", "photos", "https://app.yaadly.co.
 
 Deno.test("the ask says what is kept, both ways to check in, the 24 hours and the way out", () => {
   assert(ask.includes("JOB-WEB-1") && ask.includes("stage 3"));
-  assert(ask.includes("Your photos are kept and go on the job as soon as you reply"), ask);
+  assert(ask.includes("Your photos are kept until you reply"), ask);
+  // Not "go on the job as soon as you reply": after the reply they are still asked what they show.
+  assert(!ask.includes("as soon as you reply"), ask);
   assert(ask.includes("reply skip to file now"), ask);
   assert(ask.includes("You need to check in before you leave site today"), ask);
   assert(ask.includes("I'm on site"), ask);
@@ -70,4 +72,13 @@ Deno.test("skip files now, and the worker is told the check-in is still owed tod
 Deno.test("done after the portal is about the check-in, never a caption", () => {
   for (const said of ["done", "Done.", "sent", "checked in", "im on site", "I'm on site"]) assert(saysCheckedIn(said), said);
   for (const said of ["done the first coat", "sent the receipt", "skip", "beam is in"]) assert(!saysCheckedIn(said), said);
+});
+
+Deno.test("the ask fits a phone: short lines, no sign-in link pasted into the chat", async () => {
+  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  assert(!src.includes("mintPortalUploadLink"), "a sign-in link is being pasted into a worker's chat again");
+  assert(!/arrivalAsk\([^)]*mint/.test(src));
+  const a = arrivalAsk("JOB-WEB-1789253807959", "stage 3, Walls", "photos", null);
+  assert(a.length < 600, `the ask is ${a.length} characters`);
+  for (const line of a.split("\n")) assert(line.length <= 130, `long line: ${line}`);
 });
