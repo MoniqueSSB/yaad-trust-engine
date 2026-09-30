@@ -110,18 +110,17 @@ Deno.test("the application row is the one the site's step 1 writes, with both co
   assert(/^APP-[0-9A-F]{6}$/.test(newReference()));
 });
 
-Deno.test("the final reply is warm, five points, and promises nothing", () => {
+Deno.test("the final reply fits one phone screen and promises nothing", () => {
   const link = continueLink("https://app.yaadly.co.uk", "11111111-2222-3333-4444-555555555555", "aaaa-bbbb", "APP-ABC123");
   assert(link.startsWith("https://app.yaadly.co.uk/apply?app=") && link.includes("token=aaaa-bbbb") && link.includes("ref=APP-ABC123"));
   const r = joinedReply("APP-ABC123", link, true);
   assert(r.includes("You are in") && r.includes("APP-ABC123") && r.includes(link));
-  assert((r.match(/^\d\. /gm) ?? []).length === 5, "five points");
-  assert(/^Pay: /m.test(r) && /bank transfer within 7 days/.test(r) && /Never cash/.test(r), "when they are paid and what happens then is said at joining");
-  assert(/An AI agent reads your form/.test(r) && /A person decides/.test(r) && /either way/i.test(r), "the agent is named and a person still decides");
-  assert(!/[–—]/.test(r));
+  assert(r.split("\n").length <= 8, "one phone screen");
+  for (const line of r.split("\n")) if (line !== link) assert(line.length <= 80, `long line: ${line}`);
+  assert(/An AI agent reads your form/.test(r) && /A person decides/.test(r), "the agent is named and a person still decides");
+  assert(!/[\u2013\u2014]/.test(r));
   assert(!/guarantee|100%|escrow|approved|accepted|you will get work/i.test(r), r);
   assert(joinedReply("APP-1", link, false).includes("No photo yet"));
-  assert(joinedReply("APP-1", link, true).includes("all six"));
 });
 
 

@@ -79,24 +79,18 @@ export const WORDS_FIRST = "One thing at a time. Answer this first. Then send th
  *  today: quoting and booking wait for the check (v_job_alert_subscribers
  *  .can_quote), a person reads it, nothing is promised. The link opens the
  *  same application on the site for the identity steps. */
-export function joinedReply(reference: string, link: string, photoFiled: boolean, aiReads = true): string {
+export function joinedReply(reference: string, link: string, photoFiled: boolean, _aiReads = true): string {
+  // One phone screen, founder 30 Sep 2026: "this is one a phone", "the
+  // messages can be over whelming". The reference, the one next step, and
+  // what happens after. Everything else waits for the moment it matters.
   return [
-    `That is all six. You are in. Your reference is ${reference}.`,
+    `You are in. Your reference is ${reference}.`,
     photoFiled ? "" : "No photo yet. You can add one on the link below.",
-    "",
-    "What happens next:",
-    // Founder, 30 Sep 2026: the read is done by AI agents, and the message
-    // says so when they said YES to it. A person still decides, always.
-    aiReads ? "1. An AI agent reads your form and makes notes. A person decides." : "1. A person reads your form.",
-    "2. Finish your check here. Your ID. Your TRN. Three people who can vouch for you. Sign the Guidelines.",
+    ``,
+    `Next: finish your check here. About ten minutes.`,
     link,
-    "3. See jobs on the board. Want to quote? A person at Yaadly checks your file first.",
-    "4. We message you here, either way. Then say your price in writing. It is free.",
-    "5. Win a job and we show you how it runs.",
-    "",
-    "Pay: bank transfer within 7 days of sign off. Never cash.",
-    "",
-    "Questions? Ask here.",
+    ``,
+    `An AI agent reads your form. A person decides. We message you here.`,
   ].filter((l) => l !== "").join("\n");
 }
 

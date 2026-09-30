@@ -1,15 +1,16 @@
 import { assert } from "jsr:@std/assert@1";
 import { applyLink, checkReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
 
-Deno.test("the cleared message is short lines, names the portal, and promises nothing", () => {
+Deno.test("the cleared message fits one phone screen, names the board and the pay, and promises nothing", () => {
   const t = workerClearedText("Marcus Brown", "marcus@example.com", "https://app.yaadly.co.uk");
   assert(t.startsWith("You are cleared, Marcus."));
-  assert(t.includes("https://app.yaadly.co.uk/portal/sign-in"), "the portal door is not named");
+  assert(t.includes("https://app.yaadly.co.uk/portal/sign-in"), "the board is not linked");
   assert(t.includes("marcus@example.com"), "which email to sign in with is not said");
-  assert(/^Pay: /m.test(t) && /bank transfer within 7 days/.test(t), "when they are paid and what happens then is said at clearing");
-  for (const line of t.split("\n")) assert(line.length <= 115, `long line: ${line}`);
-  assert(/on the board in your portal/.test(t) && /sent here too/.test(t), "the board and the alerts are both named");
-  assert(!/[–—]/.test(t) && !/[–—]/.test(WORKER_CLEARED_SUBJECT), "no dashes in worker copy");
+  assert(/come here too/.test(t), "the alerts are not named");
+  assert(/^Pay: /m.test(t) && /bank transfer within 7 days/.test(t), "how pay works is not said");
+  assert(t.split("\n").length <= 8, "one phone screen");
+  for (const line of t.split("\n")) assert(line.length <= 80, `long line: ${line}`);
+  assert(!/[\u2013\u2014]/.test(t) && !/[\u2013\u2014]/.test(WORKER_CLEARED_SUBJECT), "no dashes in worker copy");
   assert(!/guarantee|100%|escrow|you will get|today|tomorrow/i.test(t), t);
   assert(workerClearedText("", "", "https://app.yaadly.co.uk").includes("Log in with your email"));
 });

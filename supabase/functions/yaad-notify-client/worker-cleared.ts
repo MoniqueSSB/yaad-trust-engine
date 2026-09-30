@@ -14,20 +14,15 @@
 
 export function workerClearedText(name: string, email: string, appUrl: string): string {
   const first = (name ?? "").trim().split(/\s+/)[0] ?? "";
+  // One phone screen, founder 30 Sep 2026.
   return [
     `You are cleared${first ? `, ${first}` : ""}. Welcome to Yaadly.`,
     ``,
-    `What happens now:`,
-    `1. Jobs are on the board in your portal. New jobs in your trades and parishes are sent here too.`,
-    `2. Say your price in writing. It is free.`,
-    `3. Win a job and we show you how it runs.`,
+    `Jobs are on the board: ${appUrl}/portal/sign-in`,
+    `Log in with ${email || "your email"}. We send you a code.`,
+    `New jobs in your area come here too.`,
     ``,
     `Pay: bank transfer within 7 days of sign off. Never cash.`,
-    ``,
-    `Your portal: ${appUrl}/portal/sign-in`,
-    `Log in with ${email || "your email"}. We send you a code.`,
-    ``,
-    `Questions? Ask here.`,
   ].join("\n");
 }
 
