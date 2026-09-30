@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { isCheckOffered } from "@/lib/portal/job-check";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { scrub } from "@/lib/scrub";
@@ -70,6 +72,25 @@ export async function agreePrice(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("agree_quote_as_me", { p_quote: quoteId });
   if (error) throw new Error(error.message);
+
+  /* The Visual Check as an addition on the quote (29 Sep 2026). Order is the
+     point: the price is agreed first, which books the worker, and only then
+     is the check added, through the same choose_job_check() the Approvals
+     box calls. So the rule "no check before a worker is on the job" is kept
+     as it is, and there is one price and one gate. A refusal here never
+     undoes the booking: the client lands on the Approvals box, where the
+     same check can still be added. Nothing here raises an invoice or moves
+     a payment; the desk raises the check's own invoice. */
+  if (isCheckOffered("visual") && formData.get("addCheck") === "visual") {
+    const { error: checkErr } = await supabase.rpc("choose_job_check", {
+      p_job: jobId,
+      p_level: "visual",
+    });
+    revalidatePath("/portal/jobs/" + jobId);
+    if (checkErr) redirect("/portal/jobs/" + encodeURIComponent(jobId) + "?tab=approvals#check");
+    return;
+  }
+
   revalidatePath("/portal/jobs/" + jobId);
 }
 

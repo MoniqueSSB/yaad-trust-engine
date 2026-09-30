@@ -25,13 +25,20 @@ export function AcceptPanel({
   code,
   quoteId,
   workerName,
+  check = null,
 }: {
   jobId: string;
   code: string;
   quoteId: string;
   workerName: string;
+  /** The Visual Check as an optional line on this quote, every figure
+   *  already formatted by the page from the catalogue. Null hides it. */
+  check?: { price: string; fullPrice: string | null; adds: string; total: string; rate: string } | null;
 }) {
   const router = useRouter();
+  /* Unticked to start, always. Approving from the evidence yourself is the
+     default and costs nothing; the check is something a client adds. */
+  const [addCheck, setAddCheck] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -50,6 +57,9 @@ export function AcceptPanel({
   async function run(mode: "price" | "pack") {
     setError("");
     setBusy(true);
+    // Only on the plain price route. A Kickoff Pack books nobody, and the
+    // database refuses a check before a worker is on the job.
+    const wantsCheck = mode === "price" && !!check && addCheck;
     try {
       const supabase = createClient();
       const { data: auth } = await supabase.auth.getUser();
@@ -59,6 +69,7 @@ export function AcceptPanel({
         // real terms begin, so it is where the account is asked for, and not
         // one screen earlier.
         const next = new URLSearchParams({ job: jobId, code, quote: quoteId, want: mode });
+        if (wantsCheck) next.set("check", "visual");
         router.push(`/portal/join?${next.toString()}`);
         return;
       }
@@ -67,6 +78,18 @@ export function AcceptPanel({
         ? await supabase.rpc("request_kickoff_as_me", { p_quote: quoteId })
         : await supabase.rpc("agree_quote_as_me", { p_quote: quoteId });
       if (rpcErr) throw new Error(rpcErr.message);
+
+      // The price is agreed, so the worker is booked. Only now is the check
+      // added, by the same choose_job_check() the portal's Approvals box
+      // calls. A refusal never undoes the booking: the client is taken to
+      // that box, where the check can still be added.
+      if (wantsCheck) {
+        const { error: checkErr } = await supabase.rpc("choose_job_check", { p_job: jobId, p_level: "visual" });
+        if (checkErr) {
+          router.push(`/portal/jobs/${encodeURIComponent(jobId)}?tab=approvals#check`);
+          return;
+        }
+      }
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "That did not go through.");
@@ -76,6 +99,33 @@ export function AcceptPanel({
 
   return (
     <div className="mt-4 border-t border-line pt-4">
+      {check && (
+        <label className="mb-3 flex cursor-pointer items-start gap-2.5 rounded-xl border border-line bg-bg px-3.5 py-3">
+          <input
+            type="checkbox"
+            checked={addCheck}
+            onChange={(e) => setAddCheck(e.target.checked)}
+            disabled={busy}
+            className="mt-1 accent-teal"
+          />
+          <span className="text-[12.5px] leading-relaxed text-dim">
+            <b className="text-ink">Add a Visual Check</b>, optional:{" "}
+            <span className="font-semibold text-tealb">
+              {check.fullPrice && (
+                <>
+                  <s className="font-normal text-dim">{check.fullPrice}</s>{" "}
+                </>
+              )}
+              {check.price}
+            </span>
+            . Somebody independent of {workerName} attends the finished work and
+            files what they saw. It is a record for your sign-off, not a ruling:
+            you still approve yourself. Adds {check.adds} at {check.rate}, so
+            this job comes to <b className="text-ink">{check.total}</b>. Yaadly
+            invoices the check in pounds, separately from the job.
+          </span>
+        </label>
+      )}
       <button
         type="button"
         onClick={() => run("price")}

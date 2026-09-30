@@ -153,3 +153,78 @@ describe("what the check adds to the job total", () => {
     assert.equal(m.penceToJmd(4500, 210), 9450);
   });
 });
+
+/* The Visual Check as an addition on the quote, 29 Sep 2026. These read the
+   source, because the order of two database calls is the rule: the price is
+   agreed first, which books the worker, and the check is added after it by
+   the same function the Approvals box uses. The database refuses a check
+   before a worker is on the job, and this must not be the reason that rule
+   gets loosened. */
+describe("the check as an addition on the quote", () => {
+  let actions, page;
+  before(async () => {
+    const { readFileSync } = await import("node:fs");
+    actions = readFileSync(join(HERE, "../app/portal/job-actions.ts"), "utf8");
+    page = readFileSync(join(HERE, "../app/portal/(gated)/jobs/[id]/page.tsx"), "utf8");
+  });
+
+  test("the price is agreed before the check is added", () => {
+    const body = actions.slice(actions.indexOf("export async function agreePrice"));
+    const agree = body.indexOf('"agree_quote_as_me"');
+    const check = body.indexOf('"choose_job_check"');
+    assert.ok(agree > -1 && check > -1);
+    assert.ok(agree < check);
+  });
+
+  test("the check is added only when the client ticked it", () => {
+    assert.match(actions, /formData\.get\("addCheck"\) === "visual"/);
+  });
+
+  test("the tick box is never ticked for the client", () => {
+    const box = page.match(/<input type="checkbox" name="addCheck"[^>]*>/);
+    assert.ok(box);
+    assert.doesNotMatch(box[0], /checked/i);
+  });
+
+  test("accepting a price raises no invoice and releases nothing", () => {
+    const body = actions.slice(actions.indexOf("export async function agreePrice"));
+    const end = body.indexOf("\n}\n");
+    assert.doesNotMatch(body.slice(0, end), /raise_job_check_invoice|mark_|release/);
+  });
+});
+
+/* The same addition on the no-account quotes page and through sign-up. */
+describe("the check on the quote link", () => {
+  let panel, joinPage, sql;
+  before(async () => {
+    const { readFileSync, readdirSync } = await import("node:fs");
+    panel = readFileSync(join(HERE, "../app/jobs/[id]/quotes/AcceptPanel.tsx"), "utf8");
+    joinPage = readFileSync(join(HERE, "../app/portal/join/page.tsx"), "utf8");
+    const dir = join(HERE, "../../supabase/migrations");
+    const f = readdirSync(dir).find((n) => n.endsWith("_the_visual_check_is_offered_on_the_quote_link.sql"));
+    sql = readFileSync(join(dir, f), "utf8");
+  });
+
+  test("the tick box starts unticked", () => {
+    assert.match(panel, /useState\(false\);\s*\n\s*const \[busy/);
+  });
+
+  test("the price is agreed before the check is added, in the panel and after sign-up", () => {
+    for (const src of [panel, joinPage]) {
+      const agree = src.indexOf('"agree_quote_as_me"');
+      const check = src.indexOf('"choose_job_check"');
+      assert.ok(agree > -1 && check > -1);
+      assert.ok(agree < check);
+    }
+  });
+
+  test("the Kickoff Pack route never adds a check", () => {
+    assert.match(panel, /mode === "price" && !!check && addCheck/);
+    assert.match(joinPage, /!wantsPack && job && params\.get\("check"\) === "visual"/);
+  });
+
+  test("the price read needs the job code and changes nothing", () => {
+    assert.match(sql, /j\.portal_code = p_code/);
+    assert.doesNotMatch(sql.replace(/--.*$/gm, ""), /\b(insert|update|delete)\b/i);
+  });
+});
