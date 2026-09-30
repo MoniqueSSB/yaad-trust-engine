@@ -35,6 +35,8 @@ before(async () => {
 // written, which is what the negative tests assert on.
 let currentStage = "qualifiedtobuy";
 let patches = [];
+let searches = [];
+let dealForJob = null;
 let hubspotStatus = 200;
 
 globalThis.fetch = async (url, init = {}) => {
@@ -42,6 +44,12 @@ globalThis.fetch = async (url, init = {}) => {
   if (!u.includes("api.hubapi.com")) throw new Error(`unexpected outbound call to ${u}`);
   if (hubspotStatus !== 200) {
     return new Response(JSON.stringify({ message: "stubbed failure" }), { status: hubspotStatus });
+  }
+  // The search the jobId form of the request makes. Answered from
+  // `dealForJob`, never recorded as a write: a search is a read.
+  if (u.includes("/deals/search")) {
+    searches.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({ results: dealForJob ? [{ id: dealForJob }] : [] }), { status: 200 });
   }
   if ((init.method ?? "GET") === "GET") {
     return new Response(JSON.stringify({ id: "123", properties: { dealstage: currentStage, pipeline: "default" } }), { status: 200 });
@@ -52,6 +60,8 @@ globalThis.fetch = async (url, init = {}) => {
 
 beforeEach(() => {
   patches = [];
+  searches = [];
+  dealForJob = null;
   hubspotStatus = 200;
   currentStage = "qualifiedtobuy";
   process.env.HUBSPOT_STAGE_WEBHOOK_SECRET = SECRET;
@@ -185,5 +195,43 @@ describe("POST /api/hubspot/stage", () => {
     for (const method of ["GET", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]) {
       assert.equal(route[method], undefined, `${method} must not be exported`);
     }
+  });
+});
+
+describe("POST /api/hubspot/stage with a job code", () => {
+  // Since 30 September 2026 the senders are database triggers relayed through
+  // yaad-crm-sync. They know the job that changed, not the HubSpot deal id.
+
+  test("resolves the deal from the job code and moves it", async () => {
+    dealForJob = "123";
+    const r = await send({ jobId: "JOB-2026-0001", event: "client_paid" });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.ok, true);
+    assert.equal(searches.length, 1);
+    assert.equal(searches[0].filterGroups[0].filters[0].value, "JOB-2026-0001");
+    assert.equal(patches.length, 1);
+  });
+
+  test("a job with no deal is 404 and writes nothing", async () => {
+    // A deal is made by the lead route or not at all. This endpoint must never
+    // conjure one up at Client Paid with no Inquiry behind it.
+    dealForJob = null;
+    const r = await send({ jobId: "JOB-2026-0002", event: "client_paid" });
+    assert.equal(r.status, 404);
+    assert.equal(patches.length, 0);
+  });
+
+  test("an unsigned request with a job code searches nothing and writes nothing", async () => {
+    dealForJob = "123";
+    const r = await send({ jobId: "JOB-2026-0001", event: "client_paid" }, { sign: false });
+    assert.equal(r.status, 401);
+    assert.equal(searches.length, 0);
+    assert.equal(patches.length, 0);
+  });
+
+  test("a body with neither id nor job code is 400", async () => {
+    const r = await send({ event: "client_paid" });
+    assert.equal(r.status, 400);
+    assert.equal(patches.length, 0);
   });
 });

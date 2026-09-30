@@ -40,6 +40,7 @@
 
 import { NextResponse } from "next/server";
 import { verifyWebhookSignature } from "@/lib/webhookSignature";
+import { findDealByJobId } from "@/lib/hubspotLeads";
 import {
   HubSpotError,
   advanceDealToClientPaid,
@@ -107,19 +108,38 @@ export async function POST(req: Request) {
     return json({ error: "Invalid signature" }, 401);
   }
 
-  let payload: { dealId?: unknown; event?: unknown };
+  let payload: { dealId?: unknown; jobId?: unknown; event?: unknown };
   try {
     payload = JSON.parse(rawBody);
   } catch {
     return json({ error: "Body is not valid JSON" }, 400);
   }
 
-  const dealId = typeof payload.dealId === "string" ? payload.dealId.trim() : "";
+  let dealId = typeof payload.dealId === "string" ? payload.dealId.trim() : "";
+  const jobId = typeof payload.jobId === "string" ? payload.jobId.trim().slice(0, 64) : "";
   const event = typeof payload.event === "string" ? payload.event : "";
 
-  if (!dealId) return json({ error: "dealId is required" }, 400);
+  if (!dealId && !jobId) return json({ error: "dealId or jobId is required" }, 400);
   if (!Object.hasOwn(EVENTS, event)) {
     return json({ error: `Unknown event. Expected one of: ${Object.keys(EVENTS).join(", ")}` }, 400);
+  }
+
+  // A job code in place of a deal id, since 30 September 2026. The senders
+  // are database triggers relayed through yaad-crm-sync: they know which job
+  // changed and have no business holding a HubSpot id. The lookup is the
+  // same exact match on yaadly_job_id the lead sync uses as its idempotency
+  // key, so a deal is found only if a lead sync made it. A job with no deal
+  // is 404, not a fresh deal: creating records is the lead route's job, and
+  // this endpoint moving a deal it did not find would be a way to make one
+  // appear at Client Paid with no Inquiry behind it.
+  if (!dealId) {
+    try {
+      dealId = (await findDealByJobId(jobId)) ?? "";
+    } catch (e) {
+      console.error(`hubspot/stage: could not look up job ${jobId}: ${e instanceof Error ? e.message : String(e)}`);
+      return json({ error: "HubSpot is temporarily unavailable. Retry." }, 503);
+    }
+    if (!dealId) return json({ error: "No deal carries that job code. The lead sync has not made one." }, 404);
   }
 
   try {
