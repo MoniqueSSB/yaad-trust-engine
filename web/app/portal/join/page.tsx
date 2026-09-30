@@ -71,8 +71,8 @@ const required = "text-[10px] font-bold uppercase tracking-[.1em] text-coral";
 type Stage = "email" | "code" | "link";
 
 /* Takes the sign-in token out of a query string and leaves everything else
-   exactly as it was. Everything else matters: `code`, `job`, `quote`, `want`
-   and `next` all still steer where this page sends somebody, and a blunter
+   exactly as it was. Everything else matters: `code`, `job`, `quote`, `want`,
+   `check` and `next` all still steer where this page sends somebody, and a blunter
    "clear the whole query string" would strand a one-tap arrival that came
    from a quote button. */
 function stripToken(search: string): string {
@@ -247,6 +247,16 @@ function JoinForm() {
             requestErr.message +
             " Open your quotes again and press the button.",
         );
+      }
+
+      /* The Visual Check ticked on the quote (29 Sep 2026). Added only after
+         the price is agreed, which is what books the worker, and never on
+         the Kickoff Pack route, which books nobody. Postgres decides, as
+         above. A refusal is not an error worth stopping an arrival for: the
+         booking stands, and the same check is offered on the job's
+         Approvals tab. */
+      if (!wantsPack && job && params.get("check") === "visual") {
+        await supabase.rpc("choose_job_check", { p_job: job, p_level: "visual" });
       }
     }
 

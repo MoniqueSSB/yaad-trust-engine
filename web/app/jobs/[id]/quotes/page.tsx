@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AcceptPanel } from "./AcceptPanel";
-import { jmdOrBlank as money } from "@/lib/money";
+import { gbp, jmdOrBlank as money } from "@/lib/money";
+import { CHECK_CATALOGUE_ID, checkChargePence, isCheckOffered, penceToJmd } from "@/lib/portal/job-check";
+import { PRICE_BENCHMARKS } from "@/lib/portal/price-bands";
 import { clientBill } from "@/lib/jobs/client-bill";
 import { billingLineForClient, billingModeOf } from "@/lib/jobs/billing";
 
@@ -65,10 +67,20 @@ export default async function Quotes({
   if (!code) notFound();
 
   const supabase = await createClient();
-  const [{ data: jobRows }, { data: quoteRows }] = await Promise.all([
+  /* The third read is the Visual Check's price (20260929233000), returned
+     only to a holder of this job's code. If it fails or comes back empty the
+     page is exactly as it was and the tick box is not shown: a price is
+     never typed here to fill the gap. */
+  const [{ data: jobRows }, { data: quoteRows }, { data: checkRows }] = await Promise.all([
     supabase.rpc("job_for_code", { p_job: id, p_code: code }),
     supabase.rpc("quotes_for_code", { p_job: id, p_code: code }),
+    supabase.rpc("job_check_prices_for_code", { p_job: id, p_code: code }),
   ]);
+  const visualRow =
+    ((checkRows ?? []) as { id: string; full_pence: number | null; founding_pence: number | null }[])
+      .find((r) => r.id === CHECK_CATALOGUE_ID.visual) ?? null;
+  const checkPence = isCheckOffered("visual") ? checkChargePence(visualRow, null) : null;
+  const jmdPerGbp = PRICE_BENCHMARKS.jmd_per_gbp;
 
   const job = (jobRows ?? [])[0];
   if (!job) {
@@ -297,7 +309,26 @@ export default async function Quotes({
                   )}
 
                   {!booked && q.status === "submitted" && (
-                    <AcceptPanel jobId={job.id} code={code} quoteId={q.id} workerName={q.worker_name} />
+                    <AcceptPanel
+                      jobId={job.id}
+                      code={code}
+                      quoteId={q.id}
+                      workerName={q.worker_name}
+                      check={
+                        checkPence == null
+                          ? null
+                          : {
+                              price: gbp(checkPence),
+                              fullPrice:
+                                visualRow?.full_pence != null && visualRow.full_pence !== checkPence
+                                  ? gbp(visualRow.full_pence)
+                                  : null,
+                              adds: money(penceToJmd(checkPence, jmdPerGbp)),
+                              total: money(bill.total + penceToJmd(checkPence, jmdPerGbp)),
+                              rate: "J$" + jmdPerGbp.toLocaleString("en-JM") + " to £1",
+                            }
+                      }
+                    />
                   )}
                   {/* Asking for a change needs the client signed in, the
                       same as accepting: holding the link is enough to read a

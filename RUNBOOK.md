@@ -6376,3 +6376,12 @@ A worker's question goes through four doors in order, in `yaad-inbound`: a fixed
 5. **What the model answered a client:** the `yaad-inbound` log, lines starting `off-script (client):`.
 6. **A client got no WhatsApp message for an update:** section 53 first. Then `yaadly.notify.client_template` on the `yaad-notify-client` span says whether a template was chosen. No summary for that kind in `CLIENT_SUMMARY` (`client-template.ts`) means email only.
 7. **Deploy:** the banned list changed, so every function that carries a copy goes: `yaad-inbound`, `yaad-notify-client`, `yaad-completion`, `yaad-completion-flow`, `yaad-kickoff`, `yaad-quote-pack`, `yaad-quote-pack-rescan`, `yaad-report`, `yaad-shortlist`, and the web app. Read each one's live `verify_jwt` first and keep it.
+
+## A client cannot see the Visual Check tick box on a quote
+
+Added 29 September 2026.
+
+1. **Signed in, on the job in the portal.** The tick box shows above "Accept this price" only while no worker is booked and no check is already set. If the job is booked, the check is on the Approvals tab instead.
+2. **On the quote link, no account.** The price comes from `job_check_prices_for_code()`. If that function is missing the page shows no tick box and nothing else changes. Check it is live: `select count(*) from pg_proc where proname = 'job_check_prices_for_code';` should return 1. If it returns 0, migration `20260929233000` has not been applied.
+3. **The catalogue row.** `select id, active, full_pence, founding_pence from service_catalogue where id = 'job-visual-check';` The row must be active. The price is changed there, never in the code.
+4. **The client ticked it but the job shows no check.** The booking stands either way. The check is refused if the final stage's evidence is already in. Add it for them from the desk, or they add it from the Approvals tab.

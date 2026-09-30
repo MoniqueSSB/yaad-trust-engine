@@ -50,6 +50,7 @@ import {
   checkChargePence,
   finalStageCountFrom,
   isCheckLevel,
+  isCheckOffered,
   jobCheckState,
   penceToJmd,
 } from "@/lib/portal/job-check";
@@ -57,7 +58,7 @@ import { PRICE_BENCHMARKS } from "@/lib/portal/price-bands";
 import legal from "@/lib/legal-copy.json";
 import { agreePrice, chooseQuote, requestKickoff, setWorkerChoice } from "@/app/portal/job-actions";
 import { scrub } from "@/lib/scrub";
-import { amount, jmdOrNull, jmdOrNull as jmd } from "@/lib/money";
+import { amount, gbp, jmdOrNull, jmdOrNull as jmd } from "@/lib/money";
 import { clientBill } from "@/lib/jobs/client-bill";
 import { billingLineForClient, billingModeOf } from "@/lib/jobs/billing";
 import { whenDate, whenDateTime } from "@/lib/date";
@@ -649,7 +650,10 @@ export default async function JobRoom({
      and nothing while it is a draft, same as every other invoice. */
   const checkLevel = isCheckLevel(job.check_level) ? job.check_level : null;
   const [{ data: checkRows }, { data: checkInvoiceRow }] = await Promise.all([
-    job.worker_email || checkLevel
+    /* Also read while the client is still choosing a quote (29 Sep 2026):
+       the Visual Check is offered on the quote itself, and its price is the
+       catalogue's there too. */
+    job.worker_email || checkLevel || (role === "client" && chooseOpen)
       ? supabase
           .from("service_catalogue")
           .select("id,name,blurb,full_pence,founding_pence")
@@ -697,6 +701,10 @@ export default async function JobRoom({
         }
       : null;
   const clientAllIn = allIn == null ? null : allIn + (checkLine?.jmd ?? 0);
+  /* What the Visual Check would cost if added on the quote. Null hides the
+     tick box: no catalogue row, the check not on offer, or one already set. */
+  const quoteCheckPence =
+    isCheckOffered("visual") && !checkLevel ? checkChargePence(checkPrices.visual, null) : null;
 
   /* Files on the job (20260910120000): receipts, quotes, permits, plans,
      certificates, from either side. Not evidence, so a separate table and
@@ -1721,6 +1729,36 @@ export default async function JobRoom({
                     <form action={agreePrice}>
                       <input type="hidden" name="jobId" value={job.id} />
                       <input type="hidden" name="quoteId" value={q.id} />
+                      {/* The Visual Check as an optional line on the quote
+                          (29 Sep 2026). Unticked by default: approving from
+                          the evidence yourself stays the default and costs
+                          nothing. Ticked, the check is added the moment the
+                          price is accepted, by the same choose_job_check()
+                          the Approvals box uses. Its own pound invoice, never
+                          part of the worker's price. */}
+                      {quoteCheckPence != null && (
+                        <label className="mb-3 flex max-w-[52ch] cursor-pointer items-start gap-2.5 rounded-xl border border-line bg-bg px-3.5 py-3">
+                          <input type="checkbox" name="addCheck" value="visual" className="mt-1 accent-teal" />
+                          <span className="text-[12.5px] leading-relaxed text-dim">
+                            <b className="text-ink">Add a {CHECK_LABEL.visual}</b>, optional:{" "}
+                            <span className="font-semibold text-tealb">
+                              {checkPrices.visual?.full_pence != null && checkPrices.visual.full_pence !== quoteCheckPence && (
+                                <><s className="font-normal text-dim">{gbp(checkPrices.visual.full_pence)}</s>{" "}</>
+                              )}
+                              {gbp(quoteCheckPence)}
+                            </span>
+                            . Somebody independent of {q.worker_name ?? "the tradesperson"} attends the finished work and files
+                            what they saw. It is a record for your sign-off, not a ruling: you still approve yourself.
+                            {q.labour_jmd != null && (
+                              <>
+                                {" "}Adds {jmd(penceToJmd(quoteCheckPence, jmdPerGbp))} at J${jmdPerGbp.toLocaleString("en-JM")} to £1,
+                                so this job comes to <b className="text-ink">{jmd(bill.total + penceToJmd(quoteCheckPence, jmdPerGbp))}</b>.
+                                Yaadly invoices the check in pounds, separately from the job.
+                              </>
+                            )}
+                          </span>
+                        </label>
+                      )}
                       <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand">
                         Accept this price from {q.worker_name ?? "this tradesperson"}
                       </button>
