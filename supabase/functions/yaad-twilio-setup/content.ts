@@ -139,10 +139,15 @@ export function signReportContent() {
  *  other buttons, so "Send as written" is a way of replying 1 and not a new
  *  authority. Used in session only, straight after the worker's own photos,
  *  so nothing is submitted to Meta. */
-export const REPORT_DRAFT_NAME = "yaadly_report_draft_buttons_v1";
+// v2, 29 Sep 2026: the same three buttons under short lines. Founder: "it is
+// a whole paragraph", "the sentences cant be long". It also says the typed
+// way, reply 1, because a button does not show on every phone and this is
+// now the one message that says what to do. Content is immutable in Twilio,
+// so a change is a new name; v1 stays in the account unused.
+export const REPORT_DRAFT_NAME = "yaadly_report_draft_buttons_v2";
 
 export const REPORT_DRAFT_BODY =
-  "{{1}}: read the draft above against what you did. Send it to the client as written, change it first, or write your own. Nothing goes to the client until you choose.";
+  "Your job: {{1}}\n\nThe draft above is for the client.\nTap a button, or reply 1 to send it.\n\nNothing goes to the client until you choose.";
 
 export const REPORT_DRAFT_SEND = "DRAFTSEND";
 export const REPORT_DRAFT_EDIT = "DRAFTEDIT";
@@ -195,3 +200,115 @@ export function onSiteContent() {
 }
 
 export const ON_SITE_APPROVAL = { name: ON_SITE_NAME, category: "UTILITY" };
+
+/** The two buttons under a worker's own words read back, 29 Sep 2026.
+ *  Founder: "add buttons that can be pressed for options".
+ *
+ *  A typed update is read back and waits for a 1 before it goes on the job
+ *  (yaad-inbound/update-draft.ts). These are that 1 and that "no", as taps.
+ *  Each id carries the job's code, so a button tapped later on an old message
+ *  cannot file or drop a different update: yaad-inbound checks the code
+ *  against the update that is actually waiting. A tap is a way of typing and
+ *  never a new authority. Change my words asks for the new words, and the
+ *  words typed next replace the update and are read back in their turn.
+ *
+ *  Used in session only, straight after the worker's own message, so nothing
+ *  is submitted to Meta. {{3}} is the sentence about photographs, which is
+ *  different for a note on photos already filed. */
+export const UPDATE_DRAFT_NAME = "yaadly_update_read_back_v1";
+
+export const UPDATE_DRAFT_BODY =
+  'Ready to go on {{1}}:\n"{{2}}"\n\n{{3}}\n\nNothing is filed until you tap Put it on the job.';
+
+export const UPDATE_DRAFT_FILE = "UPDATEFILE";
+export const UPDATE_DRAFT_DROP = "UPDATEDROP";
+export const UPDATE_DRAFT_CHANGE = "UPDATECHANGE";
+
+export function updateDraftContent() {
+  return {
+    friendly_name: UPDATE_DRAFT_NAME,
+    language: "en",
+    variables: {
+      "1": "JOB-WEB-1789253807959 (Replace stair rails)",
+      "2": "stage one done, the new rails are in",
+      "3": "Photos you send next carry these words.",
+      "4": "JOB-WEB-1789253807959",
+    },
+    types: {
+      "twilio/quick-reply": {
+        body: UPDATE_DRAFT_BODY,
+        actions: [
+          { title: "Put it on the job", id: `${UPDATE_DRAFT_FILE} {{4}}` },
+          { title: "Change my words", id: `${UPDATE_DRAFT_CHANGE} {{4}}` },
+          { title: "Drop it", id: `${UPDATE_DRAFT_DROP} {{4}}` },
+        ],
+      },
+    },
+  };
+}
+
+/** The trades and parishes questions as lists to tap, 29 Sep 2026. Founder:
+ *  "all of these choice shoulld be a button".
+ *
+ *  WhatsApp allows three buttons, or one list of ten rows where one row is
+ *  picked. There are eighteen trades and fourteen parishes and a worker may
+ *  have several, so the list carries the ten most likely and the body says
+ *  that typing still works, which is how somebody names more than one or one
+ *  that is not listed. Each row's id is a word the typed question has always
+ *  understood (trade_key and parish_key in Postgres), so a tap reaches
+ *  yaad-inbound as text and nothing downstream changes.
+ *
+ *  {{1}} is the lead sentence. On joining it carries the consent sentence,
+ *  ALERT_TERMS, word for word, so what somebody agreed to is still a thing
+ *  they read. Used in session only, so nothing is submitted to Meta. */
+export const ALERT_TRADES_NAME = "yaadly_alert_trades_menu_v1";
+export const ALERT_TRADES_BODY = "{{1}}\n\nWhat work do you do?\nTap Choose to pick one.\nMore than one? Type them.";
+export const ALERT_TRADE_ROWS: readonly string[] = [
+  "Plumbing", "Electrical", "Masonry", "Painting", "Roofing",
+  "Tiling", "Carpentry", "Welding", "Air conditioning", "Handyman",
+];
+
+export function alertTradesContent() {
+  return {
+    friendly_name: ALERT_TRADES_NAME,
+    language: "en",
+    variables: { "1": "You are on the list." },
+    types: {
+      "twilio/list-picker": {
+        body: ALERT_TRADES_BODY,
+        button: "Choose",
+        items: ALERT_TRADE_ROWS.map((t) => ({ id: t, item: t })),
+      },
+    },
+  };
+}
+
+export const ALERT_PARISHES_NAME = "yaadly_alert_parishes_menu_v1";
+export const ALERT_PARISHES_BODY = "{{1}}\n\nWhich parishes will you go to?\nTap Choose to pick one.\nMore than one? Type them.";
+export const ALERT_PARISH_ROWS: readonly { id: string; item: string }[] = [
+  { id: "Kingston", item: "Kingston" },
+  { id: "St Andrew", item: "St Andrew" },
+  { id: "St Catherine", item: "St Catherine (Portmore)" },
+  { id: "St Thomas", item: "St Thomas" },
+  { id: "Portland", item: "Portland" },
+  { id: "St Mary", item: "St Mary" },
+  { id: "Clarendon", item: "Clarendon" },
+  { id: "Manchester", item: "Manchester" },
+  { id: "St Ann", item: "St Ann" },
+  { id: "Anywhere", item: "Anywhere in Jamaica" },
+];
+
+export function alertParishesContent() {
+  return {
+    friendly_name: ALERT_PARISHES_NAME,
+    language: "en",
+    variables: { "1": "Got it: Plumbing." },
+    types: {
+      "twilio/list-picker": {
+        body: ALERT_PARISHES_BODY,
+        button: "Choose",
+        items: ALERT_PARISH_ROWS.map((r) => ({ id: r.id, item: r.item })),
+      },
+    },
+  };
+}

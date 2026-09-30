@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { recordAccepted, withStatusCallback } from "./twilio-status.ts";
-import { CLIENT_UPDATE_APPROVAL, CLIENT_UPDATE_NAME, clientUpdateContent, ON_SITE_APPROVAL, ON_SITE_NAME, onSiteContent, REPORT_DRAFT_NAME, reportDraftContent, SECTION_MENU_APPROVAL, SECTION_MENU_NAME, sectionMenuContent, SIGN_REPORT_NAME, signReportContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
+import { CLIENT_UPDATE_APPROVAL, CLIENT_UPDATE_NAME, clientUpdateContent, ON_SITE_APPROVAL, ON_SITE_NAME, onSiteContent, REPORT_DRAFT_NAME, reportDraftContent, ALERT_PARISHES_NAME, ALERT_TRADES_NAME, alertParishesContent, alertTradesContent, UPDATE_DRAFT_NAME, updateDraftContent, SECTION_MENU_APPROVAL, SECTION_MENU_NAME, sectionMenuContent, SIGN_REPORT_NAME, signReportContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
 
 // A one-shot helper for creating Yaadly's WhatsApp content templates in
 // Twilio, 15 September 2026.
@@ -409,6 +409,46 @@ Deno.serve(async (req: Request) => {
     );
     if (error) return json({ error: `Template ${sid} exists but app_settings would not take it: ${error.message}` }, 500);
     return json({ ok: true, sid, reused: Boolean(existing) });
+  }
+
+  // The two buttons under a worker's own words read back, 29 Sep 2026.
+  // Created, or found, and recorded in app_settings, where yaad-inbound reads
+  // it. Used in session only, so nothing is submitted to Meta.
+  if (action === "create-update-draft") {
+    const existing = (await listAll()).find((c) => c.friendly_name === UPDATE_DRAFT_NAME);
+    let sid = existing?.sid ?? "";
+    if (!sid) {
+      const r = await call("/Content", { method: "POST", body: JSON.stringify(updateDraftContent()) });
+      if (!r.ok) return json({ error: "Twilio refused the template.", twilio: r }, 502);
+      sid = String((r.body as { sid?: string })?.sid ?? "");
+    }
+    if (!/^HX[0-9a-f]{32}$/i.test(sid)) return json({ error: "No ContentSid came back." }, 502);
+    const { error } = await admin.from("app_settings").upsert(
+      { key: "twilio_content_sid_update_draft", value: JSON.stringify(sid) },
+      { onConflict: "key" },
+    );
+    if (error) return json({ error: `Template ${sid} exists but app_settings would not take it: ${error.message}` }, 500);
+    return json({ ok: true, sid, reused: Boolean(existing) });
+  }
+
+  // The trades and parishes lists, 29 Sep 2026. Created, or found, and
+  // recorded in app_settings, where yaad-inbound reads them. Used in session
+  // only, so nothing is submitted to Meta.
+  if (action === "create-alert-trades" || action === "create-alert-parishes") {
+    const trades = action === "create-alert-trades";
+    const name = trades ? ALERT_TRADES_NAME : ALERT_PARISHES_NAME;
+    const existing = (await listAll()).find((c) => c.friendly_name === name);
+    let sid = existing?.sid ?? "";
+    if (!sid) {
+      const r = await call("/Content", { method: "POST", body: JSON.stringify(trades ? alertTradesContent() : alertParishesContent()) });
+      if (!r.ok) return json({ error: "Twilio refused the template.", twilio: r }, 502);
+      sid = String((r.body as { sid?: string })?.sid ?? "");
+    }
+    if (!/^HX[0-9a-f]{32}$/i.test(sid)) return json({ error: "No ContentSid came back." }, 502);
+    const key = trades ? "twilio_content_sid_alert_trades" : "twilio_content_sid_alert_parishes";
+    const { error } = await admin.from("app_settings").upsert({ key, value: JSON.stringify(sid) }, { onConflict: "key" });
+    if (error) return json({ error: `Template ${sid} exists but app_settings would not take it: ${error.message}` }, 500);
+    return json({ ok: true, sid, reused: Boolean(existing), setting: key });
   }
 
   // The daily check-in button. It goes to people who may not have written in
