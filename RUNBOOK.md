@@ -6508,7 +6508,7 @@ The client raises it (WhatsApp words that read as a problem, or the job page). T
 
 ## 60. HubSpot hears every job and every stage move, from the database (30 Sep 2026)
 
-**What changed.** Until 30 September the CRM heard about one thing: a WhatsApp job whose client confirmed the read-back, sent inline by `yaad-inbound`. A portal or website job, a client paying, evidence landing, a stage approval and a worker being paid all happened in Postgres and the board never moved. Now four triggers (`20260930150000`) post to `yaad-crm-sync`, which reads the job and signs a request to the app: `/api/hubspot/lead` for a new or changed job, `/api/hubspot/stage` for an event. The stage route accepts a job code as well as a deal id and finds the deal on `yaadly_job_id`.
+**What changed.** Until 30 September the CRM heard about one thing: a WhatsApp job whose client confirmed the read-back, sent inline by `yaad-inbound`. A portal or website job, a client paying, evidence landing, a stage approval and a worker being paid all happened in Postgres and the board never moved. Now four triggers (`20260930160000`) post to `yaad-crm-sync`, which reads the job and signs a request to the app: `/api/hubspot/lead` for a new or changed job, `/api/hubspot/stage` for an event. The stage route accepts a job code as well as a deal id and finds the deal on `yaadly_job_id`.
 
 **What moves the board, and from where.**
 

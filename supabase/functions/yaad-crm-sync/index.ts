@@ -13,7 +13,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
  *
  * WHY FROM THE DATABASE AND NOT FROM EACH SCREEN. A job row is a job row
  * whichever door wrote it: WhatsApp, the portal, the website form, the desk.
- * Triggers on the writes that change state (20260930150000) post here, in the
+ * Triggers on the writes that change state (20260930160000) post here, in the
  * same shape yaad-notify-client and yaad-completion-flow already use, so a
  * new door added later is covered without anybody remembering to call this.
  *
