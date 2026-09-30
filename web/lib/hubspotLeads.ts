@@ -118,7 +118,10 @@ async function findContactByPhone(phone: string): Promise<string | null> {
   return body?.results?.[0]?.id ?? null;
 }
 
-async function findDealByJobId(jobId: string): Promise<string | null> {
+/** The deal that carries this job code, or null. Exported for the stage
+ *  webhook, which since 30 September 2026 is called by database triggers that
+ *  know the job code and have no business knowing a HubSpot id. */
+export async function findDealByJobId(jobId: string): Promise<string | null> {
   const body = await hubspotFetch("/crm/v3/objects/deals/search", {
     method: "POST",
     body: JSON.stringify({
