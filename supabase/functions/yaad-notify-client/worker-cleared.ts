@@ -22,7 +22,7 @@ export function workerClearedText(name: string, email: string, appUrl: string): 
     `2. Say your price in writing. It is free.`,
     `3. Win a job and we show you how it runs.`,
     ``,
-    `Pay: the client approves, a person at Yaadly checks, and you are paid by bank transfer within 7 days. Never cash.`,
+    `Pay: bank transfer within 7 days of sign off. Never cash.`,
     ``,
     `Your portal: ${appUrl}/portal/sign-in`,
     `Log in with ${email || "your email"}. We send you a code.`,
