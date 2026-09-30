@@ -22,6 +22,12 @@ export function workerClearedText(name: string, email: string, appUrl: string): 
     `Log in with ${email || "your email"}. We send you a code.`,
     ``,
     `Pay: bank transfer within 7 days of sign off. Never cash.`,
+    ``,
+    // An invitation, never an alert: new jobs only come on WhatsApp to
+    // somebody who asked (the ALERTS lane records their consent). Founder,
+    // 30 Sep 2026, "fix these also": published workers were never told the
+    // list existed, and sending to them without asking is not ours to do.
+    `Want new jobs sent here? Reply ALERTS.`,
   ].join("\n");
 }
 

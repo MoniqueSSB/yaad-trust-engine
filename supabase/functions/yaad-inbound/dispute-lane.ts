@@ -51,7 +51,7 @@ export function problemForWorker(jobId: string, title: string, body: string, por
     `Not sorted in ${DISPUTE_DAYS} days? Yaadly steps in.`,
     ``,
     `Nothing is approved until it is sorted.`,
-    `Nothing is taken off you in the meantime.`,
+    `Stages already signed off stay signed off.`,
   ].join("\n");
 }
 

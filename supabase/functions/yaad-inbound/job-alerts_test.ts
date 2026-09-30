@@ -7,7 +7,7 @@
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import {
-  ALERT_CONSENT_VERSION, ALERT_TERMS, ALERTS_EXACT, ALERTS_PHRASE, ALERTS_STOP,
+  ALERT_CONSENT_VERSION, ALERT_JOINED_VERSION, ALERT_TERMS, ALERT_TERMS_JOINED, ALERTS_EXACT, ALERTS_PHRASE, ALERTS_STOP,
   ALERTS_MAX_TRIES, ALERTS_OPENER, ALERTS_WA_LINK, alertsOpenerExact, alertsOpenerRemainder,
   ANYWHERE_WORD, neitherPlaced, sayList,
 } from "./job-alerts.ts";
@@ -127,6 +127,18 @@ Deno.test("the consent version and the sentence it refers to travel together", (
     inboundSource.includes("p_version: ALERT_CONSENT_VERSION"),
     "the version recorded against a consent must be the constant, never a literal",
   );
+});
+
+Deno.test("somebody who sent ALERTS is told what they joined, never asked after the fact", () => {
+  // 30 Sep 2026: "You are on the list. Can we message you here...?" asked
+  // permission after the answer. The ALERTS lane now says ALERT_TERMS_JOINED
+  // and records its own version; the join lane still asks ALERT_TERMS.
+  assertEquals(ALERT_JOINED_VERSION, "alerts-joined-v1");
+  assert(!/\?/.test(ALERT_TERMS_JOINED), "the joined sentence is a statement, not a question");
+  assert(/STOP/.test(ALERT_TERMS_JOINED) && /free/i.test(ALERT_TERMS_JOINED));
+  assertEquals(scan(ALERT_TERMS_JOINED), []);
+  assert(!/You are on the list[^`]*\$\{ALERT_TERMS\}/.test(inboundSource), "on the list, then asked permission");
+  assert(inboundSource.includes("p_version: ALERT_JOINED_VERSION"), "the ALERTS lane records the joined version");
 });
 
 Deno.test("somebody who cannot quote yet is told so when they join, not when a job arrives", () => {

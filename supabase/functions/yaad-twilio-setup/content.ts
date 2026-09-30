@@ -276,9 +276,9 @@ export function updateDraftContent() {
  *  understood (trade_key and parish_key in Postgres), so a tap reaches
  *  yaad-inbound as text and nothing downstream changes.
  *
- *  {{1}} is the lead sentence. On joining it carries the consent sentence,
- *  ALERT_TERMS, word for word, so what somebody agreed to is still a thing
- *  they read. Used in session only, so nothing is submitted to Meta. */
+ *  {{1}} is the lead sentence. On joining it carries what they joined,
+ *  ALERT_TERMS_JOINED, word for word, so what somebody agreed to is still a
+ *  thing they read. Used in session only, so nothing is submitted to Meta. */
 // v2, 30 Sep 2026: the list shows ten of eighteen trades, and v1 only said
 // how to name more than one, never how to name one that is not listed. Now
 // it says both, with the same examples the typed question gives.

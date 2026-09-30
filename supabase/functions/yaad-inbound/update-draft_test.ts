@@ -127,7 +127,7 @@ Deno.test("after a filing the worker is told what arrives next and what to do wi
    reader here, and hold the rule that a tap cannot do what typing could not. */
 
 import { oneLine, readBackVars, readUpdateTap, tapAsTyped, tapMatchesUpdate, TYPE_YOUR_NEW_WORDS } from "./update-draft.ts";
-import { ALERT_TERMS } from "./job-alerts.ts";
+import { ALERT_TERMS, ALERT_TERMS_JOINED } from "./job-alerts.ts";
 import { ALERT_PARISH_ROWS, ALERT_TRADE_ROWS, alertParishesContent, alertTradesContent, UPDATE_DRAFT_BODY, UPDATE_DRAFT_DROP, UPDATE_DRAFT_FILE, updateDraftContent } from "../yaad-twilio-setup/content.ts";
 
 const TAP_JOB = "JOB-WEB-1789253807959";
@@ -230,7 +230,7 @@ Deno.test("every parish row is a parish, or anywhere, and fits WhatsApp", () => 
 
 Deno.test("the consent sentence still reaches somebody joining, word for word", async () => {
   const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
-  assert(src.includes('"trades", `You are on the list. ${ALERT_TERMS}`'), "joining no longer says the consent sentence");
+  assert(src.includes('"trades", `You are on the list. ${ALERT_TERMS_JOINED}`'), "joining no longer says what they joined");
   assert(src.includes("return twiml(`${lead}\\n\\n${typed}`);"), "the typed question no longer carries the lead, so the consent sentence is lost when there is no list");
   assert(ALERT_TERMS.length < 900, "the consent sentence would be cut short as a template variable");
 });

@@ -11,7 +11,7 @@ import { pickEvidenceItem } from "./evidence-item-match.ts";
 import { DRAFT_STILL_WAITING, draftReadBack, readBackVars, readDraftReply, readUpdateTap, saysWhatItShows, tapAsTyped, tapMatchesUpdate, tooShortToBeAnUpdate, TYPE_YOUR_NEW_WORDS, WHAT_HAPPENS_NEXT } from "./update-draft.ts";
 import { visitorTokenOk, originAllowed, WEB_CHAT_MAX_CHARS, webReferenceIn, WEB_SAFE_FALLBACK } from "./web-chat.ts";
 import {
-  ALERT_CONSENT_VERSION, ALERT_TERMS, ALERTS_PHRASE, ALERTS_STOP,
+  ALERT_CONSENT_VERSION, ALERT_JOINED_VERSION, ALERT_TERMS, ALERT_TERMS_JOINED, ALERTS_PHRASE, ALERTS_STOP,
   ALERTS_MAX_TRIES, alertsOpenerExact, alertsOpenerRemainder, ANYWHERE_WORD,
   neitherPlaced, sayList,
 } from "./job-alerts.ts";
@@ -3172,7 +3172,7 @@ Deno.serve(async (req: Request) => {
             ? `, for ${sayList(sub.trades)} in ${sayList(sub.parishes)}`
             : "";
           root.setAttributes({ "yaadly.alerts.outcome": outcome, "yaadly.alerts.can_quote": sub?.can_quote === true });
-          return `You are on the list${onFor}.${dropped} ${ALERT_TERMS}`
+          return `You are on the list${onFor}.${dropped} ${ALERT_TERMS_JOINED}`
             + (sub?.can_quote === true ? "" :
                `\nBefore you can quote for a job, finish your check here: ${appBase}/apply`);
         };
@@ -3249,7 +3249,7 @@ Deno.serve(async (req: Request) => {
           const { data, error } = await supabase.rpc("subscribe_to_job_alerts", {
             p_phone: msg.from,
             p_words: alertsSaid,
-            p_version: ALERT_CONSENT_VERSION,
+            p_version: ALERT_JOINED_VERSION,
             p_name: msg.name || null,
           });
           if (error) {
@@ -3306,7 +3306,7 @@ Deno.serve(async (req: Request) => {
             if (gotTrades) {
               await holdAlerts({ _lane: "alerts_parishes" });
               root.setAttributes({ "yaadly.alerts.outcome": "trades_from_opener" });
-              return await askFromList(supabase as unknown as SettingsReader, msg.from, msg.channel, "parishes", `You are on the list, for ${sayList(tRow!.matched)}.${droppedHere} ${ALERT_TERMS}`, PARISHES_TYPED);
+              return await askFromList(supabase as unknown as SettingsReader, msg.from, msg.channel, "parishes", `You are on the list, for ${sayList(tRow!.matched)}.${droppedHere} ${ALERT_TERMS_JOINED}`, PARISHES_TYPED);
             }
             // Nothing usable as a trade. Fall through to the ordinary first
             // question. Any parishes they gave are already saved, and the
@@ -3319,7 +3319,7 @@ Deno.serve(async (req: Request) => {
           if (row?.listening) {
             return twiml(`You are already on the list, for ${sayList(row.trades)} in ${sayList(row.parishes)}. To change that, tell me your trades now, separated by commas. Send STOP instead if you want to come off altogether.`);
           }
-          return await askFromList(supabase as unknown as SettingsReader, msg.from, msg.channel, "trades", `You are on the list. ${ALERT_TERMS}`, TRADES_TYPED);
+          return await askFromList(supabase as unknown as SettingsReader, msg.from, msg.channel, "trades", `You are on the list. ${ALERT_TERMS_JOINED}`, TRADES_TYPED);
         }
       }
 
