@@ -62,6 +62,7 @@ import { addonPdfUrl } from "./addon-link.ts";
 import { screenOwnWords } from "./own-words.ts";
 import { captionsLine, namedNextStep, plainDraft, reportSentReceipt, unearnedClaims, usableCaptions } from "./report-draft.ts";
 import { acceptedForClient, acceptedForWorker, offerForClient, PLATFORM_LABEL as WALK_PLATFORM } from "./walkthrough-offer.ts";
+import { DISPUTE_DAYS, problemForWorker, replyForClient } from "./dispute-lane.ts";
 import { applyLink, CHECK_REMINDER_SUBJECT, checkReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -77,7 +78,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -1695,11 +1696,23 @@ Deno.serve(async (req: Request) => {
       // the worker (dispute_raised_worker) and Monique (desk_alert) really
       // are told, and this says exactly that and no more.
       subject = `We have your dispute: ${job.title}`;
-      // Founder, 28 Sep 2026: a problem is raised with Yaadly, not with the
-      // worker first (raiseDispute now opens it escalated).
-      line = `Your message about ${job.title} has gone to Yaadly. A person at Yaadly looks at it against the ` +
-        `agreed scope and the evidence, and brings the tradesperson in; they have been told. ` +
-        `Nothing on this job can be approved while it is open. See it and add anything here: ${roomLink}`;
+      // Founder, 30 Sep 2026: the worker sorts it first; Yaadly steps in
+      // when it is not sorted (dispute-lane.ts). A dispute opened already
+      // escalated (a legacy path) is with Yaadly from the start.
+      const { data: dr } = await admin.from("disputes").select("state").eq("job_id", jobId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      line = dr?.state === "escalated"
+        ? [
+            `Your message about ${job.title} is with Yaadly.`,
+            `A person looks at it against the agreed scope and the evidence.`,
+            `Nothing on the job is approved while it is open.`,
+            `See it here: ${roomLink}`,
+          ].join("\n")
+        : [
+            `Your message about ${job.title} has gone to your tradesperson.`,
+            `They reply within ${DISPUTE_DAYS} days.`,
+            `Sorted? Say so on the job. Not fixed? Bring Yaadly in there: ${roomLink}`,
+            `Nothing on the job is approved until it is sorted.`,
+          ].join("\n");
     } else if (kind === "dispute_raised_worker") {
       // The worker's panel has always said "you hear it first". Until
       // 20260913130000 they only heard it if they happened to open the
@@ -1710,17 +1723,29 @@ Deno.serve(async (req: Request) => {
       if (!d) return json({ error: "No such dispute on this job." }, 404);
       recipientEmail = String(job.worker_email ?? "").trim();
       subject = `The client has raised something: ${job.title}`;
-      line = [
-        `On ${job.title}, the client raised something with Yaadly:`,
-        ``,
-        `"${String(d.body ?? "").slice(0, 1000)}"`,
-        ``,
-        `A person at Yaadly looks at it with you, against the agreed scope and the evidence.`,
-        `Give your side here: ${roomLink}`,
-        ``,
-        `Nothing is approved until it is sorted.`,
-        `Nothing is taken off you in the meantime.`,
-      ].join("\n");
+      // Worker first (dispute-lane.ts). A dispute opened already escalated
+      // is with Yaadly, and the worker is told that instead.
+      const { data: ds } = await admin.from("disputes").select("state").eq("id", String(meta.id ?? "")).maybeSingle();
+      line = ds?.state === "escalated"
+        ? [
+            `On ${job.title}, the client raised something and it is with Yaadly:`,
+            `"${String(d.body ?? "").slice(0, 1000)}"`,
+            ``,
+            `A person looks at it with you, against the agreed scope and the evidence.`,
+            `Give your side here: ${roomLink}`,
+            ``,
+            `Nothing is approved until it is sorted.`,
+            `Nothing is taken off you in the meantime.`,
+          ].join("\n")
+        : problemForWorker(String(job.id), String(job.title ?? ""), String(d.body ?? ""), roomLink);
+    } else if (kind === "dispute_replied") {
+      // The worker's reply, to the client (20260930130000). Read by id off
+      // the row, never from the caller.
+      const { data: d } = await admin.from("disputes")
+        .select("reply, state").eq("id", String(meta.id ?? "")).eq("job_id", jobId).maybeSingle();
+      if (!d?.reply) return json({ ok: true, kind, told: false, reason: "No reply on this dispute." });
+      subject = `Your tradesperson replied: ${job.title}`;
+      line = replyForClient(String(job.id), String(job.title ?? ""), String(d.reply), roomLink);
     } else if (kind === "desk_alert") {
       // Monique, not a party. Founder, 13 Sep 2026: a problem on a job
       // "comes directly to my whatsapp and email". Fired by the triggers in

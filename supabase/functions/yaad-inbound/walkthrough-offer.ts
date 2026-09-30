@@ -53,20 +53,22 @@ export function offerForClient(jobId: string, title: string, offer: string, plat
 
 export const PLATFORM_LABEL: Record<string, string> = { whatsapp: "WhatsApp video", google_meet: "Google Meet", zoom: "Zoom" };
 
+/** The call link is made by Yaadly the moment the time is agreed
+ *  (walkthrough_room_link, 20260930120000), so both sides get it here. */
 export function acceptedForClient(offer: string, platformLabel: string, link: string | null): string {
   return [
-    `Accepted: "${offer}" on ${platformLabel}.`,
+    `Accepted: "${offer}".`,
     `Your tradesperson has been told.`,
-    link ? `The call link: ${link}` : (platformLabel === "WhatsApp video" ? `Yaadly sets up the call at that time.` : `The call link goes on your job once your tradesperson adds it.`),
+    link ? `Join here at that time: ${link}` : `The call link is on your job.`,
   ].join("\n");
 }
 
 export function acceptedForWorker(jobId: string, title: string, offer: string, platformLabel: string, link: string | null, portalLink: string): string {
   return [
-    `The client accepted: "${offer}" on ${platformLabel}.`,
+    `The client accepted: "${offer}".`,
     `${title} (${jobId}).`,
     ``,
-    link ? `The call link is on the job.` : (platformLabel === "WhatsApp video" ? `Yaadly sets up the call at that time.` : `Make the link and paste it on the job: ${portalLink}`),
+    link ? `Join here at that time: ${link}` : `The call link is on the job: ${portalLink}`,
     `After the call, write the notes on the job. The client confirms them.`,
   ].join("\n");
 }

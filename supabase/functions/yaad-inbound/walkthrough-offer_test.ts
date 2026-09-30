@@ -26,8 +26,8 @@ Deno.test("nobody is told to arrange it with the other side, and the words are s
     offerSent("Saturday 10am"),
     offerForClient("JOB-1", "Kitchen cupboards", "Saturday 10am", "Google Meet", "https://app.yaadly.co.uk/portal/jobs/JOB-1"),
     acceptedForClient("Saturday 10am", "WhatsApp video", null),
-    acceptedForClient("Saturday 10am", "Google Meet", "https://meet.google.com/x"),
-    acceptedForWorker("JOB-1", "Kitchen cupboards", "Saturday 10am", "Zoom", null, "https://app.yaadly.co.uk/portal/jobs/JOB-1"),
+    acceptedForClient("Saturday 10am", "Google Meet", "https://meet.jit.si/Yaadly-JOB1-abc123"),
+    acceptedForWorker("JOB-1", "Kitchen cupboards", "Saturday 10am", "Zoom", "https://meet.jit.si/Yaadly-JOB1-abc123", "https://app.yaadly.co.uk/portal/jobs/JOB-1"),
   ];
   for (const t of texts) {
     assert(!/arrange (it|the call) with (them|the client|the worker)|their number|your number/i.test(t), t);
@@ -53,4 +53,12 @@ Deno.test("a worker's time goes to the client only when one walkthrough is open"
   assert(block.includes('.is("walk_accepted_at", null)') && block.includes("length === 1"), "must be exactly one open walkthrough");
   assert(block.includes('rpc("offer_walkthrough_via_whatsapp"'));
   assert(!/from\("evidence"\)|update_draft/.test(block), "an offer is not evidence and not an update");
+});
+
+Deno.test("the call link is made by Yaadly on acceptance, never by the worker", async () => {
+  const mig = await Deno.readTextFile(new URL("../../migrations/20260930120000_the_client_accepts_the_walkthrough_time.sql", import.meta.url));
+  assert(mig.includes("function public.walkthrough_room_link"), "no room link function");
+  assertEquals((mig.match(/coalesce\(j?\.?walk_link, public\.walkthrough_room_link\(p_job\)\)/g) ?? []).length, 2, "both accept paths must make the link");
+  const w = acceptedForWorker("JOB-1", "K", "Sat", "Zoom", "https://meet.jit.si/Yaadly-JOB1-abc123", "x");
+  assert(w.includes("Join here at that time") && !/make the link|paste/i.test(w), w);
 });

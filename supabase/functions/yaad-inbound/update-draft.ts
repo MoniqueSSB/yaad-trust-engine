@@ -102,7 +102,8 @@ export const DRAFT_STILL_WAITING = "Your update is still waiting.\n\nReply 1: pu
 export const WHAT_HAPPENS_NEXT =
   // One thing at a time, founder 30 Sep 2026: "two things are being asked
   // at once". How to answer the draft is said by the draft when it arrives.
-  "Next: a draft for the client comes here in a few minutes.\nNothing goes to the client until you say so.";
+  // "a draft review", and videos named as a requirement: founder, 30 Sep 2026.
+  "Next: a draft review for the client comes here in a few minutes.\nNothing goes to the client until you say so.\n\nSend videos as well as photos. Both are needed.";
 
 /** The two buttons under the read-back, 29 Sep 2026. See content.ts in
  *  yaad-twilio-setup, which holds the ids these are read against.

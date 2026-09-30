@@ -82,6 +82,24 @@ $$;
 revoke all on function public.offer_walkthrough(text, text, text) from public, anon;
 grant execute on function public.offer_walkthrough(text, text, text) to authenticated;
 
+-- The call link, made by Yaadly the moment a time is agreed. Founder, 30 Sep
+-- 2026: "the worker should not make the link yaadly should and provide it
+-- to the worker ... it should be auto once the work and client agree on
+-- time and date". A Jitsi Meet room: a link is a room, no account on either
+-- side, opens in the phone's browser. Jitsi is a third party that carries
+-- the video of both sides for the length of the call; on the data list for
+-- the adviser. The room name is unguessable and never reused. A link the
+-- worker already pasted (Meet, Zoom) is kept.
+create or replace function public.walkthrough_room_link(p_job text)
+returns text
+language sql
+volatile
+set search_path to 'public'
+as $$
+  select 'https://meet.jit.si/Yaadly-' || regexp_replace(p_job, '[^A-Za-z0-9]', '', 'g') || '-' || encode(extensions.gen_random_bytes(6), 'hex');
+$$;
+revoke all on function public.walkthrough_room_link(text) from public, anon, authenticated;
+
 -- The client, from the portal.
 create or replace function public.accept_walkthrough(p_job text)
 returns void
@@ -94,7 +112,8 @@ declare
 begin
   if v_email is null then raise exception 'Not signed in.' using errcode = '28000'; end if;
   update public.jobs
-     set walk_accepted_at = now()
+     set walk_accepted_at = now(),
+         walk_link = coalesce(walk_link, public.walkthrough_room_link(p_job))
    where id = p_job
      and lower(coalesce(client_email, '')) = v_email
      and signoff_method = 'walkthrough'
@@ -110,14 +129,15 @@ grant execute on function public.accept_walkthrough(text) to authenticated;
 
 -- The client, from WhatsApp. The number must be the job's client_phone.
 create or replace function public.accept_walkthrough_via_whatsapp(p_job text, p_phone text)
-returns table (offer text, platform text)
+returns table (offer text, platform text, link text)
 language plpgsql
 security definer
 set search_path to 'public'
 as $$
 begin
   update public.jobs j
-     set walk_accepted_at = now()
+     set walk_accepted_at = now(),
+         walk_link = coalesce(j.walk_link, public.walkthrough_room_link(p_job))
    where j.id = p_job
      and j.signoff_method = 'walkthrough'
      and j.walk_offer is not null
@@ -126,7 +146,7 @@ begin
   if not found then
     raise exception 'There is no time waiting for your answer on this job.' using errcode = '28000';
   end if;
-  return query select j.walk_offer, j.walk_platform from public.jobs j where j.id = p_job;
+  return query select j.walk_offer, j.walk_platform, j.walk_link from public.jobs j where j.id = p_job;
 end;
 $$;
 revoke all on function public.accept_walkthrough_via_whatsapp(text, text) from public, anon, authenticated;

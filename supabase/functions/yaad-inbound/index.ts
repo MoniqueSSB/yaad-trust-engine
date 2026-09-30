@@ -34,6 +34,7 @@ import { parseAddonConfirm } from "./addon-confirm.ts";
 import { readDraftTap, readOnSiteTap, tapMatchesDraft } from "./report-tap.ts";
 import { screenOwnWords } from "./own-words.ts";
 import { acceptedForClient, linkIn, looksLikeATime, offerSent, PLATFORM_LABEL as WALK_PLATFORM, readWalkAccept } from "./walkthrough-offer.ts";
+import { closedReply, problemSent, readDisputeClose, replySent } from "./dispute-lane.ts";
 import { AI_CONSENT_WA_VERSION, applicationRow, CONSENT_AGAIN, CONSENT_NO, CONSENT_YES, continueLink, isJoinLane, isJoinOpener, JOIN_STALE_MS, joinedReply, LEAD_PARISHES, leadTrades, looksLikeEmail, looksLikeName, newReference, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, Q_CONSENT, Q_EMAIL, Q_NAME, Q_PHOTO, SKIP, WORDS_FIRST } from "./join-lane.ts";
 
 // Inbound intake, on whatever channel is actually available.
@@ -4405,6 +4406,20 @@ Deno.serve(async (req: Request) => {
       // that. Anything that does not contain a code it recognises falls
       // straight through to the ordinary pipeline below, unrecognised as
       // an approval rather than guessed at.
+      // ── a client closing or escalating a dispute ───────────────────────────
+      //
+      // 30 Sep 2026, dispute-lane.ts. SORTED <code> closes it; NOT FIXED
+      // <code> brings Yaadly in. Ahead of the client lane so neither is read
+      // as a remark, and never as an approval: the RPC touches the dispute's
+      // state and nothing else.
+      if (!deskHasThisNumber && !msg.media.length && readDisputeClose(msg.text)) {
+        const c = readDisputeClose(msg.text)!;
+        const { error: cErr } = await supabase.rpc("close_dispute_via_whatsapp", { p_job: c.jobId, p_phone: msg.from, p_state: c.state });
+        root.setAttributes({ "yaadly.dispute.job": c.jobId, "yaadly.dispute.outcome": cErr ? "close_refused" : c.state });
+        if (cErr) return twiml(`That did not go through: ${cErr.message}`);
+        return twiml(closedReply(c.state));
+      }
+
       // ── a client accepting a walkthrough time ──────────────────────────────
       //
       // 30 Sep 2026, walkthrough-offer.ts. The Accept button's id, or the
@@ -4414,11 +4429,10 @@ Deno.serve(async (req: Request) => {
       if (!deskHasThisNumber && !msg.media.length && readWalkAccept(msg.text)) {
         const wantJob = readWalkAccept(msg.text)!;
         const { data: acc, error: accErr } = await supabase.rpc("accept_walkthrough_via_whatsapp", { p_job: wantJob, p_phone: msg.from });
-        const row = (Array.isArray(acc) ? acc[0] : acc) as { offer?: string; platform?: string } | null;
+        const row = (Array.isArray(acc) ? acc[0] : acc) as { offer?: string; platform?: string; link?: string } | null;
         root.setAttributes({ "yaadly.walkthrough.job": wantJob, "yaadly.walkthrough.outcome": accErr ? "accept_refused" : "accepted" });
         if (accErr) return twiml(`That did not go through: ${accErr.message}`);
-        const { data: lk } = await supabase.from("jobs").select("walk_link").eq("id", wantJob).maybeSingle();
-        return twiml(acceptedForClient(String(row?.offer ?? ""), WALK_PLATFORM[String(row?.platform ?? "")] ?? "a video call", String(lk?.walk_link ?? "").trim() || null));
+        return twiml(acceptedForClient(String(row?.offer ?? ""), WALK_PLATFORM[String(row?.platform ?? "")] ?? "a video call", String(row?.link ?? "").trim() || null));
       }
 
       // ── a client on a live job, saying something that is not a code ───────
@@ -4471,8 +4485,17 @@ Deno.serve(async (req: Request) => {
             return twiml(nothingApproved(named));
           }
           if (readsAsProblem(said)) {
+            // Worker first, 30 Sep 2026 (dispute-lane.ts). One live job means
+            // the words open a dispute for that job's worker. More than one
+            // and the desk is asked which, as before.
+            if (one) {
+              const { error: rErr } = await supabase.rpc("raise_dispute_via_whatsapp", { p_job: one.id, p_phone: msg.from, p_body: said.slice(0, 2000) });
+              root.setAttributes({ "yaadly.client_lane.outcome": rErr ? "problem_refused" : "problem_to_worker", "yaadly.client_lane.job": one.id });
+              if (rErr) return twiml(`That did not go through: ${rErr.message}`);
+              return twiml(problemSent(one.id, said));
+            }
             root.setAttributes({ "yaadly.client_lane.outcome": "problem_to_yaadly" });
-            await tellYaadly("Client has a problem", "a client says something is wrong with the work.");
+            await tellYaadly("Client has a problem", "a client says something is wrong with the work, and has more than one job, so which is not clear.");
             return twiml(GONE_TO_YAADLY);
           }
           if (looksLikeQuestion(said)) {
@@ -4690,6 +4713,24 @@ Deno.serve(async (req: Request) => {
           // about photographs they filed four minutes ago. The read-back
           // names the job, so the worker still sees where it is going and
           // can drop it.
+          // A worker answering an open problem, 30 Sep 2026 (dispute-lane.ts).
+          // When exactly one of their jobs has a dispute waiting on their
+          // reply, their words are that reply and go to the client. A
+          // question or a bare ok never reaches here; the lanes above take
+          // those. Once replied, later words are updates as before.
+          if (found && text.length >= 2) {
+            const { data: openD } = await supabase.from("disputes")
+              .select("job_id").in("job_id", found.jobs.map((j) => j.id))
+              .eq("state", "direct").is("reply", null);
+            if ((openD ?? []).length === 1) {
+              const dj = String((openD![0] as { job_id: string }).job_id);
+              const { error: rpErr } = await supabase.rpc("reply_dispute_via_whatsapp", { p_job: dj, p_phone: msg.from, p_reply: text.slice(0, 2000) });
+              root.setAttributes({ "yaadly.dispute.job": dj, "yaadly.dispute.outcome": rpErr ? "reply_refused" : "replied" });
+              if (rpErr) return twiml(`That did not go through: ${rpErr.message}`);
+              return twiml(replySent(text));
+            }
+          }
+
           // A day and time for a walkthrough the client asked for, 30 Sep
           // 2026 (walkthrough-offer.ts). Only when exactly one of this
           // worker's jobs has an open walkthrough and the words read as a

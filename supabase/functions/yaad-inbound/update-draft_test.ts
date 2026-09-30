@@ -103,6 +103,7 @@ Deno.test("after a filing the worker is told what arrives next and what to do wi
   // stays is the gate: nothing reaches the client without the worker.
   assert(!WHAT_HAPPENS_NEXT.includes("Reply 1"), "the filing confirmation asks one thing, not two");
   assert(WHAT_HAPPENS_NEXT.includes("Nothing goes to the client until you say so"));
+  assert(WHAT_HAPPENS_NEXT.includes("draft review") && /videos/i.test(WHAT_HAPPENS_NEXT), "the review is named, and videos are a requirement");
   // No day, no hour, nothing about pay or about what the client will decide.
   assert(!/today|tomorrow|tonight|\bhours?\b|paid|payment|approve|guarantee/i.test(WHAT_HAPPENS_NEXT), WHAT_HAPPENS_NEXT);
   assert(!/[\u2013\u2014]/.test(WHAT_HAPPENS_NEXT));
