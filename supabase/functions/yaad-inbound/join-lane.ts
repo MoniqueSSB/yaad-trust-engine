@@ -103,12 +103,11 @@ export function joinedReply(reference: string, link: string, photoFiled: boolean
  *  an answer never given. */
 export const AI_CONSENT_WA_VERSION = "ai-review-wa-v1";
 export const Q_CONSENT =
-  "6 of 6: One last choice. Either answer is fine.\n\n" +
-  "Can a computer read your papers first?\n" +
-  "That means proof of address, TRN, certificates, CV and work photos.\n" +
-  "It makes notes for the person who decides. It never decides.\n" +
-  "It runs on NVIDIA's computers, outside Yaadly. Your papers are not used to train it.\n" +
-  "Your ID, selfie and face video are never sent to it.\n\n" +
+  "6 of 6: Can a computer read your papers first? Either answer is fine.\n\n" +
+  // One line, founder instruction. The facts the site's consent states are
+  // all still in it: notes only, never decides, NVIDIA, outside Yaadly, not
+  // used to train, and the ID, selfie and face video are never sent.
+  "It makes notes for the person who decides and never decides. It runs on NVIDIA, outside Yaadly, is not used to train, and your ID, selfie and face video are never sent to it.\n\n" +
   "Reply YES to allow it.\nReply NO for a person only.";
 export const CONSENT_YES = /^(yes|y|yeah|yeh|ok|okay|allow|allowed|fine|sure)[.!]*$/i;
 export const CONSENT_NO = /^(no|n|nah|nope|person|person only|a person only|decline)[.!]*$/i;

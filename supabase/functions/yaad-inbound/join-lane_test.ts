@@ -35,7 +35,8 @@ Deno.test("six questions, in order, each short", () => {
   assertEquals(JOIN_LANES.length, 6);
   assertEquals([...JOIN_LANES], ["join_name", "join_trades", "join_parishes", "join_email", "join_photo", "join_consent"]);
   assert(isJoinLane("join_email") && !isJoinLane("alerts_trades") && !isJoinLane(""));
-  for (const q of [Q_NAME, LEAD_PARISHES, Q_EMAIL, Q_PHOTO, Q_CONSENT, CONSENT_AGAIN, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, WORDS_FIRST]) {
+  // Q_CONSENT is one line by instruction (30 Sep 2026) and carries every fact the site states, so it alone may run long.
+  for (const q of [Q_NAME, LEAD_PARISHES, Q_EMAIL, Q_PHOTO, CONSENT_AGAIN, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, WORDS_FIRST]) {
     assert(!/[–—]/.test(q), `dash in: ${q}`);
     for (const line of q.split("\n")) assert(line.length <= 110, `long line: ${line}`);
   }
@@ -47,6 +48,7 @@ Deno.test("six questions, in order, each short", () => {
 });
 
 Deno.test("the consent question says what the site says, carries its own version, and a no is a no", () => {
+  assertEquals(Q_CONSENT.split("\n").filter((l) => l.trim() && !/^(6 of 6|Reply)/.test(l)).length, 1, "the explanation is one line");
   for (const fact of ["never decides", "NVIDIA", "outside Yaadly", "not used to train", "ID, selfie and face video are never sent"]) {
     assert(Q_CONSENT.includes(fact), `the consent question no longer says: ${fact}`);
   }
@@ -136,4 +138,14 @@ Deno.test("the AI read starts only on a YES, and the review is never told to dec
   const guard = lane.lastIndexOf("if (yes && !cErr)", call);
   assert(guard > 0 && call - guard < 400, "the review call must sit under the YES guard");
   assert(!/approve|publish|active:\s*true/.test(lane.slice(call, call + 800)), "nothing after the review call may publish or approve");
+});
+
+Deno.test("a WhatsApp application reaches the desk the way a site one does", () => {
+  const lane = src.slice(src.indexOf("joining as a tradesperson: the five questions"), src.indexOf("── the job alert list"));
+  assert(lane.includes('from("worker_profiles").upsert('), "no hidden profile row, so the desk has nobody to publish");
+  assert(/active:\s*false/.test(lane), "the profile must be created hidden");
+  assert(lane.includes('onConflict: "application_id"'), "a second go must update, not duplicate");
+  assert(lane.includes("pushToDesk(settingsReader, {"), "the desk is not told");
+  const push = lane.slice(lane.indexOf("pushToDesk(settingsReader, {"), lane.indexOf("pushToDesk(settingsReader, {") + 600);
+  assert(!/msg\.from|a\.email|a\.name/.test(push), "no contact details may travel in the push");
 });

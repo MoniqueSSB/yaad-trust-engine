@@ -2934,6 +2934,33 @@ Deno.serve(async (req: Request) => {
             }
           }
 
+          // The hidden profile row the site's submit creates (yaad-vetting-
+          // upload, action "submit"; founder decision 30 Aug 2026): active
+          // false until a person publishes it, keyed on the application so a
+          // second go updates rather than duplicates. A profile that fails to
+          // write never loses the application; the desk can make one by hand.
+          try {
+            const nm = String(a.name ?? "").trim();
+            const slug = `${nm.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "pro"}-${String(app.id).slice(0, 6)}`;
+            const trades = Array.isArray(a.trades) ? a.trades.map(String) : [];
+            const parishes = Array.isArray(a.parishes) ? a.parishes.map(String) : [];
+            const { error: profErr } = await supabase.from("worker_profiles").upsert({
+              application_id: app.id, worker_email: String(a.email ?? "").trim().toLowerCase() || null,
+              name: nm.slice(0, 120), trade: trades[0] ?? null, parish: parishes[0] ?? null,
+              areas: parishes.join(", ").slice(0, 400) || null, phone: msg.from,
+              slug, active: false, vetting_state: "probation", updated_at: new Date().toISOString(),
+            }, { onConflict: "application_id" });
+            if (profErr) root.recordError(`profile: ${String(profErr.message).slice(0, 160)}`);
+          } catch (e) { root.recordError(`profile: ${String(e).slice(0, 160)}`); }
+
+          // Tell the desk, the way the site's submit does. No contact details
+          // travel in the push.
+          await pushToDesk(settingsReader, {
+            title: "New Yaadly pro application, on WhatsApp",
+            body: `${(Array.isArray(a.trades) ? a.trades.map(String) : []).join(", ") || "trade not given"}, ${(Array.isArray(a.parishes) ? a.parishes.map(String) : [])[0] ?? "parish not given"}. ${photoFiled ? "1 photo" : "No photo"} on file.`,
+            tags: "hammer",
+          }, trace);
+
           // The application exists from here. The sixth question only sets
           // one column on it, so an answer that never comes leaves a real
           // application with the review switched off, never a lost one.
