@@ -6491,9 +6491,22 @@ The client raises it (WhatsApp words that read as a problem, or the job page). T
 4. **Nothing escalated after two days:** `select jobname, schedule, active from cron.job where jobname = 'yaad-dispute-escalation';` must show `37 15 * * *`.
 5. **The desk was not told at raise:** correct. It is told at escalation (`trg_notify_desk_dispute_escalated`), by the client or by the two day rule.
 
+## 59. WhatsApp job alerts, and the bank details ask (30 Sep 2026)
+
+**Alerts.** Sent by `yaad-match` when a person presses Match on the desk, to everybody on the WhatsApp alert list whose trade keys match the job (and parish, when they named parishes), through the Meta-approved template `yaadly_job_alert_v1`, at most five a day to any one number, recorded in `job_alerts` as `wa:<digits>` on channel `whatsapp`. Nobody is contacted on a timer.
+
+**To switch it on:** apply `20260930150000`, deploy `yaad-match` (platform check kept) and `yaad-twilio-setup`, then `{"action":"create-job-alert"}` (goes to Meta), then `{"action":"job-alert-status"}` once approved, which writes `twilio_content_sid_job_alert`. Until then the Match response says `whatsapp.skipped: "no approved job alert template"` and only email goes.
+
+**When something is wrong.**
+1. **Nobody on the list was told:** `select * from match_alert_subscribers_for_job('<job>');` shows who matched. Empty means no listening subscriber has the job's trade key. The response's `whatsapp` block says sent, capped, failed.
+2. **Somebody got five and no more:** the cap. `select whatsapp_alerts_sent_today('<phone>');`
+3. **A worker who is not cleared got an alert:** correct. They are told to finish their check, and cannot quote until a person clears them.
+
+**Bank details.** Straight after the booking message, a worker with no bank details on file (no Wise recipient, Stripe not complete) gets a second WhatsApp asking for them, with the payouts page. At sign off, the same ask again if still missing. Nothing else changes: details are never typed in the chat.
+
 ---
 
-## 58. HubSpot hears every job and every stage move, from the database (30 Sep 2026)
+## 60. HubSpot hears every job and every stage move, from the database (30 Sep 2026)
 
 **What changed.** Until 30 September the CRM heard about one thing: a WhatsApp job whose client confirmed the read-back, sent inline by `yaad-inbound`. A portal or website job, a client paying, evidence landing, a stage approval and a worker being paid all happened in Postgres and the board never moved. Now four triggers (`20260930150000`) post to `yaad-crm-sync`, which reads the job and signs a request to the app: `/api/hubspot/lead` for a new or changed job, `/api/hubspot/stage` for an event. The stage route accepts a job code as well as a deal id and finds the deal on `yaadly_job_id`.
 
@@ -6520,4 +6533,3 @@ curl -s -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-crm-s
 ```
 
 **To turn it off.** `supabase secrets unset HUBSPOT_LEAD_WEBHOOK_SECRET HUBSPOT_STAGE_WEBHOOK_SECRET --project-ref leffyisvfvjwzilydlwf`. The function then answers every trigger with `skipped` and writes nothing. Dropping the four triggers is the harder off switch and is a migration.
-
