@@ -843,6 +843,30 @@ async function assembleEvidenceChecks(admin: any, jobId: string, stage: number) 
   }
 }
 
+/** No bank details on file yet: nothing set up with Wise and nothing complete
+ *  with Stripe. Read off the profile, never assumed. */
+async function workerHasNoBankDetails(admin: any, email: string): Promise<boolean> {
+  if (!email) return false;
+  const { data: w } = await admin.from("worker_profiles")
+    .select("wise_recipient_set_at, stripe_recipient_status").ilike("worker_email", email).maybeSingle();
+  if (!w) return false;
+  const stripeDone = ["complete", "active", "verified", "ready"].includes(String(w.stripe_recipient_status ?? "").toLowerCase());
+  return !w.wise_recipient_set_at && !stripeDone;
+}
+
+/** The bank details ask, a message of its own. 30 Sep 2026. */
+function bankDetailsAsk(name: string, appUrl: string, reminder = false): string {
+  const first = (name ?? "").trim().split(/\s+/)[0] ?? "";
+  return [
+    reminder ? `Your work is signed off, but Yaadly has no bank details for you yet.` : `One thing to do now${first ? `, ${first}` : ""}.`,
+    ``,
+    `Add your bank details so Yaadly can pay you:`,
+    `${appUrl}/portal/worker/payouts`,
+    ``,
+    `Never type them in this chat. Yaadly calls you to check them.`,
+  ].join("\n");
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -1269,7 +1293,16 @@ Deno.serve(async (req: Request) => {
         ``,
         `Questions? Type them here.`,
       ].filter((x) => x !== null).join("\n");
+      // Bank details as a message of its own, straight after, when there are
+      // none yet. Founder, 30 Sep 2026: a line inside a checklist is missed,
+      // and the first anyone notices is when they try to pay. Goes only on
+      // WhatsApp, as a follow-up to the booking message; email carries the
+      // booking message which already names the page.
+      if (workerPhone && await workerHasNoBankDetails(admin, String(job.worker_email ?? ""))) {
+        waFollowUps = [bankDetailsAsk(String(q?.worker_name ?? ""), APP_URL)];
+      }
     } else if (kind === "job_live_worker") {
+      // (bank details follow-up is on booked_worker, above)
       // 17 Sep 2026, founder instruction. booked_worker tells the worker not
       // to start and promises a message on this number once the client's
       // invoice to Yaadly is paid. Nothing sent that message. Fired by
@@ -1383,6 +1416,9 @@ Deno.serve(async (req: Request) => {
         `Yaadly pays you for the work.`,
         `Your figure is in your portal.`,
       ].join("\n");
+      if (workerPhone && await workerHasNoBankDetails(admin, String(job.worker_email ?? ""))) {
+        waFollowUps = [bankDetailsAsk("", APP_URL, true)];
+      }
     } else if (kind === "worker_paid") {
       // 14 Sep 2026. Fires when a person on the desk marks a worker's pay
       // invoice paid (mark_worker_paid, 20260914230000), after paying it from

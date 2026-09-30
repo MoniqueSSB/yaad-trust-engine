@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { recordAccepted, withStatusCallback } from "./twilio-status.ts";
-import { CLIENT_UPDATE_APPROVAL, CLIENT_UPDATE_NAME, clientUpdateContent, ON_SITE_APPROVAL, ON_SITE_NAME, onSiteContent, REPORT_DRAFT_NAME, reportDraftContent, ALERT_PARISHES_NAME, ALERT_TRADES_NAME, alertParishesContent, alertTradesContent, UPDATE_DRAFT_NAME, updateDraftContent, WALK_ACCEPT_NAME, walkAcceptContent, JOIN_ALERTS_NAME, joinAlertsContent, SECTION_MENU_APPROVAL, SECTION_MENU_NAME, sectionMenuContent, SIGN_REPORT_NAME, signReportContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
+import { CLIENT_UPDATE_APPROVAL, CLIENT_UPDATE_NAME, clientUpdateContent, ON_SITE_APPROVAL, ON_SITE_NAME, onSiteContent, REPORT_DRAFT_NAME, reportDraftContent, ALERT_PARISHES_NAME, ALERT_TRADES_NAME, alertParishesContent, alertTradesContent, UPDATE_DRAFT_NAME, updateDraftContent, WALK_ACCEPT_NAME, walkAcceptContent, JOIN_ALERTS_NAME, joinAlertsContent, JOB_ALERT_APPROVAL, JOB_ALERT_NAME, jobAlertContent, SECTION_MENU_APPROVAL, SECTION_MENU_NAME, sectionMenuContent, SIGN_REPORT_NAME, signReportContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
 
 // A one-shot helper for creating Yaadly's WhatsApp content templates in
 // Twilio, 15 September 2026.
@@ -347,6 +347,40 @@ Deno.serve(async (req: Request) => {
     );
     if (error) return json({ error: `Template ${sid} exists but app_settings would not take it: ${error.message}` }, 500);
     return json({ ok: true, sid, reused: Boolean(existing), approval: { status: approval.status, body: approval.body } });
+  }
+
+  // The WhatsApp job alert, 30 Sep 2026. Submitted to Meta on creation and
+  // held as pending until job-alert-status finds it approved, the same shape
+  // as the worker update. yaad-match reads twilio_content_sid_job_alert.
+  if (action === "create-job-alert") {
+    const existing = (await listAll()).find((c) => c.friendly_name === JOB_ALERT_NAME);
+    let sid = existing?.sid ?? "";
+    if (!sid) {
+      const r = await call("/Content", { method: "POST", body: JSON.stringify(jobAlertContent()) });
+      if (!r.ok) return json({ error: "Twilio refused the template.", twilio: r }, 502);
+      sid = String((r.body as { sid?: string })?.sid ?? "");
+    }
+    if (!/^HX[0-9a-f]{32}$/i.test(sid)) return json({ error: "No ContentSid came back." }, 502);
+    const approval = await call(`/Content/${sid}/ApprovalRequests/whatsapp`, { method: "POST", body: JSON.stringify(JOB_ALERT_APPROVAL) });
+    const { error } = await admin.from("app_settings").upsert({ key: "twilio_content_sid_job_alert_pending", value: JSON.stringify(sid) }, { onConflict: "key" });
+    if (error) return json({ error: `Template ${sid} exists but app_settings would not take it: ${error.message}` }, 500);
+    return json({ ok: true, sid, reused: Boolean(existing), approval: { status: approval.status, body: approval.body } });
+  }
+  if (action === "job-alert-status") {
+    const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_job_alert_pending").maybeSingle();
+    let sid = "";
+    try { sid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { sid = String(st?.value ?? ""); }
+    if (!/^HX[0-9a-f]{32}$/i.test(sid)) return json({ error: "Nothing pending. Run create-job-alert first." }, 400);
+    const r = await call(`/Content/${sid}/ApprovalRequests`);
+    const wa = (r.body as { whatsapp?: { status?: string; rejection_reason?: string } })?.whatsapp ?? {};
+    const status = String(wa.status ?? "unknown").toLowerCase();
+    let switchedOn = false;
+    if (status === "approved") {
+      const { error } = await admin.from("app_settings").upsert({ key: "twilio_content_sid_job_alert", value: JSON.stringify(sid) }, { onConflict: "key" });
+      if (error) return json({ error: `Approved, but app_settings would not take it: ${error.message}` }, 500);
+      switchedOn = true;
+    }
+    return json({ sid, status, rejection_reason: wa.rejection_reason ?? null, switchedOn });
   }
 
   // Asks Twilio where Meta's approval stands. Switches the template on, by

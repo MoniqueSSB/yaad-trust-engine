@@ -11,6 +11,7 @@
 // =====================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { ALERT_CAP, alertKey, alertVars } from "./alert-lane.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -169,6 +170,55 @@ You are getting this because ${w.match_reason} matched your published profile.
     }
   }
 
+  // ---- the WhatsApp alert list (alert-lane.ts) --------------------------
+  //
+  // 30 Sep 2026, founder: "wire the alerts", yes. Everybody on the list whose
+  // keys match the job gets one template message, at most ALERT_CAP a day
+  // to a number, recorded in job_alerts under wa:<digits>. Only through the
+  // Meta-approved template: the list is people who have not written in for
+  // days, so free text would be accepted by Twilio and fail after we return.
+  // Without the template (not yet approved) nothing is sent and the response
+  // says so. A person pressed Match; nobody is contacted on a timer.
+  let waSent = 0, waCapped = 0, waFailed = 0, waSkipped = "";
+  {
+    const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_job_alert").maybeSingle();
+    let alertSid = "";
+    try { alertSid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { alertSid = String(st?.value ?? ""); }
+    const { data: ms } = await admin.from("app_settings").select("value").eq("key", "twilio_messaging_service_sid").maybeSingle();
+    const serviceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID") || String(ms?.value ?? "").replace(/^"(.*)"$/, "$1");
+    const tSid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "", tTok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "", tFrom = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
+    const appUrl = Deno.env.get("YAAD_APP_URL") ?? "https://app.yaadly.co.uk";
+    if (!/^HX[0-9a-f]{32}$/i.test(alertSid)) waSkipped = "no approved job alert template (twilio_content_sid_job_alert)";
+    else if (!serviceSid || !tSid || !tTok || !tFrom) waSkipped = "Twilio not configured for templates";
+    else {
+      const { data: subs } = await admin.rpc("match_alert_subscribers_for_job", { p_job: jobId });
+      const waRows: { job_id: string; worker_email: string; channel: string; status: string; detail: string | null }[] = [];
+      for (const s of (subs ?? []) as { phone: string; name: string | null; can_quote: boolean; match_reason: string }[]) {
+        const key = alertKey(s.phone);
+        const { data: already } = await admin.from("job_alerts").select("id").eq("job_id", jobId).eq("worker_email", key).eq("channel", "whatsapp").maybeSingle();
+        if (already) continue;
+        const { data: today } = await admin.rpc("whatsapp_alerts_sent_today", { p_phone: s.phone });
+        if (Number(today ?? 0) >= ALERT_CAP) { waCapped++; waRows.push({ job_id: jobId, worker_email: key, channel: "whatsapp", status: "skipped", detail: `capped at ${ALERT_CAP} a day` }); continue; }
+        try {
+          const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${tSid}/Messages.json`, {
+            method: "POST",
+            headers: { Authorization: "Basic " + btoa(`${tSid}:${tTok}`), "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              To: `whatsapp:+${s.phone.replace(/\D/g, "")}`, From: tFrom, MessagingServiceSid: serviceSid,
+              ContentSid: alertSid, ContentVariables: JSON.stringify(alertVars(String(job.trade ?? ""), job.parish ?? null, s.can_quote === true, appUrl)),
+            }),
+            signal: AbortSignal.timeout(15000),
+          });
+          if (r.ok) { waSent++; waRows.push({ job_id: jobId, worker_email: key, channel: "whatsapp", status: "sent", detail: s.match_reason }); }
+          else { waFailed++; waRows.push({ job_id: jobId, worker_email: key, channel: "whatsapp", status: "failed", detail: `http ${r.status}` }); }
+        } catch (e) {
+          waFailed++; waRows.push({ job_id: jobId, worker_email: key, channel: "whatsapp", status: "failed", detail: String(e).slice(0, 120) });
+        }
+      }
+      if (waRows.length) await admin.from("job_alerts").upsert(waRows, { onConflict: "job_id,worker_email,channel", ignoreDuplicates: true });
+    }
+  }
+
   // ---- the desk push, once for the job --------------------------------
   //
   // ntfy_topic is ONE topic, and it is Monique's own phone rather than any
@@ -243,6 +293,7 @@ You are getting this because ${w.match_reason} matched your published profile.
     failed: results.filter((r) => r.status === "failed").length,
     skipped: results.filter((r) => r.status === "skipped").length,
     desk_push: deskPush,
-    channels: { email: !!RESEND_KEY },
+    whatsapp: { sent: waSent, capped: waCapped, failed: waFailed, skipped: waSkipped || undefined },
+    channels: { email: !!RESEND_KEY, whatsapp: !waSkipped },
   });
 });
