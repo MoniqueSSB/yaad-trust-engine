@@ -1289,10 +1289,17 @@ Deno.serve(async (req: Request) => {
       }
       const firstStage = Math.max(Number(job.stage ?? 0), 1);
       subject = `The job is live: ${job.title}`;
-      line = `The client's invoice to Yaadly is paid, so ${job.id} (${job.title}) is live and you can start, beginning with ${await stageLabel(admin, jobId, firstStage)}. ` +
-        `When you arrive on site, check in before you start work: in this chat, tap the plus sign (or the paperclip) next to the message box, choose Location, then Send your current location. ` +
-        `That goes on the Arrival Log as proof you were there. Check in the same way each day you are on site.\n\n` +
-        `Photos, videos and a few words on the work can be sent here as you go. The job in your portal: ${roomLink}`;
+      line = [
+        `${job.id} (${job.title}) is live. The client has paid Yaadly.`,
+        `Start with ${await stageLabel(admin, jobId, firstStage)}.`,
+        ``,
+        `On site, check in first, every day.`,
+        `Tap +, then Location, then Send current location.`,
+        `That is your Arrival Log.`,
+        ``,
+        `Send photos, videos and a few words here as you go.`,
+        `Your job: ${roomLink}`,
+      ].join("\n");
     } else if (kind === "quote_accepted") {
       // Fired once, from the jobs row itself (notify_client_on_job_change,
       // 20260831zzzz), the moment worker_email is first set, whichever of
@@ -1375,9 +1382,12 @@ Deno.serve(async (req: Request) => {
       // drifting from whatever the money page actually shows if either
       // changes independently.
       subject = `${job.title} is signed off`;
-      line = `${job.title} (${job.id}) is signed off, every stage approved. ` +
-        `Yaadly owes you your labour and materials for it, and Yaadly pays you for the work. ` +
-        `Check your own figure any time in your Yaadly portal.`;
+      line = [
+        `${job.title} (${job.id}) is signed off. Every stage approved.`,
+        `Yaadly owes you your labour and materials.`,
+        `Yaadly pays you for the work.`,
+        `Your figure is in your portal.`,
+      ].join("\n");
     } else if (kind === "worker_paid") {
       // 14 Sep 2026. Fires when a person on the desk marks a worker's pay
       // invoice paid (mark_worker_paid, 20260914230000), after paying it from
@@ -1400,9 +1410,11 @@ Deno.serve(async (req: Request) => {
       const ref = String(inv.paid_reference ?? "").trim();
       const what = String(inv.period_label ?? "").trim() || (inv.stage ? `stage ${inv.stage}` : "the work");
       subject = `Payment sent: ${job.title}`;
-      line = `Yaadly has sent you ${amt}${how} for ${what} on ${job.title} (${job.id})` +
-        (ref ? `, reference ${ref}` : "") + `. ` +
-        `Pay invoice ${inv.id} now shows as paid in your Yaadly portal: ${roomLink}`;
+      line = [
+        `Yaadly has sent you ${amt}${how}.`,
+        `For ${what} on ${job.title} (${job.id})${ref ? `, reference ${ref}` : ""}.`,
+        `Invoice ${inv.id} now shows as paid: ${roomLink}`,
+      ].join("\n");
     } else if (kind === "materials_sent_worker") {
       // 14 Sep 2026. A materials release records a decision and moves no
       // money, so the worker hears nothing then. This fires when a person on
@@ -1421,9 +1433,13 @@ Deno.serve(async (req: Request) => {
       const how = rel.sent_method === "bank_transfer" ? " by bank transfer" : "";
       const ref = String(rel.sent_ref ?? "").trim();
       subject = `Materials money sent: ${job.title}`;
-      line = `Yaadly has sent you ${money(Number(rel.amount_jmd))}${how} for the materials on ${job.title} (${job.id})` +
-        (ref ? `, reference ${ref}` : "") + `. ` +
-        `Keep the supplier receipt. Once you have the goods, upload the receipt and a photo of the materials in the store here: ${roomLink}#files`;
+      line = [
+        `Yaadly has sent you ${money(Number(rel.amount_jmd))}${how} for materials.`,
+        `${job.title} (${job.id})${ref ? `, reference ${ref}` : ""}.`,
+        ``,
+        `Keep the supplier receipt.`,
+        `Got the goods? Upload the receipt and a photo of them here: ${roomLink}#files`,
+      ].join("\n");
     } else if (kind === "evidence_landed") {
       // Founder's own requirement, 31 Aug 2026, and a real change from how
       // this kind worked that same morning: the AI's composed report does
@@ -1700,11 +1716,17 @@ Deno.serve(async (req: Request) => {
       if (!d) return json({ error: "No such dispute on this job." }, 404);
       recipientEmail = String(job.worker_email ?? "").trim();
       subject = `The client has raised something: ${job.title}`;
-      line = `On ${job.title}, the client has raised something with Yaadly:\n\n` +
-        `"${String(d.body ?? "").slice(0, 1000)}"\n\n` +
-        `A person at Yaadly will look at it with you against the agreed scope and the evidence. ` +
-        `Give your side with Message Yaadly on the job: ${roomLink}\n\n` +
-        `Nothing on the job is approved until it is sorted, and nothing is taken off you in the meantime.`;
+      line = [
+        `On ${job.title}, the client raised something with Yaadly:`,
+        ``,
+        `"${String(d.body ?? "").slice(0, 1000)}"`,
+        ``,
+        `A person at Yaadly looks at it with you, against the agreed scope and the evidence.`,
+        `Give your side here: ${roomLink}`,
+        ``,
+        `Nothing is approved until it is sorted.`,
+        `Nothing is taken off you in the meantime.`,
+      ].join("\n");
     } else if (kind === "desk_alert") {
       // Monique, not a party. Founder, 13 Sep 2026: a problem on a job
       // "comes directly to my whatsapp and email". Fired by the triggers in
@@ -1881,11 +1903,16 @@ Deno.serve(async (req: Request) => {
       const when = String(w.walk_date ?? "").trim();
       const ask = String(w.walk_notes ?? "").trim();
       subject = `Video walkthrough requested: ${job.title}`;
-      line = `The client on ${job.title} (${job.id}) has asked for a live video walkthrough of the site, on ${platform}` +
-        (when ? `, preferred time: ${when}` : "") + `. ` +
-        (ask ? `What they want walked through: "${ask.slice(0, 600)}"\n\n` : "") +
-        `Arrange the call with them over WhatsApp as usual, then paste the link into the job so it is on the record: ${roomLink}\n\n` +
-        `This does not change the evidence you file or how the job is approved.`;
+      line = [
+        `The client on ${job.title} (${job.id}) wants a live video walkthrough.`,
+        `On ${platform}${when ? `, preferred time: ${when}` : ""}.`,
+        ask ? `They want to see: "${ask.slice(0, 600)}"` : null,
+        ``,
+        `Set up the call with them here on WhatsApp.`,
+        `Then paste the link on the job: ${roomLink}`,
+        ``,
+        `Your evidence and the sign off do not change.`,
+      ].filter((l) => l !== null).join("\n");
     } else if (kind === "completion_report_worker") {
       // The Completion Report is the worker's document (20260928210000). The
       // link carries the signing code, read here by job, never passed in, so
@@ -1899,11 +1926,24 @@ Deno.serve(async (req: Request) => {
       reportSignLink = signLink;
       subject = `Your Completion Report to sign: ${job.title}`;
       line = r.return_reason
-        ? `Yaadly has sent the Completion Report for ${job.title} back to you:\n\n"${clip(String(r.return_reason), 600)}"\n\n` +
-          `It is your document. Use the buttons below, or open it here: ${signLink}`
-        : `The Completion Report for ${job.title} (${job.id}) is ready. It is your document. Read it here, no login needed: ${signLink}\n\n` +
-          `Then use the buttons below: Sign the report if it is right, Change my words to put it in your own words first, ` +
-          `or Raise an issue if something is wrong. It goes to the owner only when you sign.`;
+        ? [
+            `Yaadly sent the Completion Report for ${job.title} back to you:`,
+            ``,
+            `"${clip(String(r.return_reason), 600)}"`,
+            ``,
+            `It is your document.`,
+            `Use the buttons below, or open it: ${signLink}`,
+          ].join("\n")
+        : [
+            `Your Completion Report for ${job.title} (${job.id}) is ready.`,
+            `It is your document. Read it here, no login: ${signLink}`,
+            ``,
+            `Sign the report if it is right.`,
+            `Change my words to say it your way first.`,
+            `Raise an issue if something is wrong.`,
+            ``,
+            `It goes to the owner only when you sign.`,
+          ].join("\n");
       // The Sign button follows, the same way the client's Approve button
       // follows an evidence report: its payload is the job's code, which
       // yaad-inbound signs through sign_completion_report_via_whatsapp().
@@ -1939,8 +1979,13 @@ Deno.serve(async (req: Request) => {
       const { data: c } = await admin.from("evidence_comments")
         .select("body").eq("id", String(meta.comment_id ?? "")).maybeSingle();
       subject = `A note from the client: ${job.title}`;
-      line = `On ${job.title}, the client wrote: "${(c?.body ?? "").slice(0, 300)}"\n\n` +
-        `Reply here on WhatsApp to answer, or open the job to reply there, either way the client sees it and it stays on the record: ${roomLink}`;
+      line = [
+        `On ${job.title}, the client wrote:`,
+        `"${(c?.body ?? "").slice(0, 300)}"`,
+        ``,
+        `Reply here to answer. The client sees it.`,
+        `Or reply on the job: ${roomLink}`,
+      ].join("\n");
     } else if (kind === "job_delayed") {
       // Told honestly and early, before the client has to ask. Says nothing
       // about why: yaad-job-health knows a job has gone quiet, not the
@@ -2010,12 +2055,23 @@ Deno.serve(async (req: Request) => {
           `Yaadly will send you its invoice for ${money(first + Math.round(first * 0.15))}${halves ? ", the first half" : ""}. Once it is paid the extra work can start. Your original job bill does not change.\n\n${extraLink}`;
       } else if (kind === "addon_agreed_worker") {
         subject = `Extra work agreed: ${title}`;
-        line = `On ${title}, the extra work is agreed: "${scope.slice(0, 200)}".\n\n` +
-          `You will be paid ${money(workerPay)} once it is done and signed off. Do not start it until Yaadly tells you it is paid. File photos of it on the Extra work tab: ${extraLink}`;
+        line = [
+          `On ${title}, extra work is agreed:`,
+          `"${scope.slice(0, 200)}"`,
+          ``,
+          `You get ${money(workerPay)} once it is done and signed off.`,
+          `Do not start until Yaadly says it is paid.`,
+          `Photos go on the Extra work tab: ${extraLink}`,
+        ].join("\n");
       } else if (kind === "addon_paid_worker") {
         subject = `Extra work paid, you can start: ${title}`;
-        line = `On ${title}, the client has paid for the extra work, so you can start it: "${scope.slice(0, 200)}".\n\n` +
-          `File photos of it on the Extra work tab as you go. Yaadly signs it off on those photos, then pays you ${money(workerPay)}: ${extraLink}`;
+        line = [
+          `On ${title}, the extra work is paid. You can start:`,
+          `"${scope.slice(0, 200)}"`,
+          ``,
+          `Photos on the Extra work tab as you go: ${extraLink}`,
+          `Yaadly signs it off on those photos, then pays you ${money(workerPay)}.`,
+        ].join("\n");
       } else if (kind === "addon_closed") {
         subject = `Extra work not going ahead: ${title}`;
         line = a.status === "declined"

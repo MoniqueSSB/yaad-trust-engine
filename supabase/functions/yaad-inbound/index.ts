@@ -3488,7 +3488,7 @@ Deno.serve(async (req: Request) => {
         root.setAttributes({ "yaadly.worker_update.job": pick.id, "yaadly.worker_update.outcome": error ? "insert_failed" : "filed" });
         return twiml(error
           ? "That did not save properly. Try again."
-          : `Got it, on record for ${pick.id} (${pick.title}). ${WHAT_HAPPENS_NEXT} If you need a person instead, just say so.`);
+          : `Got it, on record for ${pick.id} (${pick.title}).\n\n${WHAT_HAPPENS_NEXT}\n\nNeed a person instead? Just say so.`);
       }
 
       // ── a typed update waiting on a reply of 1 ────────────────────────────
@@ -3500,7 +3500,7 @@ Deno.serve(async (req: Request) => {
       // and replace the draft, so a stray message is never filed, only read
       // back. A voice note falls through the same way, because it carries
       // media and is transcribed there.
-      const CHECK_IN_TOLD = " A person at Yaadly has been told you could not check in today.";
+      const CHECK_IN_TOLD = "\nA person at Yaadly has been told you could not check in today.";
 
       // A worker who says they cannot share where they are. Their evidence is
       // filed all the same, and a person is told, because a phone that cannot
@@ -3563,7 +3563,7 @@ Deno.serve(async (req: Request) => {
           : `On record for ${job.id} (${job.title}).`;
         return error
           ? "That did not save properly. Reply 1 again in a moment."
-          : `${landed} ${WHAT_HAPPENS_NEXT}${owed ? (skipCheckIn === "cannot" ? CHECK_IN_TOLD : ` ${CHECK_IN_BEFORE_YOU_LEAVE}`) : ""} If you need a person instead, just say so.`;
+          : `${landed}\n\n${WHAT_HAPPENS_NEXT}${owed ? (skipCheckIn === "cannot" ? CHECK_IN_TOLD : `\n${CHECK_IN_BEFORE_YOU_LEAVE}`) : ""}\n\nNeed a person instead? Just say so.`;
       };
 
       if (!evidenceHeld && draftSession && !msg.media.length && msg.text.trim()) {

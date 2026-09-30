@@ -100,7 +100,7 @@ export const DRAFT_STILL_WAITING = "Your update is still waiting.\n\nReply 1: pu
  *  once a minute. No hour, no day, and nothing about the client's answer or
  *  about pay, which are not this message's to promise. */
 export const WHAT_HAPPENS_NEXT =
-  "Next: a draft of what the client will be told comes to you here in a few minutes. Reply 1 to send it, or send your own words instead. Nothing goes to the client until you do.";
+  "Next: a draft for the client comes here in a few minutes.\nReply 1 to send it, or send your own words.\nNothing goes to the client until you do.";
 
 /** The two buttons under the read-back, 29 Sep 2026. See content.ts in
  *  yaad-twilio-setup, which holds the ids these are read against.
