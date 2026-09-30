@@ -111,3 +111,48 @@ export async function recordAccepted(
     console.error("recordAccepted threw:", String(e).slice(0, 200));
   }
 }
+
+/* ── A message that was never sent ───────────────────────────────────────────
+ *
+ * Added 30 September 2026. Free text to somebody outside WhatsApp's 24 hour
+ * window is accepted by Twilio and fails afterwards (63016), so the senders
+ * now read the window first and, where no approved template fits, do not
+ * send it at all. That is better than a silent failure, but only if a person
+ * can see it: the desk's "Did it arrive" page reads message_deliveries, so the
+ * message that was held back is written there as failed with the same code
+ * Twilio would have given, under an id of our own (Twilio never issued one).
+ * The desk then shows it with its usual explanation and its follow up button.
+ *
+ * Same rules as recordAccepted: never throws, never blocks a send, carries no
+ * message body.
+ */
+export async function recordNotSent(
+  to: string,
+  channel: "whatsapp" | "sms",
+  meta: SendMeta,
+  errorCode = "63016",
+): Promise<void> {
+  const url = Deno.env.get("SUPABASE_URL") ?? "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!url || !key) return;
+  try {
+    const digits = String(to ?? "").replace(/\D/g, "");
+    const r = await fetch(`${url.replace(/\/+$/, "")}/rest/v1/rpc/record_message_delivery`, {
+      method: "POST",
+      headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        p_sid: `notsent-${crypto.randomUUID()}`,
+        p_to: digits ? `+${digits}` : "",
+        p_channel: channel,
+        p_kind: `${String(meta.kind ?? "")}, not sent`.slice(0, 80),
+        p_job: String(meta.job_id ?? ""),
+        p_status: "failed",
+        p_error_code: errorCode,
+      }),
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!r.ok) console.error("recordNotSent: could not record:", r.status, (await r.text()).slice(0, 200));
+  } catch (e) {
+    console.error("recordNotSent threw:", String(e).slice(0, 200));
+  }
+}

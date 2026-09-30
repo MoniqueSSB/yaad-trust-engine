@@ -72,7 +72,9 @@ Deno.test("the simple questions the founder named get an answer from the app its
   assert(answerWorkerQuestion("where do i send the receipt")?.includes("receipt"));
   assert(answerWorkerQuestion("what does the client see")?.includes("reply 1"));
   assert(answerWorkerQuestion("what do the letters mean")?.includes("Before is"));
-  assert(answerWorkerQuestion("how do i check in on site")?.includes("Arrival Log"));
+  assert(answerWorkerQuestion("how do i check in on site")?.includes("checks you in on the job for today"));
+  // Not "Nothing waits on it": the check-in ask holds photos for 24 hours (arrival-ask.ts).
+  assert(!answerWorkerQuestion("how do i share my location")?.includes("Nothing waits on it"));
 });
 
 Deno.test("the pay answer is the published fact and nothing more", () => {
@@ -183,7 +185,7 @@ Deno.test("a greeting and a stray ok each get their own reply", () => {
     assert(acknowledgementReply(said, true).startsWith("Hello."), said);
   }
   for (const said of ["ok", "no", "yes", "got it", "nno", "seen"]) {
-    assertEquals(acknowledgementReply(said, true), "Nothing is waiting on a reply from you right now.", said);
+    assertEquals(acknowledgementReply(said, true), "Nothing is waiting on a reply from you right now. Send a photo, a few words or a voice note when you have an update.", said);
   }
 });
 

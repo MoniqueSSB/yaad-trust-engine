@@ -138,7 +138,7 @@ export function answerClientQuestion(text: string, job: LiveJob | null): string 
     return `The photographs, videos and every report are on the Evidence tab of your job: ${link}?tab=evidence`;
   }
   if (/\b(?:something (?:is )?wrong|raise (?:a |an )?(?:problem|issue|dispute|complaint)|make a complaint|how (?:do|can) i complain)\b/.test(t)) {
-    return `Say what is wrong here, in your own words, and it goes to a person at Yaadly. Nothing on the job is approved while it is being looked at. You can also raise it in your portal: ${link}`;
+    return `Say what is wrong here, in your own words. It goes to your tradesperson first, who has two days to reply and put it right. If it is not sorted, a person at Yaadly steps in. Nothing on the job is approved while it is open. You can also raise it in your portal: ${link}`;
   }
   if (/\b(?:stop|remove|change|update) (?:these |the |my )?(?:whatsapp|messages|updates|number)\b/.test(t)) {
     return `Your WhatsApp number is on the Job details tab of your job, where you can change it or remove it: ${link}?tab=details Email updates carry on either way.`;
@@ -151,7 +151,7 @@ export function answerClientQuestion(text: string, job: LiveJob | null): string 
 export const CLIENT_HOW_TO = `How a client uses Yaadly once a job is booked:
 - Updates come by WhatsApp and email. Each report from the tradesperson carries their own words and the photographs.
 - To approve a stage: look at the report and photographs, then reply on WhatsApp with only the job's code, or tap Approve, or approve in the portal. Approving closes the stage with Yaadly and is never a payment from the client.
-- To say something is not right: say so in plain words on WhatsApp or in the portal. A remark about the work goes to the tradesperson to answer; a problem goes to a person at Yaadly.
+- To say something is not right: say so in plain words on WhatsApp or in the portal. A remark or a problem with the work goes to the tradesperson first; if a problem is not sorted within two days, a person at Yaadly steps in.
 - The portal is at app.yaadly.co.uk. Each job has tabs: Evidence for photographs and reports, Money for invoices and how to pay, Extra work for anything added to the job, Job details for the address and the WhatsApp number.
 - Extra work on a booked job is agreed by replying CONFIRM and the code in the message about it, or on the Extra work tab. It has its own invoice and the original bill does not change.
 - The client can ask for a live video walkthrough before accepting the work.

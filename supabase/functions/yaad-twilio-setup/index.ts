@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { recordAccepted, withStatusCallback } from "./twilio-status.ts";
-import { CLIENT_UPDATE_APPROVAL, CLIENT_UPDATE_NAME, clientUpdateContent, ON_SITE_APPROVAL, ON_SITE_NAME, onSiteContent, REPORT_DRAFT_NAME, reportDraftContent, ALERT_PARISHES_NAME, ALERT_TRADES_NAME, alertParishesContent, alertTradesContent, UPDATE_DRAFT_NAME, updateDraftContent, WALK_ACCEPT_NAME, walkAcceptContent, JOIN_ALERTS_NAME, joinAlertsContent, JOB_ALERT_APPROVAL, JOB_ALERT_NAME, jobAlertContent, SECTION_MENU_APPROVAL, SECTION_MENU_NAME, sectionMenuContent, SIGN_REPORT_NAME, signReportContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
+import { CLIENT_UPDATE_APPROVAL, CLIENT_UPDATE_NAME, clientUpdateContent, ON_SITE_APPROVAL, ON_SITE_NAME, onSiteContent, REPORT_DRAFT_NAME, reportDraftContent, ALERT_PARISHES_NAME, ALERT_TRADES_NAME, alertParishesContent, alertTradesContent, UPDATE_DRAFT_NAME, updateDraftContent, WALK_ACCEPT_NAME, walkAcceptContent, JOIN_ALERTS_NAME, joinAlertsContent, JOB_ALERT_APPROVAL, JOB_ALERT_NAME, jobAlertContent, META_WORKER_TEMPLATES, metaWorkerApproval, metaWorkerContent, SECTION_MENU_APPROVAL, SECTION_MENU_NAME, sectionMenuContent, SIGN_REPORT_NAME, signReportContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
 
 // A one-shot helper for creating Yaadly's WhatsApp content templates in
 // Twilio, 15 September 2026.
@@ -603,6 +603,50 @@ Deno.serve(async (req: Request) => {
       switchedOn = true;
     }
     return json({ sid, status, rejection_reason: wa.rejection_reason ?? null, switchedOn });
+  }
+
+  // The worker templates for outside the 24 hour window, 30 Sep 2026. One
+  // pair of actions for all of them, keyed by {"template": slug} from
+  // META_WORKER_TEMPLATES in content.ts. The same two steps as the worker
+  // update: create and submit to Meta, recorded as PENDING; then the status
+  // action writes the live setting only once Meta has approved. Writing the
+  // live setting switches nothing on by itself: each sender still has to be
+  // changed to read it. {"action":"worker-templates"} lists them.
+  if (action === "worker-templates") {
+    return json({ templates: META_WORKER_TEMPLATES.map((t) => ({ slug: t.slug, name: t.name, setting: t.setting, sender: t.sender })) });
+  }
+  if (action === "create-worker-template" || action === "worker-template-status") {
+    const t = META_WORKER_TEMPLATES.find((x) => x.slug === String(body.template ?? ""));
+    if (!t) return json({ error: "Give a template slug in 'template'.", slugs: META_WORKER_TEMPLATES.map((x) => x.slug) }, 400);
+    const pendingKey = `${t.setting}_pending`;
+    if (action === "create-worker-template") {
+      const existing = (await listAll()).find((c) => c.friendly_name === t.name);
+      let sid = existing?.sid ?? "";
+      if (!sid) {
+        const r = await call("/Content", { method: "POST", body: JSON.stringify(metaWorkerContent(t)) });
+        if (!r.ok) return json({ error: "Twilio refused the template.", twilio: r }, 502);
+        sid = String((r.body as { sid?: string })?.sid ?? "");
+      }
+      if (!/^HX[0-9a-f]{32}$/i.test(sid)) return json({ error: "No ContentSid came back." }, 502);
+      const approval = await call(`/Content/${sid}/ApprovalRequests/whatsapp`, { method: "POST", body: JSON.stringify(metaWorkerApproval(t)) });
+      const { error } = await admin.from("app_settings").upsert({ key: pendingKey, value: JSON.stringify(sid) }, { onConflict: "key" });
+      if (error) return json({ error: `Template ${sid} exists but app_settings would not take it: ${error.message}` }, 500);
+      return json({ ok: true, name: t.name, sid, reused: Boolean(existing), pendingSetting: pendingKey, approval: { status: approval.status, body: approval.body } });
+    }
+    const { data: st } = await admin.from("app_settings").select("value").eq("key", pendingKey).maybeSingle();
+    let sid = "";
+    try { sid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { sid = String(st?.value ?? ""); }
+    if (!/^HX[0-9a-f]{32}$/i.test(sid)) return json({ error: `Nothing pending for ${t.slug}. Run create-worker-template first.` }, 400);
+    const r = await call(`/Content/${sid}/ApprovalRequests`);
+    const wa = (r.body as { whatsapp?: { status?: string; rejection_reason?: string } })?.whatsapp ?? {};
+    const status = String(wa.status ?? "unknown").toLowerCase();
+    let recorded = false;
+    if (status === "approved") {
+      const { error } = await admin.from("app_settings").upsert({ key: t.setting, value: JSON.stringify(sid) }, { onConflict: "key" });
+      if (error) return json({ error: `Approved, but app_settings would not take it: ${error.message}` }, 500);
+      recorded = true;
+    }
+    return json({ name: t.name, sid, status, rejection_reason: wa.rejection_reason ?? null, recorded, setting: t.setting, sender: t.sender });
   }
 
   return json({ error: "Unknown action." }, 400);

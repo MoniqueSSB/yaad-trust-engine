@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { recordAccepted, withStatusCallback } from "./twilio-status.ts";
+import { recordAccepted, recordNotSent, withStatusCallback } from "./twilio-status.ts";
 
 // Unset is the state every send is in until the secret is set, so it is the
 // case that must not change behaviour.
@@ -136,4 +136,25 @@ Deno.test("every ContentSid send names a Messaging Service", () => {
     if (!src.includes("withMessagingService") && !src.includes("MessagingServiceSid")) missing.push(entry.name);
   }
   assertEquals(missing, []);
+});
+
+// recordNotSent: a message held back because it would have failed outside the
+// 24 hour window still shows on the desk, as failed, with the code Twilio
+// would have given, under an id Twilio never issued.
+Deno.test("a message held back is recorded as failed, never as accepted", async () => {
+  Deno.env.set("SUPABASE_URL", "https://example.supabase.co");
+  Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "service-key");
+  const calls = await capture(() => recordNotSent("whatsapp:+1 876 555 0101", "whatsapp", { kind: "worker cleared", job_id: "" }));
+  assertEquals(calls.length, 1);
+  assertEquals(calls[0].url, "https://example.supabase.co/rest/v1/rpc/record_message_delivery");
+  assertEquals(calls[0].body.p_status, "failed");
+  assertEquals(calls[0].body.p_error_code, "63016");
+  assertEquals(calls[0].body.p_to, "+18765550101");
+  assertEquals(calls[0].body.p_sid.startsWith("notsent-"), true);
+  assertEquals(calls[0].body.p_sid.startsWith("SM"), false);
+  assertEquals(calls[0].body.p_kind, "worker cleared, not sent");
+  Deno.env.delete("SUPABASE_SERVICE_ROLE_KEY");
+  const unset = await capture(() => recordNotSent("+18765550101", "whatsapp", { kind: "x" }));
+  assertEquals(unset.length, 0);
+  Deno.env.delete("SUPABASE_URL");
 });

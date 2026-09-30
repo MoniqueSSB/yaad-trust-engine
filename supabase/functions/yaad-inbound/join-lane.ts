@@ -1,4 +1,4 @@
-// Joining as a tradesperson over WhatsApp: the five short questions.
+// Joining as a tradesperson over WhatsApp: the six short questions.
 //
 // The join form at app.yaadly.co.uk/apply has carried a button since 17 Sep
 // 2026 reading "Rather do this on WhatsApp? Five short questions in the chat",
@@ -8,8 +8,11 @@
 // join was asked which parish their property was in. Founder: "fix this so
 // it aligns to what is stated on the site".
 //
-// What it does. Name, trades, parishes, email, one photo of finished work,
-// one question a message. At the end it writes the same applications row the
+// What it does. Name, the job alert question, trades, parishes, email, one
+// photo of finished work: six questions, one a message, and every one of
+// them says "of 6" (30 Sep 2026: the reprompts said "of 7" and this header
+// said five). STOP or cancel ends it, and asking for a person ends it and
+// tells the desk (index.ts). At the end it writes the same applications row the
 // site's step 1 writes, files the photo the way the site files a portfolio
 // upload, puts the number on the job alert list with the consent sentence
 // said to them word for word, and sends the link that opens the same
@@ -51,7 +54,7 @@ export const SKIP = /^(skip|no|none|later|not now|nah)[.!]*$/i;
 export const Q_NAME =
   "Welcome to Yaadly. Good to have you.\n\nSix quick questions, then you are in.\n\n1 of 6: What is your full name?";
 
-/** 2 of 7: the job alert consent, a question of its own. Founder, 30 Sep
+/** 2 of 6: the job alert consent, a question of its own. Founder, 30 Sep
  *  2026: "split this into two questions". YES puts the number on the alert
  *  list with alertTerms as the recorded consent; NO skips the list and the
  *  joining carries on. */
@@ -80,18 +83,29 @@ export const WORDS_FIRST = "One thing at a time. Answer this first. Then send th
  *  .can_quote), a person reads it, nothing is promised. The link opens the
  *  same application on the site for the identity steps. */
 export function joinedReply(reference: string, link: string, photoFiled: boolean, _aiReads = true): string {
-  // One phone screen, founder 30 Sep 2026: "this is one a phone", "the
-  // messages can be over whelming". The reference, the one next step, and
-  // what happens after. Everything else waits for the moment it matters.
+  // Founder, 30 Sep 2026, on this message: "make them aware they can review
+  // the job board and have a profile, apply for quote requires finishing the
+  // sign up. skip if you just want to review the job board for now". True
+  // today: app.yaadly.co.uk/jobs is open to anyone; the profile row is made
+  // hidden at this moment and goes public when a person publishes it; quoting
+  // waits for the check. Blank lines are kept (null, not "", is what drops a
+  // line), because until 30 Sep every line ran together on the phone.
+  let board = "https://app.yaadly.co.uk/jobs";
+  try { board = `${new URL(link).origin}/jobs`; } catch (_) { /* keep the default */ }
   return [
     `You are in. Your reference is ${reference}.`,
-    photoFiled ? "" : "No photo yet. You can add one on the link below.",
+    photoFiled ? null : "No photo yet. You can add one on the check link below.",
     ``,
-    `Next: finish your check here. About ten minutes.`,
+    `See open jobs now, no check needed:`,
+    board,
+    ``,
+    `To quote on a job, finish your check. About ten minutes:`,
     link,
+    `Just looking for now? Skip it, and use the link when you are ready.`,
     ``,
-    `An AI agent reads your form. A person decides. We message you here.`,
-  ].filter((l) => l !== "").join("\n");
+    `An AI agent reads your form. A person decides.`,
+    `Your profile goes live once you are cleared. We message you here.`,
+  ].filter((l): l is string => l !== null).join("\n");
 }
 
 /** The AI read is automatic. Founder, 30 Sep 2026: "the ai will read",

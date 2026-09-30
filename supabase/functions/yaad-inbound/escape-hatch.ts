@@ -50,8 +50,14 @@ export function wantsFreshJob(text: string): boolean {
   return FRESH_JOB.test(String(text ?? ""));
 }
 
+/** The short answers to "Need a person? Just say so", 30 Sep 2026. Whole
+ *  message only, so "need a person to help lift the beam" stays an update. */
+const A_PERSON_SHORT =
+  /^(?:yes,?\s+)?(?:i\s+|mi\s+|me\s+)?(?:need|want|waan|would like)\s+(?:a\s+|an\s+)?(?:real\s+)?(?:person|human)(?:\s+please)?[.!]*$|^(?:a\s+)?person(?:\s+please)?[.!]*$/i;
+
 export function wantsAPerson(text: string): boolean {
-  return A_PERSON.test(String(text ?? ""));
+  const t = String(text ?? "");
+  return A_PERSON.test(t) || A_PERSON_SHORT.test(t.trim());
 }
 
 /** Should a greedy lane let this message past instead of filing it?

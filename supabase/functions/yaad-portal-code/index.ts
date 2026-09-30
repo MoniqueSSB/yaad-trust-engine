@@ -313,6 +313,19 @@ Deno.serve(async (req: Request) => {
       .not("client_phone", "is", null).neq("client_phone", "")
       .order("updated_at", { ascending: false }).limit(1).maybeSingle();
 
+    /* A worker signing in has no client job, so the code only ever went by
+       email, although WhatsApp is where a worker actually is. 30 Sep 2026,
+       review of every worker message: the phone on their worker profile is
+       used the same way, through the same authentication path below. */
+    let onFile = job?.client_phone ? String(job.client_phone) : "";
+    if (!onFile) {
+      const { data: wp } = await admin.from("worker_profiles")
+        .select("phone").ilike("worker_email", email)
+        .not("phone", "is", null).neq("phone", "")
+        .limit(1).maybeSingle();
+      if (wp?.phone) onFile = String(wp.phone);
+    }
+
     /* Still deliberately NOT one of our own content templates. A sign in
        code is an AUTHENTICATION message in WhatsApp's own categories, and
        pushing an OTP through an ordinary UTILITY template is the thing that
@@ -331,8 +344,8 @@ Deno.serve(async (req: Request) => {
        reporting failure. With the secret unset, this block behaves exactly
        as it did before Verify existed. Email is the reliable path for a sign
        in code either way and always will be. */
-    if (job?.client_phone) {
-      const phone = String(job.client_phone);
+    if (onFile) {
+      const phone = onFile;
       phoneResult = await sendVerify(phone, otp, "whatsapp", trace);
       if (!phoneResult.sent) {
         // SMS through Verify depends on the Verify service having an SMS

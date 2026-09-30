@@ -70,3 +70,12 @@ Deno.test("the client hatch and the person hatch are both wired into shouldEscap
   assert(shouldEscapeLane("I have a new job"));
   assert(shouldEscapeLane("can I speak to a real person"));
 });
+
+Deno.test("the short answer to 'Need a person? Just say so' is heard", () => {
+  for (const said of ["I need a person", "need a person", "yes I need a person", "I want a real person please", "person please", "mi waan a person"]) {
+    assert(wantsAPerson(said), `should have escaped: ${said}`);
+  }
+  for (const said of ["need a person to help lift the beam", "the person next door let me in", "personally I think the wall is done"]) {
+    assert(!wantsAPerson(said), `must stay evidence: ${said}`);
+  }
+});

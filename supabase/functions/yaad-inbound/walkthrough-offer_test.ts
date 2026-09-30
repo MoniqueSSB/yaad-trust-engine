@@ -62,3 +62,21 @@ Deno.test("the call link is made by Yaadly on acceptance, never by the worker", 
   const w = acceptedForWorker("JOB-1", "K", "Sat", "Zoom", "https://meet.jit.si/Yaadly-JOB1-abc123", "x");
   assert(w.includes("Join here at that time") && !/make the link|paste/i.test(w), w);
 });
+
+Deno.test("an ordinary update that mentions a time is not a walkthrough offer", () => {
+  for (const t of [
+    "finished the second coat this morning",
+    "started the tiling today, grout tomorrow",
+    "rain stopped me Tuesday afternoon, back on it Wednesday",
+    "photos from this morning coming now",
+    "Monday: laid the blocks for the back wall and poured the footing, the steel is in, will do the rest on Tuesday once the cement truck comes",
+  ]) assert(!looksLikeATime(t), t);
+  for (const t of ["Saturday 10am", "tomorrow morning works for me", "Friday at 2pm on Zoom https://zoom.us/j/123456"]) assert(looksLikeATime(t), t);
+});
+
+Deno.test("an offer and a reply to a problem are screened before they reach the client", () => {
+  const walk = src.slice(src.indexOf("A day and time for a walkthrough the client asked for"), src.indexOf("const justFiled", src.indexOf("A day and time for a walkthrough the client asked for")));
+  assert(walk.indexOf("screenOwnWords(") > 0 && walk.indexOf("screenOwnWords(") < walk.indexOf('rpc("offer_walkthrough_via_whatsapp"'), "the offer reaches the client unscreened");
+  const disp = src.slice(src.indexOf("A worker answering an open problem"), src.indexOf("A day and time for a walkthrough the client asked for"));
+  assert(disp.indexOf("screenOwnWords(") > 0 && disp.indexOf("screenOwnWords(") < disp.indexOf('rpc("reply_dispute_via_whatsapp"'), "the reply reaches the client unscreened");
+});

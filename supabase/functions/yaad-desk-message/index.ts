@@ -146,8 +146,10 @@ async function sendEmail(to: string, subject: string, body: string, trace: Trace
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: `Monique at Yaadly <${FROM_EMAIL}>`, to: [to], reply_to: REPLY_TO,
-          subject, text: `${body}\n\nMonique\nYaadly`,
+          // Signed as Yaadly, never a person's name (founder rule: her name
+          // is an internal record only, never on client or worker output).
+          from: `Yaadly <${FROM_EMAIL}>`, to: [to], reply_to: REPLY_TO,
+          subject, text: `${body}\n\nYaadly`,
         }),
         signal: AbortSignal.timeout(15000),
       });

@@ -11,7 +11,7 @@ import { pickEvidenceItem } from "./evidence-item-match.ts";
 import { DRAFT_STILL_WAITING, draftReadBack, readBackVars, readDraftReply, readUpdateTap, saysWhatItShows, tapAsTyped, tapMatchesUpdate, tooShortToBeAnUpdate, TYPE_YOUR_NEW_WORDS, WHAT_HAPPENS_NEXT } from "./update-draft.ts";
 import { visitorTokenOk, originAllowed, WEB_CHAT_MAX_CHARS, webReferenceIn, WEB_SAFE_FALLBACK } from "./web-chat.ts";
 import {
-  ALERT_CONSENT_VERSION, ALERT_TERMS, ALERTS_PHRASE, ALERTS_STOP,
+  ALERT_CONSENT_VERSION, ALERT_JOINED_VERSION, ALERT_TERMS, ALERT_TERMS_JOINED, ALERTS_PHRASE, ALERTS_STOP,
   ALERTS_MAX_TRIES, alertsOpenerExact, alertsOpenerRemainder, ANYWHERE_WORD,
   neitherPlaced, sayList,
 } from "./job-alerts.ts";
@@ -19,7 +19,7 @@ import { FAQ_FACTS } from "./faq.ts";
 import { priceFigureGuard } from "./price-figures.ts";
 import { TRADES_PROMPT_LINE } from "./trades.ts";
 import { stripPromises, unkeepableSentences } from "./promises.ts";
-import { shouldEscapeLane, wantsAPerson } from "./escape-hatch.ts";
+import { shouldEscapeLane, wantsAPerson, wantsFreshJob } from "./escape-hatch.ts";
 import { samePhone, digitsOf } from "./phone.ts";
 import { Deadline } from "./deadline.ts";
 import { inboundText, wasTapped } from "./button-tap.ts";
@@ -35,6 +35,7 @@ import { readDraftTap, readOnSiteTap, tapMatchesDraft } from "./report-tap.ts";
 import { screenOwnWords } from "./own-words.ts";
 import { acceptedForClient, linkIn, looksLikeATime, offerSent, PLATFORM_LABEL as WALK_PLATFORM, readWalkAccept } from "./walkthrough-offer.ts";
 import { closedReply, problemSent, readDisputeClose, replySent } from "./dispute-lane.ts";
+import { draftShownLate, plainRefusal, readWhileNoteWaits, systemWords, wantsToStopJoining } from "./worker-reply.ts";
 import { ALERTS_AGAIN, applicationRow, CONSENT_NO, CONSENT_YES, continueLink, isJoinLane, isJoinOpener, JOIN_STALE_MS, joinedReply, LEAD_PARISHES, LEAD_TRADES, looksLikeEmail, looksLikeName, newReference, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, Q_EMAIL, Q_NAME, Q_PHOTO, qAlerts, SKIP, WORDS_FIRST } from "./join-lane.ts";
 
 // Inbound intake, on whatever channel is actually available.
@@ -675,6 +676,56 @@ async function arrivedToday(supabase: any, jobId: string, _stage: number): Promi
   }
 }
 
+/** Was WhatsApp's 24 hour window shut when this draft was made? True when no
+ *  message from this number reached the ledger in the 24 hours before it, so
+ *  the draft itself could not have been sent and only a template announced
+ *  it. A read that fails answers false: the lane then behaves as it always
+ *  has, which is the state before this check existed. */
+async function draftNotSeenYet(admin: any, from: string, draftedAt: string): Promise<boolean> {
+  const t = Date.parse(draftedAt);
+  if (!Number.isFinite(t) || !from) return false;
+  try {
+    const { data, error } = await admin.from("wa_inbound_seen").select("seen_at")
+      .eq("from_addr", from)
+      .gte("seen_at", new Date(t - 24 * 3600_000).toISOString())
+      .lt("seen_at", new Date(t).toISOString())
+      .limit(1);
+    if (error) return false;
+    return (data ?? []).length === 0;
+  } catch (_) {
+    return false;
+  }
+}
+
+/** Every worker email on a worker_profiles row with this phone, active or
+ *  not (an applicant still being checked is a worker, not a client). Empty
+ *  means the number is not on the worker list at all. */
+async function isKnownWorkerNumber(admin: any, from: string): Promise<string[]> {
+  if (from.replace(/\D/g, "").length < 9) return [];
+  const { data } = await admin.from("worker_profiles").select("worker_email, phone").not("phone", "is", null);
+  return (data ?? [])
+    .filter((w: any) => samePhone(w.phone, from))
+    .map((w: any) => String(w.worker_email ?? "").toLowerCase());
+}
+
+/** Is this number the client on any job that is not cancelled? A worker who
+ *  is also a client (the founder testing both sides) keeps the client lanes. */
+async function isClientNumber(admin: any, from: string): Promise<boolean> {
+  const { data } = await admin.from("jobs").select("client_phone, status").not("client_phone", "is", null).neq("status", "cancelled");
+  return (data ?? []).some((j: any) => samePhone(j.client_phone, from));
+}
+
+/** A job of this worker's that is booked and waiting on the client's
+ *  invoice, if there is one. Excluded from the live jobs on purpose (see
+ *  lookupActiveJobsForWorker); said here so the worker knows why. */
+async function awaitingPaymentJobFor(admin: any, emails: string[]): Promise<string> {
+  for (const email of emails.filter(Boolean)) {
+    const { data } = await admin.from("jobs").select("id").ilike("worker_email", email).eq("status", "awaiting_payment").limit(1);
+    if ((data ?? []).length) return String(data[0].id);
+  }
+  return "";
+}
+
 async function lookupWorkerWithActiveJobs(
   admin: any,
   from: string,
@@ -694,18 +745,6 @@ async function lookupWorkerWithActiveJobs(
     if (jobs.length) return { email, jobs };
   }
   return null;
-}
-
-async function mintPortalUploadLink(admin: any, email: string, jobId: string): Promise<string | null> {
-  try {
-    const { data, error } = await admin.auth.admin.generateLink({
-      type: "magiclink",
-      email,
-      options: { redirectTo: `https://app.yaadly.co.uk/portal/jobs/${encodeURIComponent(jobId)}?tab=evidence` },
-    });
-    if (error || !data?.properties?.action_link) return null;
-    return String(data.properties.action_link);
-  } catch (_) { return null; }
 }
 
 // Everything else in this file replies to whoever just messaged, via
@@ -1902,15 +1941,32 @@ async function answerOrRaiseWorkerQuestion(
     const answered = await answerOffScript(msg.text, opts.deadline, trace);
     if (answered) return `${answered} ${OFF_SCRIPT_CLOSE} ${stillWanted}`;
   }
+  await tellDeskAWorkerNeedsAPerson(supabase, msg, jobId, "question", trace);
+  return `That reads as a question, so it has not gone to the client and it is not on the job record. Someone at Yaadly will answer it here. ${stillWanted}`;
+}
+
+/** A worker a person has to answer: a question the app cannot, or a worker
+ *  who asked for a person (30 Sep 2026; until then that request fell into the
+ *  client intake and could open a draft client job on the worker's number).
+ *  One notification for both, so the set that texts her phone does not grow:
+ *  in both cases the worker has been told a person will answer, and nobody
+ *  else will. Nothing is filed, sent to a client, or held. */
+async function tellDeskAWorkerNeedsAPerson(
+  supabase: SettingsReader,
+  msg: { text: string; from: string; channel: string },
+  jobId: string,
+  why: "question" | "person",
+  trace: Trace,
+): Promise<void> {
+  const asked = why === "question" ? "has a question" : "asked for a person";
   await pushToDesk(supabase, {
     target: { channel: msg.channel, from_addr: msg.from || "unknown" },
-    title: `Worker question${jobId ? `: ${jobId}` : ""}`,
+    title: `${why === "question" ? "Worker question" : "Worker asked for a person"}${jobId ? `: ${jobId}` : ""}`,
     priority: "high",
-    tags: "question",
-    body: `${jobId ? `${jobId}: ` : ""}a worker asked something the assistant does not answer. Their words are on your phone. The job lane is still open for them.`,
-    alsoText: `Yaadly, a worker has a question.\n\nThey asked:\n"${msg.text.trim().slice(0, 700)}"\n\nFrom ${msg.from || "an unknown number"} on ${msg.channel}.${jobId ? ` Job ${jobId}.` : ""} Nothing was sent to the client and nothing was filed. Reply from the desk to answer them.`,
+    tags: why === "question" ? "question" : "raising_hand",
+    body: `${jobId ? `${jobId}: ` : ""}a worker ${asked}. Their words are on your phone. The job lane is still open for them.`,
+    alsoText: `Yaadly, a worker ${asked}.\n\nThey said:\n"${msg.text.trim().slice(0, 700)}"\n\nFrom ${msg.from || "an unknown number"} on ${msg.channel}.${jobId ? ` Job ${jobId}.` : ""} Nothing was sent to the client and nothing was filed. Reply from the desk to answer them.`,
   }, trace);
-  return `That reads as a question, so it has not gone to the client and it is not on the job record. Someone at Yaadly will answer it here. ${stillWanted}`;
 }
 
 async function notifyAdmin(
@@ -2113,14 +2169,14 @@ async function alertDeskBlocked(findings: { guidance: string }[], trace: Trace, 
       title: "Reply held back",
       priority: "high",
       tags: "warning",
-      body: `A ${where} reply failed the language screen and was not sent. The client got a `
+      body: `A ${where} reply failed the language screen and was not sent. The person who wrote in got a `
         + "holding message and is waiting on a person. Reason: "
         + [...new Set(findings.map((f) => f.guidance))].join(" ")
         + " The draft is in the yaad-inbound function log.",
       // No client words here, and that is not an oversight. What was blocked
       // is the DRAFT, which the model wrote, and the guidance strings are a
       // fixed closed set. The client is still waiting, so she is still texted.
-      alsoText: `Yaadly, a ${where} reply was held back and not sent. The client got a holding message and is waiting on a person. Reason: `
+      alsoText: `Yaadly, a ${where} reply was held back and not sent. The person who wrote in got a holding message and is waiting on a person. Reason: `
         + [...new Set(findings.map((f) => f.guidance))].join(" ")
         + " Open the desk to answer them.",
     }, trace);
@@ -2158,8 +2214,13 @@ Deno.serve(async (req: Request) => {
   // here, the model-written ones and the fixed strings alike. Screening the
   // fixed ones costs nothing and means a careless edit to one of them cannot
   // walk past the rule either.
-  const twiml = async (reply: string) => {
-    const findings = guardrails.scan(reply);
+  // `own` is the worker's own words where the reply quotes them back. They are
+  // taken out before the screen, because they are his and not the system's:
+  // "wall 100% done" read back to him must not become the holding reply.
+  // Words of his that go on to a client are screened separately, by
+  // own-words.ts, before they are sent. See worker-reply.ts.
+  const twiml = async (reply: string, own: unknown[] = []) => {
+    const findings = guardrails.scan(systemWords(reply, own));
     let body = reply;
 
     if (findings.length) {
@@ -2228,9 +2289,11 @@ Deno.serve(async (req: Request) => {
       const set = await readSettings(settings, ["twilio_content_sid_update_draft", "twilio_messaging_service_sid"]);
       const contentSid = firstTemplateSid(set.twilio_content_sid_update_draft ?? "");
       const serviceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID") || set.twilio_messaging_service_sid || "";
-      if (contentSid && await sendReadBackButtons(to, readBackVars(jobId, title, text, joinsBatch), typed, contentSid, serviceSid, trace)) return twimlSilent();
+      // Screened without the worker's own words, the way twiml() screens the
+      // typed version: they are being read back to him, not sent to a client.
+      if (contentSid && await sendReadBackButtons(to, readBackVars(jobId, title, text, joinsBatch), systemWords(typed, [text]), contentSid, serviceSid, trace)) return twimlSilent();
     }
-    return twiml(typed);
+    return twiml(typed, [text]);
   };
 
   // The trades and parishes questions, 29 Sep 2026. A list to tap on
@@ -2774,6 +2837,28 @@ Deno.serve(async (req: Request) => {
     // one flag, whichever lane ends up reading it.
     let spoken = false;
 
+    // A database call that refused, said to the person in plain words with
+    // what to do next (worker-reply.ts). A sentence the SQL wrote for people
+    // is passed on; anything else is logged here and the desk is told, and
+    // the person gets a plain sentence instead of Postgres. Informational for
+    // her phone: the desk and the push, no text.
+    const refused = async (error: { message?: unknown } | null, what: string, next: string): Promise<string> => {
+      const r = plainRefusal(error?.message, next);
+      if (r.internal) {
+        const raw = String(error?.message ?? "").slice(0, 300);
+        console.error(`${what} refused with a system error: ${raw}`);
+        root.recordError(`${what}: ${raw}`.slice(0, 300));
+        await pushToDesk(supabase as unknown as SettingsReader, {
+          target: { channel: msg.channel, from_addr: msg.from || "unknown" },
+          title: `System error on WhatsApp: ${what}`,
+          priority: "high",
+          tags: "warning",
+          body: `${what} failed with a system error, not a rule. They were told it did not go through and what to do next. The error is in the yaad-inbound function log.`,
+        }, trace);
+      }
+      return r.text;
+    };
+
     // A worker mid "which job" answer, or a fresh photo from a number
     // linked to a published worker (worker_profiles.phone). Only on the
     // WhatsApp channel and only ahead of the client-intake pipeline below:
@@ -2821,7 +2906,7 @@ Deno.serve(async (req: Request) => {
       const draftSession = !arrivalLapsed && sess && String((sess.answers as any)?._lane ?? "") === "update_draft"
         && Date.now() - new Date(sess.updated_at as string).getTime() <= SESSION_STALE_MS ? sess : null;
 
-      // ── joining as a tradesperson: the five questions ───────────────────
+      // ── joining as a tradesperson: the six questions ───────────────────
       //
       // 30 Sep 2026. See join-lane.ts for what this is and is not. Ahead of
       // the alert list and everything below it for the same reason the alert
@@ -2847,6 +2932,28 @@ Deno.serve(async (req: Request) => {
           await holdJoin({ _lane: "join_name" });
           root.setAttributes({ "yaadly.join.step": "name", "yaadly.join.outcome": "started" });
           return twiml(Q_NAME);
+        }
+
+        // A way out, 30 Sep 2026. STOP or cancel ends the questions; asking
+        // for a person ends them too and tells the desk. Either way they are
+        // told what happens next. Nothing is sent in: the application is only
+        // written at the last question.
+        if (wantsToStopJoining(joinSaid) || wantsAPerson(joinSaid)) {
+          await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+          const onList = a.alerts === true ? "\nYou are still on the job alert list. Send STOP again to come off it." : "";
+          if (wantsAPerson(joinSaid)) {
+            root.setAttributes({ "yaadly.join.step": lane, "yaadly.join.outcome": "asked_for_a_person" });
+            await pushToDesk(settingsReader, {
+              target: { channel: threadKey.channel, from_addr: threadKey.from_addr },
+              title: "Somebody joining asked for a person",
+              priority: "high",
+              tags: "raising_hand",
+              body: "A tradesperson part way through joining on WhatsApp asked for a person. The questions are stopped. Reply from the desk.",
+            }, trace);
+            return twiml(`Of course. The questions are stopped and a person at Yaadly will reply here.\nNothing was sent in yet. Send JOIN to start again any time.${onList}`);
+          }
+          root.setAttributes({ "yaadly.join.step": lane, "yaadly.join.outcome": "stopped" });
+          return twiml(`Stopped. Nothing was sent in.\nSend JOIN to start again any time.${onList}`);
         }
 
         // A photo before its question is not lost, it is just early: the
@@ -2898,7 +3005,7 @@ Deno.serve(async (req: Request) => {
           if (!(tRow?.matched ?? []).length && tries < 2) {
             await holdJoin({ ...a, tries });
             root.setAttributes({ "yaadly.join.step": "trades", "yaadly.join.outcome": "trades_not_read" });
-            return await askFromList(settingsReader, msg.from, msg.channel, "trades", "I could not place that as a trade. 3 of 7:", TRADES_TYPED);
+            return await askFromList(settingsReader, msg.from, msg.channel, "trades", "I could not place that as a trade. 3 of 6:", TRADES_TYPED);
           }
           // Their own words are kept even when nothing matched: the desk
           // reads words, and a trade the matcher does not know is still a trade.
@@ -2915,7 +3022,7 @@ Deno.serve(async (req: Request) => {
           if (!(pRow?.matched ?? []).length && tries < 2) {
             await holdJoin({ ...a, tries });
             root.setAttributes({ "yaadly.join.step": "parishes", "yaadly.join.outcome": "parishes_not_read" });
-            return await askFromList(settingsReader, msg.from, msg.channel, "parishes", "I could not place that as a parish. 4 of 7:", PARISHES_TYPED);
+            return await askFromList(settingsReader, msg.from, msg.channel, "parishes", "I could not place that as a parish. 4 of 6:", PARISHES_TYPED);
           }
           const parishes = (pRow?.matched ?? []).length ? pRow!.matched! : [joinSaid.slice(0, 80)];
           await holdJoin({ _lane: "join_email", name: a.name, alerts: a.alerts, trades: a.trades, parishes });
@@ -3065,9 +3172,9 @@ Deno.serve(async (req: Request) => {
             ? `, for ${sayList(sub.trades)} in ${sayList(sub.parishes)}`
             : "";
           root.setAttributes({ "yaadly.alerts.outcome": outcome, "yaadly.alerts.can_quote": sub?.can_quote === true });
-          return `You are on the list${onFor}.${dropped} ${ALERT_TERMS}`
+          return `You are on the list${onFor}.${dropped} ${ALERT_TERMS_JOINED}`
             + (sub?.can_quote === true ? "" :
-               ` One thing worth knowing now rather than later: this means you hear about the work. Before you can quote for any of it you have to finish being checked, which is here: ${appBase}/apply`);
+               `\nBefore you can quote for a job, finish your check here: ${appBase}/apply`);
         };
 
         // STOP, answered with or without a session open. It falls through
@@ -3142,7 +3249,7 @@ Deno.serve(async (req: Request) => {
           const { data, error } = await supabase.rpc("subscribe_to_job_alerts", {
             p_phone: msg.from,
             p_words: alertsSaid,
-            p_version: ALERT_CONSENT_VERSION,
+            p_version: ALERT_JOINED_VERSION,
             p_name: msg.name || null,
           });
           if (error) {
@@ -3199,7 +3306,7 @@ Deno.serve(async (req: Request) => {
             if (gotTrades) {
               await holdAlerts({ _lane: "alerts_parishes" });
               root.setAttributes({ "yaadly.alerts.outcome": "trades_from_opener" });
-              return await askFromList(supabase as unknown as SettingsReader, msg.from, msg.channel, "parishes", `You are on the list, for ${sayList(tRow!.matched)}.${droppedHere} ${ALERT_TERMS}`, PARISHES_TYPED);
+              return await askFromList(supabase as unknown as SettingsReader, msg.from, msg.channel, "parishes", `You are on the list, for ${sayList(tRow!.matched)}.${droppedHere} ${ALERT_TERMS_JOINED}`, PARISHES_TYPED);
             }
             // Nothing usable as a trade. Fall through to the ordinary first
             // question. Any parishes they gave are already saved, and the
@@ -3212,7 +3319,7 @@ Deno.serve(async (req: Request) => {
           if (row?.listening) {
             return twiml(`You are already on the list, for ${sayList(row.trades)} in ${sayList(row.parishes)}. To change that, tell me your trades now, separated by commas. Send STOP instead if you want to come off altogether.`);
           }
-          return await askFromList(supabase as unknown as SettingsReader, msg.from, msg.channel, "trades", `You are on the list. ${ALERT_TERMS}`, TRADES_TYPED);
+          return await askFromList(supabase as unknown as SettingsReader, msg.from, msg.channel, "trades", `You are on the list. ${ALERT_TERMS_JOINED}`, TRADES_TYPED);
         }
       }
 
@@ -3236,7 +3343,7 @@ Deno.serve(async (req: Request) => {
           "yaadly.arrival.job": onSiteJob, "yaadly.arrival.by": "button",
           "yaadly.arrival.outcome": error ? "refused" : (row?.already_logged_today ? "already_today" : "logged"),
         });
-        if (error) return twiml(`That did not save: ${error.message}`);
+        if (error) return twiml(await refused(error, "Check-in button", "Send your location here instead: tap +, Location, Send your current location."));
         const pinAsk = "To put on record where you are, tap the + or the paperclip in this chat, then Location, then Send your current location. Do this before you leave site today.";
         return twiml(row?.already_logged_today
           ? `You are already checked in on ${onSiteJob} today. One check in a day covers every stage. ${pinAsk}`
@@ -3306,8 +3413,8 @@ Deno.serve(async (req: Request) => {
               .upsert({ phone: msg.from, job_id: target.id, kind, started_at: new Date().toISOString() }, { onConflict: "phone" });
             root.setAttributes({ "yaadly.whatsapp_report.tap": kind, "yaadly.whatsapp_report.job": target.id });
             return twiml(kind === "edit"
-              ? `Type what your report should say about the work on ${target.title}, in your own words, in one message. It replaces your account on the report. The dates and photos stay as they are. You still tap Sign when it reads right.`
-              : `Tell us what is wrong with the report for ${target.title}, in one message. It goes to Yaadly and the report waits. It does not go to the owner.`);
+              ? `Type what your report should say about the work on ${target.title}, in one message.\nIt replaces your words on the report. The dates and photos stay.\nThen tap Sign when it reads right.`
+              : `Tell us what is wrong with the report for ${target.title}, in one message.\nIt goes to Yaadly, not the client, and the report waits.`);
           }
           return twiml("That report is not waiting on you from this number. Open the link in your last Yaadly message.");
         }
@@ -3319,16 +3426,26 @@ Deno.serve(async (req: Request) => {
           const looksLikeCode = /^[A-Z]+-[A-Z0-9-]+$/i.test(said);
           await supabase.from("completion_report_whatsapp_pending").delete().eq("phone", msg.from);
           if (fresh && !looksLikeCode) {
+            // His words on the report reach the client, so they are screened
+            // the way his own version of a stage report is (own-words.ts).
+            // Nothing is saved; the button is still there to try again.
+            if (pend.kind === "edit") {
+              const screened = screenOwnWords(said);
+              if (!screened.ok) {
+                root.setAttributes({ "yaadly.whatsapp_report.words": "edit", "yaadly.whatsapp_report.outcome": "own_words_screened" });
+                return twiml(`${screened.message} Tap Change my words to try again.`);
+              }
+            }
             const fn = pend.kind === "edit" ? "edit_completion_account_via_whatsapp" : "raise_completion_issue_via_whatsapp";
             const args = pend.kind === "edit"
               ? { p_job: pend.job_id, p_phone: msg.from, p_account: said.slice(0, 2000) }
               : { p_job: pend.job_id, p_phone: msg.from, p_body: said.slice(0, 1500) };
             const { error } = await supabase.rpc(fn, args);
             root.setAttributes({ "yaadly.whatsapp_report.words": String(pend.kind), "yaadly.whatsapp_report.outcome": error ? "refused" : "saved" });
-            if (error) return twiml(`That did not go through: ${error.message}`);
+            if (error) return twiml(await refused(error, "Completion Report words", "Tap the button on your report again, or say \"talk to a person\"."));
             return twiml(pend.kind === "edit"
               ? `Done. Your report now says, in your words:\n\n"${said.slice(0, 600)}"\n\nTap Sign the report above when it reads right, or Change my words again.`
-              : "Sent to Yaadly. The report waits and does not go to the owner. Yaadly will come back to you, and it comes back to you to sign once it is right.");
+              : "Sent to Yaadly. The report waits and does not go to the client.\nNext: a person at Yaadly replies here. Once it is right, it comes back to you to sign.", [said]);
           }
         }
       }
@@ -3340,6 +3457,20 @@ Deno.serve(async (req: Request) => {
       // worker to decide, not routed through anyone else first.
       if (!evidenceHeld && reportSession && !msg.media.length && msg.text.trim()) {
         const a = reportSession.answers as any;
+        // A draft he has not seen yet, 30 Sep 2026. When no message from this
+        // number came in during the 24 hours before the draft was made,
+        // WhatsApp's window was shut and the draft went out only as a
+        // template saying one is waiting ("reply here with anything"). So
+        // his first reply, whatever it says, gets the draft itself, and
+        // nothing is sent or read as his own version until he has seen it. A
+        // tap on the draft's buttons means he has, and skips this.
+        if (!draftTap && a.draft_shown !== true && await draftNotSeenYet(supabase, msg.from, String(reportSession.updated_at ?? ""))) {
+          await supabase.from("wa_intake_sessions")
+            .update({ answers: { ...a, draft_shown: true } })
+            .eq("wa_id", msg.from);
+          root.setAttributes({ "yaadly.report_confirm.job": a.job_id, "yaadly.report_confirm.outcome": "draft_shown_after_template" });
+          return twiml(draftShownLate(String(a.job_id ?? ""), String(a.draft_text ?? "")));
+        }
         // "Send as written" is a way of replying 1. It reached here only
         // because its code matched the draft that is waiting.
         const said = draftTap?.kind === "send" ? "1" : msg.text.trim();
@@ -3412,10 +3543,14 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        if (error) return twiml("That did not go through. Try again, or send it again in a moment.");
+        if (error) return twiml("That did not go through. Reply 1 again in a moment, or send your words again.");
+        // Never a dead end (founder, 29 Sep 2026): what comes next, and the
+        // one thing to keep doing. A note from the client is pushed here by
+        // the comment lane below.
+        const afterSend = "\nNext: the client checks it. If they have a note, it comes to you here.\nKeep sending photos and updates as the work goes on.";
         return twiml(said === "1"
-          ? "Sent to the client as drafted."
-          : "Sent to the client, your own words.");
+          ? `Sent to the client as drafted.${afterSend}`
+          : `Sent to the client, your own words.${afterSend}`);
       }
 
       // A code prompt, shared by the "one job" and "several jobs" cases:
@@ -3436,8 +3571,8 @@ Deno.serve(async (req: Request) => {
       // Said when the photo is first parked and again if a reply does not
       // match a job, not on every message: a clock repeated four times in a
       // row reads as nagging and stops being heard.
-      const UNFILED_NOTICE = "It is not attached to a job or a stage until you confirm which job it is, and an unattached photo is deleted after 72 hours.";
-      const UNFILED_NOTICE_SHORT = "It is not on the job until you answer, and an unfiled photo is deleted after 72 hours.";
+      const UNFILED_NOTICE = "It stays off the job until you answer. Photos nobody answers for are cleared after 72 hours.";
+      const UNFILED_NOTICE_SHORT = "It stays off the job until you answer. Photos nobody answers for are cleared after 72 hours.";
 
       const codePrompt = (choices: { id: string; title: string }[]) =>
         choices.length === 1
@@ -3454,8 +3589,12 @@ Deno.serve(async (req: Request) => {
           // about money or a stage (HUMAN_ONLY_DECISIONS). Saying which job a
           // photograph belongs to is neither, and the two must not start
           // sharing a word in front of workers.
-          ? `This looks like it is for ${choices[0].id} (${choices[0].title}). Reply 1 to confirm it is that job, or tell us the right job.`
-          : `Which job is this for? Reply with the code:  ${choices.map((c) => `${c.id} (${c.title})`).join("  ")}`;
+          // "or tell us the right job" until 30 Sep 2026, but only a code, a
+          // number or part of the title is ever matched, so free words failed.
+          ? `This looks like it is for ${choices[0].id} (${choices[0].title}). Reply 1 to confirm it is that job.`
+          // The number is matched too (pickJobChoice), and is the one thing
+          // easy to type on a phone. The code still works.
+          : `Which job is this for? Reply with its number:\n${choices.map((c, i) => `${i + 1}. ${c.id} (${c.title})`).join("\n")}`;
 
       // The job-code answer to a freeform update that named more than one
       // active job (see the text_update lane further down). Same shape as
@@ -3475,14 +3614,14 @@ Deno.serve(async (req: Request) => {
         await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
         const row = Array.isArray(logged) ? logged[0] : logged;
         root.setAttributes({ "yaadly.arrival.job": pick.id, "yaadly.arrival.outcome": error ? "refused" : "logged_after_confirm" });
-        if (error) return twiml(`That did not save: ${error.message}`);
+        if (error) return twiml(await refused(error, "Check-in pin", "Send your location again in a moment, or say \"talk to a person\"."));
         if (row?.already_logged_today) {
           const filed = await fileWorkLogPin(supabase, pick.id, msg.from, Number(a.lat), Number(a.lon), String(a.place ?? ""), root);
           return twiml(filed
-            ? `Already checked in on ${pick.id} (${pick.title}) today, so I have put this on the job as where you were. It strengthens the record and nothing waits on it.`
-            : `You are already checked in on ${pick.id} (${pick.title}) today, so nothing changed.`);
+            ? `You are already checked in on ${pick.id} ({pick.title}) today. This pin is saved on the job as where you are working.\nNext: send your photos or a few words on the work.`
+            : `You are already checked in on ${pick.id} ({pick.title}) today.\nNext: send your photos or a few words on the work.`);
         }
-        return twiml(`Checked in on ${pick.id} (${pick.title}). That is on the Arrival Log now.`);
+        return twiml(`Checked in on ${pick.id} ({pick.title}) for today.\nNext: send your photos or a few words on the work.`);
       }
 
       if (!evidenceHeld && textUpdateSession && !msg.media.length && msg.text.trim()) {
@@ -3490,16 +3629,21 @@ Deno.serve(async (req: Request) => {
         const choices: { id: string; title: string; stage: number }[] = a.job_choices ?? [];
         const pick = pickJobChoice(msg.text, choices);
         if (!pick) return twiml(`Sorry, that did not match a job. ${codePrompt(choices)}`);
-        const noteLabel = String(a.text ?? "").trim().slice(0, 1000);
-        const { error } = await supabase.from("evidence").insert({
-          job_id: pick.id, label: noteLabel, stage: pick.stage,
-          kind: "work", uploaded_by: a.worker_email, sha256: await noteSha256(noteLabel, pick.id),
+        // Read back, never filed on the job answer (30 Sep 2026). With more
+        // than one live job this used to file the words straight away, which
+        // skipped both the 17 Sep rule (only a 1 files) and the check-in ask.
+        // Now the job answer turns it into the same held update a worker with
+        // one job gets: the update_draft lane above takes the 1, and
+        // fileHeldDraft asks for the check-in exactly as it does for them.
+        const words = String(a.text ?? "").trim().slice(0, 1000);
+        await supabase.from("wa_intake_sessions").upsert({
+          wa_id: msg.from,
+          answers: { _lane: "update_draft", worker_email: a.worker_email, job_id: pick.id, job_title: pick.title, text: words },
+          photo_count: 0,
+          updated_at: new Date().toISOString(),
         });
-        await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
-        root.setAttributes({ "yaadly.worker_update.job": pick.id, "yaadly.worker_update.outcome": error ? "insert_failed" : "filed" });
-        return twiml(error
-          ? "That did not save properly. Try again."
-          : `Got it, on record for ${pick.id} (${pick.title}).\n\n${WHAT_HAPPENS_NEXT}\n\nNeed a person instead? Just say so.`);
+        root.setAttributes({ "yaadly.worker_update.job": pick.id, "yaadly.worker_update.outcome": "held_for_confirm_after_job_answer" });
+        return await readBack(supabase as unknown as SettingsReader, msg.from, msg.channel, draftReadBack(pick.id, pick.title, words), pick.id, pick.title, words);
       }
 
       // ── a typed update waiting on a reply of 1 ────────────────────────────
@@ -3530,6 +3674,15 @@ Deno.serve(async (req: Request) => {
         }, trace);
       };
 
+      // A worker who asks for a person while the check-in question is open.
+      // The desk is told the way a worker's question is (it texts her), and
+      // nothing moves: the photos or update keep waiting on the same answer.
+      const askedForAPersonMidCheckIn = async (jobId: string, held: "photos" | "update"): Promise<string> => {
+        root.setAttributes({ "yaadly.arrival_hold.outcome": "asked_for_a_person" });
+        await tellDeskAWorkerNeedsAPerson(supabase as unknown as SettingsReader, msg, jobId, "person", trace);
+        return `A person at Yaadly has your message and will reply here.\n\n${arrivalStillWanted(held)}`;
+      };
+
       // Filing a typed update that has had its 1. One place, because since the
       // check-in hold there are three ways to reach it: the 1 itself, "done"
       // after checking in on the portal, and the pin arriving on its own.
@@ -3553,7 +3706,7 @@ Deno.serve(async (req: Request) => {
             .eq("wa_id", msg.from);
           root.setAttributes({ "yaadly.worker_update.job": job.id, "yaadly.arrival_hold.outcome": first ? "asked" : "asked_again" });
           if (!first) return `No check-in found for today yet. ${arrivalStillWanted("update")}`;
-          return arrivalAsk(job.id, await stageSaid(supabase, job.id, job.stage), "update", await mintPortalUploadLink(supabase, found.email, job.id));
+          return arrivalAsk(job.id, await stageSaid(supabase, job.id, job.stage), "update", null);
         }
         await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
         // batch_id carries only when this draft was held as a note about a
@@ -3594,7 +3747,11 @@ Deno.serve(async (req: Request) => {
         // check-in question, which would file the very words being dropped.
         if (a.arrival_asked_at && said !== "1" && updateTap?.kind !== "drop") {
           if (isSkip(said)) return twiml(await fileHeldDraft(a, "skip"));
-          if (cannotCheckIn(said) || wantsAPerson(said)) {
+          // Asking for a person is not "I cannot check in" (30 Sep 2026: it
+          // was recorded as that, and the request for a person was lost). A
+          // person is told, and the update waits exactly as it was.
+          if (wantsAPerson(said)) return twiml(await askedForAPersonMidCheckIn(String(a.job_id ?? ""), "update"));
+          if (cannotCheckIn(said)) {
             await raiseCannotCheckIn(String(a.job_id ?? ""), "update");
             return twiml(await fileHeldDraft(a, "cannot"));
           }
@@ -3616,7 +3773,7 @@ Deno.serve(async (req: Request) => {
         if (reply === "discard") {
           await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
           root.setAttributes({ "yaadly.worker_update.outcome": "draft_dropped" });
-          return twiml("Dropped, nothing went on the job.");
+          return twiml("Dropped, nothing went on the job.\nSend a photo, a few words or a voice note when you have an update.");
         }
         if (reply === "file") return twiml(await fileHeldDraft(a));
         // "replace": falls through to the general door below.
@@ -3687,7 +3844,7 @@ Deno.serve(async (req: Request) => {
             await supabase.from("wa_intake_sessions")
               .update({ answers: { ...base, confirmed_job: job.id, confirmed_stage: job.stage }, updated_at: new Date().toISOString() })
               .eq("wa_id", msg.from);
-            return twiml(`${lead ?? `Got it, that's for ${job.id}, ${said}.`} Anything you send now files against that stage. What does this show? A line on what was done helps the client understand it faster. ${UNFILED_NOTICE_SHORT}`);
+            return twiml(`${lead ?? `Got it, that's for ${job.id}, ${said}.`} Anything you send now goes on that stage. \nWhat does this show? A line on what was done is enough.\n${UNFILED_NOTICE_SHORT}`);
           }
           // Everything already carries a caption, so no context question is
           // needed, but the section one still is: a worker who captioned their
@@ -3701,7 +3858,7 @@ Deno.serve(async (req: Request) => {
             })
             .eq("wa_id", msg.from);
           root.setAttributes({ "yaadly.evidence_intake.outcome": "confirmed_asked_phase" });
-          return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, `${lead ?? `Got it, that's for ${job.id} (${job.title}), ${said}.`} Anything you send now files against that stage.${pairHint(await beforesOnJob(supabase, job.id))}`);
+          return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, `${lead ?? `Got it, that's for ${job.id} (${job.title}), ${said}.`} Anything you send now goes on that stage.${pairHint(await beforesOnJob(supabase, job.id))}`);
         };
 
         // ── the check-in question, waiting on its answer ─────────────────
@@ -3718,16 +3875,17 @@ Deno.serve(async (req: Request) => {
             const { data: logged, error } = await supabase.rpc("log_arrival_via_whatsapp", {
               p_job: job.id, p_phone: msg.from, p_lat: msg.lat, p_lon: msg.lon,
             });
-            if (error) return twiml(`That did not save: ${error.message} ${arrivalStillWanted("photos")}`);
+            if (error) return twiml(await refused(error, "Check-in pin", arrivalStillWanted("photos")));
             const row = Array.isArray(logged) ? logged[0] : logged;
             root.setAttributes({ "yaadly.arrival.job": job.id, "yaadly.arrival.outcome": row?.already_logged_today ? "already_today" : "logged", "yaadly.arrival_hold.outcome": "checked_in" });
-            return askWhatNext(moveOn, job, `Checked in on ${job.id}${msg.place ? ` from ${msg.place}` : ""}. That is on the Arrival Log now.`);
+            return askWhatNext(moveOn, job, `Checked in on ${job.id}${msg.place ? ` from ${msg.place}` : ""} for today.`);
           }
           if (isSkip(said)) {
             root.setAttributes({ "yaadly.arrival_hold.outcome": "skipped" });
             return askWhatNext(moveOn, job, CHECK_IN_BEFORE_YOU_LEAVE);
           }
-          if (cannotCheckIn(said) || wantsAPerson(said)) {
+          if (wantsAPerson(said)) return twiml(await askedForAPersonMidCheckIn(job.id, "photos"));
+          if (cannotCheckIn(said)) {
             await raiseCannotCheckIn(job.id, "photos");
             return askWhatNext(moveOn, job, `Understood, your photos go on the job without a check-in.${CHECK_IN_TOLD}`);
           }
@@ -3843,7 +4001,10 @@ Deno.serve(async (req: Request) => {
             "yaadly.evidence_intake.phase": phase ?? "none",
           });
           if (!filed) return twiml("Nothing saved properly there. Try sending the photo again.");
-          const filedLabel = await stageLabel(supabase, confirmedJob.id, confirmedJob.stage);
+          // stageSaid, never stageLabel: the label ends "(30% of the total)",
+          // and what share of the money a stage is worth is not a thing to put
+          // in front of somebody mid-job (see stageSaid).
+          const filedLabel = await stageSaid(supabase, confirmedJob.id, confirmedJob.stage);
           const answering = named ? `, answering ${named.item_code}` : "";
           // The invitation to say something about them, offered every time
           // rather than only when a photograph arrived with no caption.
@@ -3853,16 +4014,18 @@ Deno.serve(async (req: Request) => {
           // not already the answer to a question: before this it is the job
           // code, the caption, or the section.
           const them = filed === 1 ? "it" : "them";
-          const invite = ` Anything to say about ${them}? Type it now and it goes on the same update. ${WHAT_HAPPENS_NEXT}`;
+          const invite = `\nAnything to say about ${them}? Type it now and it goes with ${them}.\n\n${WHAT_HAPPENS_NEXT}`;
           let body = phase
-            ? `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}, marked as ${PHASE_SAID[phase]}${answering}.${invite}`
-            : `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}. I could not tell which part of the job that was, so it is on record unmarked.${invite}`;
+            ? `Filed ${filed} item${filed === 1 ? "" : "s"} on ${confirmedJob.id}, ${filedLabel}, as ${PHASE_SAID[phase]}${answering}.${invite}`
+            : `Filed ${filed} item${filed === 1 ? "" : "s"} on ${confirmedJob.id}, ${filedLabel}, with no section (before, during or after).${invite}`;
           // Said, not silently swallowed. The evidence is filed either way;
           // what is missing is only the link between the two photographs, and
           // the desk can put that right without the worker resending anything.
-          if (code && !named) body += ` I could not find ${code} on this job, so it is filed without being linked to a before.`;
-          const link = await mintPortalUploadLink(supabase, workerEmail, confirmedJob.id);
-          if (link) body += ` For a longer video the portal takes a bigger file: ${link}`;
+          if (code && !named) body += `\nI could not find ${code} on this job, so it is not linked to a before.`;
+          // No sign-in link pasted into the chat (30 Sep 2026): a forwarded
+          // message would hand over the account, and the link ran to several
+          // lines on a phone. The address is enough; the portal signs them in.
+          body += "\nA longer video? Upload it on the job at app.yaadly.co.uk.";
           return twiml(body);
         }
 
@@ -3918,7 +4081,7 @@ Deno.serve(async (req: Request) => {
             })
             .eq("wa_id", msg.from);
           root.setAttributes({ "yaadly.arrival_hold.outcome": "asked", "yaadly.evidence_intake.outcome": "confirmed_asked_check_in" });
-          return twiml(arrivalAsk(pick.id, await stageSaid(supabase, pick.id, pick.stage), "photos", await mintPortalUploadLink(supabase, workerEmail, pick.id)));
+          return twiml(arrivalAsk(pick.id, await stageSaid(supabase, pick.id, pick.stage), "photos", null));
         }
 
         return askWhatNext(answers, pick, null);
@@ -3969,19 +4132,19 @@ Deno.serve(async (req: Request) => {
               "yaadly.arrival.job": job.id,
               "yaadly.arrival.outcome": error ? "refused" : (row?.already_logged_today ? "already_today" : "logged"),
             });
-            if (error) return twiml(`That did not save: ${error.message}`);
+            if (error) return twiml(await refused(error, "Check-in pin", "Send your location again in a moment, or say \"talk to a person\"."));
             if (row?.already_logged_today) {
               const filed = await fileWorkLogPin(supabase, job.id, msg.from, msg.lat!, msg.lon!, msg.place ?? "", root);
               return twiml(filed
-                ? `Already checked in on ${job.id} (${job.title}) today, so I have put this on the job as where you were${where}. It strengthens the record and nothing waits on it.`
-                : `You are already checked in on ${job.id} (${job.title}) today, so nothing changed.`);
+                ? `You are already checked in on ${job.id} ({job.title}) today. This pin is saved on the job as where you are working.\nNext: send your photos or a few words on the work.`
+                : `You are already checked in on ${job.id} ({job.title}) today.\nNext: send your photos or a few words on the work.`);
             }
             // A typed update that had its 1 and was waiting on this pin.
             const heldDraft = draftSession?.answers as any;
             if (heldDraft?.arrival_asked_at && heldDraft.job_id === job.id) {
-              return twiml(`Checked in on ${job.id}${where}. That is on the Arrival Log now. ${await fileHeldDraft(heldDraft)}`);
+              return twiml(`Checked in on ${job.id}${where} for today. ${await fileHeldDraft(heldDraft)}`);
             }
-            return twiml(`Checked in on ${job.id} (${job.title})${where}. That is on the Arrival Log now.`);
+            return twiml(`Checked in on ${job.id} ({job.title}){where} for today.\nNext: send your photos or a few words on the work.`);
           }
           if (found.jobs.length > 1) {
             await supabase.from("wa_intake_sessions").upsert({
@@ -4100,27 +4263,47 @@ Deno.serve(async (req: Request) => {
             const { data: stageItems } = await supabase.from("evidence")
               .select("id, item_code").eq("job_id", job.id).eq("stage", job.stage);
             const namedItem = pickEvidenceItem(msg.text, stageItems ?? []);
-            await supabase.from("evidence_comments").insert({
-              job_id: job.id, stage: job.stage, from_role: "worker", origin: "whatsapp",
-              body: msg.text.trim().slice(0, 1000), evidence_id: namedItem?.id ?? null,
-            });
-            root.setAttributes({ "yaadly.evidence_comment.job": job.id, "yaadly.evidence_comment.from": "worker" });
 
-            const { data: jobRow } = await supabase.from("jobs")
-              .select("client_phone").eq("id", job.id).maybeSingle();
-            let notified = false;
-            if (jobRow?.client_phone) {
-              notified = await sendWhatsAppTo(
-                String(jobRow.client_phone),
-                `The worker replied on ${job.id} (${job.title}): "${msg.text.trim().slice(0, 300)}"\n\nReply with the code ${job.id} to approve, or say more and we will pass it on.`,
-                trace,
-                { kind: "worker reply passed to client", job_id: job.id },
-              );
+            // Only an answer to the client goes to the client, 30 Sep 2026
+            // (worker-reply.ts). Until then any text went: "how do I share my
+            // location", a bare "ok", and ordinary updates that skipped the
+            // read-back and its 1. A question, an acknowledgement or an update
+            // falls through to the lanes below that already handle those, and
+            // unclear is read as an update, which is read back and waits for
+            // his 1. The relay is not a gate; the read-back is.
+            const kind = readWhileNoteWaits(msg.text, !!namedItem);
+            root.setAttributes({ "yaadly.evidence_comment.worker_words": kind });
+            if (kind === "reply") {
+              // His words go to the client as he typed them, so they are
+              // screened the way his own version of a report is. Nothing is
+              // rewritten and nothing is sent until they pass.
+              const screened = screenOwnWords(msg.text);
+              if (!screened.ok) {
+                root.setAttributes({ "yaadly.guardrail.blocked": 1, "yaadly.guardrail.term_count": screened.terms.length });
+                return twiml(screened.message);
+              }
+              await supabase.from("evidence_comments").insert({
+                job_id: job.id, stage: job.stage, from_role: "worker", origin: "whatsapp",
+                body: msg.text.trim().slice(0, 1000), evidence_id: namedItem?.id ?? null,
+              });
+              root.setAttributes({ "yaadly.evidence_comment.job": job.id, "yaadly.evidence_comment.from": "worker" });
+
+              const { data: jobRow } = await supabase.from("jobs")
+                .select("client_phone").eq("id", job.id).maybeSingle();
+              let notified = false;
+              if (jobRow?.client_phone) {
+                notified = await sendWhatsAppTo(
+                  String(jobRow.client_phone),
+                  `The worker replied on ${job.id} (${job.title}): "${msg.text.trim().slice(0, 300)}"\n\nReply with the code ${job.id} to approve, or say more and we will pass it on.`,
+                  trace,
+                  { kind: "worker reply passed to client", job_id: job.id },
+                );
+              }
+              root.setAttributes({ "yaadly.evidence_comment.client_notified": notified });
+              return twiml(notified
+                ? `Sent to the client on ${job.id} as your answer to their note.\nIf they reply, it comes to you here. Keep sending photos and updates as normal.`
+                : `We could not reach the client just now, but your answer is saved on ${job.id}.\nKeep sending photos and updates as normal.`);
             }
-            root.setAttributes({ "yaadly.evidence_comment.client_notified": notified });
-            return twiml(notified
-              ? `Got it, passed on to the client on ${job.id}.`
-              : `Got it, on record against ${job.id}. We could not reach the client directly just now, but it is saved.`);
           }
         }
       }
@@ -4139,7 +4322,7 @@ Deno.serve(async (req: Request) => {
         if (addonCode) {
           const { data: done, error } = await supabase.rpc("agree_addon_via_whatsapp", { p_phone: msg.from, p_code: addonCode });
           root.setAttributes({ "yaadly.addon.confirm": error ? "refused" : "agreed" });
-          if (error) return twiml(`That did not go through: ${error.message}`);
+          if (error) return twiml(await refused(error, "Add-on confirm", "Try again in a moment, or confirm it on your job in the Yaadly portal."));
           const row = Array.isArray(done) ? done[0] : done;
           return twiml(`Confirmed. The extra work on ${row?.job_id ?? "your job"} is agreed, and your tradesperson has been told. ` +
             `Yaadly will send you its invoice, and the extra work starts once it is paid. Any change from here is made on your job in the Yaadly portal.`);
@@ -4206,7 +4389,7 @@ Deno.serve(async (req: Request) => {
         if (quoteTarget) {
           const { data: qResult, error: qErr } = await supabase.rpc("agree_quote_via_whatsapp", { p_job: quoteTarget.id, p_phone: msg.from });
           root.setAttributes({ "yaadly.whatsapp_quote_confirm.job": quoteTarget.id, "yaadly.whatsapp_quote_confirm.outcome": qErr ? "refused" : "confirmed" });
-          if (qErr) return twiml(`That did not go through: ${qErr.message}`);
+          if (qErr) return twiml(await refused(qErr, "Quote reply", "Try again in a moment, or say \"talk to a person\"."));
           const row = Array.isArray(qResult) ? qResult[0] : qResult;
           // Named the real, working alternative rather than a vague
           // "ask Yaadly": the portal button next to this exact price is
@@ -4248,8 +4431,8 @@ Deno.serve(async (req: Request) => {
           if (signTarget) {
             const { error } = await supabase.rpc("sign_completion_report_via_whatsapp", { p_job: signTarget.id, p_phone: msg.from });
             root.setAttributes({ "yaadly.whatsapp_report_sign.job": signTarget.id, "yaadly.whatsapp_report_sign.outcome": error ? "refused" : "signed" });
-            if (error) return twiml(`That did not go through: ${error.message}`);
-            return twiml(`Signed. Your Completion Report for ${signTarget.title} goes to the owner in a moment. Thank you for the work.`);
+            if (error) return twiml(await refused(error, "Completion Report sign", "Tap Sign again in a moment, or sign it on the job in the portal."));
+            return twiml(`Signed. Your Completion Report for ${signTarget.title} goes to the client next. Thank you for the work.`);
           }
         }
       }
@@ -4348,7 +4531,7 @@ Deno.serve(async (req: Request) => {
           // different jobs must still resolve the one it actually typed.
           const { data: kResult, error: kErr } = await supabase.rpc("agree_kickoff_pack_via_whatsapp", { p_job: kickoffTarget.id, p_phone: msg.from });
           root.setAttributes({ "yaadly.whatsapp_kickoff_confirm.job": kickoffTarget.id, "yaadly.whatsapp_kickoff_confirm.outcome": kErr ? "refused" : "confirmed" });
-          if (kErr) return twiml(`That did not go through: ${kErr.message}`);
+          if (kErr) return twiml(await refused(kErr, "Job agreement confirm", "Try again in a moment, or say \"talk to a person\"."));
           const row = Array.isArray(kResult) ? kResult[0] : kResult;
           // The client's own next action has to be spelled out here: found
           // live, testing this for real - "ready to be chosen" told the
@@ -4361,9 +4544,17 @@ Deno.serve(async (req: Request) => {
           if (row?.both_confirmed) {
             return twiml(row.agreed_side === "client"
               ? `Confirmed. Both sides have signed off on the Kickoff Pack for ${kickoffTarget.title}. Reply ${kickoffTarget.id} again to book them.`
-              : `Confirmed. Both sides have signed off on the Kickoff Pack for ${kickoffTarget.title}, ready for the client to choose.`);
+              // The worker's side, in plain words (30 Sep 2026): "the job
+              // agreement" is the Kickoff Pack, and "ready for the client to
+              // choose" described the order before 9 Sep, when the client's
+              // acceptance started booking the job on its own.
+              : `Confirmed. You and the client have both agreed the job agreement for ${kickoffTarget.title}.\nNext: you get a message here when the job is live.`);
           }
-          return twiml(`Confirmed on your side for ${kickoffTarget.title}. Waiting on the other side now, you'll hear the moment they confirm.`);
+          // No message fires when the other side confirms, so none is
+          // promised. The one that does fire is the job going live.
+          return twiml(row?.agreed_side === "client"
+            ? `Confirmed on your side for ${kickoffTarget.title}. Waiting on the tradesperson to confirm theirs.`
+            : `Confirmed on your side: the job agreement for ${kickoffTarget.title}.\nNothing more is needed from you on it. You get a message here when the job is live.`);
         }
       }
 
@@ -4398,7 +4589,7 @@ Deno.serve(async (req: Request) => {
         if (bookTarget) {
           const { error } = await supabase.rpc("choose_worker_via_whatsapp", { p_job: bookTarget.id, p_phone: msg.from });
           root.setAttributes({ "yaadly.whatsapp_quote_accept.job": bookTarget.id, "yaadly.whatsapp_quote_accept.outcome": error ? "refused" : "accepted" });
-          if (error) return twiml(`That did not go through: ${error.message}`);
+          if (error) return twiml(await refused(error, "Booking reply", "Try again in a moment, or choose on your job in the Yaadly portal."));
           return twiml(`Booked. ${bookTarget.title} is on. A message with the price and how payment works is coming through next.`);
         }
       }
@@ -4425,7 +4616,7 @@ Deno.serve(async (req: Request) => {
         const c = readDisputeClose(msg.text)!;
         const { error: cErr } = await supabase.rpc("close_dispute_via_whatsapp", { p_job: c.jobId, p_phone: msg.from, p_state: c.state });
         root.setAttributes({ "yaadly.dispute.job": c.jobId, "yaadly.dispute.outcome": cErr ? "close_refused" : c.state });
-        if (cErr) return twiml(`That did not go through: ${cErr.message}`);
+        if (cErr) return twiml(await refused(cErr, "Problem close", "Try again in a moment, or say \"talk to a person\"."));
         return twiml(closedReply(c.state));
       }
 
@@ -4440,7 +4631,7 @@ Deno.serve(async (req: Request) => {
         const { data: acc, error: accErr } = await supabase.rpc("accept_walkthrough_via_whatsapp", { p_job: wantJob, p_phone: msg.from });
         const row = (Array.isArray(acc) ? acc[0] : acc) as { offer?: string; platform?: string; link?: string } | null;
         root.setAttributes({ "yaadly.walkthrough.job": wantJob, "yaadly.walkthrough.outcome": accErr ? "accept_refused" : "accepted" });
-        if (accErr) return twiml(`That did not go through: ${accErr.message}`);
+        if (accErr) return twiml(await refused(accErr, "Walkthrough accept", "Try again in a moment, or accept it on your job in the Yaadly portal."));
         return twiml(acceptedForClient(String(row?.offer ?? ""), WALK_PLATFORM[String(row?.platform ?? "")] ?? "a video call", String(row?.link ?? "").trim() || null));
       }
 
@@ -4500,7 +4691,7 @@ Deno.serve(async (req: Request) => {
             if (one) {
               const { error: rErr } = await supabase.rpc("raise_dispute_via_whatsapp", { p_job: one.id, p_phone: msg.from, p_body: said.slice(0, 2000) });
               root.setAttributes({ "yaadly.client_lane.outcome": rErr ? "problem_refused" : "problem_to_worker", "yaadly.client_lane.job": one.id });
-              if (rErr) return twiml(`That did not go through: ${rErr.message}`);
+              if (rErr) return twiml(await refused(rErr, "Problem raised", "Try again in a moment, or say \"talk to a person\"."));
               return twiml(problemSent(one.id, said));
             }
             root.setAttributes({ "yaadly.client_lane.outcome": "problem_to_yaadly" });
@@ -4538,7 +4729,7 @@ Deno.serve(async (req: Request) => {
         if (target) {
           const { error } = await supabase.rpc("approve_stage_via_whatsapp", { p_job: target.id, p_phone: msg.from });
           root.setAttributes({ "yaadly.whatsapp_approval.job": target.id, "yaadly.whatsapp_approval.outcome": error ? "refused" : "approved" });
-          if (error) return twiml(`That did not go through: ${error.message}`);
+          if (error) return twiml(await refused(error, "Stage approval", "Try again in a moment, or approve it on your job in the Yaadly portal."));
           const label = await stageLabel(supabase, target.id, target.stage ?? 1);
           // "and the worker is paid for it" until 4 Sep 2026, which was not
           // true at the moment it was sent. Approving a stage fires
@@ -4586,7 +4777,7 @@ Deno.serve(async (req: Request) => {
             if (worker?.phone) {
               notified = await sendWhatsAppTo(
                 String(worker.phone),
-                `A note from the client on ${job.id} (${job.title}), stage ${job.stage}: "${msg.text.trim().slice(0, 300)}"\n\nReply to this number to answer, and it goes straight back to them.`,
+                `A note from the client on ${job.id} (${job.title}): "${msg.text.trim().slice(0, 300)}"\n\nReply here to answer them. Photos and updates still go on the job as normal.`,
                 trace,
                 { kind: "client note passed to worker", job_id: job.id },
               );
@@ -4733,10 +4924,17 @@ Deno.serve(async (req: Request) => {
               .eq("state", "direct").is("reply", null);
             if ((openD ?? []).length === 1) {
               const dj = String((openD![0] as { job_id: string }).job_id);
+              // His reply goes to the client word for word, so it is screened
+              // first, as his own version of a report is (own-words.ts).
+              const screenedReply = screenOwnWords(text);
+              if (!screenedReply.ok) {
+                root.setAttributes({ "yaadly.dispute.job": dj, "yaadly.dispute.outcome": "own_words_screened" });
+                return twiml(screenedReply.message);
+              }
               const { error: rpErr } = await supabase.rpc("reply_dispute_via_whatsapp", { p_job: dj, p_phone: msg.from, p_reply: text.slice(0, 2000) });
               root.setAttributes({ "yaadly.dispute.job": dj, "yaadly.dispute.outcome": rpErr ? "reply_refused" : "replied" });
-              if (rpErr) return twiml(`That did not go through: ${rpErr.message}`);
-              return twiml(replySent(text));
+              if (rpErr) return twiml(await refused(rpErr, "Problem reply", "Try again in a moment, or reply on the job in the portal."));
+              return twiml(replySent(text), [text]);
             }
           }
 
@@ -4751,10 +4949,15 @@ Deno.serve(async (req: Request) => {
               .eq("signoff_method", "walkthrough").is("walk_accepted_at", null);
             if ((walks ?? []).length === 1) {
               const wj = walks![0] as { id: string; title: string };
+              const screenedOffer = screenOwnWords(text);
+              if (!screenedOffer.ok) {
+                root.setAttributes({ "yaadly.walkthrough.job": wj.id, "yaadly.walkthrough.outcome": "own_words_screened" });
+                return twiml(screenedOffer.message);
+              }
               const { error: offErr } = await supabase.rpc("offer_walkthrough_via_whatsapp", { p_job: wj.id, p_phone: msg.from, p_offer: text.slice(0, 300), p_link: linkIn(text) });
               root.setAttributes({ "yaadly.walkthrough.job": wj.id, "yaadly.walkthrough.outcome": offErr ? "offer_refused" : "offered" });
-              if (offErr) return twiml(`That did not go through: ${offErr.message}`);
-              return twiml(offerSent(text.slice(0, 300)));
+              if (offErr) return twiml(await refused(offErr, "Walkthrough time", "Send the day and time again in a moment, or say \"talk to a person\"."));
+              return twiml(offerSent(text.slice(0, 300)), [text]);
             }
           }
 
@@ -4799,6 +5002,58 @@ Deno.serve(async (req: Request) => {
               updated_at: new Date().toISOString(),
             });
             return twiml(`Got it. ${codePrompt(found.jobs)}`);
+          }
+        }
+      }
+
+      // ── a tradesperson who would otherwise reach the client intake ──────
+      //
+      // 30 Sep 2026. A worker who asked for a person, or whose number has no
+      // live job (finished, or waiting on the client's invoice), fell through
+      // every worker lane into the client intake below. They were greeted as
+      // a client (asked what work their property needs) and a draft client job
+      // could be written with the worker's own phone as client_phone. Now a
+      // number that is on worker_profiles, and is not the client on any job,
+      // gets a worker's reply here and never reaches the intake. "New job"
+      // still goes through, for the worker who really is starting one. A
+      // held number is left to the held-thread block below, as before.
+      if (!deskHasThisNumber && !wantsFreshJob(msg.text)) {
+        const knownWorker = await isKnownWorkerNumber(supabase, msg.from);
+        if (knownWorker.length && !(await isClientNumber(supabase, msg.from))) {
+          const live = await lookupWorkerWithActiveJobs(supabase, msg.from);
+          const oneJob = live?.jobs.length === 1 ? live.jobs[0].id : "";
+          if (wantsAPerson(msg.text)) {
+            root.setAttributes({ "yaadly.worker_intake.outcome": "asked_for_a_person" });
+            await tellDeskAWorkerNeedsAPerson(supabase as unknown as SettingsReader, msg, oneJob, "person", trace);
+            return twiml(
+              "Of course. A person at Yaadly has your message and will reply here. It may not be straight away."
+                + (live ? "\nPhotos and updates for your job still go on it as normal." : ""),
+            );
+          }
+          if (!live) {
+            // Kept where the desk reads conversations, so a person can see
+            // what they said. No job is written and nothing is filed.
+            const said = msg.text.trim() || (msg.media.length ? "[sent a file with no words]" : "");
+            await supabase.from("intake_threads").upsert({
+              channel: threadKey.channel,
+              from_addr: threadKey.from_addr,
+              job_id: prior?.job_id ?? null,
+              transcript: `${String(prior?.transcript ?? "")}\n\n${said}`.slice(-8000),
+              turns: Number(prior?.turns ?? 0) + 1,
+              stage: String(prior?.stage ?? "done"),
+              last_at: new Date().toISOString(),
+            }, { onConflict: "channel,from_addr" });
+            await pushToDesk(supabase as unknown as SettingsReader, {
+              target: { channel: msg.channel, from_addr: msg.from || "unknown" },
+              title: "A tradesperson with no live job wrote in",
+              tags: "hammer",
+              body: "A number on the worker list wrote in with no live job on it. Nothing was filed and no job was made. Their words are on the conversation for this number.",
+            }, trace);
+            const payWait = await awaitingPaymentJobFor(supabase, knownWorker);
+            root.setAttributes({ "yaadly.worker_intake.outcome": payWait ? "job_waiting_on_payment" : "no_live_job" });
+            return twiml(payWait
+              ? `${payWait} starts once the client's invoice is paid, so nothing was filed yet.\nYou get a message here when the job is live.`
+              : "There is no live job on this number right now, so nothing was filed and nothing went to a client.\nYour message is saved for a person at Yaadly, who will reply here if it needs an answer.");
           }
         }
       }
@@ -4894,7 +5149,12 @@ Deno.serve(async (req: Request) => {
       }, trace);
       root.setAttributes({ "yaadly.inbound.outcome": "held_for_human", "yaadly.job.id": heldJobId });
       if (isTwilio) {
-        return twiml("Someone at Yaadly has this and is coming back to you. I have added your message so they see it.");
+        // A held worker's photos, pins and the 1 on an update still file
+        // (see heldWorker, above), so they are told, or they stop sending
+        // evidence while they wait.
+        return twiml(heldWorker
+          ? "Someone at Yaadly has this and is coming back to you. I have added your message so they see it.\nPhotos and your location still go on the job as normal."
+          : "Someone at Yaadly has this and is coming back to you. I have added your message so they see it.");
       }
       if (isWeb) {
         // On the web there is no reply lane back to this widget, so the

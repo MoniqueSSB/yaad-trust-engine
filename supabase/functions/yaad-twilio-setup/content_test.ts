@@ -62,3 +62,69 @@ Deno.test("the daily check-in's second message is the same line in both function
   assert(ON_SITE_BODY.includes("Are you on site today?") && ON_SITE_BODY.includes("Send current location"), "the first message asks the question and says how to add the location");
   assert(!/[\u2013\u2014]/.test(ON_SITE_BODY + ON_SITE_STEPS), "no dashes");
 });
+
+/* ── the new versions and the worker templates, 30 Sep 2026 ─────────────── */
+
+import {
+  ALERT_PARISHES_BODY, ALERT_PARISHES_NAME, ALERT_TRADES_BODY, ALERT_TRADES_NAME, JOB_ALERT_BODY, JOB_ALERT_NAME,
+  JOIN_ALERTS_BODY, JOIN_ALERTS_NAME, META_WORKER_TEMPLATES, metaWorkerApproval, metaWorkerContent,
+  UPDATE_DRAFT_BODY, UPDATE_DRAFT_NAME,
+} from "./content.ts";
+
+const DASH = /[\u2013\u2014]/;
+const BANNED = /escrow|\bheld\b|100%|guarantee/i;
+
+Deno.test("a changed body is a new name, never the approved one edited", () => {
+  assertEquals(UPDATE_DRAFT_NAME, "yaadly_update_read_back_v2");
+  assertEquals(JOIN_ALERTS_NAME, "yaadly_join_alerts_v2");
+  assertEquals(ALERT_TRADES_NAME, "yaadly_alert_trades_menu_v2");
+  assertEquals(ALERT_PARISHES_NAME, "yaadly_alert_parishes_menu_v2");
+  assertEquals(JOB_ALERT_NAME, "yaadly_job_alert_v2");
+});
+
+Deno.test("the joining button counts the questions joining actually asks", async () => {
+  const lane = await Deno.readTextFile(new URL("../yaad-inbound/join-lane.ts", import.meta.url));
+  // What a worker reads, not what a comment says: comment lines are skipped.
+  const code = lane.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
+  const totals = [...code.matchAll(/\b\d of (\d)\b/g)].map((m) => m[1]);
+  assert(totals.length > 0);
+  for (const n of totals) assert(JOIN_ALERTS_BODY.includes(`2 of ${n}:`), `join-lane.ts says of ${n}, the button disagrees`);
+});
+
+Deno.test("the read-back button says the typed way too", () => {
+  assert(UPDATE_DRAFT_BODY.includes("or reply 1"));
+});
+
+Deno.test("the lists say how to name one that is not listed", () => {
+  for (const b of [ALERT_TRADES_BODY, ALERT_PARISHES_BODY]) assert(/not on the list\? Type/.test(b), b);
+});
+
+Deno.test("the job alert puts no article in front of the trade", () => {
+  assert(!/\ban? \{\{1\}\}/.test(JOB_ALERT_BODY), JOB_ALERT_BODY);
+});
+
+Deno.test("every worker template follows Meta's rules and Yaadly's", () => {
+  const names = new Set<string>();
+  const settings = new Set<string>();
+  for (const t of META_WORKER_TEMPLATES) {
+    assert(/^[a-z0-9_]+$/.test(t.name), t.name);
+    assert(!names.has(t.name) && !settings.has(t.setting), `${t.name} is listed twice`);
+    names.add(t.name); settings.add(t.setting);
+    assert(t.setting.startsWith("twilio_content_sid_"));
+    assert(!/^\s*\{\{/.test(t.body) && !/\}\}\s*[.]?\s*$/.test(t.body), `${t.name} starts or ends with a variable`);
+    const used = [...t.body.matchAll(/\{\{(\d+)\}\}/g)].map((m) => m[1]);
+    assertEquals([...new Set(used)].sort(), Object.keys(t.variables).sort(), `${t.name}: every variable needs a sample, and every sample a variable`);
+    assert(!DASH.test(t.body), `${t.name} has a dash`);
+    assert(!BANNED.test(t.body), `${t.name} has a banned word`);
+    assert(!/\bowner\b/i.test(t.body), `${t.name} says owner, not client`);
+    assertEquals(metaWorkerApproval(t).category, "UTILITY");
+    assertEquals(metaWorkerContent(t).types["twilio/text"].body, t.body);
+  }
+});
+
+Deno.test("no new body carries a dash or a banned word", () => {
+  for (const b of [UPDATE_DRAFT_BODY, JOIN_ALERTS_BODY, ALERT_TRADES_BODY, ALERT_PARISHES_BODY, JOB_ALERT_BODY]) {
+    assert(!DASH.test(b), b);
+    assert(!BANNED.test(b), b);
+  }
+});

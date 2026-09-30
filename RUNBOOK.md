@@ -6533,3 +6533,36 @@ curl -s -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-crm-s
 ```
 
 **To turn it off.** `supabase secrets unset HUBSPOT_LEAD_WEBHOOK_SECRET HUBSPOT_STAGE_WEBHOOK_SECRET --project-ref leffyisvfvjwzilydlwf`. The function then answers every trigger with `skipped` and writes nothing. Dropping the four triggers is the harder off switch and is a migration.
+
+## 61. Worker WhatsApp templates: new versions and new templates waiting (30 Sep 2026)
+
+**Why.** A review of every worker WhatsApp message found wrong step numbers, buttons with no typed way, lists that did not say how to name a missing trade or parish, "a Air conditioning job", and six worker messages that go as free text outside the 24 hour window, where they fail as 63016 and nobody sees it. An approved template cannot be edited, so every change here is a new name. Nothing old is deleted, and nothing new is used until the steps below are done.
+
+**In session only, no Meta approval (the create action is the switch).** Run `yaad-twilio-setup` with each action once. Each makes the new version and overwrites the setting the sender already reads; the variables and button ids are unchanged, so no sender changes.
+
+1. `{"action":"create-update-draft"}` makes `yaadly_update_read_back_v2` (adds "or reply 1").
+2. `{"action":"create-join-alerts"}` makes `yaadly_join_alerts_v2` ("2 of 6", was "2 of 7").
+3. `{"action":"create-alert-trades"}` and `{"action":"create-alert-parishes"}` make `yaadly_alert_trades_menu_v2` and `yaadly_alert_parishes_menu_v2` (say how to name one not on the list).
+
+**Needs Meta approval first.** 
+
+4. `{"action":"create-job-alert"}` submits `yaadly_job_alert_v2` (no article in front of the trade). It overwrites `twilio_content_sid_job_alert_pending` only; v1 keeps sending. `{"action":"job-alert-status"}` switches to v2 once approved.
+5. Six new worker templates, each created and submitted with `{"action":"create-worker-template","template":"<slug>"}` and checked with `{"action":"worker-template-status","template":"<slug>"}`. `{"action":"worker-templates"}` lists them. Approval writes the setting; **the sender must then be changed to read it**, which is a code change in that sender:
+
+| Slug | Template | Setting written on approval | Sender to switch |
+|---|---|---|---|
+| `daily-steps` | `yaadly_daily_steps_v1` | `twilio_content_sid_daily_steps` | `yaad-daily-checkin`, second message (stop carrying it in the worker update template) |
+| `completion-report` | `yaadly_worker_completion_report_v1` | `twilio_content_sid_worker_completion_report` | `yaad-notify-client`, `completion_report_worker` outside the window |
+| `worker-cleared` | `yaadly_worker_cleared_v1` | `twilio_content_sid_worker_cleared` | `yaad-notify-client`, `worker_cleared` |
+| `check-reminder` | `yaadly_worker_check_reminder_v1` | `twilio_content_sid_worker_check_reminder` | `yaad-notify-client`, `worker_check_reminder` |
+| `job-quiet` | `yaadly_worker_job_quiet_v1` | `twilio_content_sid_worker_job_quiet` | `yaad-job-health`, the 72 hour nudge |
+| `draft-waiting` | `yaadly_worker_draft_waiting_v1` | `twilio_content_sid_worker_draft_waiting` | `yaad-notify-client`, `evidence_landed` outside the window |
+
+**Order.** Deploy `yaad-twilio-setup` from disk first (it keeps its platform auth; do not pass `--no-verify-jwt`). Then steps 1 to 3 in any order. Then submit 4 and 5 the same day, because Meta takes a day or more. Switch each sender only after its status action says approved, one at a time, and send one test to your own number before the next.
+
+## 62. Worker WhatsApp fixes: what to deploy and apply (30 Sep 2026)
+
+1. Apply `supabase/migrations/20260930170000_the_worker_hears_when_a_stage_is_signed_off.sql`, then `20260930180000_the_worker_hears_when_a_stage_bill_is_paid.sql` (a new trigger on invoices; tells the worker on a by-stage job that the next stage's bill is paid and they can start; it writes nothing and never blocks marking a bill paid). Before applying, read the live `notify_client_on_job_change()` with `pg_get_functiondef` and diff it against the file; if another session changed it since, merge first. Until this is applied, the worker stage message (`stage_signed_off_worker`) never fires.
+2. Deploy from disk, main checked out and fetched: `yaad-inbound` (keeps `--no-verify-jwt`), `yaad-notify-client` (keeps `--no-verify-jwt`), `yaad-daily-checkin`, `yaad-job-health`, `yaad-desk-message`, `yaad-desk-reply`, `yaad-match`, `yaad-enquiry`, `yaad-portal-code`, `yaad-twilio-setup`. Read `supabase functions list` first and preserve each function's live `verify_jwt`; `_shared/twilio-status.ts` changed, so every function carrying a copy is in the list.
+3. A worker message held back because the worker has not written in 24 hours and no approved template exists is recorded as a failed delivery (code 63016) on the desk's "Did it arrive" page, and goes by SMS or email where the code has one. If a worker says they never heard, look there first.
+4. Templates in §61 switch on one at a time as Meta approves them; until then the fallbacks in step 3 apply.

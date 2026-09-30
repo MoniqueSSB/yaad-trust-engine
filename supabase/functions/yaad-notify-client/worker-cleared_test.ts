@@ -46,3 +46,11 @@ Deno.test("the check reminder says what is left, twice at most, and promises not
   const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
   assert(src.includes('"worker_check_reminder"'), "worker_check_reminder is not a kind");
 });
+
+Deno.test("the job delayed check-in is short, supportive and says a person answers", async () => {
+  const { jobDelayedWorkerText } = await import("./worker-cleared.ts");
+  const t = jobDelayedWorkerText("JOB-7", "");
+  assert(t.startsWith("JOB-7: "), t);
+  assert(t.length <= 160, "one short message");
+  assert(!/[\u2013\u2014]/.test(t) && !/guarantee|escrow|100%|held/i.test(t), t);
+});

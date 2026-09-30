@@ -228,10 +228,15 @@ export const ON_SITE_APPROVAL = { name: ON_SITE_NAME, category: "UTILITY" };
  *  Used in session only, straight after the worker's own message, so nothing
  *  is submitted to Meta. {{3}} is the sentence about photographs, which is
  *  different for a note on photos already filed. */
-export const UPDATE_DRAFT_NAME = "yaadly_update_read_back_v1";
+// v2, 30 Sep 2026: the last line also says the typed way, reply 1, because
+// a button does not show on every phone and the typed read-back has always
+// said reply 1 (update-draft.ts). The same fix the report draft had in its
+// v2. Content is immutable in Twilio, so a change is a new name; v1 stays in
+// the account unused once create-update-draft has been run again.
+export const UPDATE_DRAFT_NAME = "yaadly_update_read_back_v2";
 
 export const UPDATE_DRAFT_BODY =
-  'Ready to go on {{1}}:\n"{{2}}"\n\n{{3}}\n\nNothing is filed until you tap Put it on the job.';
+  'Ready to go on {{1}}:\n"{{2}}"\n\n{{3}}\n\nNothing is filed until you tap Put it on the job, or reply 1.';
 
 export const UPDATE_DRAFT_FILE = "UPDATEFILE";
 export const UPDATE_DRAFT_DROP = "UPDATEDROP";
@@ -271,11 +276,15 @@ export function updateDraftContent() {
  *  understood (trade_key and parish_key in Postgres), so a tap reaches
  *  yaad-inbound as text and nothing downstream changes.
  *
- *  {{1}} is the lead sentence. On joining it carries the consent sentence,
- *  ALERT_TERMS, word for word, so what somebody agreed to is still a thing
- *  they read. Used in session only, so nothing is submitted to Meta. */
-export const ALERT_TRADES_NAME = "yaadly_alert_trades_menu_v1";
-export const ALERT_TRADES_BODY = "{{1}}\n\nWhat work do you do?\nTap Choose and pick one.\nDo more than one? Type them all.";
+ *  {{1}} is the lead sentence. On joining it carries what they joined,
+ *  ALERT_TERMS_JOINED, word for word, so what somebody agreed to is still a
+ *  thing they read. Used in session only, so nothing is submitted to Meta. */
+// v2, 30 Sep 2026: the list shows ten of eighteen trades, and v1 only said
+// how to name more than one, never how to name one that is not listed. Now
+// it says both, with the same examples the typed question gives.
+export const ALERT_TRADES_NAME = "yaadly_alert_trades_menu_v2";
+export const ALERT_TRADES_BODY =
+  "{{1}}\n\nWhat work do you do?\nTap Choose and pick one.\nMore than one, or yours is not on the list? Type them, like: plumbing, tiling, solar.";
 export const ALERT_TRADE_ROWS: readonly string[] = [
   "Plumbing", "Electrical", "Masonry", "Painting", "Roofing",
   "Tiling", "Carpentry", "Welding", "Air conditioning", "Handyman",
@@ -296,8 +305,12 @@ export function alertTradesContent() {
   };
 }
 
-export const ALERT_PARISHES_NAME = "yaadly_alert_parishes_menu_v1";
-export const ALERT_PARISHES_BODY = "{{1}}\n\nWhich parishes will you work in?\nTap Choose and pick one.\nMore than one? Type them all.";
+// v2, 30 Sep 2026: nine of fourteen parishes fit on the list (St James,
+// Trelawny, Hanover, Westmoreland and St Elizabeth do not), so it says how to
+// name one that is missing, and asks the question in the typed words.
+export const ALERT_PARISHES_NAME = "yaadly_alert_parishes_menu_v2";
+export const ALERT_PARISHES_BODY =
+  "{{1}}\n\nWhich parishes will you go to?\nTap Choose and pick one.\nMore than one, or yours is not on the list? Type them, like: St James, Kingston.";
 export const ALERT_PARISH_ROWS: readonly { id: string; item: string }[] = [
   { id: "Kingston", item: "Kingston" },
   { id: "St Andrew", item: "St Andrew" },
@@ -354,8 +367,11 @@ export function walkAcceptContent() {
  *  only, straight after the worker's own message, so nothing goes to Meta.
  *  The bodies are held word for word against join-lane.ts and job-alerts.ts
  *  by the tests, because the words are what somebody agrees to. */
-export const JOIN_ALERTS_NAME = "yaadly_join_alerts_v1";
-export const JOIN_ALERTS_BODY = "{{1}}\n\n2 of 7: Can we message you here when there is a job for you? It is free. Send STOP any time.";
+// v2, 30 Sep 2026: joining asks six questions (join-lane.ts, "Six quick
+// questions"), and v1 said "2 of 7", so a phone that showed the buttons read
+// 1 of 6, 2 of 7, 3 of 6. The consent sentence is unchanged, word for word.
+export const JOIN_ALERTS_NAME = "yaadly_join_alerts_v2";
+export const JOIN_ALERTS_BODY = "{{1}}\n\n2 of 6: Can we message you here when there is a job for you? It is free. Send STOP any time.";
 export function joinAlertsContent() {
   return {
     friendly_name: JOIN_ALERTS_NAME,
@@ -370,9 +386,14 @@ export function joinAlertsContent() {
  *  in within 24 hours, so it needs Meta's approval before it is any use, and
  *  the setting yaad-match reads is written only once that comes back. Trade
  *  and parish only; nothing personal; the way out in every message. */
-export const JOB_ALERT_NAME = "yaadly_job_alert_v1";
+// v2, 30 Sep 2026: v1 put "a" in front of the trade, so it read "a Air
+// conditioning job" and "a Electrical job". The trade and parish now stand as
+// labels, so no article is needed whatever the trade is. Submitted to Meta by
+// create-job-alert; v1 stays switched on until job-alert-status finds v2
+// approved and writes the live setting.
+export const JOB_ALERT_NAME = "yaadly_job_alert_v2";
 export const JOB_ALERT_BODY =
-  "Yaadly: a {{1}} job is open in {{2}}. {{3}} Reply STOP to end these alerts.";
+  "Yaadly: a new job is open.\nWork: {{1}}\nParish: {{2}}\n\nWhat to do: {{3}}\n\nReply STOP to end these alerts.";
 export function jobAlertContent() {
   return {
     friendly_name: JOB_ALERT_NAME,
@@ -382,3 +403,122 @@ export function jobAlertContent() {
   };
 }
 export const JOB_ALERT_APPROVAL = { name: JOB_ALERT_NAME, category: "UTILITY" };
+
+
+/* ── Worker templates for outside the 24 hour window, 30 Sep 2026 ─────────
+   Founder: "fix the issues", after a review of every worker WhatsApp message.
+
+   Each of these replaces a message that today goes as free text, or rides
+   inside the approved worker update template carrying a sentence it was not
+   approved for. Free text outside the window is accepted by Twilio and then
+   fails as 63016, which nobody sees. Each one here is its own template, so
+   what Meta approves is the sentence that is actually sent.
+
+   None of them is used by anything yet. create-worker-template submits one
+   to Meta and records its ContentSid under "<setting>_pending";
+   worker-template-status writes "<setting>" only once Meta has approved it.
+   The sender then has to be changed to read "<setting>", which is a code
+   change in that sender and nothing to do with this file.
+
+   Meta's rules, followed here: a body never starts or ends with a variable,
+   and every variable has a sample value. Every one is Utility, about work
+   the worker has already applied for or agreed to, never marketing. */
+
+export type MetaWorkerTemplate = {
+  /** The action word: create-worker-template with {"template": slug}. */
+  slug: string;
+  name: string;
+  /** The app_settings key the sender will read once approved. */
+  setting: string;
+  /** Who sends it, so the switch can be made in the right place. */
+  sender: string;
+  body: string;
+  variables: Record<string, string>;
+};
+
+/** The daily check-in's second message. Today it rides in the approved
+ *  worker update template, which reads "Yaadly update on your job X: 1.
+ *  Photos...". It asks for photos and videos, and says the words can be a
+ *  voice note, so it no longer disagrees with the first message. Checking
+ *  in is asked, never required: the photos and videos are what count. */
+export const DAILY_STEPS_BODY =
+  "Yaadly, your job {{1}}.\n\nFor today:\n1. Photos and videos, before, during and after.\n2. Say what each shows, in a line or a voice note.\n3. Send them here before you leave.\n\nNothing goes to the client until you say so.";
+
+/** The Completion Report, outside the window. The worker update template
+ *  says "The full details are on the job in your Yaadly portal" around a
+ *  link that needs no login, which contradicts itself. This says what the
+ *  link is, and says client, never owner. */
+export const COMPLETION_REPORT_BODY =
+  "Yaadly: your Completion Report for {{1}} is ready.\n\nIt is your document. Open it here, no login needed: {{2}}\n\nSign it, change your words, or raise an issue. It goes to the client only when you sign.";
+
+/** "You are cleared", from worker-cleared.ts, as a template. The email is
+ *  left out: a template carries as little personal detail as it can. */
+export const WORKER_CLEARED_BODY =
+  "Yaadly: you are cleared, {{1}}. Welcome.\n\nJobs are on the board. Log in here with your email and we send you a code: {{2}}\n\nPay is by bank transfer within 7 days of sign off. Never cash.";
+
+/** The reminder to finish the check, day 3 and day 10. {{2}} is the line
+ *  that changes: "Your check is still waiting." the first time, "Last
+ *  reminder from us. Your check is still waiting." the second. */
+export const CHECK_REMINDER_BODY =
+  "Hi {{1}}, it is Yaadly. {{2}}\n\nWhat is left: your ID, your TRN, three people who can vouch for you, and the Guidelines to sign. About ten minutes on your phone: {{3}}\n\nUntil it is done you cannot price jobs. Questions? Ask here.";
+
+/** The job health nudge at 72 quiet hours, from yaad-job-health. It asks
+ *  for evidence and does not ask for a check-in: checking in asks, it never
+ *  gates. */
+export const JOB_QUIET_BODY =
+  "Yaadly: nothing has come in on your job {{1}} for a few days.\n\nSend a photo or a short video of where the work is, when you can. The client is waiting to see progress.\n\nIf something is holding you up, tell us here.";
+
+/** The draft report, outside the window. The draft itself is never a
+ *  template, because the worker has to read it before replying 1, and that
+ *  does not change. This only says a draft is waiting and opens the window:
+ *  one reply and it comes straight through. */
+export const DRAFT_WAITING_BODY =
+  "Yaadly: the draft report for your job {{1}} is ready for you to check.\n\nWhatsApp only lets us send it after you message us, so reply here with anything and it comes straight through.\n\nNothing goes to the client until you choose.";
+
+const SAMPLE_JOB = "Replace stair rails (JOB-WEB-1789253807959)";
+
+export const META_WORKER_TEMPLATES: readonly MetaWorkerTemplate[] = [
+  {
+    slug: "daily-steps", name: "yaadly_daily_steps_v1", setting: "twilio_content_sid_daily_steps",
+    sender: "yaad-daily-checkin, the second message", body: DAILY_STEPS_BODY,
+    variables: { "1": SAMPLE_JOB },
+  },
+  {
+    slug: "completion-report", name: "yaadly_worker_completion_report_v1", setting: "twilio_content_sid_worker_completion_report",
+    sender: "yaad-notify-client, completion_report_worker outside the window", body: COMPLETION_REPORT_BODY,
+    variables: { "1": SAMPLE_JOB, "2": "https://app.yaadly.co.uk/sign/JOB-WEB-1789253807959?t=sample" },
+  },
+  {
+    slug: "worker-cleared", name: "yaadly_worker_cleared_v1", setting: "twilio_content_sid_worker_cleared",
+    sender: "yaad-notify-client, worker_cleared", body: WORKER_CLEARED_BODY,
+    variables: { "1": "Marcus", "2": "https://app.yaadly.co.uk/portal/sign-in" },
+  },
+  {
+    slug: "check-reminder", name: "yaadly_worker_check_reminder_v1", setting: "twilio_content_sid_worker_check_reminder",
+    sender: "yaad-notify-client, worker_check_reminder", body: CHECK_REMINDER_BODY,
+    variables: { "1": "Marcus", "2": "Your check is still waiting.", "3": "https://app.yaadly.co.uk/apply?app=sample&token=sample&ref=sample" },
+  },
+  {
+    slug: "job-quiet", name: "yaadly_worker_job_quiet_v1", setting: "twilio_content_sid_worker_job_quiet",
+    sender: "yaad-job-health, the 72 hour nudge", body: JOB_QUIET_BODY,
+    variables: { "1": SAMPLE_JOB },
+  },
+  {
+    slug: "draft-waiting", name: "yaadly_worker_draft_waiting_v1", setting: "twilio_content_sid_worker_draft_waiting",
+    sender: "yaad-notify-client, evidence_landed outside the window", body: DRAFT_WAITING_BODY,
+    variables: { "1": SAMPLE_JOB },
+  },
+];
+
+export function metaWorkerContent(t: MetaWorkerTemplate) {
+  return {
+    friendly_name: t.name,
+    language: "en",
+    variables: t.variables,
+    types: { "twilio/text": { body: t.body } },
+  };
+}
+
+export function metaWorkerApproval(t: MetaWorkerTemplate) {
+  return { name: t.name, category: "UTILITY" };
+}

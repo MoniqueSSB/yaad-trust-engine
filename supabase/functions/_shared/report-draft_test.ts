@@ -1,6 +1,6 @@
 import * as guardrails from "./guardrails.ts";
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { canBeACaption, captionsLine, isCameraNote, isUsableCaption, namedNextStep, plainDraft, unearnedClaims, usableCaptions, reportSentReceipt } from "./report-draft.ts";
+import { canBeACaption, captionsLine, isCameraNote, isUsableCaption, namedNextStep, noCaptionPrompt, plainDraft, unearnedClaims, usableCaptions, reportSentReceipt } from "./report-draft.ts";
 
 // The captions and the draft from the founder's own test, 29 September 2026.
 const FILED = ["1", "fixing beam in place", "changing focus", "the work is done for this stage"];
@@ -102,4 +102,14 @@ Deno.test("the receipt promises nothing and passes the language screen", () => {
     assert(!/today|tomorrow|\bhours?\b|paid|payment|approved|will approve|guarantee/i.test(a), a);
     assert(!/[\u2013\u2014]/.test(a), a);
   }
+});
+
+Deno.test("the no-caption draft is written to the client, and the worker is told apart from it", () => {
+  const d = plainDraft("stage 2", []);
+  // It is what reaches the client on "Send as written".
+  assert(!/\byou\b|\byour\b/i.test(d), `the client's text must not address anybody as you: ${d}`);
+  assert(d.includes("stage 2"));
+  const p = noCaptionPrompt();
+  assert(/what the photos show/.test(p) && /send it as it is/i.test(p), p);
+  assert(!/[\u2013\u2014]/.test(d + p), "no dashes");
 });

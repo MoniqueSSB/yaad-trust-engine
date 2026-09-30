@@ -22,6 +22,12 @@ export function workerClearedText(name: string, email: string, appUrl: string): 
     `Log in with ${email || "your email"}. We send you a code.`,
     ``,
     `Pay: bank transfer within 7 days of sign off. Never cash.`,
+    ``,
+    // An invitation, never an alert: new jobs only come on WhatsApp to
+    // somebody who asked (the ALERTS lane records their consent). Founder,
+    // 30 Sep 2026, "fix these also": published workers were never told the
+    // list existed, and sending to them without asking is not ours to do.
+    `Want new jobs sent here? Reply ALERTS.`,
   ].join("\n");
 }
 
@@ -57,4 +63,12 @@ export function applyLink(appUrl: string, applicationId: string, uploadToken: st
   u.searchParams.set("token", uploadToken);
   u.searchParams.set("ref", reference);
   return u.toString();
+}
+
+/** The worker's side of job_delayed, 30 Sep 2026. The client is told the job
+ *  has gone quiet and that the worker has been checked in with; this is that
+ *  check-in. Supportive, not a warning, and it says what happens next: a reply
+ *  reaches a person. */
+export function jobDelayedWorkerText(jobId: string, title: string): string {
+  return `${jobId}${title ? ` (${title})` : ""}: the client has been told the job is running late. Is anything holding you up? Reply here and a person will help.`;
 }
