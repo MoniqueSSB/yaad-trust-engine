@@ -12,6 +12,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { ALERT_CAP, alertKey, alertVars } from "./alert-lane.ts";
+import { recordAccepted, withStatusCallback } from "./twilio-status.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -203,12 +204,15 @@ You are getting this because ${w.match_reason} matched your published profile.
           const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${tSid}/Messages.json`, {
             method: "POST",
             headers: { Authorization: "Basic " + btoa(`${tSid}:${tTok}`), "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
+            body: withStatusCallback(new URLSearchParams({
               To: `whatsapp:+${s.phone.replace(/\D/g, "")}`, From: tFrom, MessagingServiceSid: serviceSid,
               ContentSid: alertSid, ContentVariables: JSON.stringify(alertVars(String(job.trade ?? ""), job.parish ?? null, s.can_quote === true, appUrl)),
-            }),
+            })),
             signal: AbortSignal.timeout(15000),
           });
+          // What was sent, for the desk's "Did it arrive" page, the same as
+          // every other Twilio sender (twilio-status_test holds the rule).
+          await recordAccepted(r, s.phone, "whatsapp", { kind: "job alert", job_id: jobId });
           if (r.ok) { waSent++; waRows.push({ job_id: jobId, worker_email: key, channel: "whatsapp", status: "sent", detail: s.match_reason }); }
           else { waFailed++; waRows.push({ job_id: jobId, worker_email: key, channel: "whatsapp", status: "failed", detail: `http ${r.status}` }); }
         } catch (e) {
