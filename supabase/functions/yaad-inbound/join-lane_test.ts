@@ -5,9 +5,9 @@
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import {
-  applicationRow, continueLink, isJoinLane, isJoinOpener, JOIN_LANES, joinedReply, LEAD_PARISHES, leadTrades,
+  applicationRow, continueLink, isJoinLane, isJoinOpener, JOIN_LANES, joinedReply, LEAD_PARISHES,
   looksLikeEmail, looksLikeName, newReference, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, Q_EMAIL, Q_NAME, Q_PHOTO, SKIP, WORDS_FIRST,
-  AI_CONSENT_WA_VERSION, CONSENT_AGAIN, CONSENT_NO, CONSENT_YES, Q_CONSENT,
+  AI_CONSENT_WA_VERSION, ALERTS_AGAIN, CONSENT_AGAIN, CONSENT_NO, CONSENT_YES, LEAD_TRADES, Q_CONSENT, qAlerts,
 } from "./join-lane.ts";
 import { ALERT_TERMS, ALERTS_OPENER } from "./job-alerts.ts";
 
@@ -31,27 +31,25 @@ Deno.test("a client, an alert sign-up and a job description are never read as jo
   }
 });
 
-Deno.test("six questions, in order, each short", () => {
-  assertEquals(JOIN_LANES.length, 6);
-  assertEquals([...JOIN_LANES], ["join_name", "join_trades", "join_parishes", "join_email", "join_photo", "join_consent"]);
+Deno.test("seven questions, in order, each short", () => {
+  assertEquals(JOIN_LANES.length, 7);
+  assertEquals([...JOIN_LANES], ["join_name", "join_alerts", "join_trades", "join_parishes", "join_email", "join_photo", "join_consent"]);
   assert(isJoinLane("join_email") && !isJoinLane("alerts_trades") && !isJoinLane(""));
-  // Q_CONSENT is one line by instruction (30 Sep 2026) and carries every fact the site states, so it alone may run long.
-  for (const q of [Q_NAME, LEAD_PARISHES, Q_EMAIL, Q_PHOTO, CONSENT_AGAIN, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, WORDS_FIRST]) {
+  for (const q of [Q_NAME, qAlerts("Marcus Brown", ALERT_TERMS), ALERTS_AGAIN, LEAD_TRADES, LEAD_PARISHES, Q_EMAIL, Q_PHOTO, Q_CONSENT, CONSENT_AGAIN, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, WORDS_FIRST]) {
     assert(!/[–—]/.test(q), `dash in: ${q}`);
     for (const line of q.split("\n")) assert(line.length <= 110, `long line: ${line}`);
   }
-  // The trades lead is one line by design: it is a template variable, and it
-  // carries the consent sentence, which is not to be shortened.
-  const lead = leadTrades("Marcus Brown", ALERT_TERMS);
-  assert(!/[–—\n]/.test(lead) && lead.length < 900, lead);
-  assert(Q_NAME.includes("1 of 6") && lead.includes("2 of 6") && LEAD_PARISHES.includes("3 of 6") && Q_EMAIL.includes("4 of 6") && Q_PHOTO.includes("5 of 6") && Q_CONSENT.includes("6 of 6"));
+  assert(Q_NAME.includes("1 of 7") && qAlerts("A B", ALERT_TERMS).includes("2 of 7") && LEAD_TRADES.includes("3 of 7") && LEAD_PARISHES.includes("4 of 7") && Q_EMAIL.includes("5 of 7") && Q_PHOTO.includes("6 of 7") && Q_CONSENT.includes("7 of 7"));
 });
 
 Deno.test("the consent question says what the site says, carries its own version, and a no is a no", () => {
-  assertEquals(Q_CONSENT.split("\n").filter((l) => l.trim() && !/^(6 of 6|Reply)/.test(l)).length, 1, "the explanation is one line");
-  for (const fact of ["never decides", "NVIDIA", "outside Yaadly", "not used to train", "ID, selfie and face video are never sent"]) {
+  // One short sentence, on instruction: who decides, where it runs, what it never sees.
+  for (const fact of ["person who decides", "NVIDIA", "outside Yaadly", "never sees your ID or face"]) {
     assert(Q_CONSENT.includes(fact), `the consent question no longer says: ${fact}`);
   }
+  const explanation = Q_CONSENT.split("\n").filter((l) => l.trim() && !/^(7 of 7|Reply)/.test(l));
+  assertEquals(explanation.length, 1, "the explanation is one line");
+  assert(explanation[0].length <= 130, "and it is short");
   assert(Q_CONSENT.includes("Either answer is fine"), "saying no must be said to cost nothing");
   // The site's own version, read off the site, so the two can never be the same string.
   const siteVersion = /const AI_CONSENT_VERSION = "([^"]+)"/.exec(joinFlow)?.[1] ?? "";
@@ -66,12 +64,13 @@ Deno.test("the consent question says what the site says, carries its own version
 });
 
 Deno.test("the consent sentence is said, word for word, before the number goes on the alert list", () => {
-  assert(leadTrades("Marcus Brown", ALERT_TERMS).includes(ALERT_TERMS));
+  assert(qAlerts("Marcus Brown", ALERT_TERMS).includes(ALERT_TERMS));
   const lane = src.slice(src.indexOf("joining as a tradesperson: the five questions"), src.indexOf("── the job alert list"));
   assert(lane.length > 0, "the join lane is gone or moved");
-  const asked = lane.indexOf("leadTrades(name, ALERT_TERMS)");
+  const asked = lane.indexOf("qAlerts(name, ALERT_TERMS)");
   const subscribed = lane.indexOf('rpc("subscribe_to_job_alerts"');
   assert(asked > 0 && subscribed > asked, "the number is put on the list before the consent sentence is said");
+  assert(/if \(yes\) \{\s*await supabase\.rpc\("subscribe_to_job_alerts"/.test(lane), "only a YES puts the number on the list");
   assert(lane.includes("p_version: ALERT_CONSENT_VERSION"), "the consent is recorded without its version");
 });
 
@@ -125,10 +124,13 @@ Deno.test("the final reply is warm, five points, and promises nothing", () => {
   const r = joinedReply("APP-ABC123", link, true);
   assert(r.includes("You are in") && r.includes("APP-ABC123") && r.includes(link));
   assert((r.match(/^\d\. /gm) ?? []).length === 5, "five points");
-  assert(/real person/i.test(r) && /either way/i.test(r), "warm, and honest about who decides");
+  assert(/A person reads your form/.test(r) && /either way/i.test(r), "honest about who decides");
+  const ai = joinedReply("APP-1", link, true, true);
+  assert(/An AI agent reads your form/.test(ai) && /A person decides/.test(ai), "with a YES, the agent is named and a person still decides");
   assert(!/[–—]/.test(r));
   assert(!/guarantee|100%|escrow|approved|accepted|you will get work/i.test(r), r);
   assert(joinedReply("APP-1", link, false).includes("No photo yet"));
+  assert(joinedReply("APP-1", link, true).includes("all seven"));
 });
 
 Deno.test("the AI read starts only on a YES, and the review is never told to decide", () => {

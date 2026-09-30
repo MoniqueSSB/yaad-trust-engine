@@ -35,7 +35,7 @@ import { readDraftTap, readOnSiteTap, tapMatchesDraft } from "./report-tap.ts";
 import { screenOwnWords } from "./own-words.ts";
 import { acceptedForClient, linkIn, looksLikeATime, offerSent, PLATFORM_LABEL as WALK_PLATFORM, readWalkAccept } from "./walkthrough-offer.ts";
 import { closedReply, problemSent, readDisputeClose, replySent } from "./dispute-lane.ts";
-import { AI_CONSENT_WA_VERSION, applicationRow, CONSENT_AGAIN, CONSENT_NO, CONSENT_YES, continueLink, isJoinLane, isJoinOpener, JOIN_STALE_MS, joinedReply, LEAD_PARISHES, leadTrades, looksLikeEmail, looksLikeName, newReference, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, Q_CONSENT, Q_EMAIL, Q_NAME, Q_PHOTO, SKIP, WORDS_FIRST } from "./join-lane.ts";
+import { AI_CONSENT_WA_VERSION, ALERTS_AGAIN, applicationRow, CONSENT_AGAIN, CONSENT_NO, CONSENT_YES, continueLink, isJoinLane, isJoinOpener, JOIN_STALE_MS, joinedReply, LEAD_PARISHES, LEAD_TRADES, looksLikeEmail, looksLikeName, newReference, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, Q_CONSENT, Q_EMAIL, Q_NAME, Q_PHOTO, qAlerts, SKIP, WORDS_FIRST } from "./join-lane.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -2845,30 +2845,51 @@ Deno.serve(async (req: Request) => {
         if (lane === "join_name") {
           if (!looksLikeName(joinSaid)) return twiml(NOT_A_NAME);
           const name = joinSaid.replace(/\s+/g, " ").slice(0, 120);
-          await holdJoin({ _lane: "join_trades", name });
-          root.setAttributes({ "yaadly.join.step": "trades" });
-          return await askFromList(settingsReader, msg.from, msg.channel, "trades", leadTrades(name, ALERT_TERMS), TRADES_TYPED);
+          await holdJoin({ _lane: "join_alerts", name });
+          root.setAttributes({ "yaadly.join.step": "alerts" });
+          return twiml(qAlerts(name, ALERT_TERMS));
+        }
+
+        if (lane === "join_alerts") {
+          // The alert consent, a question of its own (30 Sep 2026). YES puts
+          // the number on the list with the sentence they answered as the
+          // record. NO skips the list; joining carries on. Sends nothing.
+          const yes = CONSENT_YES.test(joinSaid);
+          const no = CONSENT_NO.test(joinSaid);
+          if (!yes && !no) return twiml(ALERTS_AGAIN);
+          if (yes) {
+            await supabase.rpc("subscribe_to_job_alerts", {
+              p_phone: msg.from, p_words: joinSaid, p_version: ALERT_CONSENT_VERSION, p_name: String(a.name ?? ""),
+            });
+          }
+          await holdJoin({ _lane: "join_trades", name: a.name, alerts: yes });
+          root.setAttributes({ "yaadly.join.step": "trades", "yaadly.join.alerts": yes });
+          return await askFromList(settingsReader, msg.from, msg.channel, "trades", LEAD_TRADES, TRADES_TYPED);
         }
 
         if (lane === "join_trades") {
-          // On the alert list from here, with the consent sentence they have
-          // just read (leadTrades carries ALERT_TERMS) and their own words
-          // as the record. Sends nothing.
-          await supabase.rpc("subscribe_to_job_alerts", {
-            p_phone: msg.from, p_words: joinSaid, p_version: ALERT_CONSENT_VERSION, p_name: String(a.name ?? ""),
-          });
+          // The trades go on the alert list only when they said YES to it.
+          // Either way the words are read by the same matcher, so the
+          // application carries a trade the desk understands: a NO gets a
+          // stopped row, which set_job_alert_trades still writes to.
+          if (a.alerts !== true) {
+            await supabase.rpc("subscribe_to_job_alerts", {
+              p_phone: msg.from, p_words: "(declined alerts; trades read for the application only)", p_version: ALERT_CONSENT_VERSION, p_name: String(a.name ?? ""),
+            });
+            await supabase.rpc("stop_job_alerts", { p_phone: msg.from });
+          }
           const { data: t } = await supabase.rpc("set_job_alert_trades", { p_phone: msg.from, p_said: joinSaid });
           const tRow = (Array.isArray(t) ? t[0] : t) as { matched?: string[]; unmatched?: string[] } | null;
           const tries = Number(a.tries ?? 0) + 1;
           if (!(tRow?.matched ?? []).length && tries < 2) {
             await holdJoin({ ...a, tries });
             root.setAttributes({ "yaadly.join.step": "trades", "yaadly.join.outcome": "trades_not_read" });
-            return await askFromList(settingsReader, msg.from, msg.channel, "trades", "I could not place that as a trade. 2 of 5:", TRADES_TYPED);
+            return await askFromList(settingsReader, msg.from, msg.channel, "trades", "I could not place that as a trade. 3 of 7:", TRADES_TYPED);
           }
           // Their own words are kept even when nothing matched: the desk
           // reads words, and a trade the matcher does not know is still a trade.
           const trades = (tRow?.matched ?? []).length ? tRow!.matched! : [joinSaid.slice(0, 80)];
-          await holdJoin({ _lane: "join_parishes", name: a.name, trades, tries: 0 });
+          await holdJoin({ _lane: "join_parishes", name: a.name, alerts: a.alerts, trades, tries: 0 });
           root.setAttributes({ "yaadly.join.step": "parishes" });
           return await askFromList(settingsReader, msg.from, msg.channel, "parishes", LEAD_PARISHES, PARISHES_TYPED);
         }
@@ -2880,10 +2901,10 @@ Deno.serve(async (req: Request) => {
           if (!(pRow?.matched ?? []).length && tries < 2) {
             await holdJoin({ ...a, tries });
             root.setAttributes({ "yaadly.join.step": "parishes", "yaadly.join.outcome": "parishes_not_read" });
-            return await askFromList(settingsReader, msg.from, msg.channel, "parishes", "I could not place that as a parish. 3 of 5:", PARISHES_TYPED);
+            return await askFromList(settingsReader, msg.from, msg.channel, "parishes", "I could not place that as a parish. 4 of 7:", PARISHES_TYPED);
           }
           const parishes = (pRow?.matched ?? []).length ? pRow!.matched! : [joinSaid.slice(0, 80)];
-          await holdJoin({ _lane: "join_email", name: a.name, trades: a.trades, parishes });
+          await holdJoin({ _lane: "join_email", name: a.name, alerts: a.alerts, trades: a.trades, parishes });
           root.setAttributes({ "yaadly.join.step": "email" });
           return twiml(Q_EMAIL);
         }
@@ -3011,7 +3032,7 @@ Deno.serve(async (req: Request) => {
           }
           await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
           root.setAttributes({ "yaadly.join.step": "done", "yaadly.join.outcome": "joined", "yaadly.join.ai_consent": yes ? "granted" : "declined" });
-          return twiml(joinedReply(String(a.reference ?? ""), String(a.link ?? ""), a.photo_filed === true));
+          return twiml(joinedReply(String(a.reference ?? ""), String(a.link ?? ""), a.photo_filed === true, yes));
         }
       }
 

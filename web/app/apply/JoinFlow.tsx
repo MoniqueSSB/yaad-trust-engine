@@ -1221,7 +1221,7 @@ export function JoinFlow() {
           <span className="flex flex-col">
             <b className="text-[14.5px] text-ink">Rather do this on WhatsApp?</b>
             <span className="text-[12.5px] leading-snug text-mute">
-              Six short questions in the chat, Patois or English.
+              Seven short questions in the chat, Patois or English.
             </span>
           </span>
           <span className="ml-auto font-mono text-[13px] font-semibold text-green" aria-hidden="true">&rarr;</span>

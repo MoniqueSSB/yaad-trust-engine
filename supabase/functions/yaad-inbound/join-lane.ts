@@ -33,7 +33,7 @@ export function isJoinOpener(said: string): boolean {
   return OPENER.test(t) || JOIN_WORD.test(t);
 }
 
-export const JOIN_LANES = ["join_name", "join_trades", "join_parishes", "join_email", "join_photo", "join_consent"] as const;
+export const JOIN_LANES = ["join_name", "join_alerts", "join_trades", "join_parishes", "join_email", "join_photo", "join_consent"] as const;
 export type JoinLane = typeof JOIN_LANES[number];
 
 export function isJoinLane(lane: unknown): lane is JoinLane {
@@ -49,37 +49,45 @@ export const SKIP = /^(skip|no|none|later|not now|nah)[.!]*$/i;
  *  long this goes on for. Trades and parishes are asked through the tappable
  *  lists in index.ts and take only a lead sentence from here. */
 export const Q_NAME =
-  "Welcome to Yaadly. Good to have you.\n\nSix quick questions, then you are in.\n\n1 of 6: What is your full name?";
+  "Welcome to Yaadly. Good to have you.\n\nSeven quick questions, then you are in.\n\n1 of 7: What is your full name?";
 
-export function leadTrades(name: string, alertTerms: string): string {
+/** 2 of 7: the job alert consent, a question of its own. Founder, 30 Sep
+ *  2026: "split this into two questions". YES puts the number on the alert
+ *  list with alertTerms as the recorded consent; NO skips the list and the
+ *  joining carries on. */
+export function qAlerts(name: string, alertTerms: string): string {
   const first = firstName(name);
-  return `Thanks${first ? `, ${first}` : ""}. ${alertTerms} 2 of 6:`;
+  return `Thanks${first ? `, ${first}` : ""}.\n\n2 of 7: Hear about jobs here?\n${alertTerms}\n\nReply YES or NO.`;
 }
+export const ALERTS_AGAIN = "Reply YES to hear about jobs here, or NO.";
 
-export const LEAD_PARISHES = "3 of 6:";
+export const LEAD_TRADES = "3 of 7:";
+export const LEAD_PARISHES = "4 of 7:";
 
 export const Q_EMAIL =
-  "4 of 6: Your email address?\nYou use it to log in.\nNo email? Reply SKIP.";
+  "5 of 7: Your email address?\nYou use it to log in.\nNo email? Reply SKIP.";
 
 export const Q_PHOTO =
-  "5 of 6: Send one photo of a job you did.\nNo photo? Reply SKIP.";
+  "6 of 7: Send one photo of a job you did.\nNo photo? Reply SKIP.";
 
-export const NOT_A_NAME = "A name is needed to start.\n\n1 of 6: What is your full name?";
-export const NOT_AN_EMAIL = "That does not look like an email.\n\n4 of 6: Your email address?\nNo email? Reply SKIP.";
-export const PHOTO_PLEASE = "Send a photo here, not words.\n\n5 of 6: Send one photo of a job you did.\nNo photo? Reply SKIP.";
+export const NOT_A_NAME = "A name is needed to start.\n\n1 of 7: What is your full name?";
+export const NOT_AN_EMAIL = "That does not look like an email.\n\n5 of 7: Your email address?\nNo email? Reply SKIP.";
+export const PHOTO_PLEASE = "Send a photo here, not words.\n\n6 of 7: Send one photo of a job you did.\nNo photo? Reply SKIP.";
 export const WORDS_FIRST = "One thing at a time. Answer this first. Then send the photo.";
 
 /** What they are told at the end. Warm, five points, and only what is true
  *  today: quoting and booking wait for the check (v_job_alert_subscribers
  *  .can_quote), a person reads it, nothing is promised. The link opens the
  *  same application on the site for the identity steps. */
-export function joinedReply(reference: string, link: string, photoFiled: boolean): string {
+export function joinedReply(reference: string, link: string, photoFiled: boolean, aiReads = false): string {
   return [
-    `That is all six. You are in. Your reference is ${reference}.`,
+    `That is all seven. You are in. Your reference is ${reference}.`,
     photoFiled ? "" : "No photo yet. You can add one on the link below.",
     "",
     "What happens next:",
-    "1. A real person reads your form. Not a machine.",
+    // Founder, 30 Sep 2026: the read is done by AI agents, and the message
+    // says so when they said YES to it. A person still decides, always.
+    aiReads ? "1. An AI agent reads your form and makes notes. A person decides." : "1. A person reads your form.",
     "2. Finish your check here. Your ID. Your TRN. Three people who can vouch for you. Sign the Guidelines.",
     link,
     "3. We message you here, either way.",
@@ -103,11 +111,11 @@ export function joinedReply(reference: string, link: string, photoFiled: boolean
  *  an answer never given. */
 export const AI_CONSENT_WA_VERSION = "ai-review-wa-v1";
 export const Q_CONSENT =
-  "6 of 6: Can a computer read your papers first? Either answer is fine.\n\n" +
-  // One line, founder instruction. The facts the site's consent states are
-  // all still in it: notes only, never decides, NVIDIA, outside Yaadly, not
-  // used to train, and the ID, selfie and face video are never sent.
-  "It makes notes for the person who decides and never decides. It runs on NVIDIA, outside Yaadly, is not used to train, and your ID, selfie and face video are never sent to it.\n\n" +
+  "7 of 7: Can a computer read your papers first? Either answer is fine.\n\n" +
+  // One short sentence, founder instruction 30 Sep 2026 ("one sentence
+  // maximum very short"). It names who decides, where it runs, and what it
+  // never sees. Shorter than the site's, so it carries its own version.
+  "It only writes notes for the person who decides, on NVIDIA outside Yaadly, and never sees your ID or face.\n\n" +
   "Reply YES to allow it.\nReply NO for a person only.";
 export const CONSENT_YES = /^(yes|y|yeah|yeh|ok|okay|allow|allowed|fine|sure)[.!]*$/i;
 export const CONSENT_NO = /^(no|n|nah|nope|person|person only|a person only|decline)[.!]*$/i;
