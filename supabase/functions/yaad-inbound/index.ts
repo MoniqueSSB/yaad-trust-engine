@@ -33,6 +33,7 @@ import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-stat
 import { parseAddonConfirm } from "./addon-confirm.ts";
 import { readDraftTap, readOnSiteTap, tapMatchesDraft } from "./report-tap.ts";
 import { screenOwnWords } from "./own-words.ts";
+import { acceptedForClient, linkIn, looksLikeATime, offerSent, PLATFORM_LABEL as WALK_PLATFORM, readWalkAccept } from "./walkthrough-offer.ts";
 import { AI_CONSENT_WA_VERSION, applicationRow, CONSENT_AGAIN, CONSENT_NO, CONSENT_YES, continueLink, isJoinLane, isJoinOpener, JOIN_STALE_MS, joinedReply, LEAD_PARISHES, leadTrades, looksLikeEmail, looksLikeName, newReference, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, Q_CONSENT, Q_EMAIL, Q_NAME, Q_PHOTO, SKIP, WORDS_FIRST } from "./join-lane.ts";
 
 // Inbound intake, on whatever channel is actually available.
@@ -4404,6 +4405,22 @@ Deno.serve(async (req: Request) => {
       // that. Anything that does not contain a code it recognises falls
       // straight through to the ordinary pipeline below, unrecognised as
       // an approval rather than guessed at.
+      // ── a client accepting a walkthrough time ──────────────────────────────
+      //
+      // 30 Sep 2026, walkthrough-offer.ts. The Accept button's id, or the
+      // words ACCEPT <code>, on a job whose time is waiting. Ahead of the
+      // client lane so "accept" is never read as a remark, and never as a
+      // stage approval: the RPC touches walk_accepted_at and nothing else.
+      if (!deskHasThisNumber && !msg.media.length && readWalkAccept(msg.text)) {
+        const wantJob = readWalkAccept(msg.text)!;
+        const { data: acc, error: accErr } = await supabase.rpc("accept_walkthrough_via_whatsapp", { p_job: wantJob, p_phone: msg.from });
+        const row = (Array.isArray(acc) ? acc[0] : acc) as { offer?: string; platform?: string } | null;
+        root.setAttributes({ "yaadly.walkthrough.job": wantJob, "yaadly.walkthrough.outcome": accErr ? "accept_refused" : "accepted" });
+        if (accErr) return twiml(`That did not go through: ${accErr.message}`);
+        const { data: lk } = await supabase.from("jobs").select("walk_link").eq("id", wantJob).maybeSingle();
+        return twiml(acceptedForClient(String(row?.offer ?? ""), WALK_PLATFORM[String(row?.platform ?? "")] ?? "a video call", String(lk?.walk_link ?? "").trim() || null));
+      }
+
       // ── a client on a live job, saying something that is not a code ───────
       //
       // 29 Sep 2026, client-lane.ts. Runs ahead of the approval and comment
@@ -4673,6 +4690,24 @@ Deno.serve(async (req: Request) => {
           // about photographs they filed four minutes ago. The read-back
           // names the job, so the worker still sees where it is going and
           // can drop it.
+          // A day and time for a walkthrough the client asked for, 30 Sep
+          // 2026 (walkthrough-offer.ts). Only when exactly one of this
+          // worker's jobs has an open walkthrough and the words read as a
+          // time; anything else is an update as before. Yaadly sends the
+          // time to the client; nobody's number moves.
+          if (found && looksLikeATime(text)) {
+            const { data: walks } = await supabase.from("jobs")
+              .select("id, title").in("id", found.jobs.map((j) => j.id))
+              .eq("signoff_method", "walkthrough").is("walk_accepted_at", null);
+            if ((walks ?? []).length === 1) {
+              const wj = walks![0] as { id: string; title: string };
+              const { error: offErr } = await supabase.rpc("offer_walkthrough_via_whatsapp", { p_job: wj.id, p_phone: msg.from, p_offer: text.slice(0, 300), p_link: linkIn(text) });
+              root.setAttributes({ "yaadly.walkthrough.job": wj.id, "yaadly.walkthrough.outcome": offErr ? "offer_refused" : "offered" });
+              if (offErr) return twiml(`That did not go through: ${offErr.message}`);
+              return twiml(offerSent(text.slice(0, 300)));
+            }
+          }
+
           const justFiled = found ? await recentFiledBatch(supabase, found.email) : null;
           const noteJob = justFiled ? found!.jobs.find((j) => j.id === justFiled.jobId) : undefined;
           if (found && justFiled && noteJob) {

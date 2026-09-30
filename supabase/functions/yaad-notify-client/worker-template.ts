@@ -39,6 +39,7 @@ const SUMMARY: Record<string, string | null> = {
   materials_sent_worker: "Yaadly has sent you the materials money",
   worker_paid: "Yaadly has sent you a payment",
   walkthrough_requested: "the client has asked for a video walkthrough",
+  walkthrough_accepted_worker: "the client accepted your time for the video walkthrough",
   completion_report_worker: "your Completion Report is ready. Open the link below, no login needed, to sign it, change your words or raise an issue",
   addon_for_worker: "the client has asked for extra work. Accept it, change it or turn it down on the Extra work tab",
   addon_agreed_worker: "the extra work is agreed. Do not start it until Yaadly tells you it is paid",

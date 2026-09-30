@@ -96,6 +96,8 @@ const CLIENT_SUMMARY: Record<string, string> = {
   addon_for_client: "your tradesperson has changed the extra work, and the new version is waiting for your answer",
   addon_agreed: "the extra work is agreed. Yaadly will send its invoice, and the extra work starts once that is paid",
   addon_closed: "the extra work is not going ahead. Nothing has been booked or charged for it",
+  walkthrough_offered: "your tradesperson has offered a day and time for the video walkthrough. Accept it in your portal, or reply here with another time",
+  walkthrough_accepted: "the video walkthrough time is accepted and your tradesperson has been told",
 };
 
 export function clientTemplateSummary(kind: string): string | null {

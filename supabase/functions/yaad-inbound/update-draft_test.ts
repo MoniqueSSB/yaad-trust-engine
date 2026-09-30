@@ -98,8 +98,11 @@ Deno.test("a 1 or an ok is never what a photograph shows", () => {
 
 Deno.test("after a filing the worker is told what arrives next and what to do with it", async () => {
   assert(WHAT_HAPPENS_NEXT.startsWith("Next:"));
-  assert(WHAT_HAPPENS_NEXT.includes("Reply 1 to send it"));
-  assert(WHAT_HAPPENS_NEXT.includes("Nothing goes to the client until you do"));
+  // 30 Sep 2026: the reply instruction moved to the draft itself, on the
+  // founder's instruction that two asks in one message was confusing. What
+  // stays is the gate: nothing reaches the client without the worker.
+  assert(!WHAT_HAPPENS_NEXT.includes("Reply 1"), "the filing confirmation asks one thing, not two");
+  assert(WHAT_HAPPENS_NEXT.includes("Nothing goes to the client until you say so"));
   // No day, no hour, nothing about pay or about what the client will decide.
   assert(!/today|tomorrow|tonight|\bhours?\b|paid|payment|approve|guarantee/i.test(WHAT_HAPPENS_NEXT), WHAT_HAPPENS_NEXT);
   assert(!/[\u2013\u2014]/.test(WHAT_HAPPENS_NEXT));

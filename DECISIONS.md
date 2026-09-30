@@ -4984,3 +4984,12 @@ The site's thank you screen became a welcome with five points and names the port
 Two automatic reminders to finish the check, at day 3 and day 10 after applying, never a third (`remind_unfinished_applications()`, cron `yaad-check-reminders`, 20260930110000): WhatsApp inside the window, SMS outside it, email where there is one. And the AI read starts from the chat on a YES to the sixth question, exactly as the site's Send starts it; the review checks the consent column again itself, writes notes, and decides nothing.
 
 Still to decide, hers: whether a worker may quote before being cleared (today: no), and whether an applicant may sign in to the portal before being published (today: no).
+
+
+## 2026-09-30 · The walkthrough time is arranged through Yaadly, and every worker message is short
+
+Founder, on the worker's walkthrough message: "they dont have their whatsapp to arrange the call", then "i dont confirm not with the client, the client accept the info is sent by yaadly", then "there should be a link when they can both confirm times and join". The two sides never hold each other's number, so the worker offers a day and time, Yaadly sends it, the client accepts, both are told (`walk_offer`, `walk_offered_at`, `walk_accepted_at`; `offer_walkthrough*`, `accept_walkthrough*`; kinds `walkthrough_offered`, `walkthrough_accepted`, `walkthrough_accepted_worker`). On WhatsApp a worker's reply that reads as a time goes to the client only when exactly one of their jobs has an open walkthrough; anything else stays a work update. Accepting a time touches nothing else: not a stage, not a booking, not money.
+
+Still open, hers: a call link made automatically. Meet and Zoom need an account and an API; a service that makes a room from a link (Jitsi, Daily) is a new third party that would carry video of both sides, which is a data decision before it is a technical one. Until then a worker pastes a Meet or Zoom link on the job, and WhatsApp video is set up by a person.
+
+Also today: the fourteen long worker notifications became short lines with the same facts; the booking message states the exact pay in three points; the filing confirmation asks one thing (the reply instruction moved to the draft itself, and the test that held the old two-part wording was changed to hold the new one, on the founder's instruction); the alert consent is `alerts-v2`, one sentence that asks permission and promises nothing about when.

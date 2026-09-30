@@ -6426,3 +6426,19 @@ Added 29 September 2026.
 4. **The link says nothing on the site:** it needs `app`, `token` and `ref` all present and well formed; the page cleans the address bar on arrival, so a copied address afterwards has none of them. Send the WhatsApp message again with JOIN to get a fresh one, which makes a second application, so tell the desk.
 5. **No reminder went out:** `select jobname, schedule, active from cron.job where jobname = 'yaad-check-reminders';` must show `7 15 * * *`. `select app_id, check_reminders, check_reminded_at from applications where status = 'received' order by created_at;` shows who has had which. Two at most, ever; after that it is a person's call.
 6. **The review did not run on a WhatsApp application:** they answered NO to the sixth question, or never answered it. `ai_review_consent` on the row says which; the version `ai-review-wa-v1` is the WhatsApp sentence.
+
+
+## 57. The video walkthrough time: offered by the worker, accepted by the client (30 Sep 2026)
+
+Nobody's number moves. The worker offers a day and time (a WhatsApp reply that reads as a time, or the form on the job), Yaadly sends it to the client, the client accepts (the Accept button, the words ACCEPT <code>, or the button on the job), and both are told.
+
+**To switch it on:** apply `20260930120000`, deploy `yaad-inbound` and `yaad-notify-client` (`--no-verify-jwt`) and `yaad-twilio-setup` (platform check kept), deploy the app, then `{"action":"create-walk-accept"}` on `yaad-twilio-setup` for the client's Accept button. Without the template the client is told the words that accept.
+
+**What a correct result looks like.** Client requests a walkthrough on the job. Worker gets the short message and replies "Saturday 10am". Worker sees "Sent to the client". Client gets the offer with Accept. Client taps it. Both get "Accepted".
+
+**When something is wrong.**
+
+1. **The worker's time was read back as a work update:** the words did not read as a time (`looksLikeATime`, walkthrough-offer.ts), or the worker has more than one job with an open walkthrough. The portal form always works.
+2. **"There is no time waiting for your answer":** nothing was offered, or it was already accepted. `select walk_offer, walk_offered_at, walk_accepted_at from jobs where id = '<job>';`
+3. **No Accept button:** `twilio_content_sid_walk_accept` is not in app_settings, or the client is outside the 24 hour window and got the update template instead. Typing ACCEPT <code> still works.
+4. **WhatsApp video with no link:** there is no link to make. Both sides are told Yaadly sets up the call at that time; that is a person's job until a call service is chosen.

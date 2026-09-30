@@ -1,6 +1,8 @@
 import {
   requestWalkthrough,
   confirmWalkthrough,
+  offerWalkthrough,
+  acceptWalkthrough,
   clearWalkthrough,
   recordWalkthroughNotes,
   confirmWalkthroughNotes,
@@ -35,6 +37,8 @@ export function WalkthroughPanel({
   walkNotes,
   walkCallNotes,
   walkNotesConfirmedAt,
+  walkOffer = null,
+  walkAcceptedAt = null,
 }: {
   jobId: string;
   role: "client" | "worker";
@@ -45,9 +49,14 @@ export function WalkthroughPanel({
   walkNotes: string | null;
   walkCallNotes: string | null;
   walkNotesConfirmedAt: string | null;
+  walkOffer?: string | null;
+  walkAcceptedAt?: string | null;
 }) {
   const requested = !!walkPlatform;
   const confirmed = requested && !!walkLink;
+  // The time: offered by the worker, sent by Yaadly, accepted by the client. 30 Sep 2026.
+  const offered = requested && !!walkOffer;
+  const accepted = offered && !!walkAcceptedAt;
   const notesConfirmed = !!walkNotesConfirmedAt;
 
   return (
@@ -101,8 +110,38 @@ export function WalkthroughPanel({
           <p className="text-[13px] text-mute">
             <b className="text-ink">Requested:</b> {PLATFORM_LABEL[walkPlatform!] ?? walkPlatform}
             {walkDate ? ", " + walkDate : ""}.{" "}
-            {role === "client" ? "The worker has been sent a WhatsApp and an email. Waiting for them to confirm a link." : "Send a link once you have arranged it."}
+            {role === "client"
+              ? (offered ? (accepted ? "Time accepted." : "Your tradesperson has offered a time. Accept it below, or message Yaadly with another.") : "Your tradesperson has been asked for a day and time. You accept it here or on WhatsApp.")
+              : (offered ? (accepted ? "The client accepted your time." : "Your time has gone to the client. You hear when they accept.") : "Offer a day and time below, or reply on WhatsApp. Yaadly sends it to the client.")}
           </p>
+          {offered && (
+            <p className="mt-1.5 text-[13px] text-ink">
+              <b className={accepted ? "text-tealb" : "text-mango"}>{accepted ? "Accepted:" : "Offered:"}</b> &ldquo;{walkOffer}&rdquo;
+            </p>
+          )}
+          {role === "client" && offered && !accepted && (
+            <form action={acceptWalkthrough} className="mt-2.5">
+              <input type="hidden" name="jobId" value={jobId} />
+              <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2.5 text-[13px] font-bold text-onbrand">
+                Accept this time
+              </button>
+            </form>
+          )}
+          {role === "worker" && !accepted && (
+            <form action={offerWalkthrough} className="mt-2.5 grid gap-2 sm:grid-cols-[1fr_auto]">
+              <input type="hidden" name="jobId" value={jobId} />
+              <input
+                name="offer"
+                required
+                maxLength={300}
+                placeholder={offered ? "Offer a different day and time" : "A day and time you can do"}
+                className="rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-teal"
+              />
+              <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2.5 text-[13px] font-bold text-onbrand">
+                Send to the client
+              </button>
+            </form>
+          )}
           {walkNotes && role === "worker" && (
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-dim">&ldquo;{walkNotes}&rdquo;</p>
           )}

@@ -312,3 +312,23 @@ export function alertParishesContent() {
     },
   };
 }
+
+/** The client's Accept button on a walkthrough time, 30 Sep 2026. The id is
+ *  WALKOK plus the job's code, which yaad-inbound reads exactly as the typed
+ *  "ACCEPT <code>" (walkthrough-offer.ts). Used in session only; outside the
+ *  window the client gets the approved update template with one true line. */
+export const WALK_ACCEPT_NAME = "yaadly_walkthrough_accept_v1";
+export const WALK_ACCEPT_BODY = "{{1}}\n\nTap Accept, or reply with another time.";
+export function walkAcceptContent() {
+  return {
+    friendly_name: WALK_ACCEPT_NAME,
+    language: "en",
+    variables: { "1": "Your tradesperson can do the walkthrough on Kitchen cupboards (JOB-WEB-1789253807959): Saturday 10am, on WhatsApp video.", "2": "JOB-WEB-1789253807959" },
+    types: {
+      "twilio/quick-reply": {
+        body: WALK_ACCEPT_BODY,
+        actions: [{ title: "Accept", id: "WALKOK {{2}}" }],
+      },
+    },
+  };
+}

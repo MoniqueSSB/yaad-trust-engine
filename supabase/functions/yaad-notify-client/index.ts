@@ -61,6 +61,7 @@ import { encodeBase64 } from "jsr:@std/encoding/base64";
 import { addonPdfUrl } from "./addon-link.ts";
 import { screenOwnWords } from "./own-words.ts";
 import { captionsLine, namedNextStep, plainDraft, reportSentReceipt, unearnedClaims, usableCaptions } from "./report-draft.ts";
+import { acceptedForClient, acceptedForWorker, offerForClient, PLATFORM_LABEL as WALK_PLATFORM } from "./walkthrough-offer.ts";
 import { applyLink, CHECK_REMINDER_SUBJECT, checkReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -76,7 +77,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -1015,7 +1016,7 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
     }
-    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
@@ -1057,7 +1058,7 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -1906,11 +1907,48 @@ Deno.serve(async (req: Request) => {
         // Founder, 30 Sep 2026: "they dont have their whatsapp to arrange
         // the call". A reply here reaches the desk like any worker reply.
         `Reply here with a day and time you can do.`,
-        `A person at Yaadly confirms it with the client.`,
-        `Google Meet or Zoom: make the link and paste it on the job: ${roomLink}`,
+        `Yaadly sends it to the client. They accept.`,
+        `Or offer a time on the job: ${roomLink}`,
         ``,
         `Your evidence and the sign off do not change.`,
       ].filter((l) => l !== null).join("\n");
+    } else if (kind === "walkthrough_offered" || kind === "walkthrough_accepted" || kind === "walkthrough_accepted_worker") {
+      // The walkthrough time, arranged through Yaadly (20260930120000,
+      // walkthrough-offer.ts). Read off the row, so a stray call cannot send
+      // a time that has since changed or been withdrawn.
+      const { data: w } = await admin.from("jobs")
+        .select("signoff_method, walk_platform, walk_link, walk_offer, walk_offered_at, walk_accepted_at")
+        .eq("id", jobId).maybeSingle();
+      const offer = String(w?.walk_offer ?? "").trim();
+      if (w?.signoff_method !== "walkthrough" || !offer) {
+        root.setAttributes({ "yaadly.notify.outcome": "walkthrough_no_offer" });
+        return json({ ok: true, kind, told: false, reason: "No offered time on this job." });
+      }
+      const platformLabel = WALK_PLATFORM[String(w.walk_platform ?? "")] ?? "a video call";
+      const link = String(w.walk_link ?? "").trim() || null;
+      if (kind === "walkthrough_offered") {
+        if (w.walk_accepted_at) return json({ ok: true, kind, told: false, reason: "Already accepted." });
+        subject = `A time for your video walkthrough: ${job.title}`;
+        line = offerForClient(String(job.id), String(job.title ?? ""), offer, platformLabel, roomLink);
+        // The Accept button, in session, when the template exists.
+        let walkSid = Deno.env.get("TWILIO_CONTENT_SID_WALK_ACCEPT") ?? "";
+        if (!walkSid) {
+          const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_walk_accept").maybeSingle();
+          try { walkSid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { walkSid = String(st?.value ?? ""); }
+        }
+        if (/^HX[0-9a-f]{32}$/i.test(walkSid) && clientPhone) {
+          approveButton = { sid: walkSid, vars: { "1": templateVar(`Your tradesperson can do the walkthrough on ${job.title} (${job.id}): ${offer}, on ${platformLabel}.`, 300), "2": String(job.id) } };
+        }
+      } else if (kind === "walkthrough_accepted") {
+        if (!w.walk_accepted_at) return json({ ok: true, kind, told: false, reason: "Not accepted." });
+        subject = `Walkthrough accepted: ${job.title}`;
+        line = acceptedForClient(offer, platformLabel, link);
+      } else {
+        if (!w.walk_accepted_at) return json({ ok: true, kind, told: false, reason: "Not accepted." });
+        recipientEmail = String(job.worker_email ?? "").trim();
+        subject = `Walkthrough accepted: ${job.title}`;
+        line = acceptedForWorker(String(job.id), String(job.title ?? ""), offer, platformLabel, link, roomLink);
+      }
     } else if (kind === "completion_report_worker") {
       // The Completion Report is the worker's document (20260928210000). The
       // link carries the signing code, read here by job, never passed in, so
