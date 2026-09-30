@@ -6490,3 +6490,34 @@ The client raises it (WhatsApp words that read as a problem, or the job page). T
 3. **"A problem is already open on this job":** one dispute at a time. The client closes or escalates the open one first.
 4. **Nothing escalated after two days:** `select jobname, schedule, active from cron.job where jobname = 'yaad-dispute-escalation';` must show `37 15 * * *`.
 5. **The desk was not told at raise:** correct. It is told at escalation (`trg_notify_desk_dispute_escalated`), by the client or by the two day rule.
+
+---
+
+## 58. HubSpot hears every job and every stage move, from the database (30 Sep 2026)
+
+**What changed.** Until 30 September the CRM heard about one thing: a WhatsApp job whose client confirmed the read-back, sent inline by `yaad-inbound`. A portal or website job, a client paying, evidence landing, a stage approval and a worker being paid all happened in Postgres and the board never moved. Now four triggers (`20260930150000`) post to `yaad-crm-sync`, which reads the job and signs a request to the app: `/api/hubspot/lead` for a new or changed job, `/api/hubspot/stage` for an event. The stage route accepts a job code as well as a deal id and finds the deal on `yaadly_job_id`.
+
+**What moves the board, and from where.**
+
+| On the board | Fires when | Trigger |
+|---|---|---|
+| Inquiry and Scoping (deal made or updated) | a `jobs` row is inserted or leaves `draft`, or its name, number, parish, trade or urgency changes | `trg_crm_job_written` |
+| Client Paid | a client invoice on the job is marked paid | `trg_crm_invoice_paid` |
+| Evidence Submitted | the job's status moves into `evidence` | `trg_crm_job_status` |
+| Client Approved | a `stage_approvals` row is written (only `approve_stage()` does) | `trg_crm_stage_approved` |
+| Completed and Paid | the job is `complete` and every worker payable on it is paid, whichever lands last | `trg_crm_invoice_paid` and `trg_crm_job_status` |
+
+Forward only. The app refuses to move a deal backwards, so a trigger firing twice, or a second stage payment, is a no-op there. Test jobs (`is_test`) never leave. The field list is unchanged from §"Turning the HubSpot lead sync on": no description, address, photographs or email. A portal job with no phone number makes a deal and no contact.
+
+**Secrets.** `yaad-crm-sync` reads `HUBSPOT_LEAD_WEBHOOK_SECRET` and `HUBSPOT_STAGE_WEBHOOK_SECRET`, each of which must equal the app's copy (`wrangler secret put` in `web/`). The trigger door is `public.notify_trigger_secret()`, the same secret the client notifications use; never regenerate it (see `20260831z2`).
+
+**When the board does not move.** Nothing is broken on the job: the CRM is never on a client's path. Look in the `yaad-crm-sync` logs for lines starting `crm sync:`. A 404 on a stage event means no deal carries that job code, which means the lead never synced (the job was a draft, a test, or the secret was unset when it was written). Send the lead again by touching the row, for example resaving its parish on the desk, or run the lead by hand:
+
+```bash
+curl -s -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-crm-sync \
+  -H 'Content-Type: application/json' \
+  -d '{"secret":"<notify trigger secret>","jobId":"<job code>","kind":"lead"}'
+```
+
+**To turn it off.** `supabase secrets unset HUBSPOT_LEAD_WEBHOOK_SECRET HUBSPOT_STAGE_WEBHOOK_SECRET --project-ref leffyisvfvjwzilydlwf`. The function then answers every trigger with `skipped` and writes nothing. Dropping the four triggers is the harder off switch and is a migration.
+

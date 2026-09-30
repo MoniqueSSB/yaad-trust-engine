@@ -5013,3 +5013,16 @@ Also today, on instruction: the call link for a video walkthrough is made by Yaa
 ## 2026-09-30 · The AI agent reads every application, with no question asked
 
 Founder, in these words: "the ai will read", "remove the ask for review by human", "yes ai agent review this information all the time on recuitement sites". This changes the 30 August rule that the paperwork read ran only on a granted answer. Every application, on the site and on WhatsApp, is now written `ai_review_consent = granted` with version `ai-review-auto-v1`, so every row it applies to says the read was not asked for, and `yaad-vetting-review` runs on every one. The gate inside `review()` is untouched and still reads the column; what changed is what writes it. The ID, selfie and face video are withheld from the model exactly as before; a person still decides every application. The joining flow is six questions again, and the site's consent screen is gone. The lawful basis for sending proof of address, TRN, certificates and CV to NVIDIA's model without asking is now a question for the adviser, and CLAUDE.md §6 still describes the 30 August rule; that file is Monique's to bring up to date.
+
+## 2026-09-30 · The CRM is fed by the database, not by the doors
+
+Monique asked how HubSpot worked with the site and the honest answer was that it did not: the portal had zero deals, the lead sync fired only on a confirmed WhatsApp job and none had arrived since it went live, and the stage webhook was built, tested and called by nothing. She said to connect it correctly, from the portal and from WhatsApp alike.
+
+**Triggers, not call sites.** Every door that makes a job (WhatsApp, the portal, the website form, the desk) writes the same `jobs` row, and every event worth a stage move (a bill marked paid, a status change, a stage approval) is a Postgres write. Four triggers post to a new `yaad-crm-sync`, which reads the row and signs the request to the app. That is the pattern the client notifications and the Completion Report already use, and it means a door added next month is covered without anybody remembering to call HubSpot. The inline sync in `yaad-inbound` stays, because a WhatsApp job is confirmed while its row is still a draft and the trigger deliberately ignores drafts; the lead route is idempotent so the two never make two deals.
+
+**The app still owns HubSpot.** The stage route learned to accept a job code, looked up on the same `yaadly_job_id` the lead sync uses as its idempotency key, rather than the function holding a HubSpot token. One implementation, one field list, one place that refuses to move a deal backwards. A job with no deal is a 404 from the stage route, never a fresh deal: creating records is the lead route's job, and a stage endpoint that conjures deals would be a way to make one appear at Client Paid with no Inquiry behind it.
+
+**What "Completed and Paid" means.** Not the first of several stage payments to the worker. The job is `complete` and no worker payable on it is still owed. Checked from both sides, the last payment and the status change, because either can land last.
+
+**What did not change.** The field list from 4 September, and the test that enforces it. Test jobs never leave. No money moves and no approval is made here: the board records decisions that named humans took elsewhere.
+
