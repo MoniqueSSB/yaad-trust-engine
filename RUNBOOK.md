@@ -6401,3 +6401,37 @@ Added 29 September 2026.
 2. **On the quote link, no account.** The price comes from `job_check_prices_for_code()`. If that function is missing the page shows no tick box and nothing else changes. Check it is live: `select count(*) from pg_proc where proname = 'job_check_prices_for_code';` should return 1. If it returns 0, migration `20260929233000` has not been applied.
 3. **The catalogue row.** `select id, active, full_pence, founding_pence from service_catalogue where id = 'job-visual-check';` The row must be active. The price is changed there, never in the code.
 4. **The client ticked it but the job shows no check.** The booking stands either way. The check is refused if the final stage's evidence is already in. Add it for them from the desk, or they add it from the Approvals tab.
+
+## 56. HubSpot: the Partnerships pipeline, the worker stage, and the partner intro message (30 Sep 2026)
+
+**What exists in the portal, created 30 September 2026 through the API on Monique's instruction.**
+
+- A second deal pipeline, **Partnerships** (id `4197500138`), five stages: Inbound Lead, Founder Review, Introduction Scheduled, Active Collaboration, Not Proceeding. IDs are in `web/lib/hubspotConfig.ts` as `PARTNER_STAGES`. Rename in the UI if a label needs to change; never delete and recreate.
+- Four contact properties: `yaadly_worker_stage` (Application Initiated, Vetting In Progress, Identity Confirmed, Vetting Cleared, Active Supplier, Engaged on Active Job, Not Cleared), `yaadly_worker_parish` (the fourteen parishes), `partner_category` (Investor, Corporate Partner, Diaspora Community Group, Ground Vendor, Media / Press), `partner_operational_country` (United Kingdom, United States, Canada, Jamaica).
+- `trade_specialization` now carries the eighteen trades from `data/job-taxonomy.js` instead of five old names. If the taxonomy changes, change the property to match.
+
+**What is NOT in HubSpot, on purpose.** No identity document, TRN, bank detail, property address, job description, evidence link or check-in time. A worker's Vetting Cleared stage is set by hand by a named person on the desk; Persona confirming identity is "Identity Confirmed" and nothing more. No HubSpot workflow moves a worker's stage.
+
+**The partner sync.** Somebody who picks "Press, partnership or investment" on `yaadly.co.uk/contact` becomes a contact and a deal at Inbound Lead on the Partnerships pipeline. `yaad-enquiry` signs a payload (enquiry id, name, email or number, source) and posts it to `/api/hubspot/partner`, which shares `HUBSPOT_LEAD_WEBHOOK_SECRET` with the lead route. The message does not leave. Category and country are set by hand at Founder Review. Idempotent on `yaadly_job_id = ENQ-<enquiry id>`. Off until the secret is set, which it already is in both places; on once `yaad-enquiry` is redeployed and the app is rebuilt:
+
+```bash
+supabase functions deploy yaad-enquiry --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+```
+
+Failures are log lines in `yaad-enquiry` starting `hubspot partner:`. The enquiry is on the desk regardless.
+
+**The intro message, for a HubSpot email template or sequence, not WhatsApp.** Partners write in by form or email, so an email answers them. A WhatsApp template would need Meta approval and numbered variables, and HubSpot tokens do not pass through Twilio. Paste this into Sales > Templates:
+
+> Subject: Your message reached Yaadly
+>
+> Hi {{ contact.firstname }},
+>
+> Thank you for getting in touch about working with Yaadly.
+> Your note is with Monique, who reads every partnership enquiry herself.
+> If a call would help, pick a time here: https://cal.com/yaadly/15min
+>
+> Yaadly
+
+No "team", no "main desk": there is one person and the copy says so. Use the bare booking link; `?overlayCalendar=true` is a Cal.com display flag.
+
+**Reports.** The deal count on the Sales Pipeline is the pipeline number. Filter any deal report by pipeline, or partner enquiries inflate it.
