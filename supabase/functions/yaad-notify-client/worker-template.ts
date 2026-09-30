@@ -27,7 +27,8 @@ export const WORKER_UPDATE_BODY =
  *  sentence without asking them to approve words they have not seen. */
 const SUMMARY: Record<string, string | null> = {
   booked_worker: "the client has accepted your price and you are booked. Do not start until Yaadly tells you the job is live",
-  job_live_worker: "the client has paid, so the job is live and you can start. When you arrive on site, send your location in this chat to check in",
+  job_live_worker: "the client has paid, so the job is live. The job shows where to start. Please share your location in this chat when you arrive on site, if you can",
+  stage_paid_worker: "the client has paid for the next stage, so you can start it. Send photos and videos as you go",
   evidence_comment: "the client has left a note on your evidence",
   evidence_landed: null,
   kickoff_pack_ready: "your Kickoff Pack is ready to read and confirm",

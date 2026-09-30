@@ -51,7 +51,8 @@ import { type AttrValue, httpAttrs, SpanKind, Trace } from "./otel.ts";
 import { pickTextProvider, providerAttrs, chatWithFailover } from "./textmodel.ts";
 import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, type VisionProvider, visionAttrs } from "./visionmodel.ts";
 import * as guardrails from "./guardrails.ts";
-import { checkAttrs, deskPack, runEvidenceChecks, workerGaps, workerNotes } from "./evidence-checks.ts";
+import { checkAttrs, deskPack, runEvidenceChecks } from "./evidence-checks.ts";
+import { bookedPayLine, completionReportWorkerCopy, stagePaidWorkerText, workerEvidenceLines } from "./worker-copy.ts";
 import { checkInApplies } from "./arrival-rule.ts";
 import { clientSummaryVars, clientTemplateSummary, clientUpdateVars } from "./client-template.ts";
 import { recordAccepted, recordNotSent, type SendMeta, withMessagingService, withStatusCallback } from "./twilio-status.ts";
@@ -79,7 +80,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "stage_signed_off_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "stage_signed_off_worker", "stage_paid_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -913,6 +914,20 @@ async function sendToWorker(
   return { sent: false, reason: wa.reason || sms.reason, outsideWindow: inWindow === false };
 }
 
+/** Whether the client's bill for one stage is marked paid, on a job billed
+ *  by stage (20260929100000). True on any other job, where there are no stage
+ *  bills and the start bill already covered the work. Marking paid is always
+ *  a person at the desk; this only reads what they marked. */
+async function stageBillPaid(admin: any, jobId: string, stage: number): Promise<boolean> {
+  const { data: bq } = await admin.from("job_quotes").select("billing_mode")
+    .eq("job_id", jobId).eq("status", "accepted").limit(1).maybeSingle();
+  if (bq?.billing_mode !== "by_stage") return true;
+  const { data: inv } = await admin.from("invoices").select("id")
+    .eq("job_id", jobId).eq("stage", stage).eq("status", "paid").is("addon_id", null)
+    .or("payable_to.is.null,payable_to.eq.yaadly").limit(1).maybeSingle();
+  return Boolean(inv);
+}
+
 /** Whether a daily check-in is asked for on this job (arrival-rule.ts). Read
  *  on its own, not in the job select above, so a missing column costs only
  *  this line: a failed read means asked, the safe reading of a blank. */
@@ -1138,7 +1153,7 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
     }
-    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "stage_signed_off_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "stage_signed_off_worker" || kind === "stage_paid_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
@@ -1177,7 +1192,7 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "stage_signed_off_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "stage_signed_off_worker" || kind === "stage_paid_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -1371,10 +1386,9 @@ Deno.serve(async (req: Request) => {
         .select("worker_name, labour_jmd, materials_jmd")
         .eq("job_id", jobId).eq("status", "accepted")
         .order("updated_at", { ascending: false }).limit(1).maybeSingle();
-      const l = Math.round(Number(q?.labour_jmd ?? 0));
       const m = Math.round(Number(q?.materials_jmd ?? 0));
-      const labourPay = l - Math.round(l * 0.05);
-      const pay = labourPay + m;
+      // No accepted quote read back means no figure, never "J$0" (30 Sep 2026).
+      const payLine = bookedPayLine(q, money);
       subject = `You are booked: ${job.title}`;
       // Three points and the exact figures, founder instruction 30 Sep 2026:
       // "let the know the exact amount they will be paid they should not need
@@ -1388,8 +1402,8 @@ Deno.serve(async (req: Request) => {
       line = [
         `You are booked: ${job.title} (${job.id}), ${job.parish ?? "Jamaica"}.`,
         ``,
-        `Your pay: ${money(labourPay)} for labour.${m ? ` Materials ${money(m)} at cost.` : ""} Total ${money(pay)}.`,
-        ``,
+        payLine,
+        payLine ? `` : null,
         `1. Do not start yet.`,
         `You get a message here when the client has paid.`,
         ``,
@@ -1429,10 +1443,18 @@ Deno.serve(async (req: Request) => {
       }
       const firstStage = Math.max(Number(job.stage ?? 0), 1);
       const askCheckIn = await checkInAsked(admin, jobId);
+      // On a job billed by stage, the bill that starts the job is not the
+      // bill for its first stage, and that stage cannot be worked until its
+      // own bill is paid (20260929100000). Say so rather than tell him to
+      // start; stage_paid_worker tells him when it is.
+      const firstLabel = await stageLabel(admin, jobId, firstStage);
+      const firstPaid = await stageBillPaid(admin, jobId, firstStage);
       subject = `The job is live: ${job.title}`;
       line = [
         `${job.id} (${job.title}) is live. The client has paid Yaadly.`,
-        `Start with ${await stageLabel(admin, jobId, firstStage)}.`,
+        firstPaid
+          ? `Start with ${firstLabel}.`
+          : `${firstLabel} starts once the client has paid for it. Do not start it yet: you get a message here when they have.`,
         ``,
         // An ask, never a gate (arrival-rule.ts), and only where it is asked.
         askCheckIn ? `Each day you get there, please share your location here.` : null,
@@ -1553,15 +1575,7 @@ Deno.serve(async (req: Request) => {
       // On a job billed by stage, the next stage is worked only once its bill
       // is paid (20260929100000, evidence_on_the_working_stage). Say so rather
       // than tell him to start.
-      const { data: bq } = await admin.from("job_quotes").select("billing_mode")
-        .eq("job_id", jobId).eq("status", "accepted").limit(1).maybeSingle();
-      let nextPaid = true;
-      if (bq?.billing_mode === "by_stage") {
-        const { data: inv } = await admin.from("invoices").select("id")
-          .eq("job_id", jobId).eq("stage", nextStage).eq("status", "paid").is("addon_id", null)
-          .or("payable_to.is.null,payable_to.eq.yaadly").limit(1).maybeSingle();
-        nextPaid = Boolean(inv);
-      }
+      const nextPaid = await stageBillPaid(admin, jobId, nextStage);
       subject = `${doneLabel} is signed off: ${job.title}`;
       line = [
         `${doneLabel} on ${job.id} (${job.title}) is signed off by the client.`,
@@ -1569,12 +1583,40 @@ Deno.serve(async (req: Request) => {
         ``,
         nextPaid
           ? `Next: ${nextLabel}. Send photos as you go, here or on the job: ${roomLink}`
-          : `Next: ${nextLabel}. Do not start it yet: the client pays for it first. The job shows when it is paid: ${roomLink}`,
+          : `Next: ${nextLabel}. Do not start it yet: the client pays for it first. You get a message here when they have.`,
       ].join("\n");
       if (workerPhone && await workerHasNoBankDetails(admin, String(job.worker_email ?? ""))) {
         bankAsk = bankDetailsAsk("", APP_URL, false);
         waFollowUps = [bankAsk];
       }
+    } else if (kind === "stage_paid_worker") {
+      // 30 Sep 2026. On a job billed by stage, stage_signed_off_worker tells
+      // the worker not to start the next stage until the client pays for it,
+      // and promises a message when they have. This is that message. Fired by
+      // notify_worker_on_stage_bill_paid (20260930180000) when a person at the
+      // desk marks the stage's bill paid, and checked again here off the rows
+      // themselves, so a stray call cannot tell a worker to start unpaid work.
+      // It moves no money and decides nothing.
+      const { data: inv } = await admin.from("invoices")
+        .select("id, status, stage, payable_to, addon_id, part_of, starts_job")
+        .eq("id", String(meta.invoiceId ?? "")).eq("job_id", jobId).maybeSingle();
+      const paidStage = Number(inv?.stage ?? 0);
+      if (!inv || inv.status !== "paid" || paidStage < 1 || inv.addon_id || inv.part_of || inv.starts_job
+          || (inv.payable_to && inv.payable_to !== "yaadly")) {
+        root.setAttributes({ "yaadly.notify.outcome": "stage_bill_not_paid" });
+        return json({ ok: true, kind, told: false, reason: "That is not a paid stage bill on this job." });
+      }
+      // Before the job is live, job_live_worker says where to start. A stage
+      // paid ahead of the one being worked is said by stage_signed_off_worker
+      // when it comes up, which reads the same bill.
+      if (!["in_progress", "evidence"].includes(String(job.status ?? "")) || !job.worker_email
+          || paidStage !== Number(job.stage ?? 0)) {
+        root.setAttributes({ "yaadly.notify.outcome": "stage_paid_not_current" });
+        return json({ ok: true, kind, told: false, reason: "Not the stage being worked on a live job." });
+      }
+      const paidLabel = await stageLabel(admin, jobId, paidStage);
+      subject = `${paidLabel} is paid: ${job.title}`;
+      line = stagePaidWorkerText(String(job.id), String(job.title ?? "your job"), paidLabel, roomLink);
     } else if (kind === "worker_paid") {
       // 14 Sep 2026. Fires when a person on the desk marks a worker's pay
       // invoice paid (mark_worker_paid, 20260914230000), after paying it from
@@ -1670,10 +1712,12 @@ Deno.serve(async (req: Request) => {
       // client a complete pack keeps the worker off the hook for one he could
       // have finished in two minutes.
       const evChecks = await assembleEvidenceChecks(admin, jobId, job.stage ?? 1);
-      const gaps = workerGaps(evChecks);
-      // Notes are offers, not demands, and are carried separately so the
-      // location-pin ask can never read as one more thing he has to do.
-      const notes = workerNotes(evChecks);
+      // Presented by worker-copy.ts, 30 Sep 2026. The check-in and the
+      // location are never "Still missing": founder, 29 Sep 2026, the
+      // check-in asks and never gates, so both become one soft tip. Tips are
+      // carried apart from what is missing for the same reason the notes
+      // always were: an offer must never read as one more thing he has to do.
+      const { missing: gaps, tips: notes } = workerEvidenceLines(evChecks);
       if (gaps.length) {
         await ntfyPush(admin, `Evidence gaps: ${job.title}`,
           `${jobId} stage ${job.stage ?? 1}: ${gaps.length} thing${gaps.length === 1 ? "" : "s"} missing. `
@@ -2190,27 +2234,17 @@ Deno.serve(async (req: Request) => {
         try { signSid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { signSid = String(st?.value ?? ""); }
       }
       const hasSignButtons = /^HX[0-9a-f]{32}$/i.test(signSid);
-      line = r.return_reason
-        ? [
-            `Yaadly sent the Completion Report for ${job.title} back to you:`,
-            ``,
-            `"${clip(String(r.return_reason), 600)}"`,
-            ``,
-            `It is your document.`,
-            hasSignButtons ? `Use the buttons below, or open it: ${signLink}` : `Open it here, no login: ${signLink}`,
-          ].join("\n")
-        : [
-            `Your Completion Report for ${job.title} (${job.id}) is ready.`,
-            `It is your document. Read it here, no login: ${signLink}`,
-            // The buttons that follow say the three choices; without them the
-            // page does, so they are named once, here.
-            ...(hasSignButtons ? [] : [
-              ``,
-              `On that page: sign it if it is right, change the words to say it your way, or raise an issue if something is wrong.`,
-            ]),
-            ``,
-            `It goes to the client only when you sign.`,
-          ].join("\n");
+      // Two versions, 30 Sep 2026 (worker-copy.ts). `line` goes wherever no
+      // buttons arrive (text message, email, a template fallback) and names
+      // the three choices once. `waLine` is the WhatsApp free text the three
+      // buttons follow, so it names them nowhere and says "the buttons
+      // below". The buttons are only sent after that free text lands.
+      const copy = completionReportWorkerCopy({
+        title: String(job.title ?? "your job"), jobId: String(job.id), signLink,
+        returnReason: r.return_reason, buttons: hasSignButtons, clip,
+      });
+      line = copy.line;
+      waLine = copy.waLine;
       // The Sign button follows, the same way the client's Approve button
       // follows an evidence report: its payload is the job's code, which
       // yaad-inbound signs through sign_completion_report_via_whatsapp().

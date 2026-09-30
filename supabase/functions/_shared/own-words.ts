@@ -35,7 +35,10 @@ export function screenOwnWords(text: unknown): OwnWordsResult {
   return {
     ok: false,
     terms,
-    message: `Not sent. Your message says ${quoted}, which Yaadly does not say to a client. ${findings[0].guidance} `
-      + "Send it again without that. Nothing has gone to the client.",
+    // No guidance line: that is written for a model, and for "fully covered"
+    // it told a worker to promise a guarantee limit Yaadly has not set (30 Sep
+    // 2026, review of every worker message).
+    message: `Not sent. Your message says ${quoted}, which Yaadly does not say to a client. `
+      + "Say it another way, in plain words about the work. Nothing has gone to the client.",
   };
 }
