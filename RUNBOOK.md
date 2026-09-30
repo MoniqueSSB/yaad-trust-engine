@@ -6393,3 +6393,26 @@ A worker's question goes through four doors in order, in `yaad-inbound`: a fixed
 1. **The read-back arrives as plain text with no buttons:** `select value from app_settings where key = 'twilio_content_sid_update_draft';` is empty, there is no Messaging Service, or Twilio refused the send. The function log line `sendReadBackButtons: Twilio refused the template` carries Twilio's code. Replying 1 still works.
 2. **"That update is not waiting any more":** the button tapped belongs to an update already filed, dropped or replaced. Working as designed.
 3. **The worker's words are cut short in the read-back with buttons:** a template variable is one line and at most 600 characters. What is filed is the full text held in the session, never the clipped copy.
+
+## 56. Joining on WhatsApp, the welcome screen, and the "you are cleared" message (30 Sep 2026)
+
+**To switch it on, in this order.** Each step is safe without the next.
+
+1. **Apply `20260930100000_the_worker_hears_when_they_are_cleared.sql`.** Check: `select tgname from pg_trigger where tgname = 'trg_worker_cleared';` returns one row.
+2. **Deploy from disk:** `yaad-inbound` and `yaad-notify-client` with `--no-verify-jwt`. Read the live `verify_jwt` first and keep it.
+3. **Deploy the app**, which carries the welcome screen and the link that opens a WhatsApp application on the site.
+4. **The marketing site** carries the FAQ wording ("six short questions"); Pages publishes `docs/` on merge.
+
+**What a correct result looks like.**
+
+- Tap "Rather do this on WhatsApp?" on `/apply`. Six questions arrive one at a time: name, trades (a list to tap), parishes (a list), email, one photo, then the paperwork question. The last reply carries a reference `APP-XXXXXX` and a link. Opening the link on the site lands on the identity steps with that reference. Check: `select app_id, name, trade, parishes, phone, email, status, ai_review_consent from applications order by created_at desc limit 1;`
+- Send the application on the site: the screen says Welcome, five points, and names the portal. No WhatsApp box.
+- Publish a worker on the desk: they get one WhatsApp (SMS behind it) and one email, "You are cleared", naming the portal.
+
+**When something is wrong.**
+
+1. **The button's message is read as a job:** the sentence in `WA_JOIN` (JoinFlow.tsx) and `isJoinOpener()` (join-lane.ts) have drifted. `join-lane_test.ts` reads both and fails on drift.
+2. **The lists do not appear:** section 55, the templates are not created. Typing still works.
+3. **No "you are cleared" message:** `select * from net._http_response order by id desc limit 5;` shows the trigger's call and the function's answer. "That worker is not published" means `active` did not flip. No phone on the profile means email only.
+4. **The link says nothing on the site:** it needs `app`, `token` and `ref` all present and well formed; the page cleans the address bar on arrival, so a copied address afterwards has none of them. Send the WhatsApp message again with JOIN to get a fresh one, which makes a second application, so tell the desk.
+5. **The review did not run on a WhatsApp application:** they answered NO to the sixth question, or never answered it. `ai_review_consent` on the row says which; the version `ai-review-wa-v1` is the WhatsApp sentence.

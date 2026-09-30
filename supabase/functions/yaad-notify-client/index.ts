@@ -61,6 +61,7 @@ import { encodeBase64 } from "jsr:@std/encoding/base64";
 import { addonPdfUrl } from "./addon-link.ts";
 import { screenOwnWords } from "./own-words.ts";
 import { captionsLine, namedNextStep, plainDraft, reportSentReceipt, unearnedClaims, usableCaptions } from "./report-draft.ts";
+import { WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -75,7 +76,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -871,8 +872,11 @@ Deno.serve(async (req: Request) => {
     // accept more than one quote and compare), so job_id alone no longer
     // says which worker or which pack this notification is about.
     const quoteId = typeof meta.quoteId === "string" && meta.quoteId.trim() ? meta.quoteId.trim() : "";
-    if (!secret || !KINDS.includes(kind) || (isService ? !serviceId : !jobId)) {
-      return json({ error: "secret, a valid kind, and jobId (or serviceId for a service kind) are required." }, 400);
+    // worker_cleared is about a person, not a job: it carries workerEmail.
+    const workerEmailIn = String(b.workerEmail ?? "").trim().toLowerCase();
+    const isWorkerOnly = kind === "worker_cleared";
+    if (!secret || !KINDS.includes(kind) || (isWorkerOnly ? !workerEmailIn : isService ? !serviceId : !jobId)) {
+      return json({ error: "secret, a valid kind, and jobId (or serviceId for a service kind, workerEmail for worker_cleared) are required." }, 400);
     }
 
     // The trigger proves itself with the secret, not a user session. Only a
@@ -883,6 +887,39 @@ Deno.serve(async (req: Request) => {
     if (!setting?.value || setting.value !== hash) {
       root.setAttributes({ "yaadly.notify.outcome": "bad_secret" });
       return json({ error: "Not authorised." }, 403);
+    }
+
+    // A worker who has just been published, 30 Sep 2026 (worker-cleared.ts).
+    // Answered here, before any job is loaded, because there is no job. One
+    // message to the worker, on WhatsApp with SMS behind it, and by email.
+    // Read off the row the trigger fired on, never off the request body, so
+    // the body can name a person but cannot put words in the message.
+    if (kind === "worker_cleared") {
+      const { data: w } = await admin.from("worker_profiles")
+        .select("worker_email, phone, name, active").ilike("worker_email", workerEmailIn).maybeSingle();
+      if (!w || w.active !== true) {
+        root.setAttributes({ "yaadly.notify.outcome": "worker_not_cleared" });
+        return json({ ok: true, kind, told: false, reason: "That worker is not published." });
+      }
+      const text = workerClearedText(String(w.name ?? ""), String(w.worker_email ?? ""), APP_URL);
+      const phone = String(w.phone ?? "").trim();
+      const meta: SendMeta = { kind: "worker cleared" };
+      let wa = phone ? await sendTwilio(phone, text, "whatsapp", trace, [], undefined, meta) : { sent: false, reason: "no phone on the profile" };
+      if (!wa.sent && phone) wa = await sendTwilio(phone, text, "sms", trace, [], undefined, meta);
+      let emailed = false;
+      if (w.worker_email && RESEND_KEY) {
+        try {
+          const r = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ from: `Yaadly <${FROM_EMAIL}>`, to: [String(w.worker_email)], reply_to: REPLY_TO, subject: WORKER_CLEARED_SUBJECT, text }),
+            signal: AbortSignal.timeout(15000),
+          });
+          emailed = r.ok;
+        } catch (_) { emailed = false; }
+      }
+      root.setAttributes({ "yaadly.notify.outcome": "worker_cleared", "yaadly.notify.wa_sent": wa.sent, "yaadly.notify.emailed": emailed });
+      return json({ ok: true, kind, told: wa.sent || emailed, whatsapp: wa.sent, emailed });
     }
 
     // A service kind reads services and never touches jobs; job stays null
@@ -1170,20 +1207,36 @@ Deno.serve(async (req: Request) => {
       const l = Math.round(Number(q?.labour_jmd ?? 0));
       const pay = l - Math.round(l * 0.05) + Math.round(Number(q?.materials_jmd ?? 0));
       subject = `You are booked: ${job.title}`;
-      line = `The client has accepted your price on ${job.id} (${job.title}) in ${job.parish ?? "Jamaica"}. ` +
-        `Yaadly is engaging you for it at your quoted labour price less 5%, plus materials at cost: ${money(pay)} owed to you by Yaadly. ` +
-        `Materials money is sent to you to buy the goods once the client has paid for them; your labour is paid as the stages are signed off. ` +
-        `Do not start yet. The job goes live once the client's invoice to Yaadly is paid, and you will get a message on this number when it is. ` +
-        // 17 Sep 2026, founder instruction. The pin was the only way to check
-        // in over WhatsApp and nothing told a worker it existed until they
-        // asked, so the steps are said here, the first message they get.
-        `When you arrive on site, check in before you start work: in this chat, tap the plus sign (or the paperclip) next to the message box, choose Location, then Send your current location. ` +
-        `That goes on the Arrival Log as proof you were there, and your check-in on day one is what opens the first stage. Check in the same way each day you are on site.\n\n` +
-        // 20260914200000, reworded 20260914220000 (bank transfer only, no cash, Stripe coming soon). How the worker is paid, pointing at a page
-        // in their own portal and never asking for a reply here: anything a
-        // worker types to this number is kept with the job and read by the
-        // intake and reporting steps, so bank details must never be sent in it.
-        `Yaadly pays you by bank transfer, never cash. Add your bank details securely here, and Yaadly will call you to check them: ${APP_URL}/portal/worker/payouts. Never type bank details into this chat.`;
+      // Rewritten 30 Sep 2026 as five short points, founder instruction:
+      // "there needs to be a checklist of what is require of them", "this is
+      // only given once the person wins the quote", "maximum 5 points",
+      // "less words", "videos to be sent also this is important". Every fact
+      // was already in the paragraph this replaces or in the approved facts
+      // the assistant answers from; nothing new is promised.
+      line = [
+        `You are booked: ${job.title} (${job.id}), ${job.parish ?? "Jamaica"}.`,
+        `Yaadly owes you ${money(pay)}: your labour less 5%, plus materials at cost.`,
+        ``,
+        `1. Do not start yet.`,
+        `The job goes live once the client has paid. You get a message here.`,
+        ``,
+        `2. On site, check in first, every day.`,
+        `Tap +, then Location, then Send current location.`,
+        `That is your Arrival Log. Day one opens the first stage.`,
+        ``,
+        `3. Photos and videos before, during and after.`,
+        `Send them here or in your portal: ${APP_URL}/portal/jobs/${encodeURIComponent(job.id)}`,
+        `One line on what each shows.`,
+        `Send the day's photos and videos before you leave.`,
+        ``,
+        `4. Paid by bank transfer, never cash.`,
+        `Within 7 days of a person signing off each stage.`,
+        `Bank details here, never in this chat: ${APP_URL}/portal/worker/payouts`,
+        `Materials money comes at cost once the client has paid. Send the receipt back.`,
+        ``,
+        `5. Questions? Type them here.`,
+        `Money and client questions go to a person.`,
+      ].join("\n");
     } else if (kind === "job_live_worker") {
       // 17 Sep 2026, founder instruction. booked_worker tells the worker not
       // to start and promises a message on this number once the client's
