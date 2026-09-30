@@ -8,7 +8,7 @@ import { pickJobChoice } from "./job-match.ts";
 import { docExt, fileLabel, guessFileKind, isDocMime, isFileableStatus } from "./job-file-lane.ts";
 import { matchApprovingJob, namesWithoutApproving } from "./approval-match.ts";
 import { pickEvidenceItem } from "./evidence-item-match.ts";
-import { DRAFT_STILL_WAITING, draftReadBack, readDraftReply, saysWhatItShows, tooShortToBeAnUpdate, WHAT_HAPPENS_NEXT } from "./update-draft.ts";
+import { DRAFT_STILL_WAITING, draftReadBack, readBackVars, readDraftReply, readUpdateTap, saysWhatItShows, tapAsTyped, tapMatchesUpdate, tooShortToBeAnUpdate, TYPE_YOUR_NEW_WORDS, WHAT_HAPPENS_NEXT } from "./update-draft.ts";
 import { visitorTokenOk, originAllowed, WEB_CHAT_MAX_CHARS, webReferenceIn, WEB_SAFE_FALLBACK } from "./web-chat.ts";
 import {
   ALERT_CONSENT_VERSION, ALERT_TERMS, ALERTS_PHRASE, ALERTS_STOP,
@@ -846,6 +846,59 @@ async function sendPhaseMenu(to: string, lead: string, contentSid: string, messa
     }
   });
 }
+
+/** The read-back with its two buttons, 29 Sep 2026. Founder: "add buttons
+ *  that can be pressed for options".
+ *
+ *  Same rules as the section menu above: a template goes through the Messages
+ *  API and never as a webhook reply, it needs a Messaging Service, and false
+ *  means "did not go", so the caller sends the typed read-back instead. Until
+ *  the template exists nothing changes at all. `screen` is the typed
+ *  read-back, which carries the worker's own words, so what reaches the phone
+ *  is screened exactly as the typed version would have been. */
+async function sendReadBackButtons(
+  to: string, vars: Record<string, string>, screen: string, contentSid: string, messagingServiceSid: string, trace: Trace,
+  label = "update_read_back",
+): Promise<boolean> {
+  const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
+  const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
+  const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
+  const digits = to.replace(/\D/g, "");
+  if (!contentSid || !messagingServiceSid || !sid || !tok || !from || digits.length < 7) return false;
+  if (guardrails.scan(screen).length) return false;
+  return await trace.span("twilio.send.whatsapp", SpanKind.CLIENT, {
+    "server.address": "api.twilio.com", "messaging.system": "twilio", "yaadly.template": label,
+  }, async (s) => {
+    try {
+      const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+        method: "POST",
+        headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
+        body: withStatusCallback(new URLSearchParams({
+          To: `whatsapp:+${digits}`, From: from, MessagingServiceSid: messagingServiceSid,
+          ContentSid: contentSid, ContentVariables: JSON.stringify(vars),
+        })),
+        signal: AbortSignal.timeout(15000),
+      });
+      s.setAttributes({ "http.response.status_code": r.status });
+      await recordAccepted(r, digits, "whatsapp", { kind: label.replace(/_/g, " ") });
+      if (!r.ok) {
+        const d = await r.json().catch(() => null) as { code?: number; message?: string } | null;
+        const detail = [`HTTP ${r.status}`, d?.code ? `Twilio code ${d.code}` : "", d?.message ?? "", `ContentSid ${contentSid}`].filter(Boolean).join(" | ");
+        s.recordError(detail.slice(0, 300));
+        console.error("sendReadBackButtons: Twilio refused the template:", detail);
+      }
+      return r.ok;
+    } catch (e) {
+      s.recordError(String(e).slice(0, 200));
+      return false;
+    }
+  });
+}
+
+/** The typed trades and parishes questions, said when there is no list to
+ *  tap, 29 Sep 2026. Short lines, the same things asked. */
+const TRADES_TYPED = "What work do you do?\nLike: plumbing, tiling, roofing.";
+const PARISHES_TYPED = "Which parishes will you go to?\nLike: Kingston, St Catherine.\nOr say ANYWHERE.";
 
 /** A voice note, transcribed inside the request budget.
  *
@@ -2163,6 +2216,36 @@ Deno.serve(async (req: Request) => {
     return twiml(`${lead} ${PHASE_QUESTION}`);
   };
 
+  // The one place a worker's words are read back. Buttons on WhatsApp when
+  // the template exists and the send worked, the typed read-back otherwise.
+  // `typed` is built by the caller with draftReadBack(), so every place that
+  // holds a worker's words still says, in its own lines, that it reads them back.
+  const readBack = async (settings: SettingsReader, to: string, channel: string, typed: string, jobId: string, title: string, text: string, joinsBatch = false) => {
+    if (channel === "whatsapp") {
+      const set = await readSettings(settings, ["twilio_content_sid_update_draft", "twilio_messaging_service_sid"]);
+      const contentSid = firstTemplateSid(set.twilio_content_sid_update_draft ?? "");
+      const serviceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID") || set.twilio_messaging_service_sid || "";
+      if (contentSid && await sendReadBackButtons(to, readBackVars(jobId, title, text, joinsBatch), typed, contentSid, serviceSid, trace)) return twimlSilent();
+    }
+    return twiml(typed);
+  };
+
+  // The trades and parishes questions, 29 Sep 2026. A list to tap on
+  // WhatsApp when the template exists and the send worked, the typed
+  // question otherwise. `lead` is what has just happened, consent sentence
+  // included where there is one, and goes out word for word either way.
+  const askFromList = async (settings: SettingsReader, to: string, channel: string, which: "trades" | "parishes", lead: string, typed: string) => {
+    if (channel === "whatsapp") {
+      const key = which === "trades" ? "twilio_content_sid_alert_trades" : "twilio_content_sid_alert_parishes";
+      const set = await readSettings(settings, [key, "twilio_messaging_service_sid"]);
+      const contentSid = firstTemplateSid(set[key] ?? "");
+      const serviceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID") || set.twilio_messaging_service_sid || "";
+      const vars = { "1": lead.replace(/\s+/g, " ").trim().slice(0, 900) };
+      if (contentSid && await sendReadBackButtons(to, vars, `${lead} ${typed}`, contentSid, serviceSid, trace, `alert_${which}_menu`)) return twimlSilent();
+    }
+    return twiml(`${lead}\n\n${typed}`);
+  };
+
   // The web sibling of twiml(): same screen, same refusal, a JSON body the
   // widget can render instead of TwiML. "handoff" tells the widget to show
   // the WhatsApp button; a blocked reply always hands off, because the
@@ -2826,7 +2909,7 @@ Deno.serve(async (req: Request) => {
           if (askingTrades) {
             await holdAlerts({ _lane: "alerts_parishes" });
             root.setAttributes({ "yaadly.alerts.outcome": "trades_set", "yaadly.alerts.trades": matched.length });
-            return twiml(`Got it: ${sayList(matched)}.${dropped} Now the parishes. Which will you travel to? Separate them with commas, or say ANYWHERE if you go island wide.`);
+            return await askFromList(supabase as unknown as SettingsReader, msg.from, msg.channel, "parishes", `Got it: ${sayList(matched)}.${dropped}`, PARISHES_TYPED);
           }
 
           await endAlerts();
@@ -2896,7 +2979,7 @@ Deno.serve(async (req: Request) => {
             if (gotTrades) {
               await holdAlerts({ _lane: "alerts_parishes" });
               root.setAttributes({ "yaadly.alerts.outcome": "trades_from_opener" });
-              return twiml(`You are on the list, for ${sayList(tRow!.matched)}.${droppedHere} ${ALERT_TERMS} Now the parishes. Which will you travel to? Separate them with commas, or say ANYWHERE if you go island wide.`);
+              return await askFromList(supabase as unknown as SettingsReader, msg.from, msg.channel, "parishes", `You are on the list, for ${sayList(tRow!.matched)}.${droppedHere} ${ALERT_TERMS}`, PARISHES_TYPED);
             }
             // Nothing usable as a trade. Fall through to the ordinary first
             // question. Any parishes they gave are already saved, and the
@@ -2906,9 +2989,10 @@ Deno.serve(async (req: Request) => {
           await holdAlerts({ _lane: "alerts_trades" });
           root.setAttributes({ "yaadly.alerts.outcome": row?.already ? "rejoined" : "subscribed" });
 
-          return twiml(row?.listening
-            ? `You are already on the list, for ${sayList(row.trades)} in ${sayList(row.parishes)}. To change that, tell me your trades now, separated by commas. Send STOP instead if you want to come off altogether.`
-            : `You are on the list. ${ALERT_TERMS} First, which trades do you take? Write them separated by commas, like: plumbing, tiling, roofing.`);
+          if (row?.listening) {
+            return twiml(`You are already on the list, for ${sayList(row.trades)} in ${sayList(row.parishes)}. To change that, tell me your trades now, separated by commas. Send STOP instead if you want to come off altogether.`);
+          }
+          return await askFromList(supabase as unknown as SettingsReader, msg.from, msg.channel, "trades", `You are on the list. ${ALERT_TERMS}`, TRADES_TYPED);
         }
       }
 
@@ -2937,6 +3021,17 @@ Deno.serve(async (req: Request) => {
         return twiml(row?.already_logged_today
           ? `You are already checked in on ${onSiteJob} today. One check in a day covers every stage. ${pinAsk}`
           : `Checked in on ${onSiteJob}. That covers every stage you work today. ${pinAsk}`);
+      }
+
+      // A tap on the read-back buttons. Read here, ahead of the report lane,
+      // for the reason the draft taps are: that lane takes any text that is
+      // not "1" as the worker's own report, and a button id must never reach
+      // a client. A tap that matches the update waiting is handled in the
+      // update_draft lane below, as the "1" or the "no" it stands for.
+      const updateTap = !msg.media.length ? readUpdateTap(msg.text) : null;
+      if (updateTap && !(draftSession && tapMatchesUpdate(updateTap, (draftSession.answers as any)?.job_id))) {
+        root.setAttributes({ "yaadly.worker_update.job": updateTap.jobId, "yaadly.worker_update.outcome": "tap_on_an_update_not_waiting" });
+        return twiml("That update is not waiting any more.\nTo add one, type it here.");
       }
 
       const draftTap = !msg.media.length ? readDraftTap(msg.text) : null;
@@ -3264,12 +3359,20 @@ Deno.serve(async (req: Request) => {
 
       if (!evidenceHeld && draftSession && !msg.media.length && msg.text.trim()) {
         const a = draftSession.answers as any;
-        const said = msg.text.trim();
+        // A tap that reached here matched this update, so it is the reply it
+        // stands for. Anything typed is read as it always was.
+        if (updateTap?.kind === "change") {
+          root.setAttributes({ "yaadly.worker_update.outcome": "asked_for_new_words" });
+          return twiml(TYPE_YOUR_NEW_WORDS);
+        }
+        const said = updateTap ? tapAsTyped(updateTap) : msg.text.trim();
         // The update has had its 1 and is waiting on the check-in question.
         // "skip", "done" after the portal, or anything short is an answer to
         // that question and is never read back as a new update. Real words
         // still replace the draft.
-        if (a.arrival_asked_at && said !== "1") {
+        // Drop it, tapped, always drops. It never counts as an answer to the
+        // check-in question, which would file the very words being dropped.
+        if (a.arrival_asked_at && said !== "1" && updateTap?.kind !== "drop") {
           if (isSkip(said)) return twiml(await fileHeldDraft(a, "skip"));
           if (cannotCheckIn(said) || wantsAPerson(said)) {
             await raiseCannotCheckIn(String(a.job_id ?? ""), "update");
@@ -4378,7 +4481,7 @@ Deno.serve(async (req: Request) => {
               "yaadly.worker_update.job": noteJob.id,
               "yaadly.worker_update.outcome": "held_for_confirm_as_note",
             });
-            return twiml(draftReadBack(noteJob.id, noteJob.title, text, true));
+            return await readBack(supabase as unknown as SettingsReader, msg.from, msg.channel, draftReadBack(noteJob.id, noteJob.title, text, true), noteJob.id, noteJob.title, text, true);
           }
 
           // Held and read back, never filed on arrival (17 Sep 2026). The
@@ -4392,7 +4495,7 @@ Deno.serve(async (req: Request) => {
               updated_at: new Date().toISOString(),
             });
             root.setAttributes({ "yaadly.worker_update.job": job.id, "yaadly.worker_update.outcome": "held_for_confirm" });
-            return twiml(draftReadBack(job.id, job.title, text));
+            return await readBack(supabase as unknown as SettingsReader, msg.from, msg.channel, draftReadBack(job.id, job.title, text), job.id, job.title, text);
           }
           if (found && found.jobs.length > 1) {
             await supabase.from("wa_intake_sessions").upsert({
@@ -5399,7 +5502,8 @@ Deno.serve(async (req: Request) => {
           // Jamaica" is a description a dozen people could give. Dealing with
           // Yaadly rather than with a stranger is the part that is actually
           // different, and it is what the site leads on.
-          "Thanks for writing in. Yaadly gets property work done in Jamaica for people who are not there to watch it, and you deal with us rather than with a stranger out there. Tell me what needs doing, which parish the property is in, and who can let a worker in.",
+          // One thing a line, 29 Sep 2026. Founder: "it is a whole paragraph".
+          "Thanks for writing in.\n\nYaadly gets property work done in Jamaica.\nYou deal with us, not a stranger.\n\nTell me:\n1. What needs doing\n2. Which parish\n3. Who can let a worker in",
         );
       }
 

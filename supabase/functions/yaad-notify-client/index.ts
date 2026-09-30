@@ -1442,13 +1442,14 @@ Deno.serve(async (req: Request) => {
       // The typed way to do each thing a button does. Always sent, buttons or
       // not: a button does not show on every phone, and "1" has to keep working.
       const howTo = [
-        "Reply 1 to send the draft as written.",
+        "Reply 1 to send the draft.",
         editLink
-          ? `To change it, open it here with the words already in the box: ${editLink}`
-          : "To change it, hold your finger on the draft above, tap Copy, paste it here, change what is not right, and send.",
-        "Or just type your own words and those go to the client instead.",
+          ? `To change it: ${editLink}`
+          : "To change it: hold the draft, tap Copy, paste it here, fix it, send.",
+        "Or type your own words.",
         "Nothing goes to the client until you choose.",
-      ].join(" ");
+      // One thing a line, 29 Sep 2026. Founder: "it is a whole paragraph".
+      ].join("\n");
 
       subject = `Draft for the client: ${job.title}`;
       // TWO MESSAGES ON WHATSAPP, and that is the point. The draft goes alone,
@@ -1457,27 +1458,40 @@ Deno.serve(async (req: Request) => {
       // also copied the list of what is missing from the worker's own
       // evidence, and one careless paste would have sent that to a client.
       waLine = draftText;
-      const details = [
-        `That is what we would tell the client about ${evLandedLabel} of ${job.title}.`,
-        // His own words, next to the draft made from them, at the moment of
-        // the tap. Better information in front of the person making the call.
+      const about = `That draft is for the client, about ${evLandedLabel} of ${job.title}.`;
+      // WHAT IS MISSING IS A MESSAGE OF ITS OWN, 29 Sep 2026. Founder: "that
+      // should be a sperate message", "once they file the photo". It sat in
+      // the middle of the instructions, where a list of things to fix read as
+      // part of how to send the draft. It still comes after the draft and
+      // before the choice, so a worker reads what the client would be told,
+      // then what is missing, then what to do. Nothing here stops him
+      // sending: the choice is still his, and a stage is never blocked by this.
+      const missing = gaps.length
+        ? `Still missing:\n${gaps.map((g) => "- " + g).join("\n")}\n\nSend them here.`
+        : null;
+      // His own words, next to the draft made from them, at the moment of
+      // the tap. Better information in front of the person making the call.
+      const extras = [
         captionsLine(composed?.captions ?? []),
         aiSummaries?.desk ? `AI noticed: ${aiSummaries.desk}` : null,
-        // The gaps sit BELOW the draft and ABOVE the reply instruction, so a
-        // worker reads what the client would be told, then what is missing,
-        // then what to do. Nothing here stops him sending: the choice is
-        // still his, and a stage is never blocked by this.
-        gaps.length ? `Still missing:\n${gaps.map((g) => "- " + g).join("\n")}` : null,
         notes.length ? notes.join("\n\n") : null,
         itemsLine,
-        howTo,
-      ].filter(Boolean).join("\n\n");
-      waFollowUps = [details];
+      ].filter(Boolean) as string[];
+      // With buttons, the message that carries them says what to do, typed
+      // way included, so saying it here as well is the same thing twice.
+      // Founder, on reading both: "confused by this, why does the message
+      // happen". Without buttons this is the only place it is said.
+      const details = approveButton
+        ? (extras.length ? [about, ...extras].join("\n\n") : null)
+        : [about, ...extras, howTo].join("\n\n");
+      waFollowUps = [missing, details].filter(Boolean) as string[];
       // Email and the SMS fallback are one message, so they carry everything.
       line = [
         `Here's what we'd tell the client about ${evLandedLabel} of ${job.title}:`,
         `"${draftText}"`,
-        details.split("\n\n").slice(1).join("\n\n"),
+        ...extras,
+        missing,
+        howTo,
       ].filter(Boolean).join("\n\n");
       root.setAttributes({
         "yaadly.notify.evidence_report_composed": !!composed,

@@ -109,3 +109,116 @@ Deno.test("after a filing the worker is told what arrives next and what to do wi
   assert(!src.includes("The client hears about it once it is drafted"), "the old ending is back");
   assert((src.match(/\$\{WHAT_HAPPENS_NEXT\}/g) ?? []).length >= 3, "a filing confirmation lost its next step");
 });
+
+/* ── the two buttons under the read-back (29 Sep 2026) ────────────────────
+   A tap is a way of typing. These hold the ids in content.ts against the
+   reader here, and hold the rule that a tap cannot do what typing could not. */
+
+import { oneLine, readBackVars, readUpdateTap, tapAsTyped, tapMatchesUpdate, TYPE_YOUR_NEW_WORDS } from "./update-draft.ts";
+import { ALERT_TERMS } from "./job-alerts.ts";
+import { ALERT_PARISH_ROWS, ALERT_TRADE_ROWS, alertParishesContent, alertTradesContent, UPDATE_DRAFT_BODY, UPDATE_DRAFT_DROP, UPDATE_DRAFT_FILE, updateDraftContent } from "../yaad-twilio-setup/content.ts";
+
+const TAP_JOB = "JOB-WEB-1789253807959";
+
+Deno.test("both buttons on the read-back are read, as the thing the label says", () => {
+  const actions = updateDraftContent().types["twilio/quick-reply"].actions;
+  assertEquals(actions.length, 3, "three buttons is what shows reliably on every phone");
+  const want: Record<string, string> = { "Put it on the job": "file", "Change my words": "change", "Drop it": "drop" };
+  for (const a of actions) {
+    assert(a.title.length <= 20, `${a.title} is too long for a WhatsApp button`);
+    const tap = readUpdateTap(a.id.replace("{{4}}", TAP_JOB));
+    assert(tap, `${a.id} is not read`);
+    assertEquals(tap!.kind, want[a.title]);
+    assertEquals(tap!.jobId, TAP_JOB);
+  }
+  assertEquals(readUpdateTap(`${UPDATE_DRAFT_FILE} ${TAP_JOB}`)?.kind, "file");
+  assertEquals(readUpdateTap(`${UPDATE_DRAFT_DROP} ${TAP_JOB}`)?.kind, "drop");
+});
+
+Deno.test("a tap is the reply it stands for and goes through the same gate", () => {
+  assertEquals(read(tapAsTyped(readUpdateTap(`UPDATEFILE ${TAP_JOB}`)!)), "file");
+  assertEquals(read(tapAsTyped(readUpdateTap(`UPDATEDROP ${TAP_JOB}`)!)), "discard");
+});
+
+Deno.test("a worker's own words are never mistaken for a tap", () => {
+  for (const said of ["1", "no", "drop it", "updatefile", "put it on the job", "UPDATEFILE JOB-1 and more", "DRAFTSEND JOB-1", "EDIT JOB-1"]) {
+    assertEquals(readUpdateTap(said), null, said);
+  }
+});
+
+Deno.test("a tap on an old message cannot file or drop a different update", () => {
+  const tap = readUpdateTap(`UPDATEFILE ${TAP_JOB}`)!;
+  assertEquals(tapMatchesUpdate(tap, TAP_JOB), true);
+  assertEquals(tapMatchesUpdate(tap, "JOB-WEB-1"), false);
+  assertEquals(tapMatchesUpdate(tap, ""), false);
+  assertEquals(tapMatchesUpdate(tap, null), false);
+});
+
+Deno.test("a button id never reaches the report lane or the general door", async () => {
+  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const stale = src.indexOf("tap_on_an_update_not_waiting");
+  const report = src.indexOf("relay_confirmed_report");
+  assert(stale > 0 && report > 0 && stale < report, "the stale tap must be answered before the report lane can send it to a client");
+});
+
+Deno.test("the read-back with buttons says what the typed one says", () => {
+  assert(UPDATE_DRAFT_BODY.includes("Nothing is filed until you tap Put it on the job"), "the gate is no longer stated");
+  assert(!/[\u2013\u2014]/.test(UPDATE_DRAFT_BODY), "no dashes in worker copy");
+  const plain = readBackVars("JOB-1", "Stair rails", "stage one done,\nstairs are in");
+  assertEquals(plain["1"], "JOB-1 (Stair rails)");
+  assertEquals(plain["2"], "stage one done, stairs are in", "a variable is one line");
+  assert(plain["3"].includes("Photos you send next"));
+  assertEquals(plain["4"], "JOB-1");
+  const note = readBackVars("JOB-1", "Stair rails", "rail was rusted", true);
+  assert(!note["3"].includes("Photos you send next"), "a note must not promise the next photos carry it");
+  assert(note["3"].includes("photos you just sent"));
+  assertEquals(oneLine("", 10), "-");
+  assert(oneLine("x".repeat(900), 600).length <= 600);
+});
+
+Deno.test("Change my words asks for the words and files nothing", async () => {
+  const tap = readUpdateTap(`UPDATECHANGE ${TAP_JOB}`)!;
+  assertEquals(tap.kind, "change");
+  assertEquals(tapAsTyped(tap), "", "it must never stand for a 1");
+  assert(!/[\u2013\u2014]/.test(TYPE_YOUR_NEW_WORDS));
+  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const at = src.indexOf('updateTap?.kind === "change"');
+  const typed = src.indexOf("const said = updateTap ? tapAsTyped(updateTap)");
+  assert(at > 0 && typed > 0 && at < typed, "the change tap must be answered before anything reads it as a reply");
+});
+
+/* ── the trades and parishes lists (29 Sep 2026) ──────────────────────────
+   A row's id is what reaches the lane as text, so every id has to be a word
+   the typed question already understood. The patterns are trade_key's and
+   parish names, copied here so a row that would be refused is caught before
+   a worker taps it. */
+
+Deno.test("every trade row is a word the typed question understands, and fits WhatsApp", () => {
+  const known = /(solar|plumb|electric|roof|tile|tiling|mason|paint|weld|air ?con|carpent|landscap|window|handy|lock)/i;
+  const items = alertTradesContent().types["twilio/list-picker"].items;
+  assert(items.length <= 10, "a WhatsApp list carries ten rows");
+  assertEquals(items.length, ALERT_TRADE_ROWS.length);
+  for (const r of items) {
+    assert(known.test(r.id), `${r.id} would not be recognised as a trade`);
+    assert(r.item.length <= 24, `${r.item} is too long for a list row`);
+    assert(!/,|;|\/|\band\b/i.test(r.id), `${r.id} would be split into two answers`);
+  }
+});
+
+Deno.test("every parish row is a parish, or anywhere, and fits WhatsApp", () => {
+  const parishes = ["Kingston", "St Andrew", "St Catherine", "St Thomas", "Portland", "St Mary", "St Ann", "Trelawny", "St James", "Hanover", "Westmoreland", "St Elizabeth", "Manchester", "Clarendon"];
+  const items = alertParishesContent().types["twilio/list-picker"].items;
+  assert(items.length <= 10, "a WhatsApp list carries ten rows");
+  assertEquals(items.length, ALERT_PARISH_ROWS.length);
+  for (const r of items) {
+    assert(parishes.includes(r.id) || /^anywhere$/i.test(r.id), `${r.id} is not a parish`);
+    assert(r.item.length <= 24, `${r.item} is too long for a list row`);
+  }
+});
+
+Deno.test("the consent sentence still reaches somebody joining, word for word", async () => {
+  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  assert(src.includes('"trades", `You are on the list. ${ALERT_TERMS}`'), "joining no longer says the consent sentence");
+  assert(src.includes("return twiml(`${lead}\\n\\n${typed}`);"), "the typed question no longer carries the lead, so the consent sentence is lost when there is no list");
+  assert(ALERT_TERMS.length < 900, "the consent sentence would be cut short as a template variable");
+});
