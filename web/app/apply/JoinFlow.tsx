@@ -243,8 +243,8 @@ const PHASE1_STEPS: Step[] = [
     p: "",
     note: "" },
 { phase: 1, n: "Your track record", body: "port",
-    h: "Anything here makes your quote land harder",
-    p: "All of it is optional and can wait. Skip straight to sending if you would rather.",
+    h: "This is what a client sees when choosing who to book",
+    p: "Optional, and you can send without it. But a client picks from what they can see, and a profile with real work on it gets picked more often than an empty one.",
     note: "" },
 { phase: 1, n: "Check and send", body: "live",
     h: "This is what goes to a person",
@@ -474,6 +474,24 @@ export function JoinFlow() {
      button on the sent screen, and that screen needs the reference. */
   useEffect(() => {
     try {
+      // An application started on WhatsApp (the six questions in yaad-inbound,
+      // 30 Sep 2026) arrives here by a link carrying the same claim the site
+      // keeps in its own storage: the application id and its upload token.
+      // It is written to storage exactly as a claim made here would be, and
+      // the address bar is cleaned so the token is not left on screen or in
+      // history. The identity steps are then the same page for everybody.
+      const q = new URLSearchParams(window.location.search);
+      const linkApp = q.get("app") ?? "", linkTok = q.get("token") ?? "", linkRef = q.get("ref") ?? "";
+      if (/^[0-9a-f-]{36}$/i.test(linkApp) && /^[0-9a-f-]{36}$/i.test(linkTok) && /^APP-[0-9A-Z]{6}$/.test(linkRef)) {
+        const c: Claim = { applicationId: linkApp, uploadToken: linkTok, reference: linkRef };
+        claimRef.current = c; setClaim(c); setSentRef(linkRef); setContinuing(true); setStep(0);
+        try {
+          const cur = JSON.parse(localStorage.getItem(STORE) ?? "{}");
+          localStorage.setItem(STORE, JSON.stringify({ ...cur, claim: c, sentRef: linkRef, continuing: true, step: 0 }));
+        } catch { /* private browsing, carry on */ }
+        window.history.replaceState(null, "", "/apply");
+        restored.current = true; return;
+      }
       const raw = localStorage.getItem(STORE);
       if (!raw) { restored.current = true; return; }
       const v = JSON.parse(raw);
@@ -976,29 +994,35 @@ export function JoinFlow() {
           <span className="grid size-[52px] place-items-center rounded-[15px] border border-green/35 bg-green/10 text-[23px] text-green" aria-hidden="true">✓</span>
           <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[.16em] text-dim">Application sent</p>
           <h1 className="font-display text-[clamp(26px,6vw,32px)] font-light leading-[1.15] tracking-[-0.02em]">
-            Sent. A person reads it inside 24 hours.
+            Welcome to Yaadly{firstName ? `, ${firstName}` : ""}. Good to have you.
           </h1>
           <p className="text-[15px] leading-relaxed text-mute text-pretty">
-            {firstName ? `${firstName}, your` : "Your"} application for{" "}
-            {tradesSent.length ? tradesSent.slice(0, 2).join(" and ") : "your trade"} is
-            in. You get a straight answer either way, and the verification steps
-            come after that. Allow <b className="text-ink">within 24 hours</b>, and
-            quote your reference if you contact us first.
+            Your application for{" "}
+            {tradesSent.length ? tradesSent.slice(0, 2).join(" and ") : "your trade"} is in.
           </p>
           <div className="rounded-2xl border border-line px-4 py-3">
             <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[.16em] text-dim">Your reference</span>
             <CopyRef reference={sentRef} />
           </div>
-          <a href={WA_JOIN} target="_blank" rel="noopener noreferrer" className="jwa">
-            <span className="flex flex-col">
-              <b className="text-[14.5px] text-ink">Want it faster?</b>
-              <span className="text-[12.5px] leading-snug text-mute">
-                Say hello on WhatsApp and give your reference. It is where we
-                chase the next steps.
-              </span>
-            </span>
-            <span className="ml-auto font-mono text-[13px] font-semibold text-green" aria-hidden="true">&rarr;</span>
-          </a>
+          {/* Founder, 30 Sep 2026: a welcome and next steps, warm, five points,
+              and the portal named, because nothing on this path said it
+              existed. Only what is true today: a person decides, quoting waits
+              for the check, nothing is promised. The WhatsApp "want it faster"
+              box that sat here came out on the same instruction: "not
+              required". */}
+          <div className="rounded-2xl border border-line bg-panel p-5">
+            <b className="text-[15px] text-ink">What happens next</b>
+            <ol className="mt-3 grid gap-2 text-[13.5px] leading-relaxed text-mute">
+              <li><b className="text-ink">1.</b> A real person reads your application. Not a machine.</li>
+              <li><b className="text-ink">2.</b> Your check: your ID, TRN, three referees, and sign the Guidelines. Below, when you are ready.</li>
+              <li><b className="text-ink">3.</b> You hear back on WhatsApp, either way. No silence.</li>
+              <li><b className="text-ink">4.</b> Once cleared, jobs come to you on WhatsApp. Quote in writing. Always free.</li>
+              <li><b className="text-ink">5.</b> Win a quote and we walk you through how the job runs.</li>
+            </ol>
+            <p className="mt-3 text-[13px] leading-relaxed text-mute">
+              Your portal is at <b className="text-ink">app.yaadly.co.uk/portal</b>. Sign in with the email you gave us and a code comes to you. It opens once you are cleared.
+            </p>
+          </div>
         </div>
 
         {/* WHAT THIS IS NOT. The page said "it is with a person now" and left
@@ -1197,7 +1221,7 @@ export function JoinFlow() {
           <span className="flex flex-col">
             <b className="text-[14.5px] text-ink">Rather do this on WhatsApp?</b>
             <span className="text-[12.5px] leading-snug text-mute">
-              Five short questions in the chat, Patois or English.
+              Six short questions in the chat, Patois or English.
             </span>
           </span>
           <span className="ml-auto font-mono text-[13px] font-semibold text-green" aria-hidden="true">&rarr;</span>

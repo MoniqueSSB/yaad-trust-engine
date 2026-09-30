@@ -33,6 +33,7 @@ import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-stat
 import { parseAddonConfirm } from "./addon-confirm.ts";
 import { readDraftTap, readOnSiteTap, tapMatchesDraft } from "./report-tap.ts";
 import { screenOwnWords } from "./own-words.ts";
+import { AI_CONSENT_WA_VERSION, applicationRow, CONSENT_AGAIN, CONSENT_NO, CONSENT_YES, continueLink, isJoinLane, isJoinOpener, JOIN_STALE_MS, joinedReply, LEAD_PARISHES, leadTrades, looksLikeEmail, looksLikeName, newReference, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, Q_CONSENT, Q_EMAIL, Q_NAME, Q_PHOTO, SKIP, WORDS_FIRST } from "./join-lane.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -2803,6 +2804,214 @@ Deno.serve(async (req: Request) => {
       // A worker's typed update, read back and waiting on a reply of 1. See update-draft.ts.
       const draftSession = !arrivalLapsed && sess && String((sess.answers as any)?._lane ?? "") === "update_draft"
         && Date.now() - new Date(sess.updated_at as string).getTime() <= SESSION_STALE_MS ? sess : null;
+
+      // ── joining as a tradesperson: the five questions ───────────────────
+      //
+      // 30 Sep 2026. See join-lane.ts for what this is and is not. Ahead of
+      // the alert list and everything below it for the same reason the alert
+      // list is: the number is a stranger, and nothing further down expects
+      // one. Nothing here sends an alert, checks an identity or decides
+      // anything. A held desk number is held for this too.
+      const joinSession = sess && isJoinLane((sess.answers as any)?._lane)
+        && Date.now() - new Date(sess.updated_at as string).getTime() <= JOIN_STALE_MS ? sess : null;
+      const joinSaid = msg.text.trim();
+      if (!deskHasThisNumber && (joinSession || (joinSaid && isJoinOpener(joinSaid)))) {
+        const settingsReader = supabase as unknown as SettingsReader;
+        const holdJoin = (answers: Record<string, unknown>) =>
+          supabase.from("wa_intake_sessions").upsert({
+            wa_id: msg.from, answers, photo_count: 0, updated_at: new Date().toISOString(),
+          });
+        const a = (joinSession?.answers ?? {}) as Record<string, unknown>;
+        const lane = joinSession ? String(a._lane) : "";
+
+        // The opener, fresh or mid-way: start again from the name. Somebody
+        // who taps the site's button twice gets the first question twice,
+        // never a half-finished application.
+        if (!joinSession || isJoinOpener(joinSaid)) {
+          await holdJoin({ _lane: "join_name" });
+          root.setAttributes({ "yaadly.join.step": "name", "yaadly.join.outcome": "started" });
+          return twiml(Q_NAME);
+        }
+
+        // A photo before its question is not lost, it is just early: the
+        // question in hand is asked again and the photo is not read.
+        if (lane !== "join_photo" && msg.media.length && !joinSaid) {
+          root.setAttributes({ "yaadly.join.step": lane, "yaadly.join.outcome": "photo_too_early" });
+          return twiml(WORDS_FIRST);
+        }
+
+        if (lane === "join_name") {
+          if (!looksLikeName(joinSaid)) return twiml(NOT_A_NAME);
+          const name = joinSaid.replace(/\s+/g, " ").slice(0, 120);
+          await holdJoin({ _lane: "join_trades", name });
+          root.setAttributes({ "yaadly.join.step": "trades" });
+          return await askFromList(settingsReader, msg.from, msg.channel, "trades", leadTrades(name, ALERT_TERMS), TRADES_TYPED);
+        }
+
+        if (lane === "join_trades") {
+          // On the alert list from here, with the consent sentence they have
+          // just read (leadTrades carries ALERT_TERMS) and their own words
+          // as the record. Sends nothing.
+          await supabase.rpc("subscribe_to_job_alerts", {
+            p_phone: msg.from, p_words: joinSaid, p_version: ALERT_CONSENT_VERSION, p_name: String(a.name ?? ""),
+          });
+          const { data: t } = await supabase.rpc("set_job_alert_trades", { p_phone: msg.from, p_said: joinSaid });
+          const tRow = (Array.isArray(t) ? t[0] : t) as { matched?: string[]; unmatched?: string[] } | null;
+          const tries = Number(a.tries ?? 0) + 1;
+          if (!(tRow?.matched ?? []).length && tries < 2) {
+            await holdJoin({ ...a, tries });
+            root.setAttributes({ "yaadly.join.step": "trades", "yaadly.join.outcome": "trades_not_read" });
+            return await askFromList(settingsReader, msg.from, msg.channel, "trades", "I could not place that as a trade. 2 of 5:", TRADES_TYPED);
+          }
+          // Their own words are kept even when nothing matched: the desk
+          // reads words, and a trade the matcher does not know is still a trade.
+          const trades = (tRow?.matched ?? []).length ? tRow!.matched! : [joinSaid.slice(0, 80)];
+          await holdJoin({ _lane: "join_parishes", name: a.name, trades, tries: 0 });
+          root.setAttributes({ "yaadly.join.step": "parishes" });
+          return await askFromList(settingsReader, msg.from, msg.channel, "parishes", LEAD_PARISHES, PARISHES_TYPED);
+        }
+
+        if (lane === "join_parishes") {
+          const { data: pr } = await supabase.rpc("set_job_alert_parishes", { p_phone: msg.from, p_said: joinSaid });
+          const pRow = (Array.isArray(pr) ? pr[0] : pr) as { matched?: string[] } | null;
+          const tries = Number(a.tries ?? 0) + 1;
+          if (!(pRow?.matched ?? []).length && tries < 2) {
+            await holdJoin({ ...a, tries });
+            root.setAttributes({ "yaadly.join.step": "parishes", "yaadly.join.outcome": "parishes_not_read" });
+            return await askFromList(settingsReader, msg.from, msg.channel, "parishes", "I could not place that as a parish. 3 of 5:", PARISHES_TYPED);
+          }
+          const parishes = (pRow?.matched ?? []).length ? pRow!.matched! : [joinSaid.slice(0, 80)];
+          await holdJoin({ _lane: "join_email", name: a.name, trades: a.trades, parishes });
+          root.setAttributes({ "yaadly.join.step": "email" });
+          return twiml(Q_EMAIL);
+        }
+
+        if (lane === "join_email") {
+          const skipped = SKIP.test(joinSaid);
+          if (!skipped && !looksLikeEmail(joinSaid)) return twiml(NOT_AN_EMAIL);
+          await holdJoin({ ...a, _lane: "join_photo", email: skipped ? "" : joinSaid.toLowerCase() });
+          root.setAttributes({ "yaadly.join.step": "photo" });
+          return twiml(Q_PHOTO);
+        }
+
+        if (lane === "join_photo") {
+          const photo = msg.media.find((m) => (m.mime || "").toLowerCase().startsWith("image/")) ?? null;
+          const skipped = !photo && SKIP.test(joinSaid);
+          if (!photo && !skipped) return twiml(PHOTO_PLEASE);
+
+          // The same row the site's step 1 writes (yaad-vetting-upload,
+          // action "apply"), and the same status its Send sets.
+          const reference = newReference();
+          const { data: app, error: appErr } = await supabase.from("applications")
+            .insert(applicationRow(a, msg.from, reference))
+            .select("id, app_id, upload_token").single();
+          if (appErr || !app) {
+            root.recordError(String(appErr?.message ?? "no application row").slice(0, 200));
+            return twiml("That did not save. Send the photo again in a moment, or reply SKIP.");
+          }
+
+          // The photo, filed the way the site files a portfolio upload: the
+          // private vetting bucket, the server's own hash, the ninety day
+          // purge clock. A photo that fails to file costs the photo, not the
+          // application, and the reply says so.
+          let photoFiled = false;
+          if (photo) {
+            const got = await fetchMedia(photo.url, deadline.signal(9_000, 2_500, 1_500));
+            const mime = (photo.mime || got?.mime || "").split(";")[0].trim().toLowerCase();
+            const ext = ({ "image/jpeg": "jpg", "image/png": "png", "image/heic": "heic", "image/webp": "webp" } as Record<string, string>)[mime];
+            if (got && got.bytes.byteLength > 0 && got.bytes.byteLength <= 52428800 && ext) {
+              const path = `applications/${app.id}/portfolio-${crypto.randomUUID()}.${ext}`;
+              const { error: upErr } = await supabase.storage.from("vetting").upload(path, got.bytes, { contentType: mime, upsert: false });
+              if (!upErr) {
+                const { error: docErr } = await supabase.from("vetting_documents").insert({
+                  application_id: app.id, doc_type: "portfolio", storage_path: path,
+                  sha256: await evidenceSha256(got.bytes.buffer as ArrayBuffer), bytes: got.bytes.byteLength, mime,
+                  purge_after: new Date(Date.now() + 90 * 86400_000).toISOString(),
+                });
+                photoFiled = !docErr;
+                if (docErr) await supabase.storage.from("vetting").remove([path]);
+              }
+            }
+          }
+
+          // The hidden profile row the site's submit creates (yaad-vetting-
+          // upload, action "submit"; founder decision 30 Aug 2026): active
+          // false until a person publishes it, keyed on the application so a
+          // second go updates rather than duplicates. A profile that fails to
+          // write never loses the application; the desk can make one by hand.
+          try {
+            const nm = String(a.name ?? "").trim();
+            const slug = `${nm.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "pro"}-${String(app.id).slice(0, 6)}`;
+            const trades = Array.isArray(a.trades) ? a.trades.map(String) : [];
+            const parishes = Array.isArray(a.parishes) ? a.parishes.map(String) : [];
+            const { error: profErr } = await supabase.from("worker_profiles").upsert({
+              application_id: app.id, worker_email: String(a.email ?? "").trim().toLowerCase() || null,
+              name: nm.slice(0, 120), trade: trades[0] ?? null, parish: parishes[0] ?? null,
+              areas: parishes.join(", ").slice(0, 400) || null, phone: msg.from,
+              slug, active: false, vetting_state: "probation", updated_at: new Date().toISOString(),
+            }, { onConflict: "application_id" });
+            if (profErr) root.recordError(`profile: ${String(profErr.message).slice(0, 160)}`);
+          } catch (e) { root.recordError(`profile: ${String(e).slice(0, 160)}`); }
+
+          // Tell the desk, the way the site's submit does. No contact details
+          // travel in the push.
+          await pushToDesk(settingsReader, {
+            title: "New Yaadly pro application, on WhatsApp",
+            body: `${(Array.isArray(a.trades) ? a.trades.map(String) : []).join(", ") || "trade not given"}, ${(Array.isArray(a.parishes) ? a.parishes.map(String) : [])[0] ?? "parish not given"}. ${photoFiled ? "1 photo" : "No photo"} on file.`,
+            tags: "hammer",
+          }, trace);
+
+          // The application exists from here. The sixth question only sets
+          // one column on it, so an answer that never comes leaves a real
+          // application with the review switched off, never a lost one.
+          const appBase = Deno.env.get("YAADLY_APP_URL") ?? "https://app.yaadly.co.uk";
+          await holdJoin({
+            _lane: "join_consent", application_id: String(app.id), reference: String(app.app_id),
+            link: continueLink(appBase, String(app.id), String(app.upload_token), String(app.app_id)), photo_filed: photoFiled,
+          });
+          root.setAttributes({
+            "yaadly.join.step": "consent", "yaadly.join.outcome": "application_received",
+            "yaadly.join.photo_filed": photoFiled, "yaadly.join.reference": String(app.app_id),
+          });
+          return twiml(Q_CONSENT);
+        }
+
+        if (lane === "join_consent") {
+          const yes = CONSENT_YES.test(joinSaid);
+          const no = CONSENT_NO.test(joinSaid);
+          if (!yes && !no) return twiml(CONSENT_AGAIN);
+          // Recorded with the version of the sentence they answered, the
+          // same rule as the site. A "no" is written too, with its time, so
+          // the row shows the question was asked and answered.
+          const { error: cErr } = await supabase.from("applications").update({
+            ai_review_consent: yes ? "granted" : "declined",
+            ai_review_consent_at: new Date().toISOString(),
+            ai_review_consent_version: AI_CONSENT_WA_VERSION,
+          }).eq("id", String(a.application_id ?? ""));
+          if (cErr) root.recordError(String(cErr.message).slice(0, 160));
+          // The AI read, started here exactly as the site's Send starts it
+          // (yaad-vetting-upload, action "submit"): only on a YES, in the
+          // background, and yaad-vetting-review checks the same column again
+          // itself before it opens a single file. Founder, 30 Sep 2026: "I
+          // want the ai to read the applications". It writes notes for the
+          // person deciding and decides nothing; a failure writes itself down
+          // and the desk carries "Run the check again".
+          if (yes && !cErr) {
+            const work = fetch(`${SUPABASE_URL}/functions/v1/yaad-vetting-review`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}`, apikey: SERVICE_KEY },
+              body: JSON.stringify({ applicationId: String(a.application_id ?? "") }),
+              signal: AbortSignal.timeout(120000),
+            }).catch(() => { /* the desk can run it */ });
+            const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+            if (rt?.waitUntil) rt.waitUntil(work);
+            root.setAttributes({ "yaadly.join.ai_review": "started" });
+          }
+          await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+          root.setAttributes({ "yaadly.join.step": "done", "yaadly.join.outcome": "joined", "yaadly.join.ai_consent": yes ? "granted" : "declined" });
+          return twiml(joinedReply(String(a.reference ?? ""), String(a.link ?? ""), a.photo_filed === true));
+        }
+      }
 
       // ── the job alert list ──────────────────────────────────────────────
       //

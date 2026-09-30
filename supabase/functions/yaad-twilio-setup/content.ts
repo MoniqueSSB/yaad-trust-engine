@@ -262,7 +262,7 @@ export function updateDraftContent() {
  *  ALERT_TERMS, word for word, so what somebody agreed to is still a thing
  *  they read. Used in session only, so nothing is submitted to Meta. */
 export const ALERT_TRADES_NAME = "yaadly_alert_trades_menu_v1";
-export const ALERT_TRADES_BODY = "{{1}}\n\nWhat work do you do?\nTap Choose to pick one.\nMore than one? Type them.";
+export const ALERT_TRADES_BODY = "{{1}}\n\nWhat work do you do?\nTap Choose and pick one.\nDo more than one? Type them all.";
 export const ALERT_TRADE_ROWS: readonly string[] = [
   "Plumbing", "Electrical", "Masonry", "Painting", "Roofing",
   "Tiling", "Carpentry", "Welding", "Air conditioning", "Handyman",
@@ -284,7 +284,7 @@ export function alertTradesContent() {
 }
 
 export const ALERT_PARISHES_NAME = "yaadly_alert_parishes_menu_v1";
-export const ALERT_PARISHES_BODY = "{{1}}\n\nWhich parishes will you go to?\nTap Choose to pick one.\nMore than one? Type them.";
+export const ALERT_PARISHES_BODY = "{{1}}\n\nWhich parishes will you work in?\nTap Choose and pick one.\nMore than one? Type them all.";
 export const ALERT_PARISH_ROWS: readonly { id: string; item: string }[] = [
   { id: "Kingston", item: "Kingston" },
   { id: "St Andrew", item: "St Andrew" },
