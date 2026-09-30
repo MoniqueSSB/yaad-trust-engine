@@ -4977,4 +4977,6 @@ The six questions (`yaad-inbound/join-lane.ts`) write the same `applications` ro
 
 The site's thank you screen became a welcome with five points and names the portal; the "say hello on WhatsApp" box came out on instruction ("not required"). The track record step now says what an empty one costs, as a fact about how clients choose and not as a promise. A new trigger, `trg_worker_cleared`, sends one message when `active` flips to true, after the publish gate has let it, so it is only ever true.
 
+Two automatic reminders to finish the check, at day 3 and day 10 after applying, never a third (`remind_unfinished_applications()`, cron `yaad-check-reminders`, 20260930110000): WhatsApp inside the window, SMS outside it, email where there is one. And the AI read starts from the chat on a YES to the sixth question, exactly as the site's Send starts it; the review checks the consent column again itself, writes notes, and decides nothing.
+
 Still to decide, hers: whether a worker may quote before being cleared (today: no), and whether an applicant may sign in to the portal before being published (today: no).

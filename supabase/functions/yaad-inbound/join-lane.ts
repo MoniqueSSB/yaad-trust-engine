@@ -59,15 +59,15 @@ export function leadTrades(name: string, alertTerms: string): string {
 export const LEAD_PARISHES = "3 of 6:";
 
 export const Q_EMAIL =
-  "4 of 6: Your email address?\nIt is how you sign in to your portal.\nReply SKIP to add it later.";
+  "4 of 6: Your email address?\nYou use it to log in.\nNo email? Reply SKIP.";
 
 export const Q_PHOTO =
-  "5 of 6: Send one photo of a job you finished.\nReply SKIP if you have none to hand.";
+  "5 of 6: Send one photo of a job you did.\nNo photo? Reply SKIP.";
 
 export const NOT_A_NAME = "A name is needed to start.\n\n1 of 6: What is your full name?";
-export const NOT_AN_EMAIL = "That does not look like an email address.\n\n4 of 6: Your email address?\nReply SKIP to add it later.";
-export const PHOTO_PLEASE = "A photo is needed here, not words.\n\n5 of 6: Send one photo of a job you finished.\nReply SKIP if you have none to hand.";
-export const WORDS_FIRST = "One thing at a time. Answer this first, then send the photo.";
+export const NOT_AN_EMAIL = "That does not look like an email.\n\n4 of 6: Your email address?\nNo email? Reply SKIP.";
+export const PHOTO_PLEASE = "Send a photo here, not words.\n\n5 of 6: Send one photo of a job you did.\nNo photo? Reply SKIP.";
+export const WORDS_FIRST = "One thing at a time. Answer this first. Then send the photo.";
 
 /** What they are told at the end. Warm, five points, and only what is true
  *  today: quoting and booking wait for the check (v_job_alert_subscribers
@@ -79,14 +79,14 @@ export function joinedReply(reference: string, link: string, photoFiled: boolean
     photoFiled ? "" : "No photo yet. You can add one on the link below.",
     "",
     "What happens next:",
-    "1. A real person reads your application. Not a machine.",
-    "2. Finish your check here: your ID, TRN, three referees, and sign the Guidelines.",
+    "1. A real person reads your form. Not a machine.",
+    "2. Finish your check here. Your ID. Your TRN. Three people who can vouch for you. Sign the Guidelines.",
     link,
-    "3. You hear back here, either way. No silence.",
-    "4. Once cleared, jobs come to you here. Quote in writing. Always free.",
-    "5. Win a quote and we walk you through how the job runs.",
+    "3. We message you here, either way.",
+    "4. Once you are cleared, jobs come here. Say your price in writing. It is free.",
+    "5. Win a job and we show you how it runs.",
     "",
-    "Any questions, just ask here.",
+    "Questions? Ask here.",
   ].filter((l) => l !== "").join("\n");
 }
 
@@ -103,15 +103,16 @@ export function joinedReply(reference: string, link: string, photoFiled: boolean
  *  an answer never given. */
 export const AI_CONSENT_WA_VERSION = "ai-review-wa-v1";
 export const Q_CONSENT =
-  "6 of 6: One choice. Either answer is fine.\n\n" +
-  "Software can read your paperwork first: proof of address, TRN, certificates, CV, work photos.\n" +
-  "It writes notes for the person deciding. It never decides.\n" +
-  "It runs on NVIDIA's model, outside Yaadly, and is not used to train anything.\n" +
+  "6 of 6: One last choice. Either answer is fine.\n\n" +
+  "Can a computer read your papers first?\n" +
+  "That means proof of address, TRN, certificates, CV and work photos.\n" +
+  "It makes notes for the person who decides. It never decides.\n" +
+  "It runs on NVIDIA's computers, outside Yaadly. Your papers are not used to train it.\n" +
   "Your ID, selfie and face video are never sent to it.\n\n" +
   "Reply YES to allow it.\nReply NO for a person only.";
 export const CONSENT_YES = /^(yes|y|yeah|yeh|ok|okay|allow|allowed|fine|sure)[.!]*$/i;
 export const CONSENT_NO = /^(no|n|nah|nope|person|person only|a person only|decline)[.!]*$/i;
-export const CONSENT_AGAIN = "Reply YES to let software read your paperwork first, or NO for a person only.";
+export const CONSENT_AGAIN = "Reply YES to let a computer read your papers first.\nReply NO for a person only.";
 
 export function firstName(name: string): string {
   return (name ?? "").trim().split(/\s+/)[0] ?? "";
@@ -150,15 +151,14 @@ export function applicationRow(a: { name?: unknown; trades?: unknown; parishes?:
     work: "",
     status: "received",
     submitted_at: new Date().toISOString(),
-    // Neither consent was asked for in the chat, and the safe reading of an
-    // answer never given is no (JoinFlow.tsx, the same rule). They can be
-    // granted on the site when the application is opened there.
+    // Declined until the sixth question is answered: the safe reading of an
+    // answer never given (JoinFlow.tsx, the same rule). The showcase consent
+    // is not written here because production has no such columns (read live
+    // 30 Sep 2026; 20260905b is not applied there), and a column the table
+    // does not have refuses the whole insert.
     ai_review_consent: "declined",
     ai_review_consent_at: new Date().toISOString(),
     ai_review_consent_version: "not-asked-whatsapp",
-    showcase_consent: "declined",
-    showcase_consent_at: new Date().toISOString(),
-    showcase_consent_version: "not-asked-whatsapp",
   };
 }
 

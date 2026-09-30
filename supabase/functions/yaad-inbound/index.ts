@@ -2962,6 +2962,24 @@ Deno.serve(async (req: Request) => {
             ai_review_consent_version: AI_CONSENT_WA_VERSION,
           }).eq("id", String(a.application_id ?? ""));
           if (cErr) root.recordError(String(cErr.message).slice(0, 160));
+          // The AI read, started here exactly as the site's Send starts it
+          // (yaad-vetting-upload, action "submit"): only on a YES, in the
+          // background, and yaad-vetting-review checks the same column again
+          // itself before it opens a single file. Founder, 30 Sep 2026: "I
+          // want the ai to read the applications". It writes notes for the
+          // person deciding and decides nothing; a failure writes itself down
+          // and the desk carries "Run the check again".
+          if (yes && !cErr) {
+            const work = fetch(`${SUPABASE_URL}/functions/v1/yaad-vetting-review`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}`, apikey: SERVICE_KEY },
+              body: JSON.stringify({ applicationId: String(a.application_id ?? "") }),
+              signal: AbortSignal.timeout(120000),
+            }).catch(() => { /* the desk can run it */ });
+            const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+            if (rt?.waitUntil) rt.waitUntil(work);
+            root.setAttributes({ "yaadly.join.ai_review": "started" });
+          }
           await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
           root.setAttributes({ "yaadly.join.step": "done", "yaadly.join.outcome": "joined", "yaadly.join.ai_consent": yes ? "granted" : "declined" });
           return twiml(joinedReply(String(a.reference ?? ""), String(a.link ?? ""), a.photo_filed === true));

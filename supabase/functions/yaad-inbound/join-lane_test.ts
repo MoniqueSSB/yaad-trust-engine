@@ -110,7 +110,10 @@ Deno.test("the application row is the one the site's step 1 writes, with both co
   // Neither consent was asked, so neither is granted. The safe reading of an
   // answer never given, the same as JoinFlow.tsx.
   assertEquals(row.ai_review_consent, "declined");
-  assertEquals(row.showcase_consent, "declined");
+  // Only columns the live table has (read 30 Sep 2026). A column it lacks
+  // refuses the whole insert, and the worker is told "That did not save".
+  const live = ["app_id","name","trade","trade_other","parish","parishes","phone","email","years","work","status","submitted_at","ai_review_consent","ai_review_consent_at","ai_review_consent_version"];
+  for (const k of Object.keys(row)) assert(live.includes(k), `applications has no column ${k} in production`);
   assert(/^APP-[0-9A-F]{6}$/.test(newReference()));
 });
 
@@ -124,4 +127,13 @@ Deno.test("the final reply is warm, five points, and promises nothing", () => {
   assert(!/[–—]/.test(r));
   assert(!/guarantee|100%|escrow|approved|accepted|you will get work/i.test(r), r);
   assert(joinedReply("APP-1", link, false).includes("No photo yet"));
+});
+
+Deno.test("the AI read starts only on a YES, and the review is never told to decide", () => {
+  const lane = src.slice(src.indexOf("joining as a tradesperson: the five questions"), src.indexOf("── the job alert list"));
+  const call = lane.indexOf("functions/v1/yaad-vetting-review");
+  assert(call > 0, "the review is no longer started from the chat");
+  const guard = lane.lastIndexOf("if (yes && !cErr)", call);
+  assert(guard > 0 && call - guard < 400, "the review call must sit under the YES guard");
+  assert(!/approve|publish|active:\s*true/.test(lane.slice(call, call + 800)), "nothing after the review call may publish or approve");
 });

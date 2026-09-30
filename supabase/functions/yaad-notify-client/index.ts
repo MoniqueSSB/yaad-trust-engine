@@ -61,7 +61,7 @@ import { encodeBase64 } from "jsr:@std/encoding/base64";
 import { addonPdfUrl } from "./addon-link.ts";
 import { screenOwnWords } from "./own-words.ts";
 import { captionsLine, namedNextStep, plainDraft, reportSentReceipt, unearnedClaims, usableCaptions } from "./report-draft.ts";
-import { WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
+import { applyLink, CHECK_REMINDER_SUBJECT, checkReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -76,7 +76,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -874,8 +874,11 @@ Deno.serve(async (req: Request) => {
     const quoteId = typeof meta.quoteId === "string" && meta.quoteId.trim() ? meta.quoteId.trim() : "";
     // worker_cleared is about a person, not a job: it carries workerEmail.
     const workerEmailIn = String(b.workerEmail ?? "").trim().toLowerCase();
-    const isWorkerOnly = kind === "worker_cleared";
-    if (!secret || !KINDS.includes(kind) || (isWorkerOnly ? !workerEmailIn : isService ? !serviceId : !jobId)) {
+    // worker_check_reminder is about an application: it carries applicationId.
+    const applicationIdIn = String(b.applicationId ?? "").trim();
+    const isWorkerOnly = kind === "worker_cleared" || kind === "worker_check_reminder";
+    const workerOnlyKey = kind === "worker_cleared" ? workerEmailIn : applicationIdIn;
+    if (!secret || !KINDS.includes(kind) || (isWorkerOnly ? !workerOnlyKey : isService ? !serviceId : !jobId)) {
       return json({ error: "secret, a valid kind, and jobId (or serviceId for a service kind, workerEmail for worker_cleared) are required." }, 400);
     }
 
@@ -919,6 +922,40 @@ Deno.serve(async (req: Request) => {
         } catch (_) { emailed = false; }
       }
       root.setAttributes({ "yaadly.notify.outcome": "worker_cleared", "yaadly.notify.wa_sent": wa.sent, "yaadly.notify.emailed": emailed });
+      return json({ ok: true, kind, told: wa.sent || emailed, whatsapp: wa.sent, emailed });
+    }
+
+    // The reminder to finish the check, 30 Sep 2026 (worker-cleared.ts).
+    // Answered here, before any job is loaded. remind_unfinished_
+    // applications() decided who is due and counted the send; this only
+    // reads the row and sends. The link carries the application's own
+    // upload token, the same claim the six questions hand out, to the phone
+    // and the email that started the application.
+    if (kind === "worker_check_reminder") {
+      const { data: app } = await admin.from("applications")
+        .select("id, app_id, name, phone, email, upload_token, status, check_reminders").eq("id", applicationIdIn).maybeSingle();
+      if (!app || app.status !== "received") {
+        root.setAttributes({ "yaadly.notify.outcome": "application_not_open" });
+        return json({ ok: true, kind, told: false, reason: "That application is not open." });
+      }
+      const text = checkReminderText(String(app.name ?? ""), applyLink(APP_URL, String(app.id), String(app.upload_token), String(app.app_id)), Number(app.check_reminders ?? 1));
+      const phone = String(app.phone ?? "").trim();
+      const meta: SendMeta = { kind: "check reminder" };
+      let wa = phone ? await sendTwilio(phone, text, "whatsapp", trace, [], undefined, meta) : { sent: false, reason: "no phone on the application" };
+      if (!wa.sent && phone) wa = await sendTwilio(phone, text, "sms", trace, [], undefined, meta);
+      let emailed = false;
+      if (app.email && RESEND_KEY) {
+        try {
+          const r = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ from: `Yaadly <${FROM_EMAIL}>`, to: [String(app.email)], reply_to: REPLY_TO, subject: CHECK_REMINDER_SUBJECT, text }),
+            signal: AbortSignal.timeout(15000),
+          });
+          emailed = r.ok;
+        } catch (_) { emailed = false; }
+      }
+      root.setAttributes({ "yaadly.notify.outcome": "check_reminder", "yaadly.notify.wa_sent": wa.sent, "yaadly.notify.emailed": emailed });
       return json({ ok: true, kind, told: wa.sent || emailed, whatsapp: wa.sent, emailed });
     }
 
