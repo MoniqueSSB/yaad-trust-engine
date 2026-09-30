@@ -115,7 +115,13 @@ Deno.test("the final reply fits one phone screen and promises nothing", () => {
   assert(link.startsWith("https://app.yaadly.co.uk/apply?app=") && link.includes("token=aaaa-bbbb") && link.includes("ref=APP-ABC123"));
   const r = joinedReply("APP-ABC123", link, true);
   assert(r.includes("You are in") && r.includes("APP-ABC123") && r.includes(link));
-  assert(r.split("\n").length <= 8, "one phone screen");
+  assert(r.split("\n").length <= 12, "one phone screen");
+  // 30 Sep 2026, founder: the board is open without the check, quoting needs
+  // it, skipping for now is allowed, and the profile goes live once cleared.
+  assert(r.includes("/jobs") && /no check needed/.test(r), "the job board is not offered");
+  assert(/To quote on a job, finish your check/.test(r), "quoting is not tied to the check");
+  assert(/Skip it/.test(r) && /profile/i.test(r), "the skip option or the profile is missing");
+  assert(/\n\n/.test(r), "blank lines were dropped, so the message runs together");
   for (const line of r.split("\n")) if (line !== link) assert(line.length <= 80, `long line: ${line}`);
   assert(/An AI agent reads your form/.test(r) && /A person decides/.test(r), "the agent is named and a person still decides");
   assert(!/[\u2013\u2014]/.test(r));

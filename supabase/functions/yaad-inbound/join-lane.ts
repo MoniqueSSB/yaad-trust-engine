@@ -83,18 +83,29 @@ export const WORDS_FIRST = "One thing at a time. Answer this first. Then send th
  *  .can_quote), a person reads it, nothing is promised. The link opens the
  *  same application on the site for the identity steps. */
 export function joinedReply(reference: string, link: string, photoFiled: boolean, _aiReads = true): string {
-  // One phone screen, founder 30 Sep 2026: "this is one a phone", "the
-  // messages can be over whelming". The reference, the one next step, and
-  // what happens after. Everything else waits for the moment it matters.
+  // Founder, 30 Sep 2026, on this message: "make them aware they can review
+  // the job board and have a profile, apply for quote requires finishing the
+  // sign up. skip if you just want to review the job board for now". True
+  // today: app.yaadly.co.uk/jobs is open to anyone; the profile row is made
+  // hidden at this moment and goes public when a person publishes it; quoting
+  // waits for the check. Blank lines are kept (null, not "", is what drops a
+  // line), because until 30 Sep every line ran together on the phone.
+  let board = "https://app.yaadly.co.uk/jobs";
+  try { board = `${new URL(link).origin}/jobs`; } catch (_) { /* keep the default */ }
   return [
     `You are in. Your reference is ${reference}.`,
-    photoFiled ? "" : "No photo yet. You can add one on the link below.",
+    photoFiled ? null : "No photo yet. You can add one on the check link below.",
     ``,
-    `Next: finish your check here. About ten minutes.`,
+    `See open jobs now, no check needed:`,
+    board,
+    ``,
+    `To quote on a job, finish your check. About ten minutes:`,
     link,
+    `Just looking for now? Skip it, and use the link when you are ready.`,
     ``,
-    `An AI agent reads your form. A person decides. We message you here.`,
-  ].filter((l) => l !== "").join("\n");
+    `An AI agent reads your form. A person decides.`,
+    `Your profile goes live once you are cleared. We message you here.`,
+  ].filter((l): l is string => l !== null).join("\n");
 }
 
 /** The AI read is automatic. Founder, 30 Sep 2026: "the ai will read",
