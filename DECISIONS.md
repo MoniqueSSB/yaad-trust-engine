@@ -4985,6 +4985,16 @@ Two automatic reminders to finish the check, at day 3 and day 10 after applying,
 
 Still to decide, hers: whether a worker may quote before being cleared (today: no), and whether an applicant may sign in to the portal before being published (today: no).
 
+## 2026-09-30 · HubSpot holds stages and labels, never documents, and partners get their own board
+
+Monique pasted an external "HubSpot Lead Collection Architecture" and, after two rounds of review, asked for it set up with the corrections. The original would have put TRN, ID document links, bank account numbers, property addresses, job descriptions and evidence links into the CRM, and would have recorded the named human's approval as a HubSpot checkbox. Every one of those collides with a decision already made: bank details go by phone and are never stored, identity sits with Persona, the lead sync deliberately withholds the description and address and has a test to prove it, and the approval must be a named person in Postgres. So the version built is label only.
+
+**What was created.** A separate Partnerships deal pipeline, because a journalist or an investor counted as a job overstates the one number a funding conversation turns on. Four contact properties: worker stage, worker parish, partner category, partner country. The worker pipeline is a contact property rather than a deal pipeline for the same reason: a deal per worker is a deal that is not a job. The "Bank Setup Completed" stage from the paste was dropped; there is no Stripe worker onboarding, bank details are taken once a job is booked and never before, and readiness to be paid is not a sales fact. "Persona webhook clears the worker" became two stages, Identity Confirmed and Vetting Cleared, because the second is a named human's decision and a label saying a webhook did it is the governing rule broken where `guardrails.scan` cannot see. `trade_specialization` was realigned to the eighteen taxonomy trades; the paste had guessed eight names that matched none.
+
+**The partner sync** is the one new personal-data flow, and it is hers: the contact form's "Press, partnership or investment" topic now creates a contact and a deal at Inbound Lead. It reuses the lead route's secret, because a secret per purpose exists to keep record creation apart from stage moves that touch money, and this creates records. The message never leaves, category and country are hand-set at Founder Review, and `web/tests/hubspot-partner.test.mjs` fails the build if any of that changes. The idempotency key rides in `yaadly_job_id` as `ENQ-<id>` rather than a second custom property, so setup stays at one step.
+
+**What was refused.** The time zone reminder for a missing property address: HubSpot never receives the address, so it cannot know one is missing, a +1 country code cannot tell East Coast from West, and any such nudge is a WhatsApp template out of the engine, not a CRM workflow. The Twilio partner nudge became an email template: partners arrive by form or email, HubSpot tokens do not pass through Twilio, and "our team at our main desk" was a headcount the company does not have.
+
 
 ## 2026-09-30 · The walkthrough time is arranged through Yaadly, and every worker message is short
 
