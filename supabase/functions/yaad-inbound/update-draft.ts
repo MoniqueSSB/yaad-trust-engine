@@ -78,12 +78,15 @@ export function draftReadBack(jobId: string, title: string, text: string, joinsB
   const where = joinsBatch
     ? `Ready to go on ${jobId} (${title}), with the photos you just sent:`
     : `Ready to go on ${jobId} (${title}):`;
-  const carry = joinsBatch ? "" : ` Photos you send next carry these words with them.`;
+  // One thing a line, 29 Sep 2026. Founder: "it is a whole paragraph", "the
+  // sentences cant be long". The words and the gate are the same as before.
+  const carry = joinsBatch ? "" : `\nPhotos you send next carry these words.`;
   return `${where}\n"${clip(text, 600)}"\n\n` +
-    `Reply 1 to put it on the job. Send different words to replace it, or reply no to drop it. Nothing is filed until you reply 1.${carry}`;
+    `Reply 1: put it on the job.\nReply no: drop it.\nOr send new words.\n\n` +
+    `Nothing is filed until you reply 1.${carry}`;
 }
 
-export const DRAFT_STILL_WAITING = "Your update is still waiting. Reply 1 to put it on the job, send different words to replace it, or reply no to drop it.";
+export const DRAFT_STILL_WAITING = "Your update is still waiting.\n\nReply 1: put it on the job.\nReply no: drop it.\nOr send new words.";
 
 /** What a worker is told after anything goes on the job.
  *
@@ -98,3 +101,53 @@ export const DRAFT_STILL_WAITING = "Your update is still waiting. Reply 1 to put
  *  about pay, which are not this message's to promise. */
 export const WHAT_HAPPENS_NEXT =
   "Next: a draft of what the client will be told comes to you here in a few minutes. Reply 1 to send it, or send your own words instead. Nothing goes to the client until you do.";
+
+/** The two buttons under the read-back, 29 Sep 2026. See content.ts in
+ *  yaad-twilio-setup, which holds the ids these are read against.
+ *
+ *  A tap arrives as text, the button's id and the job's code. It is turned
+ *  into the reply a worker would have typed, "1" or "no", and goes through
+ *  readDraftReply() like any other. Nothing here files anything. */
+export type UpdateTap = { kind: "file" | "drop" | "change"; jobId: string };
+
+export function readUpdateTap(text: unknown): UpdateTap | null {
+  const m = /^(UPDATEFILE|UPDATEDROP|UPDATECHANGE)\s+(\S+)$/i.exec(String(text ?? "").trim());
+  if (!m) return null;
+  const kinds: Record<string, UpdateTap["kind"]> = { UPDATEFILE: "file", UPDATEDROP: "drop", UPDATECHANGE: "change" };
+  return { kind: kinds[m[1].toUpperCase()], jobId: m[2] };
+}
+
+/** Whether a tap belongs to the update that is actually waiting. */
+export function tapMatchesUpdate(tap: UpdateTap, waitingJobId: unknown): boolean {
+  const w = String(waitingJobId ?? "").trim();
+  return w !== "" && w.toLowerCase() === tap.jobId.toLowerCase();
+}
+
+/** What the tap stands for, as typed. Change my words stands for nothing
+ *  typed: it asks for the new words and the update stays waiting, so the
+ *  caller answers it before this is reached. */
+export function tapAsTyped(tap: UpdateTap): string {
+  return tap.kind === "file" ? "1" : tap.kind === "drop" ? "no" : "";
+}
+
+export const TYPE_YOUR_NEW_WORDS = "Type your new words here.\nThey replace this update.";
+
+/** One line, bounded, never empty: what a template variable has to be. */
+export function oneLine(s: unknown, max: number): string {
+  const t = String(s ?? "").replace(/\s+/g, " ").trim();
+  if (!t) return "-";
+  return t.length > max ? t.slice(0, max - 1).trimEnd() + "…" : t;
+}
+
+/** The variables for the read-back with buttons. Says the same things the
+ *  typed read-back says: which job, the words, and where photographs stand. */
+export function readBackVars(jobId: string, title: string, text: string, joinsBatch = false): Record<string, string> {
+  return {
+    "1": oneLine(`${jobId} (${title})`, 120),
+    "2": oneLine(text, 600),
+    "3": joinsBatch
+      ? "These go with the photos you just sent."
+      : "Photos you send next carry these words.",
+    "4": jobId,
+  };
+}

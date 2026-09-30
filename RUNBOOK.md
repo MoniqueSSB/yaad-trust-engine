@@ -6376,3 +6376,20 @@ A worker's question goes through four doors in order, in `yaad-inbound`: a fixed
 5. **What the model answered a client:** the `yaad-inbound` log, lines starting `off-script (client):`.
 6. **A client got no WhatsApp message for an update:** section 53 first. Then `yaadly.notify.client_template` on the `yaad-notify-client` span says whether a template was chosen. No summary for that kind in `CLIENT_SUMMARY` (`client-template.ts`) means email only.
 7. **Deploy:** the banned list changed, so every function that carries a copy goes: `yaad-inbound`, `yaad-notify-client`, `yaad-completion`, `yaad-completion-flow`, `yaad-kickoff`, `yaad-quote-pack`, `yaad-quote-pack-rescan`, `yaad-report`, `yaad-shortlist`, and the web app. Read each one's live `verify_jwt` first and keep it.
+
+## 55. Short messages and the buttons under a worker's words (29 Sep 2026)
+
+**To switch it on, in this order.** Each step is safe without the next: with no template the typed read-back goes instead and replying 1 still works.
+
+1. **Deploy the functions from disk:** `yaad-inbound` and `yaad-notify-client` with `--no-verify-jwt`, `yaad-twilio-setup` without it. Read the live `verify_jwt` first and keep it.
+2. **Create the read-back buttons:** call `yaad-twilio-setup` with `{"action":"create-update-draft"}`. It writes `twilio_content_sid_update_draft`. Used in session, so nothing goes to Meta.
+3. **Create the trades and parishes lists:** call `yaad-twilio-setup` with `{"action":"create-alert-trades"}` and then `{"action":"create-alert-parishes"}`. They write `twilio_content_sid_alert_trades` and `twilio_content_sid_alert_parishes`. A list carries ten rows and one row is picked, so the message says typing still works for more than one.
+4. **Create the shorter draft buttons:** call `yaad-twilio-setup` with `{"action":"create-report-draft"}` again. The template is now `yaadly_report_draft_buttons_v2`, so it makes a new one and overwrites `twilio_content_sid_report_draft`. Until this runs the old v1 buttons keep going out with the long wording.
+
+**What a correct result looks like.** From a worker's phone with one live job, type an update. The words come back with three buttons: Put it on the job, Change my words, Drop it. Send ALERTS from a number not on the list: the question arrives with a Choose button that opens ten trades. After photos are filed, the messages arrive in this order: the draft alone; Still missing, only when something is; what the draft was written from; then the three buttons.
+
+**When something is wrong.**
+
+1. **The read-back arrives as plain text with no buttons:** `select value from app_settings where key = 'twilio_content_sid_update_draft';` is empty, there is no Messaging Service, or Twilio refused the send. The function log line `sendReadBackButtons: Twilio refused the template` carries Twilio's code. Replying 1 still works.
+2. **"That update is not waiting any more":** the button tapped belongs to an update already filed, dropped or replaced. Working as designed.
+3. **The worker's words are cut short in the read-back with buttons:** a template variable is one line and at most 600 characters. What is filed is the full text held in the session, never the clipped copy.
