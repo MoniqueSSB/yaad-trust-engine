@@ -123,7 +123,12 @@ const WA_JOIN =
    supabase/functions/yaad-vetting-review/index.ts, which is checked before the
    download so a withheld file is never even fetched out of the bucket. If that
    list changes, this sentence and this version change with it. */
-const AI_CONSENT_VERSION = "ai-review-v4";
+// Founder, 30 Sep 2026: "the ai will read", "remove the ask for review by
+// human". The question is gone. Every application is read by the AI agent
+// and the row says so with this version, so the change is visible on every
+// row it applies to. This changes the 30 August rule that the read ran only
+// on a granted answer; DECISIONS.md carries the date and the words.
+const AI_CONSENT_VERSION = "ai-review-auto-v1";
 
 /* The wording that earns the showcase consent, versioned for the same reason
    AI_CONSENT_VERSION is: a consent is worth exactly what the sentence on
@@ -849,7 +854,7 @@ export function JoinFlow() {
            the server correctly read that as declined, and every application
            since has recorded a refusal nobody made. Do not remove one without
            removing the other. */
-        aiReviewConsent: aiConsent || "declined",
+        aiReviewConsent: "granted",
         aiReviewConsentVersion: AI_CONSENT_VERSION,
         /* Same rule and the same trap as the line above: unanswered travels as
            the word "declined" so the row records a decision rather than a gap,
@@ -859,7 +864,7 @@ export function JoinFlow() {
         showcaseConsent: showcaseConsent || "declined",
         showcaseConsentVersion: SHOWCASE_CONSENT_VERSION,
       });
-      setSentConsent(aiConsent || "declined");
+      setSentConsent("granted");
       setSentRef(c.reference);
       if (continuing) {
         // The second sitting is finished. There is nothing left to come back
@@ -881,7 +886,7 @@ export function JoinFlow() {
           localStorage.setItem(STORE, JSON.stringify({
             ...cur, ...snapshot(),
             sentRef: c.reference,
-            sentConsent: aiConsent || "declined",
+            sentConsent: "granted",
           }));
         } catch { /* private browsing, carry on */ }
       }
@@ -1090,10 +1095,8 @@ export function JoinFlow() {
             <li className="flex items-start gap-2">
               <span className="text-tealb" aria-hidden="true">✓</span>
               <span className="text-mute">
-                <b className="text-ink">Who may read your paperwork.</b>{" "}
-                {sentConsent === "granted"
-                  ? "You agreed that software may read your proof of address, TRN, certificates, CV and portfolio first and write notes for the person deciding. Your ID, selfie, face video and photograph of yourself were not sent to it."
-                  : "You asked that no AI model reads your documents, so none of them left Yaadly. A person reads every page by hand."}
+                <b className="text-ink">An AI agent reads your paperwork.</b>{" "}
+                It reads your proof of address, TRN, certificates, CV and portfolio and writes notes for the person deciding. Your ID, selfie, face video and photograph of yourself are never sent to it. A person decides.
               </span>
             </li>
           </ul>
@@ -1221,7 +1224,7 @@ export function JoinFlow() {
           <span className="flex flex-col">
             <b className="text-[14.5px] text-ink">Rather do this on WhatsApp?</b>
             <span className="text-[12.5px] leading-snug text-mute">
-              Seven short questions in the chat, Patois or English.
+              Six short questions in the chat, Patois or English.
             </span>
           </span>
           <span className="ml-auto font-mono text-[13px] font-semibold text-green" aria-hidden="true">&rarr;</span>
@@ -1523,7 +1526,6 @@ export function JoinFlow() {
                     portfolio and the certificates, and because it is the last
                     screen before the first send. See AiConsent for why the
                     position is load bearing rather than tidy. */}
-                <AiConsent value={aiConsent} onChange={setAiConsent} />
               </div>
             )}
 
@@ -1721,8 +1723,6 @@ export function JoinFlow() {
                     documents it covers, and somebody who said no in two
                     minutes flat should be able to change that when they are
                     actually handing the paperwork over. */}
-                <AiConsent value={aiConsent} onChange={setAiConsent} />
-
                 <div className="rounded-xl border border-softline bg-soft px-4 py-3 text-[12.5px] leading-relaxed text-mute">
                   {personaActive ? (
                     <>
@@ -2226,80 +2226,6 @@ function ShowcaseConsent({
   );
 }
 
-function AiConsent({
-  value, onChange,
-}: {
-  value: "" | "granted" | "declined";
-  onChange: (v: "granted" | "declined") => void;
-}) {
-  return (
-    <div className="rounded-xl border border-line bg-bg px-4 py-4">
-      <label className="fl" id="lbl-ai-consent">
-        Who may read your paperwork{" "}
-        <span className={value ? "src ok" : "src opt"}>
-          {value ? "Answered" : "Your choice, either way"}
-        </span>
-      </label>
-
-      <p className="mt-1 text-[12.5px] leading-relaxed text-mute">
-        A person at Yaadly reads your documents and decides. Before they do, we
-        can have software read the paperwork first, to check the name is the
-        same on every one, that the dates are current, and that nothing looks
-        altered. It writes notes for that person.{" "}
-        <b className="text-ink">It never decides anything.</b>
-      </p>
-
-      <p className="mt-2.5 text-[12.5px] leading-relaxed text-mute">
-        <b className="text-ink">Your photo ID, your selfie, your face video and
-        your photograph of yourself are never sent to any AI model, whichever
-        you choose here.</b> Not once. Those go to our identity checker and to a
-        person at Yaadly, and nowhere else.
-      </p>
-
-      <p className="mt-2.5 text-[12.5px] leading-relaxed text-mute">
-        This choice is about the rest of it: your proof of address, your TRN,
-        your trade certificates, your CV and your portfolio. To read those we
-        send them to a model run by <b className="text-ink">NVIDIA</b>, outside
-        Yaadly, and they are not used to train anything. Say no and only a
-        person at Yaadly ever opens them.{" "}
-        <b className="text-ink">Saying no counts against you in no way at
-        all.</b> It is a little slower. That is the whole difference.
-      </p>
-
-      <div className="mt-3 grid gap-2.5" role="radiogroup" aria-labelledby="lbl-ai-consent">
-        {([
-          ["granted",
-            "Software may read the paperwork first, then a person decides",
-            "Your proof of address, TRN, certificates, CV and portfolio go to NVIDIA's model to be read. Your ID, selfie, face video and photograph of yourself do not."],
-          ["declined",
-            "A person only. Do not send any of my documents to an AI model",
-            "Nothing at all leaves Yaadly. A person reads every page from cold, and you still hear back within 24 hours."],
-        ] as const).map(([v, title, sub]) => (
-          <label key={v}
-            className={"flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition "
-              + (value === v ? "border-teal bg-soft" : "border-line bg-panel hover:border-line2")}>
-            <input type="radio" name="aiconsent" className="mt-0.5 size-5 shrink-0 accent-teal"
-              checked={value === v} onChange={() => onChange(v)} />
-            <span>
-              <b className="block text-[13.5px] leading-snug">{title}</b>
-              <span className="mt-1 block text-[12px] leading-relaxed text-dim">{sub}</span>
-            </span>
-          </label>
-        ))}
-      </div>
-
-      <p className="mt-2.5 text-[12px] leading-relaxed text-dim">
-        Neither is ticked for you. If you send your application without
-        choosing, <b className="text-mute">we read that as no</b> and a person
-        reads everything by hand.{" "}
-        <a href="https://yaadly.co.uk/how-we-use-ai" target="_blank" rel="noreferrer"
-           className="underline underline-offset-2 hover:text-mute">
-          How we use AI at Yaadly
-        </a>, if you want the whole picture first.
-      </p>
-    </div>
-  );
-}
 
 /**
  * The reference, and a way to take it with you.

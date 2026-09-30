@@ -7,7 +7,7 @@ import { assert, assertEquals } from "jsr:@std/assert@1";
 import {
   applicationRow, continueLink, isJoinLane, isJoinOpener, JOIN_LANES, joinedReply, LEAD_PARISHES,
   looksLikeEmail, looksLikeName, newReference, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, Q_EMAIL, Q_NAME, Q_PHOTO, SKIP, WORDS_FIRST,
-  AI_CONSENT_WA_VERSION, ALERTS_AGAIN, CONSENT_AGAIN, CONSENT_NO, CONSENT_YES, LEAD_TRADES, Q_CONSENT, qAlerts,
+  AI_CONSENT_WA_VERSION, ALERTS_AGAIN, CONSENT_NO, CONSENT_YES, LEAD_TRADES, qAlerts,
 } from "./join-lane.ts";
 import { ALERT_TERMS, ALERTS_OPENER } from "./job-alerts.ts";
 
@@ -31,36 +31,28 @@ Deno.test("a client, an alert sign-up and a job description are never read as jo
   }
 });
 
-Deno.test("seven questions, in order, each short", () => {
-  assertEquals(JOIN_LANES.length, 7);
-  assertEquals([...JOIN_LANES], ["join_name", "join_alerts", "join_trades", "join_parishes", "join_email", "join_photo", "join_consent"]);
+Deno.test("six questions, in order, each short", () => {
+  assertEquals(JOIN_LANES.length, 6);
+  assertEquals([...JOIN_LANES], ["join_name", "join_alerts", "join_trades", "join_parishes", "join_email", "join_photo"]);
   assert(isJoinLane("join_email") && !isJoinLane("alerts_trades") && !isJoinLane(""));
-  for (const q of [Q_NAME, qAlerts("Marcus Brown", ALERT_TERMS), ALERTS_AGAIN, LEAD_TRADES, LEAD_PARISHES, Q_EMAIL, Q_PHOTO, Q_CONSENT, CONSENT_AGAIN, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, WORDS_FIRST]) {
+  for (const q of [Q_NAME, qAlerts("Marcus Brown", ALERT_TERMS), ALERTS_AGAIN, LEAD_TRADES, LEAD_PARISHES, Q_EMAIL, Q_PHOTO, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, WORDS_FIRST]) {
     assert(!/[–—]/.test(q), `dash in: ${q}`);
     for (const line of q.split("\n")) assert(line.length <= 110, `long line: ${line}`);
   }
-  assert(Q_NAME.includes("1 of 7") && qAlerts("A B", ALERT_TERMS).includes("2 of 7") && LEAD_TRADES.includes("3 of 7") && LEAD_PARISHES.includes("4 of 7") && Q_EMAIL.includes("5 of 7") && Q_PHOTO.includes("6 of 7") && Q_CONSENT.includes("7 of 7"));
+  assert(Q_NAME.includes("1 of 6") && qAlerts("A B", ALERT_TERMS).includes("2 of 6") && LEAD_TRADES.includes("3 of 6") && LEAD_PARISHES.includes("4 of 6") && Q_EMAIL.includes("5 of 6") && Q_PHOTO.includes("6 of 6"));
 });
 
-Deno.test("the consent question says what the site says, carries its own version, and a no is a no", () => {
-  // One short sentence, on instruction: who decides, where it runs, what it never sees.
-  for (const fact of ["person who decides", "NVIDIA", "outside Yaadly", "never sees your ID or face"]) {
-    assert(Q_CONSENT.includes(fact), `the consent question no longer says: ${fact}`);
-  }
-  const explanation = Q_CONSENT.split("\n").filter((l) => l.trim() && !/^(7 of 7|Reply)/.test(l));
-  assertEquals(explanation.length, 1, "the explanation is one line");
-  assert(explanation[0].length <= 130, "and it is short");
-  assert(Q_CONSENT.includes("Either answer is fine"), "saying no must be said to cost nothing");
-  // The site's own version, read off the site, so the two can never be the same string.
-  const siteVersion = /const AI_CONSENT_VERSION = "([^"]+)"/.exec(joinFlow)?.[1] ?? "";
-  assert(siteVersion && String(AI_CONSENT_WA_VERSION) !== siteVersion && AI_CONSENT_WA_VERSION.startsWith("ai-review-wa-"), "a different sentence needs its own version");
-  for (const y of ["yes", "YES", "ok", "allow"]) assert(CONSENT_YES.test(y) && !CONSENT_NO.test(y), y);
-  for (const n of ["no", "NO", "person only", "nah"]) assert(CONSENT_NO.test(n) && !CONSENT_YES.test(n), n);
-  for (const neither of ["", "maybe", "what does that mean", "1"]) assert(!CONSENT_YES.test(neither) && !CONSENT_NO.test(neither), neither);
+Deno.test("the AI read is automatic on every application, granted with its own version, and a person still decides", () => {
+  const row = applicationRow({ name: "M B", trades: ["Plumbing"], parishes: ["Kingston"], email: "" }, "+1876", "APP-1");
+  assertEquals(row.ai_review_consent, "granted");
+  assertEquals(row.ai_review_consent_version, AI_CONSENT_WA_VERSION);
+  assert(AI_CONSENT_WA_VERSION.includes("auto"), "the version must say the read was not asked for");
   const lane = src.slice(src.indexOf("joining as a tradesperson: the five questions"), src.indexOf("── the job alert list"));
-  assert(lane.includes('ai_review_consent: yes ? "granted" : "declined"'), "the answer is not what is recorded");
-  assert(lane.includes("ai_review_consent_version: AI_CONSENT_WA_VERSION"), "the consent is recorded without its version");
-  assert(!/ai_review_consent:\s*"granted"/.test(lane), "nothing may default the consent to granted");
+  assert(!lane.includes("join_consent") && !lane.includes("Q_CONSENT"), "the question is gone");
+  const read = lane.indexOf("functions/v1/yaad-vetting-review");
+  assert(read > 0, "the read no longer starts from the chat");
+  assert(!/approve|publish|active:\s*true/.test(lane.slice(read, read + 900)), "nothing after the read may publish or approve");
+  assert(/A person decides/.test(joinedReply("APP-1", "x", true)), "a person still decides, and the worker is told so");
 });
 
 Deno.test("the consent sentence is said, word for word, before the number goes on the alert list", () => {
@@ -110,7 +102,7 @@ Deno.test("the application row is the one the site's step 1 writes, with both co
   assertEquals(row.app_id, "APP-ABC123");
   // Neither consent was asked, so neither is granted. The safe reading of an
   // answer never given, the same as JoinFlow.tsx.
-  assertEquals(row.ai_review_consent, "declined");
+  assertEquals(row.ai_review_consent, "granted");
   // Only columns the live table has (read 30 Sep 2026). A column it lacks
   // refuses the whole insert, and the worker is told "That did not save".
   const live = ["app_id","name","trade","trade_other","parish","parishes","phone","email","years","work","status","submitted_at","ai_review_consent","ai_review_consent_at","ai_review_consent_version"];
@@ -124,23 +116,13 @@ Deno.test("the final reply is warm, five points, and promises nothing", () => {
   const r = joinedReply("APP-ABC123", link, true);
   assert(r.includes("You are in") && r.includes("APP-ABC123") && r.includes(link));
   assert((r.match(/^\d\. /gm) ?? []).length === 5, "five points");
-  assert(/A person reads your form/.test(r) && /either way/i.test(r), "honest about who decides");
-  const ai = joinedReply("APP-1", link, true, true);
-  assert(/An AI agent reads your form/.test(ai) && /A person decides/.test(ai), "with a YES, the agent is named and a person still decides");
+  assert(/An AI agent reads your form/.test(r) && /A person decides/.test(r) && /either way/i.test(r), "the agent is named and a person still decides");
   assert(!/[–—]/.test(r));
   assert(!/guarantee|100%|escrow|approved|accepted|you will get work/i.test(r), r);
   assert(joinedReply("APP-1", link, false).includes("No photo yet"));
-  assert(joinedReply("APP-1", link, true).includes("all seven"));
+  assert(joinedReply("APP-1", link, true).includes("all six"));
 });
 
-Deno.test("the AI read starts only on a YES, and the review is never told to decide", () => {
-  const lane = src.slice(src.indexOf("joining as a tradesperson: the five questions"), src.indexOf("── the job alert list"));
-  const call = lane.indexOf("functions/v1/yaad-vetting-review");
-  assert(call > 0, "the review is no longer started from the chat");
-  const guard = lane.lastIndexOf("if (yes && !cErr)", call);
-  assert(guard > 0 && call - guard < 400, "the review call must sit under the YES guard");
-  assert(!/approve|publish|active:\s*true/.test(lane.slice(call, call + 800)), "nothing after the review call may publish or approve");
-});
 
 Deno.test("a WhatsApp application reaches the desk the way a site one does", () => {
   const lane = src.slice(src.indexOf("joining as a tradesperson: the five questions"), src.indexOf("── the job alert list"));
@@ -150,4 +132,15 @@ Deno.test("a WhatsApp application reaches the desk the way a site one does", () 
   assert(lane.includes("pushToDesk(settingsReader, {"), "the desk is not told");
   const push = lane.slice(lane.indexOf("pushToDesk(settingsReader, {"), lane.indexOf("pushToDesk(settingsReader, {") + 600);
   assert(!/msg\.from|a\.email|a\.name/.test(push), "no contact details may travel in the push");
+});
+
+Deno.test("the YES or NO button carries the same words as the typed question, and its ids are the typed answers", async () => {
+  const { JOIN_ALERTS_BODY, joinAlertsContent } = await import("../yaad-twilio-setup/content.ts");
+  assert(JOIN_ALERTS_BODY.includes(ALERT_TERMS), "the alert button must say the consent sentence word for word");
+  for (const c of [joinAlertsContent()]) {
+    const ids = c.types["twilio/quick-reply"].actions.map((a) => a.id);
+    assertEquals(ids, ["YES", "NO"]);
+    assert(CONSENT_YES.test(ids[0]) && CONSENT_NO.test(ids[1]), "a tap must read exactly as the typed word");
+    for (const a of c.types["twilio/quick-reply"].actions) assert(a.title.length <= 20, a.title);
+  }
 });

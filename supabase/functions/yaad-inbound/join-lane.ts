@@ -33,7 +33,7 @@ export function isJoinOpener(said: string): boolean {
   return OPENER.test(t) || JOIN_WORD.test(t);
 }
 
-export const JOIN_LANES = ["join_name", "join_alerts", "join_trades", "join_parishes", "join_email", "join_photo", "join_consent"] as const;
+export const JOIN_LANES = ["join_name", "join_alerts", "join_trades", "join_parishes", "join_email", "join_photo"] as const;
 export type JoinLane = typeof JOIN_LANES[number];
 
 export function isJoinLane(lane: unknown): lane is JoinLane {
@@ -49,7 +49,7 @@ export const SKIP = /^(skip|no|none|later|not now|nah)[.!]*$/i;
  *  long this goes on for. Trades and parishes are asked through the tappable
  *  lists in index.ts and take only a lead sentence from here. */
 export const Q_NAME =
-  "Welcome to Yaadly. Good to have you.\n\nSeven quick questions, then you are in.\n\n1 of 7: What is your full name?";
+  "Welcome to Yaadly. Good to have you.\n\nSix quick questions, then you are in.\n\n1 of 6: What is your full name?";
 
 /** 2 of 7: the job alert consent, a question of its own. Founder, 30 Sep
  *  2026: "split this into two questions". YES puts the number on the alert
@@ -57,31 +57,31 @@ export const Q_NAME =
  *  joining carries on. */
 export function qAlerts(name: string, alertTerms: string): string {
   const first = firstName(name);
-  return `Thanks${first ? `, ${first}` : ""}.\n\n2 of 7: ${alertTerms}\n\nReply YES or NO.`;
+  return `Thanks${first ? `, ${first}` : ""}.\n\n2 of 6: ${alertTerms}\n\nReply YES or NO.`;
 }
 export const ALERTS_AGAIN = "Reply YES to hear about jobs here, or NO.";
 
-export const LEAD_TRADES = "3 of 7:";
-export const LEAD_PARISHES = "4 of 7:";
+export const LEAD_TRADES = "3 of 6:";
+export const LEAD_PARISHES = "4 of 6:";
 
 export const Q_EMAIL =
-  "5 of 7: Your email address?\nYou use it to log in.\nNo email? Reply SKIP.";
+  "5 of 6: Your email address?\nYou use it to log in.\nNo email? Reply SKIP.";
 
 export const Q_PHOTO =
-  "6 of 7: Send one photo of a job you did.\nNo photo? Reply SKIP.";
+  "6 of 6: Send one photo of a job you did.\nNo photo? Reply SKIP.";
 
-export const NOT_A_NAME = "A name is needed to start.\n\n1 of 7: What is your full name?";
-export const NOT_AN_EMAIL = "That does not look like an email.\n\n5 of 7: Your email address?\nNo email? Reply SKIP.";
-export const PHOTO_PLEASE = "Send a photo here, not words.\n\n6 of 7: Send one photo of a job you did.\nNo photo? Reply SKIP.";
+export const NOT_A_NAME = "A name is needed to start.\n\n1 of 6: What is your full name?";
+export const NOT_AN_EMAIL = "That does not look like an email.\n\n5 of 6: Your email address?\nNo email? Reply SKIP.";
+export const PHOTO_PLEASE = "Send a photo here, not words.\n\n6 of 6: Send one photo of a job you did.\nNo photo? Reply SKIP.";
 export const WORDS_FIRST = "One thing at a time. Answer this first. Then send the photo.";
 
 /** What they are told at the end. Warm, five points, and only what is true
  *  today: quoting and booking wait for the check (v_job_alert_subscribers
  *  .can_quote), a person reads it, nothing is promised. The link opens the
  *  same application on the site for the identity steps. */
-export function joinedReply(reference: string, link: string, photoFiled: boolean, aiReads = false): string {
+export function joinedReply(reference: string, link: string, photoFiled: boolean, aiReads = true): string {
   return [
-    `That is all seven. You are in. Your reference is ${reference}.`,
+    `That is all six. You are in. Your reference is ${reference}.`,
     photoFiled ? "" : "No photo yet. You can add one on the link below.",
     "",
     "What happens next:",
@@ -98,28 +98,14 @@ export function joinedReply(reference: string, link: string, photoFiled: boolean
   ].filter((l) => l !== "").join("\n");
 }
 
-/** The sixth question: whether software may read the paperwork first.
- *
- *  The same choice the site asks in AiConsent (JoinFlow.tsx), in fewer
- *  words, so it carries its own version: a consent is worth exactly what the
- *  sentence that earned it said, and this sentence is not that one.
- *  yaad-vetting-review reads the answer, never the version, so YES here
- *  switches the review on exactly as the site's tick does. The facts are the
- *  site's facts: NVIDIA's model, outside Yaadly, not used to train; the ID,
- *  selfie and face video never go to it; it never decides; no costs nothing.
- *  Until it is answered the row says declined, which is the safe reading of
- *  an answer never given. */
-export const AI_CONSENT_WA_VERSION = "ai-review-wa-v1";
-export const Q_CONSENT =
-  "7 of 7: Can a computer read your papers first? Either answer is fine.\n\n" +
-  // One short sentence, founder instruction 30 Sep 2026 ("one sentence
-  // maximum very short"). It names who decides, where it runs, and what it
-  // never sees. Shorter than the site's, so it carries its own version.
-  "It only writes notes for the person who decides, on NVIDIA outside Yaadly, and never sees your ID or face.\n\n" +
-  "Reply YES to allow it.\nReply NO for a person only.";
+/** The AI read is automatic. Founder, 30 Sep 2026: "the ai will read",
+ *  "remove the ask for review by human". The row is written granted with
+ *  this version, so every row it applies to says so, and yaad-vetting-review
+ *  (which still checks the column) runs on every application. This changed
+ *  the 30 August rule; DECISIONS.md carries the date and the words. */
+export const AI_CONSENT_WA_VERSION = "ai-review-auto-v1";
 export const CONSENT_YES = /^(yes|y|yeah|yeh|ok|okay|allow|allowed|fine|sure)[.!]*$/i;
 export const CONSENT_NO = /^(no|n|nah|nope|person|person only|a person only|decline)[.!]*$/i;
-export const CONSENT_AGAIN = "Reply YES to let a computer read your papers first.\nReply NO for a person only.";
 
 export function firstName(name: string): string {
   return (name ?? "").trim().split(/\s+/)[0] ?? "";
@@ -158,14 +144,13 @@ export function applicationRow(a: { name?: unknown; trades?: unknown; parishes?:
     work: "",
     status: "received",
     submitted_at: new Date().toISOString(),
-    // Declined until the sixth question is answered: the safe reading of an
-    // answer never given (JoinFlow.tsx, the same rule). The showcase consent
-    // is not written here because production has no such columns (read live
-    // 30 Sep 2026; 20260905b is not applied there), and a column the table
-    // does not have refuses the whole insert.
-    ai_review_consent: "declined",
+    // Granted on every row, founder instruction 30 Sep 2026 (see
+    // AI_CONSENT_WA_VERSION). The showcase consent is not written here
+    // because production has no such columns (read live 30 Sep 2026;
+    // 20260905b is not applied there).
+    ai_review_consent: "granted",
     ai_review_consent_at: new Date().toISOString(),
-    ai_review_consent_version: "not-asked-whatsapp",
+    ai_review_consent_version: AI_CONSENT_WA_VERSION,
   };
 }
 

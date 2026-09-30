@@ -345,3 +345,23 @@ export function walkAcceptContent() {
     },
   };
 }
+
+/** The YES or NO question in the joining flow, as buttons. 30 Sep 2026.
+ *  (The AI consent question was one of two; it went the same day: the read
+ *  is automatic now, see join-lane.ts.) The
+ *  ids are the words YES and NO, which yaad-inbound already reads as the
+ *  typed answers, so a tap and a typed reply are the same thing. In session
+ *  only, straight after the worker's own message, so nothing goes to Meta.
+ *  The bodies are held word for word against join-lane.ts and job-alerts.ts
+ *  by the tests, because the words are what somebody agrees to. */
+export const JOIN_ALERTS_NAME = "yaadly_join_alerts_v1";
+export const JOIN_ALERTS_BODY = "{{1}}\n\n2 of 7: Can we message you here when there is a job for you? It is free. Send STOP any time.";
+export function joinAlertsContent() {
+  return {
+    friendly_name: JOIN_ALERTS_NAME,
+    language: "en",
+    variables: { "1": "Thanks, Marcus." },
+    types: { "twilio/quick-reply": { body: JOIN_ALERTS_BODY, actions: [{ title: "Yes", id: "YES" }, { title: "No", id: "NO" }] } },
+  };
+}
+

@@ -35,7 +35,7 @@ import { readDraftTap, readOnSiteTap, tapMatchesDraft } from "./report-tap.ts";
 import { screenOwnWords } from "./own-words.ts";
 import { acceptedForClient, linkIn, looksLikeATime, offerSent, PLATFORM_LABEL as WALK_PLATFORM, readWalkAccept } from "./walkthrough-offer.ts";
 import { closedReply, problemSent, readDisputeClose, replySent } from "./dispute-lane.ts";
-import { AI_CONSENT_WA_VERSION, ALERTS_AGAIN, applicationRow, CONSENT_AGAIN, CONSENT_NO, CONSENT_YES, continueLink, isJoinLane, isJoinOpener, JOIN_STALE_MS, joinedReply, LEAD_PARISHES, LEAD_TRADES, looksLikeEmail, looksLikeName, newReference, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, Q_CONSENT, Q_EMAIL, Q_NAME, Q_PHOTO, qAlerts, SKIP, WORDS_FIRST } from "./join-lane.ts";
+import { ALERTS_AGAIN, applicationRow, CONSENT_NO, CONSENT_YES, continueLink, isJoinLane, isJoinOpener, JOIN_STALE_MS, joinedReply, LEAD_PARISHES, LEAD_TRADES, looksLikeEmail, looksLikeName, newReference, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, Q_EMAIL, Q_NAME, Q_PHOTO, qAlerts, SKIP, WORDS_FIRST } from "./join-lane.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -2249,6 +2249,20 @@ Deno.serve(async (req: Request) => {
     return twiml(`${lead}\n\n${typed}`);
   };
 
+  // A YES or NO question with two buttons (the joining flow, 30 Sep 2026).
+  // Same rules as askFromList: the template when it exists and the send
+  // worked, the typed question otherwise. `typed` is what goes if not, and
+  // what is screened either way.
+  const askYesNo = async (settings: SettingsReader, to: string, channel: string, key: string, vars: Record<string, string>, typed: string, label: string) => {
+    if (channel === "whatsapp") {
+      const set = await readSettings(settings, [key, "twilio_messaging_service_sid"]);
+      const contentSid = firstTemplateSid(set[key] ?? "");
+      const serviceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID") || set.twilio_messaging_service_sid || "";
+      if (contentSid && await sendReadBackButtons(to, vars, typed, contentSid, serviceSid, trace, label)) return twimlSilent();
+    }
+    return twiml(typed);
+  };
+
   // The web sibling of twiml(): same screen, same refusal, a JSON body the
   // widget can render instead of TwiML. "handoff" tells the widget to show
   // the WhatsApp button; a blocked reply always hands off, because the
@@ -2847,7 +2861,7 @@ Deno.serve(async (req: Request) => {
           const name = joinSaid.replace(/\s+/g, " ").slice(0, 120);
           await holdJoin({ _lane: "join_alerts", name });
           root.setAttributes({ "yaadly.join.step": "alerts" });
-          return twiml(qAlerts(name, ALERT_TERMS));
+          return await askYesNo(settingsReader, msg.from, msg.channel, "twilio_content_sid_join_alerts", { "1": `Thanks, ${name.split(/\s+/)[0]}.` }, qAlerts(name, ALERT_TERMS), "join_alerts");
         }
 
         if (lane === "join_alerts") {
@@ -2984,46 +2998,16 @@ Deno.serve(async (req: Request) => {
             tags: "hammer",
           }, trace);
 
-          // The application exists from here. The sixth question only sets
-          // one column on it, so an answer that never comes leaves a real
-          // application with the review switched off, never a lost one.
-          const appBase = Deno.env.get("YAADLY_APP_URL") ?? "https://app.yaadly.co.uk";
-          await holdJoin({
-            _lane: "join_consent", application_id: String(app.id), reference: String(app.app_id),
-            link: continueLink(appBase, String(app.id), String(app.upload_token), String(app.app_id)), photo_filed: photoFiled,
-          });
-          root.setAttributes({
-            "yaadly.join.step": "consent", "yaadly.join.outcome": "application_received",
-            "yaadly.join.photo_filed": photoFiled, "yaadly.join.reference": String(app.app_id),
-          });
-          return twiml(Q_CONSENT);
-        }
-
-        if (lane === "join_consent") {
-          const yes = CONSENT_YES.test(joinSaid);
-          const no = CONSENT_NO.test(joinSaid);
-          if (!yes && !no) return twiml(CONSENT_AGAIN);
-          // Recorded with the version of the sentence they answered, the
-          // same rule as the site. A "no" is written too, with its time, so
-          // the row shows the question was asked and answered.
-          const { error: cErr } = await supabase.from("applications").update({
-            ai_review_consent: yes ? "granted" : "declined",
-            ai_review_consent_at: new Date().toISOString(),
-            ai_review_consent_version: AI_CONSENT_WA_VERSION,
-          }).eq("id", String(a.application_id ?? ""));
-          if (cErr) root.recordError(String(cErr.message).slice(0, 160));
-          // The AI read, started here exactly as the site's Send starts it
-          // (yaad-vetting-upload, action "submit"): only on a YES, in the
-          // background, and yaad-vetting-review checks the same column again
-          // itself before it opens a single file. Founder, 30 Sep 2026: "I
-          // want the ai to read the applications". It writes notes for the
-          // person deciding and decides nothing; a failure writes itself down
-          // and the desk carries "Run the check again".
-          if (yes && !cErr) {
+          // The AI read starts here, on every application (founder, 30 Sep
+          // 2026; join-lane.ts, AI_CONSENT_WA_VERSION), the same way the
+          // site's Send starts it: in the background, and yaad-vetting-review
+          // checks the column itself before it opens a file. It writes notes
+          // for the person deciding and decides nothing.
+          {
             const work = fetch(`${SUPABASE_URL}/functions/v1/yaad-vetting-review`, {
               method: "POST",
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}`, apikey: SERVICE_KEY },
-              body: JSON.stringify({ applicationId: String(a.application_id ?? "") }),
+              body: JSON.stringify({ applicationId: String(app.id) }),
               signal: AbortSignal.timeout(120000),
             }).catch(() => { /* the desk can run it */ });
             const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
@@ -3031,8 +3015,12 @@ Deno.serve(async (req: Request) => {
             root.setAttributes({ "yaadly.join.ai_review": "started" });
           }
           await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
-          root.setAttributes({ "yaadly.join.step": "done", "yaadly.join.outcome": "joined", "yaadly.join.ai_consent": yes ? "granted" : "declined" });
-          return twiml(joinedReply(String(a.reference ?? ""), String(a.link ?? ""), a.photo_filed === true, yes));
+          const appBase = Deno.env.get("YAADLY_APP_URL") ?? "https://app.yaadly.co.uk";
+          root.setAttributes({
+            "yaadly.join.step": "done", "yaadly.join.outcome": "joined",
+            "yaadly.join.photo_filed": photoFiled, "yaadly.join.reference": String(app.app_id),
+          });
+          return twiml(joinedReply(String(app.app_id), continueLink(appBase, String(app.id), String(app.upload_token), String(app.app_id)), photoFiled));
         }
       }
 
