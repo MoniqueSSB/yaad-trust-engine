@@ -57,7 +57,7 @@ export const Q_NAME =
  *  joining carries on. */
 export function qAlerts(name: string, alertTerms: string): string {
   const first = firstName(name);
-  return `Thanks${first ? `, ${first}` : ""}.\n\n2 of 7: Hear about jobs here?\n${alertTerms}\n\nReply YES or NO.`;
+  return `Thanks${first ? `, ${first}` : ""}.\n\n2 of 7: ${alertTerms}\n\nReply YES or NO.`;
 }
 export const ALERTS_AGAIN = "Reply YES to hear about jobs here, or NO.";
 

@@ -38,8 +38,10 @@ export const ALERT_CONSENT_VERSION = "alerts-v2";
 /** The sentence ALERT_CONSENT_VERSION refers to. Said at the moment somebody
  *  joins, so what they agreed to is a thing they actually read rather than a
  *  policy page nobody opened. */
+// Reworded 30 Sep 2026 before v2 ever went out ("rephrase confusing"), so
+// the version stays alerts-v2: nobody has agreed to the earlier v2 wording.
 export const ALERT_TERMS =
-  "OK to message this number when a job opens in your trades and parishes? It is free. Send STOP to end it.";
+  "Can we message you here when there is a job for you? It is free. Send STOP any time.";
 
 /** "ALERTS" on its own, and the openers a click-to-WhatsApp link puts in
  *  somebody's box. Always read as joining. */
