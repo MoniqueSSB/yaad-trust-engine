@@ -178,10 +178,23 @@ export function reportDraftContent() {
  *  within 24 hours, so it needs Meta's approval before it is any use, and the
  *  setting that switches it on is written only once that approval comes back,
  *  the same as the worker update template. */
-export const ON_SITE_NAME = "yaadly_on_site_checkin_v1";
+// v2, 30 Sep 2026, founder: "split this into two messages are you on site
+// with a add location button then the other stuff in a 1.2.3". This is the
+// first message: the question, the button, and how to add the location.
+// WhatsApp has no button that attaches a location through Twilio, so the
+// location is the three taps in words. The 1.2.3 goes as a second message
+// through the approved worker update template (yaad-daily-checkin). v1
+// stays in the account; Meta approval starts again for v2.
+export const ON_SITE_NAME = "yaadly_on_site_checkin_v2";
 
 export const ON_SITE_BODY =
-  "Yaadly, your job {{1}}: are you on site today? Tap the button to check in. One check in a day covers every stage, before or after the work. Then send photos, a short clip or a voice note of the work in this chat. Sending your location as well puts on record where you were.";
+  "Yaadly, your job {{1}}.\n\nAre you on site today?\nTap I am on site.\nThen add your location: tap +, Location, Send current location.";
+
+/** The second message, one line, through the approved worker update
+ *  template: "Yaadly update on your job {{1}}: {{2}}. The full details are on
+ *  the job in your Yaadly portal: {{3}} Reply here if you have a question." */
+export const ON_SITE_STEPS =
+  "1. Photos and videos before, during and after. 2. One line on what each shows. 3. Send them here before you leave";
 
 export const ON_SITE_TAP = "ONSITE";
 
@@ -312,3 +325,43 @@ export function alertParishesContent() {
     },
   };
 }
+
+/** The client's Accept button on a walkthrough time, 30 Sep 2026. The id is
+ *  WALKOK plus the job's code, which yaad-inbound reads exactly as the typed
+ *  "ACCEPT <code>" (walkthrough-offer.ts). Used in session only; outside the
+ *  window the client gets the approved update template with one true line. */
+export const WALK_ACCEPT_NAME = "yaadly_walkthrough_accept_v1";
+export const WALK_ACCEPT_BODY = "{{1}}\n\nTap Accept, or reply with another time.";
+export function walkAcceptContent() {
+  return {
+    friendly_name: WALK_ACCEPT_NAME,
+    language: "en",
+    variables: { "1": "Your tradesperson can do the walkthrough on Kitchen cupboards (JOB-WEB-1789253807959): Saturday 10am, on WhatsApp video.", "2": "JOB-WEB-1789253807959" },
+    types: {
+      "twilio/quick-reply": {
+        body: WALK_ACCEPT_BODY,
+        actions: [{ title: "Accept", id: "WALKOK {{2}}" }],
+      },
+    },
+  };
+}
+
+/** The YES or NO question in the joining flow, as buttons. 30 Sep 2026.
+ *  (The AI consent question was one of two; it went the same day: the read
+ *  is automatic now, see join-lane.ts.) The
+ *  ids are the words YES and NO, which yaad-inbound already reads as the
+ *  typed answers, so a tap and a typed reply are the same thing. In session
+ *  only, straight after the worker's own message, so nothing goes to Meta.
+ *  The bodies are held word for word against join-lane.ts and job-alerts.ts
+ *  by the tests, because the words are what somebody agrees to. */
+export const JOIN_ALERTS_NAME = "yaadly_join_alerts_v1";
+export const JOIN_ALERTS_BODY = "{{1}}\n\n2 of 7: Can we message you here when there is a job for you? It is free. Send STOP any time.";
+export function joinAlertsContent() {
+  return {
+    friendly_name: JOIN_ALERTS_NAME,
+    language: "en",
+    variables: { "1": "Thanks, Marcus." },
+    types: { "twilio/quick-reply": { body: JOIN_ALERTS_BODY, actions: [{ title: "Yes", id: "YES" }, { title: "No", id: "NO" }] } },
+  };
+}
+

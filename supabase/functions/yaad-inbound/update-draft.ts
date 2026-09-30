@@ -100,7 +100,10 @@ export const DRAFT_STILL_WAITING = "Your update is still waiting.\n\nReply 1: pu
  *  once a minute. No hour, no day, and nothing about the client's answer or
  *  about pay, which are not this message's to promise. */
 export const WHAT_HAPPENS_NEXT =
-  "Next: a draft of what the client will be told comes to you here in a few minutes. Reply 1 to send it, or send your own words instead. Nothing goes to the client until you do.";
+  // One thing at a time, founder 30 Sep 2026: "two things are being asked
+  // at once". How to answer the draft is said by the draft when it arrives.
+  // "a draft review", and videos named as a requirement: founder, 30 Sep 2026.
+  "Next: a draft review for the client comes here in a few minutes.\nNothing goes to the client until you say so.\n\nSend videos as well as photos. Both are needed.";
 
 /** The two buttons under the read-back, 29 Sep 2026. See content.ts in
  *  yaad-twilio-setup, which holds the ids these are read against.

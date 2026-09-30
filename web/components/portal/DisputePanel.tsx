@@ -50,17 +50,17 @@ export function DisputePanel({
     if (role === "worker")
       return (
         <div className="mt-6 rounded-2xl border border-line bg-panel p-4 text-[13px] leading-relaxed text-mute">
-          <b className="text-mute">If the client raises something, it goes to Yaadly.</b>{" "}
-          You are told at once, with what they said, and a person at Yaadly
-          looks at it with you both against the agreed scope and the
-          evidence. Nothing on the job is approved until it is sorted, and
-          nothing is taken off you either.
+          <b className="text-mute">If the client raises something, it comes to you first.</b>{" "}
+          You are told at once, with what they said. Reply here or on
+          WhatsApp with what you will do and when. If it is not sorted in two
+          days, Yaadly steps in. Nothing on the job is approved until it is
+          sorted, and nothing is taken off you either.
         </div>
       );
     if (!open)
       return (
         <div className={box}>
-          <b className="text-[14px] text-coral">Not right? Raise it with Yaadly.</b>
+          <b className="text-[14px] text-coral">Not right? Raise it with your tradesperson.</b>
           <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
             Approving is a signature, so do not approve something you are not
             happy with. Most things are a missing photo or a misunderstanding
@@ -101,10 +101,10 @@ export function DisputePanel({
           <button disabled={busy || tooShort}
             onClick={() => act(() => raiseDispute(jobId, picked, body))}
             className="rounded-full border border-coral/50 px-4 py-2 text-[13px] font-bold text-coral hover:bg-coral/10 disabled:opacity-40">
-            {busy ? "Sending" : "Send it to Yaadly"}
+            {busy ? "Sending" : "Send it to your tradesperson"}
           </button>
           <button onClick={() => { setOpen(false); setErr(""); }} className="rounded-full border border-line2 px-4 py-2 text-[13px] text-ink">Cancel</button>
-          <span className="text-[11.5px] text-dim">Goes to a person at Yaadly now. {workerName} is told too, and Yaadly brings you both together.</span>
+          <span className="text-[11.5px] text-dim">Goes to {workerName} now. They reply within two days. Not sorted? Bring Yaadly in from here.</span>
         </div>
         {err && <p className="mt-2 text-[12.5px] text-coral">{err}</p>}
       </div>

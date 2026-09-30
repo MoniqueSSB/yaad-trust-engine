@@ -72,7 +72,7 @@ export function arrivalStillWanted(held: Held): string {
 /** Said when a worker skips. The evidence is filed; the check-in is still
  *  owed, today, before they leave. */
 export const CHECK_IN_BEFORE_YOU_LEAVE =
-  `No check-in yet for today. You need to check in before you leave site today: ${HOW}.`;
+  `No check-in yet today.\nCheck in before you leave site today: ${HOW}.`;
 
 const SKIP = /^(?:skip|skip it|later|not now|after|afterwards|file it|file now|file them|just file it)[.!]*$/i;
 const DONE = /^(?:done|sent|checked in|check in done|i have|i did|did it|finished|i'?m on site|on site)[.!]*$/i;

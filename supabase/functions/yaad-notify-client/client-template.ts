@@ -90,12 +90,15 @@ const CLIENT_SUMMARY: Record<string, string> = {
   stage_released: "your approval of the stage is recorded",
   worker_on_site: "your tradesperson checked in on site today",
   walkthrough_notes_ready: "the notes from your video walkthrough are ready to read",
-  dispute_raised: "your message has reached Yaadly and a person is looking at it. Nothing on the job can be approved while it is open",
+  dispute_raised: "your message has gone to your tradesperson to sort first. Nothing on the job can be approved while it is open",
+  dispute_replied: "your tradesperson has replied to what you raised. Say on the job whether it is sorted, or bring Yaadly in",
   completion_report_issued: "your Completion Report is ready to read and keep",
   job_delayed: "there has been no update for a few days, so Yaadly is checking in with your tradesperson",
   addon_for_client: "your tradesperson has changed the extra work, and the new version is waiting for your answer",
   addon_agreed: "the extra work is agreed. Yaadly will send its invoice, and the extra work starts once that is paid",
   addon_closed: "the extra work is not going ahead. Nothing has been booked or charged for it",
+  walkthrough_offered: "your tradesperson has offered a day and time for the video walkthrough. Accept it in your portal, or reply here with another time",
+  walkthrough_accepted: "the video walkthrough time is accepted and your tradesperson has been told",
 };
 
 export function clientTemplateSummary(kind: string): string | null {

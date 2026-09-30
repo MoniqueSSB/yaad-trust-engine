@@ -120,7 +120,7 @@ Deno.test("the consent version and the sentence it refers to travel together", (
   // A consent is only worth the sentence that earned it. If ALERT_TERMS is
   // edited without moving the version, everybody's existing answer is silently
   // reinterpreted as agreement to the new wording.
-  assertEquals(ALERT_CONSENT_VERSION, "alerts-v1");
+  assertEquals(ALERT_CONSENT_VERSION, "alerts-v2");
   assert(/STOP/.test(ALERT_TERMS), "the terms must say how to get out");
   assert(/free/i.test(ALERT_TERMS), "the terms must say quoting is free");
   assert(

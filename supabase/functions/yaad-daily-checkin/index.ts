@@ -53,6 +53,11 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const CRON_SECRET = Deno.env.get("YAAD_CRON_SECRET") ?? "";
 const CONTENT_SID = Deno.env.get("TWILIO_CONTENT_SID_DAILY_CHECKIN") ?? "";
+// The second message's one line. A copy of ON_SITE_STEPS in
+// yaad-twilio-setup/content.ts, because a function bundle cannot import
+// from another function; content_test.ts there fails if the two drift.
+const ON_SITE_STEPS =
+  "1. Photos and videos before, during and after. 2. One line on what each shows. 3. Send them here before you leave";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -159,6 +164,12 @@ Deno.serve(async (req: Request) => {
       if (!/^HX[0-9a-f]{32}$/i.test(onSiteSid)) onSiteSid = "";
     }
     const useSid = onSiteSid || CONTENT_SID;
+    let workerUpdateSid = Deno.env.get("TWILIO_CONTENT_SID_WORKER_UPDATE") ?? "";
+    if (!workerUpdateSid) {
+      const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_worker_update").maybeSingle();
+      try { workerUpdateSid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { workerUpdateSid = String(st?.value ?? ""); }
+      if (!/^HX[0-9a-f]{32}$/i.test(workerUpdateSid)) workerUpdateSid = "";
+    }
     root.setAttributes({ "yaadly.daily_checkin.button": Boolean(onSiteSid) });
 
     if (!useSid) {
@@ -191,6 +202,16 @@ Deno.serve(async (req: Request) => {
         ? { "1": `${j.title ?? "your job"} (${j.id})`, "2": j.id }
         : { "1": j.title ?? j.id };
       const result = await sendTwilioTemplate(String(profile.phone), vars, trace, { kind: "daily check-in", job_id: j.id }, useSid);
+      // The second message, 30 Sep 2026: the 1.2.3 of what to send today,
+      // through the approved worker update template, only after the
+      // question went. Founder: "then the other stuff in a 1.2.3".
+      if (result.sent && onSiteSid && workerUpdateSid) {
+        await sendTwilioTemplate(String(profile.phone), {
+          "1": `${j.title ?? "your job"} (${j.id})`,
+          "2": ON_SITE_STEPS,
+          "3": `https://app.yaadly.co.uk/portal/jobs/${encodeURIComponent(j.id)}`,
+        }, trace, { kind: "daily check-in steps", job_id: j.id }, workerUpdateSid);
+      }
       // Logged once per job per day regardless of delivery, same reasoning
       // as mark_job_nudged: this is a once-a-day ask, not a retry queue,
       // and a Twilio outage should not turn into the same worker getting

@@ -47,6 +47,32 @@ export async function confirmWalkthrough(formData: FormData): Promise<void> {
   revalidatePath("/portal/jobs/" + jobId);
 }
 
+/** The worker offers a day and time; Yaadly sends it to the client. 30 Sep 2026. */
+export async function offerWalkthrough(formData: FormData): Promise<void> {
+  await requireUser();
+  const jobId = String(formData.get("jobId") ?? "");
+  if (!jobId) return;
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("offer_walkthrough", {
+    p_job: jobId,
+    p_offer: String(formData.get("offer") ?? ""),
+    p_link: String(formData.get("link") ?? ""),
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/portal/jobs/" + jobId);
+}
+
+/** The client accepts the offered time. Both sides are told by the trigger. */
+export async function acceptWalkthrough(formData: FormData): Promise<void> {
+  await requireUser();
+  const jobId = String(formData.get("jobId") ?? "");
+  if (!jobId) return;
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("accept_walkthrough", { p_job: jobId });
+  if (error) throw new Error(error.message);
+  revalidatePath("/portal/jobs/" + jobId);
+}
+
 export async function clearWalkthrough(formData: FormData): Promise<void> {
   await requireUser();
   const jobId = String(formData.get("jobId") ?? "");

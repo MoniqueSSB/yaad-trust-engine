@@ -211,11 +211,12 @@ export async function raiseDispute(
   const { clean } = scrub(body.trim().slice(0, 2000));
   const { error } = await supabase.from("disputes").insert({
     job_id: jobId, raised_by: (user.email ?? "").toLowerCase(),
-    /* Founder, 28 Sep 2026: "you raise this with Yaadly". A problem opens
-       with Yaadly from the start rather than with the worker first; the
-       worker is still told at once (trg_notify_dispute_raised_worker_desk).
-       Disputes opened before this in 'direct' keep working as they were. */
-    kinds: kinds.slice(0, 6), body: clean, state: "escalated",
+    /* Founder, 30 Sep 2026: "it goes to the worker to solve, only when
+       there is no resolve then it comes to me". Opens direct: the worker
+       replies, the client closes it or brings Yaadly in, and two days with
+       no reply escalates on its own (20260930130000). This reverses the 28
+       September rule that opened every dispute with Yaadly. */
+    kinds: kinds.slice(0, 6), body: clean, state: "direct",
   });
   if (error) throw new Error("refused");
   revalidatePath("/portal/jobs/" + jobId);
