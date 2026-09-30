@@ -189,7 +189,7 @@ export default async function JobRoom({
   const { data: job } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,stage,status,descr,open,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,walk_call_notes,walk_notes_confirmed_at,check_level,check_chosen_at,check_invoice_id,check_assigned_to,portal_code,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,job_type,size_band,access_type,materials_by,urgency,worker_choice",
+      "id,title,trade,parish,stage,status,descr,open,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,walk_offer,walk_offered_at,walk_accepted_at,walk_call_notes,walk_notes_confirmed_at,check_level,check_chosen_at,check_invoice_id,check_assigned_to,portal_code,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,job_type,size_band,access_type,materials_by,urgency,worker_choice",
     )
     .eq("id", id)
     .maybeSingle();
@@ -1974,6 +1974,8 @@ export default async function JobRoom({
           walkNotes={job.walk_notes ?? null}
           walkCallNotes={job.walk_call_notes ?? null}
           walkNotesConfirmedAt={job.walk_notes_confirmed_at ?? null}
+          walkOffer={job.walk_offer ?? null}
+          walkAcceptedAt={job.walk_accepted_at ?? null}
         />
       )}
         {role === "client" && addonsToApprove.map((a) => (

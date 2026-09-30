@@ -6460,3 +6460,33 @@ Failures are log lines in `yaad-enquiry` starting `hubspot partner:`. The enquir
 No "team", no "main desk": there is one person and the copy says so. Use the bare booking link; `?overlayCalendar=true` is a Cal.com display flag.
 
 **Reports.** The deal count on the Sales Pipeline is the pipeline number. Filter any deal report by pipeline, or partner enquiries inflate it.
+
+
+## 57. The video walkthrough time: offered by the worker, accepted by the client (30 Sep 2026)
+
+Nobody's number moves. The worker offers a day and time (a WhatsApp reply that reads as a time, or the form on the job), Yaadly sends it to the client, the client accepts (the Accept button, the words ACCEPT <code>, or the button on the job), and both are told.
+
+**To switch it on:** apply `20260930120000`, deploy `yaad-inbound` and `yaad-notify-client` (`--no-verify-jwt`) and `yaad-twilio-setup` (platform check kept), deploy the app, then `{"action":"create-walk-accept"}` on `yaad-twilio-setup` for the client's Accept button. Without the template the client is told the words that accept.
+
+**What a correct result looks like.** Client requests a walkthrough on the job. Worker gets the short message and replies "Saturday 10am". Worker sees "Sent to the client". Client gets the offer with Accept. Client taps it. Both get "Accepted".
+
+**When something is wrong.**
+
+1. **The worker's time was read back as a work update:** the words did not read as a time (`looksLikeATime`, walkthrough-offer.ts), or the worker has more than one job with an open walkthrough. The portal form always works.
+2. **"There is no time waiting for your answer":** nothing was offered, or it was already accepted. `select walk_offer, walk_offered_at, walk_accepted_at from jobs where id = '<job>';`
+3. **No Accept button:** `twilio_content_sid_walk_accept` is not in app_settings, or the client is outside the 24 hour window and got the update template instead. Typing ACCEPT <code> still works.
+4. **WhatsApp video with no link:** there is no link to make. Both sides are told Yaadly sets up the call at that time; that is a person's job until a call service is chosen.
+
+## 58. A problem with the work goes to the worker first (30 Sep 2026)
+
+The client raises it (WhatsApp words that read as a problem, or the job page). The worker gets the words at once and replies (WhatsApp, or the job page). The client says SORTED <code> or NOT FIXED <code>, or presses the button on the job. Two days with no reply and Yaadly steps in on its own. The desk hears only at escalation.
+
+**To switch it on:** apply `20260930130000`, deploy `yaad-inbound` and `yaad-notify-client` (`--no-verify-jwt`), deploy the app.
+
+**When something is wrong.**
+
+1. **The client's problem went to the desk, not the worker:** the client has more than one live job on that number, so which was not clear. Working as designed.
+2. **The worker's reply was read back as a work update:** no dispute was waiting on their reply (`select job_id, state, reply from disputes where state = 'direct';`), or they have more than one. The job page always works.
+3. **"A problem is already open on this job":** one dispute at a time. The client closes or escalates the open one first.
+4. **Nothing escalated after two days:** `select jobname, schedule, active from cron.job where jobname = 'yaad-dispute-escalation';` must show `37 15 * * *`.
+5. **The desk was not told at raise:** correct. It is told at escalation (`trg_notify_desk_dispute_escalated`), by the client or by the two day rule.

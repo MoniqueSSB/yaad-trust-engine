@@ -33,7 +33,7 @@ export function isJoinOpener(said: string): boolean {
   return OPENER.test(t) || JOIN_WORD.test(t);
 }
 
-export const JOIN_LANES = ["join_name", "join_trades", "join_parishes", "join_email", "join_photo", "join_consent"] as const;
+export const JOIN_LANES = ["join_name", "join_alerts", "join_trades", "join_parishes", "join_email", "join_photo"] as const;
 export type JoinLane = typeof JOIN_LANES[number];
 
 export function isJoinLane(lane: unknown): lane is JoinLane {
@@ -51,67 +51,57 @@ export const SKIP = /^(skip|no|none|later|not now|nah)[.!]*$/i;
 export const Q_NAME =
   "Welcome to Yaadly. Good to have you.\n\nSix quick questions, then you are in.\n\n1 of 6: What is your full name?";
 
-export function leadTrades(name: string, alertTerms: string): string {
+/** 2 of 7: the job alert consent, a question of its own. Founder, 30 Sep
+ *  2026: "split this into two questions". YES puts the number on the alert
+ *  list with alertTerms as the recorded consent; NO skips the list and the
+ *  joining carries on. */
+export function qAlerts(name: string, alertTerms: string): string {
   const first = firstName(name);
-  return `Thanks${first ? `, ${first}` : ""}. Jobs will come to you here. ${alertTerms} 2 of 6:`;
+  return `Thanks${first ? `, ${first}` : ""}.\n\n2 of 6: ${alertTerms}\n\nReply YES or NO.`;
 }
+export const ALERTS_AGAIN = "Reply YES to hear about jobs here, or NO.";
 
-export const LEAD_PARISHES = "3 of 6:";
+export const LEAD_TRADES = "3 of 6:";
+export const LEAD_PARISHES = "4 of 6:";
 
 export const Q_EMAIL =
-  "4 of 6: Your email address?\nYou use it to log in.\nNo email? Reply SKIP.";
+  "5 of 6: Your email address?\nYou use it to log in.\nNo email? Reply SKIP.";
 
 export const Q_PHOTO =
-  "5 of 6: Send one photo of a job you did.\nNo photo? Reply SKIP.";
+  "6 of 6: Send one photo of a job you did.\nNo photo? Reply SKIP.";
 
 export const NOT_A_NAME = "A name is needed to start.\n\n1 of 6: What is your full name?";
-export const NOT_AN_EMAIL = "That does not look like an email.\n\n4 of 6: Your email address?\nNo email? Reply SKIP.";
-export const PHOTO_PLEASE = "Send a photo here, not words.\n\n5 of 6: Send one photo of a job you did.\nNo photo? Reply SKIP.";
+export const NOT_AN_EMAIL = "That does not look like an email.\n\n5 of 6: Your email address?\nNo email? Reply SKIP.";
+export const PHOTO_PLEASE = "Send a photo here, not words.\n\n6 of 6: Send one photo of a job you did.\nNo photo? Reply SKIP.";
 export const WORDS_FIRST = "One thing at a time. Answer this first. Then send the photo.";
 
 /** What they are told at the end. Warm, five points, and only what is true
  *  today: quoting and booking wait for the check (v_job_alert_subscribers
  *  .can_quote), a person reads it, nothing is promised. The link opens the
  *  same application on the site for the identity steps. */
-export function joinedReply(reference: string, link: string, photoFiled: boolean): string {
+export function joinedReply(reference: string, link: string, photoFiled: boolean, _aiReads = true): string {
+  // One phone screen, founder 30 Sep 2026: "this is one a phone", "the
+  // messages can be over whelming". The reference, the one next step, and
+  // what happens after. Everything else waits for the moment it matters.
   return [
-    `That is all six. You are in. Your reference is ${reference}.`,
+    `You are in. Your reference is ${reference}.`,
     photoFiled ? "" : "No photo yet. You can add one on the link below.",
-    "",
-    "What happens next:",
-    "1. A real person reads your form. Not a machine.",
-    "2. Finish your check here. Your ID. Your TRN. Three people who can vouch for you. Sign the Guidelines.",
+    ``,
+    `Next: finish your check here. About ten minutes.`,
     link,
-    "3. We message you here, either way.",
-    "4. Once you are cleared, jobs come here. Say your price in writing. It is free.",
-    "5. Win a job and we show you how it runs.",
-    "",
-    "Questions? Ask here.",
+    ``,
+    `An AI agent reads your form. A person decides. We message you here.`,
   ].filter((l) => l !== "").join("\n");
 }
 
-/** The sixth question: whether software may read the paperwork first.
- *
- *  The same choice the site asks in AiConsent (JoinFlow.tsx), in fewer
- *  words, so it carries its own version: a consent is worth exactly what the
- *  sentence that earned it said, and this sentence is not that one.
- *  yaad-vetting-review reads the answer, never the version, so YES here
- *  switches the review on exactly as the site's tick does. The facts are the
- *  site's facts: NVIDIA's model, outside Yaadly, not used to train; the ID,
- *  selfie and face video never go to it; it never decides; no costs nothing.
- *  Until it is answered the row says declined, which is the safe reading of
- *  an answer never given. */
-export const AI_CONSENT_WA_VERSION = "ai-review-wa-v1";
-export const Q_CONSENT =
-  "6 of 6: Can a computer read your papers first? Either answer is fine.\n\n" +
-  // One line, founder instruction. The facts the site's consent states are
-  // all still in it: notes only, never decides, NVIDIA, outside Yaadly, not
-  // used to train, and the ID, selfie and face video are never sent.
-  "It makes notes for the person who decides and never decides. It runs on NVIDIA, outside Yaadly, is not used to train, and your ID, selfie and face video are never sent to it.\n\n" +
-  "Reply YES to allow it.\nReply NO for a person only.";
+/** The AI read is automatic. Founder, 30 Sep 2026: "the ai will read",
+ *  "remove the ask for review by human". The row is written granted with
+ *  this version, so every row it applies to says so, and yaad-vetting-review
+ *  (which still checks the column) runs on every application. This changed
+ *  the 30 August rule; DECISIONS.md carries the date and the words. */
+export const AI_CONSENT_WA_VERSION = "ai-review-auto-v1";
 export const CONSENT_YES = /^(yes|y|yeah|yeh|ok|okay|allow|allowed|fine|sure)[.!]*$/i;
 export const CONSENT_NO = /^(no|n|nah|nope|person|person only|a person only|decline)[.!]*$/i;
-export const CONSENT_AGAIN = "Reply YES to let a computer read your papers first.\nReply NO for a person only.";
 
 export function firstName(name: string): string {
   return (name ?? "").trim().split(/\s+/)[0] ?? "";
@@ -150,14 +140,13 @@ export function applicationRow(a: { name?: unknown; trades?: unknown; parishes?:
     work: "",
     status: "received",
     submitted_at: new Date().toISOString(),
-    // Declined until the sixth question is answered: the safe reading of an
-    // answer never given (JoinFlow.tsx, the same rule). The showcase consent
-    // is not written here because production has no such columns (read live
-    // 30 Sep 2026; 20260905b is not applied there), and a column the table
-    // does not have refuses the whole insert.
-    ai_review_consent: "declined",
+    // Granted on every row, founder instruction 30 Sep 2026 (see
+    // AI_CONSENT_WA_VERSION). The showcase consent is not written here
+    // because production has no such columns (read live 30 Sep 2026;
+    // 20260905b is not applied there).
+    ai_review_consent: "granted",
     ai_review_consent_at: new Date().toISOString(),
-    ai_review_consent_version: "not-asked-whatsapp",
+    ai_review_consent_version: AI_CONSENT_WA_VERSION,
   };
 }
 

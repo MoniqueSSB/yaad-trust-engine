@@ -53,3 +53,12 @@ Deno.test("the client update template is the one yaad-notify-client fills", asyn
   assertEquals(CLIENT_UPDATE_APPROVAL.category, "UTILITY");
   assert(!/[\u2013\u2014]/.test(CLIENT_UPDATE_BODY));
 });
+
+Deno.test("the daily check-in's second message is the same line in both functions", async () => {
+  const { ON_SITE_BODY, ON_SITE_STEPS } = await import("./content.ts");
+  const checkin = await Deno.readTextFile(new URL("../yaad-daily-checkin/index.ts", import.meta.url));
+  assert(checkin.includes(JSON.stringify(ON_SITE_STEPS)), "yaad-daily-checkin's copy of ON_SITE_STEPS has drifted from content.ts");
+  assert(!ON_SITE_STEPS.includes("\n"), "a template variable is one line");
+  assert(ON_SITE_BODY.includes("Are you on site today?") && ON_SITE_BODY.includes("Send current location"), "the first message asks the question and says how to add the location");
+  assert(!/[\u2013\u2014]/.test(ON_SITE_BODY + ON_SITE_STEPS), "no dashes");
+});
