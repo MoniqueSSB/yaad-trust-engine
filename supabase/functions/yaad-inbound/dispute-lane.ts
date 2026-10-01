@@ -24,7 +24,12 @@ export function readDisputeClose(text: string): { jobId: string; state: "resolve
   return null;
 }
 
-export const DISPUTE_DAYS = 2;
+// Founder, 1 Oct 2026: "the check should say 48 hours and be 48 hours."
+// The words say hours, the timer counts hours (20261001120000), and the
+// check runs every five minutes so 48 means 48.
+export const DISPUTE_HOURS = 48;
+/** Kept for the 30 Sep migration's own test, which reads '2 days'. */
+export const DISPUTE_DAYS = DISPUTE_HOURS / 24;
 
 /** To the client, once their words have gone to the worker. */
 export function problemSent(jobId: string, body: string): string {
@@ -32,7 +37,7 @@ export function problemSent(jobId: string, body: string): string {
     `Sent to your tradesperson:`,
     `"${body.slice(0, 300)}"`,
     ``,
-    `They reply here within ${DISPUTE_DAYS} days.`,
+    `They reply here within ${DISPUTE_HOURS} hours.`,
     `Sorted? Reply SORTED ${jobId}.`,
     `Not fixed? Reply NOT FIXED ${jobId} and Yaadly steps in.`,
     `Nothing on the job is approved until it is sorted.`,
@@ -48,7 +53,7 @@ export function problemForWorker(jobId: string, title: string, body: string, por
     `This is yours to sort first.`,
     `Reply here with what you will do and when. It goes to the client.`,
     `Or reply on the job: ${portalLink}`,
-    `Not sorted in ${DISPUTE_DAYS} days? Yaadly steps in.`,
+    `Not sorted in ${DISPUTE_HOURS} hours? Yaadly steps in.`,
     ``,
     `Nothing is approved until it is sorted.`,
     `Stages already signed off stay signed off.`,

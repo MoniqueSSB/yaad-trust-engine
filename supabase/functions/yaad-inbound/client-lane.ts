@@ -106,6 +106,53 @@ export function clientWordReply(word: Exclude<ClientWord, null>, jobs: LiveJob[]
   return `${lead}You have ${jobs.length} jobs with Yaadly: ${jobs.map((j) => j.id).join(", ")}. Say which one you mean, or open them in your portal: https://app.yaadly.co.uk/portal`;
 }
 
+// ── NO, and STOP, on a report waiting for approval ────────────────────────
+//
+// Founder, 1 October 2026: a client who does not want to approve needs a
+// reply that says so. The stage report names NO as the third choice.
+//
+// STOP means hold: nothing is approved and the job does not move on. Founder,
+// 1 Oct 2026: "stop should only stop anything being approved and moving
+// forward." It is not read as leaving the messages. It is not advertised in
+// the report either, because Twilio treats STOP on the text message fallback
+// as an opt out, which is outside this code.
+//
+// Runs ahead of clientWord(), which still reads a bare "no" as a stray word
+// on a job with nothing waiting.
+const DECLINE = /^(?:no|nah|nope|not yet|no not yet|no thanks|hold|hold on|wait|stop|don'?t approve|do not approve|not approved|not ready|not happy yet)[.!]*$/i;
+const DECLINE_P = new RegExp(DECLINE.source.replace(/([a-z])\1+/gi, "$1"), DECLINE.flags);
+
+/** STOP on its own, doubled letters forgiven. Yaadly is told (index.ts). */
+export function isStop(text: string): boolean {
+  return /^stop+[.!]*$/i.test(String(text ?? "").trim());
+}
+
+/** The reply to NO or STOP when exactly this job has a report waiting.
+ *  Null for anything else, which then goes on to the lanes below. */
+export function declineReply(text: string, job: LiveJob): string | null {
+  const t = String(text ?? "").trim();
+  if (job.status !== "evidence") return null;
+  if (!DECLINE.test(t) && !DECLINE_P.test(pressDoubledLetters(t))) return null;
+  const lines = [
+    `Understood. Nothing has been approved on ${job.id}.`,
+    `Next: if something is not right, say what in your own words, and which photo if it is about one. It goes to your tradesperson to put right.`,
+    `If you just need more time, nothing more is needed now. The report waits for you. To approve it later, send only the code ${job.id}.`,
+  ];
+  if (isStop(t)) {
+    // Founder, 1 Oct 2026: "ask them question to ensure we understand the
+    // context of the stop." Their answer comes back through the lanes as
+    // anything else does: a problem with the work opens a dispute with the
+    // worker, a remark goes to the worker as a note, a question is answered.
+    return [
+      `Stopped. Nothing on ${job.id} is approved, and the job does not move on to the next stage until you approve it.`,
+      `So we understand: what made you stop? Tell us in your own words, and which photo if it is about one.`,
+      `If something is not right with the work, it goes to your tradesperson to put right. If you need more time to look, say so and the report waits for you.`,
+      `To approve it later, send only the code ${job.id}.`,
+    ].join("\n");
+  }
+  return lines.join("\n");
+}
+
 const PROBLEM =
   /\b(?:not happy|unhappy|not satisfied|dissatisfied|not right|not good|no good|not finished|not done|unfinished|wrong|poor|bad job|bad work|shoddy|sloppy|rubbish|terrible|awful|mess|messy|damage\w*|broke|broken|crack\w*|leak\w*|fault\w*|defect\w*|complain\w*|complaint|refund|dispute|rip\w* off|scam\w*|cheat\w*|overcharg\w*|did not turn up|didn'?t turn up|no show|never came|never turned up|stolen|missing|late again|redo|re-do|do it again|put it right|mash up|nuh good|nah good|nuh right)\b/i;
 
@@ -138,7 +185,7 @@ export function answerClientQuestion(text: string, job: LiveJob | null): string 
     return `The photographs, videos and every report are on the Evidence tab of your job: ${link}?tab=evidence`;
   }
   if (/\b(?:something (?:is )?wrong|raise (?:a |an )?(?:problem|issue|dispute|complaint)|make a complaint|how (?:do|can) i complain)\b/.test(t)) {
-    return `Say what is wrong here, in your own words. It goes to your tradesperson first, who has two days to reply and put it right. If it is not sorted, a person at Yaadly steps in. Nothing on the job is approved while it is open. You can also raise it in your portal: ${link}`;
+    return `Say what is wrong here, in your own words. It goes to your tradesperson first, who has 48 hours to reply and put it right. If it is not sorted, a person at Yaadly steps in. Nothing on the job is approved while it is open. You can also raise it in your portal: ${link}`;
   }
   if (/\b(?:stop|remove|change|update) (?:these |the |my )?(?:whatsapp|messages|updates|number)\b/.test(t)) {
     return `Your WhatsApp number is on the Job details tab of your job, where you can change it or remove it: ${link}?tab=details Email updates carry on either way.`;
@@ -151,7 +198,7 @@ export function answerClientQuestion(text: string, job: LiveJob | null): string 
 export const CLIENT_HOW_TO = `How a client uses Yaadly once a job is booked:
 - Updates come by WhatsApp and email. Each report from the tradesperson carries their own words and the photographs.
 - To approve a stage: look at the report and photographs, then reply on WhatsApp with only the job's code, or tap Approve, or approve in the portal. Approving closes the stage with Yaadly and is never a payment from the client.
-- To say something is not right: say so in plain words on WhatsApp or in the portal. A remark or a problem with the work goes to the tradesperson first; if a problem is not sorted within two days, a person at Yaadly steps in.
+- To say something is not right: say so in plain words on WhatsApp or in the portal. A remark or a problem with the work goes to the tradesperson first; if a problem is not sorted within 48 hours, a person at Yaadly steps in.
 - The portal is at app.yaadly.co.uk. Each job has tabs: Evidence for photographs and reports, Money for invoices and how to pay, Extra work for anything added to the job, Job details for the address and the WhatsApp number.
 - Extra work on a booked job is agreed by replying CONFIRM and the code in the message about it, or on the Extra work tab. It has its own invoice and the original bill does not change.
 - The client can ask for a live video walkthrough before accepting the work.

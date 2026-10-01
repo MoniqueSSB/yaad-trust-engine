@@ -104,7 +104,7 @@ export function DisputePanel({
             {busy ? "Sending" : "Send it to your tradesperson"}
           </button>
           <button onClick={() => { setOpen(false); setErr(""); }} className="rounded-full border border-line2 px-4 py-2 text-[13px] text-ink">Cancel</button>
-          <span className="text-[11.5px] text-dim">Goes to {workerName} now. They reply within two days. Not sorted? Bring Yaadly in from here.</span>
+          <span className="text-[11.5px] text-dim">Goes to {workerName} now. They reply within 48 hours. Not sorted? Bring Yaadly in from here.</span>
         </div>
         {err && <p className="mt-2 text-[12.5px] text-coral">{err}</p>}
       </div>

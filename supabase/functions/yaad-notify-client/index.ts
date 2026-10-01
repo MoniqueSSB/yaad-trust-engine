@@ -54,7 +54,7 @@ import * as guardrails from "./guardrails.ts";
 import { checkAttrs, deskPack, runEvidenceChecks } from "./evidence-checks.ts";
 import { bookedPayLine, completionReportWorkerCopy, stagePaidWorkerText, workerEvidenceLines } from "./worker-copy.ts";
 import { checkInApplies } from "./arrival-rule.ts";
-import { clientSummaryVars, clientTemplateSummary, clientUpdateVars } from "./client-template.ts";
+import { bookedPaymentLines, clientSummaryVars, clientTemplateSummary, clientUpdateVars, quoteChoices } from "./client-template.ts";
 import { recordAccepted, recordNotSent, type SendMeta, withMessagingService, withStatusCallback } from "./twilio-status.ts";
 import { hasWorkerTemplateDecision, insideWindow, samePhoneDigits, templateVar, WINDOW_MS, workerTemplateSummary } from "./worker-template.ts";
 import { approvedTemplateSid, lastInboundInWindow } from "./wa-window.ts";
@@ -64,7 +64,7 @@ import { addonPdfUrl } from "./addon-link.ts";
 import { screenOwnWords } from "./own-words.ts";
 import { captionsLine, namedNextStep, noCaptionPrompt, plainDraft, reportSentReceipt, unearnedClaims, usableCaptions } from "./report-draft.ts";
 import { acceptedForClient, acceptedForWorker, offerForClient, PLATFORM_LABEL as WALK_PLATFORM } from "./walkthrough-offer.ts";
-import { DISPUTE_DAYS, problemForWorker, replyForClient } from "./dispute-lane.ts";
+import { chaseClient, DISPUTE_HOURS, problemForWorker, replyForClient, type SteppedInWhy, steppedInForClient, steppedInForWorker } from "./dispute-lane.ts";
 import { applyLink, CHECK_REMINDER_SUBJECT, checkReminderText, jobDelayedWorkerText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -80,7 +80,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "stage_signed_off_worker", "stage_paid_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "stage_signed_off_worker", "stage_paid_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied", "dispute_stepped_in", "dispute_stepped_in_worker", "dispute_chase_client"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -1153,7 +1153,7 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
     }
-    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "stage_signed_off_worker" || kind === "stage_paid_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "stage_signed_off_worker" || kind === "stage_paid_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "dispute_stepped_in_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
@@ -1192,7 +1192,7 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "stage_signed_off_worker" || kind === "stage_paid_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "stage_signed_off_worker" || kind === "stage_paid_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "dispute_stepped_in_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -1219,6 +1219,9 @@ Deno.serve(async (req: Request) => {
     let reportSignLink = "";
     let photoUrls: EvidencePhoto[] = [];
     let attachPhotos: string[] = [];
+    // Each photograph as its own WhatsApp message, its label as the caption,
+    // so a client can tell P1 from P2 (1 Oct 2026). Set by the stage report.
+    let labelledPhotos: { url: string; caption: string }[] = [];
     // Only quote_arrived has an approved WhatsApp Content Template
     // (yaadly_quote_landed_v2); see the header comment for why it is the
     // one kind that may reuse it, and only as a fallback for the specific
@@ -1335,12 +1338,13 @@ Deno.serve(async (req: Request) => {
       // nobody is booked until both sides have confirmed.
       // 9 Sep 2026, founder: "the only person that needs to accept is the
       // client." One reply books; the worker's quote is their agreement.
-      const bookHint = clientPhone
-        ? `Reply ${job.id} to accept this price and book ${workerName}. Or `
-        : "";
+      // 1 Oct 2026, founder: the message has to say the client can accept,
+      // go back or review the price. Three choices, named, each with where
+      // it is done (quoteChoices). Accepting by reply only with a phone.
       line = `A price has come in on your Yaadly job, ${job.title}. ` +
         `${workerName} quoted it and your all-in price from Yaadly is ${priceText}: ${bill.breakdown}.${scopeLine} ` +
-        `You pay Yaadly, never the tradesperson. Nothing is booked and nothing is charged until you choose. ${bookHint}see it here: ${codeLink}`;
+        `You pay Yaadly, never the tradesperson.\n\n` +
+        quoteChoices(job.id, String(workerName), Boolean(clientPhone), codeLink, roomLink);
       const contentSid = Deno.env.get("TWILIO_CONTENT_SID_QUOTE") ?? "";
       if (contentSid) {
         waTemplate = {
@@ -1367,12 +1371,10 @@ Deno.serve(async (req: Request) => {
       const proposal = String(q?.note ?? "").trim();
       const scopeLine = proposal ? ` They propose: "${proposal.slice(0, 300)}"` : "";
       subject = `Yaadly has chosen your tradesperson: ${job.title}`;
-      const bookHint = clientPhone
-        ? `Reply ${job.id} to accept this price and book ${workerName}. Or `
-        : "";
       line = `You asked Yaadly to pick the tradesperson for ${job.title}. ${chooser} has read the quotes and chosen ${workerName}.${whyLine}${scopeLine} ` +
         `Your all-in price from Yaadly is ${money(bill.total)}: ${bill.breakdown}. ` +
-        `You pay Yaadly, never the tradesperson. Nothing is booked and nothing is charged until you accept this price. ${bookHint}see it here: ${codeLink}`;
+        `You pay Yaadly, never the tradesperson.\n\n` +
+        quoteChoices(job.id, String(workerName), Boolean(clientPhone), codeLink, roomLink);
     } else if (kind === "booked_worker") {
       // 9 Sep 2026. The worker's quote is their agreement, so the client's
       // acceptance books them with no reply from their side. That makes
@@ -1383,7 +1385,7 @@ Deno.serve(async (req: Request) => {
       // them, at their price less 5%, and nothing starts until the client's
       // invoice to Yaadly is paid, which a person marks by hand.
       const { data: q } = await admin.from("job_quotes")
-        .select("worker_name, labour_jmd, materials_jmd")
+        .select("worker_name, labour_jmd, materials_jmd, billing_mode")
         .eq("job_id", jobId).eq("status", "accepted")
         .order("updated_at", { ascending: false }).limit(1).maybeSingle();
       const m = Math.round(Number(q?.materials_jmd ?? 0));
@@ -1476,7 +1478,7 @@ Deno.serve(async (req: Request) => {
       // and matches the worker FAQ rather than inventing new payment
       // language.
       const { data: q } = await admin.from("job_quotes")
-        .select("worker_name, labour_jmd, materials_jmd")
+        .select("worker_name, labour_jmd, materials_jmd, billing_mode")
         .eq("job_id", jobId).eq("status", "accepted")
         .order("updated_at", { ascending: false }).limit(1).maybeSingle();
       subject = `Booked: ${job.title}`;
@@ -1485,11 +1487,18 @@ Deno.serve(async (req: Request) => {
       // invoice, sent separately, marked paid by a person before anything
       // moves. Saying "the worker is on site" here would be wrong now.
       const accepted = allInPrice(q?.labour_jmd ?? 0, q?.materials_jmd ?? 0);
-      line = `${q?.worker_name ?? "Your worker"} is booked on ${job.id} (${job.title}). ` +
+      // 1 Oct 2026, founder: the fee shown on its own, a link to the full
+      // invoice, and what has to be paid before the job goes live, per the
+      // terms (bookedPaymentLines in client-template.ts).
+      const feeJmd = Math.round(Math.round(Number(q?.labour_jmd) || 0) * 0.15);
+      const matJmd = Math.round(Number(q?.materials_jmd) || 0);
+      line = `${q?.worker_name ?? "Your tradesperson"} is booked on ${job.id} (${job.title}).\n\n` +
         `Your all-in price from Yaadly is ${money(accepted.total)}: ${accepted.breakdown}. ` +
-        `You pay Yaadly, not the worker: Yaadly engages and pays them. ` +
-        `Your invoice for the job is on its way separately, one price covering the work, materials at cost and Yaadly's Guarantee & Support fee. ` +
-        `The job goes live once that is paid. Yaadly pays the worker under our own agreement with him, so he never waits on you. Your approval is what closes each stage with us, once you have seen the evidence. ${roomLink}`;
+        `Yaadly's fee is ${money(feeJmd)}, the 15% Guarantee & Support on the labour.\n\n` +
+        `You pay Yaadly, never the tradesperson. Yaadly pays them under its own agreement with them, so they never wait on you.\n\n` +
+        bookedPaymentLines(q?.billing_mode === "by_stage", money(feeJmd), matJmd > 0 ? money(matJmd) : null, `${roomLink}?tab=money`) +
+        `\n\nYour approval is what closes each stage with Yaadly, once you have seen the evidence.` +
+        `\n\nNext: pay your invoice from the Money tab once it is there. You get a message here when the job is live.`;
     } else if (kind === "quote_not_selected") {
       // Founder, 13 Sep 2026: a worker whose quote closed because somebody
       // else was booked still sees the job, and this tells them so rather
@@ -1879,12 +1888,29 @@ Deno.serve(async (req: Request) => {
       const reportLabel = await stageLabel(admin, jobId, job.stage ?? 1);
       const workerSays = overrideText || `Photos have come in for ${reportLabel} of your job, ${job.title}.`;
       const aiSays = aiSummary ? `AI noticed: ${aiSummary}` : null;
-      const itemsLine = photoUrls.length > 1
-        ? `Items: ${photoUrls.map(itemCode).join(", ")}. Mention a code if your comment is about one specific photo.`
+      // Labelled photographs, 1 Oct 2026, founder: "give the photo labels so
+      // it is clear which is which." Until then the photos rode together on
+      // the report with no caption, and a list "Items: P1, P2" sat in the
+      // text with nothing on the photos to match it. Now each goes as its
+      // own message straight after the report, captioned with its code, the
+      // worker's answer to before or after, and the worker's own label when
+      // it passes the same screen as the report. A reply naming the code is
+      // matched to that photo (pickEvidenceItem in yaad-inbound).
+      labelledPhotos = photoUrls.map((p, i) => {
+        const own = String(p.label ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
+        const said = own && !/^\d+$/.test(own) && screenOwnWords(own).ok ? `: ${own}` : "";
+        return { url: p.url, caption: `${p.code ? itemCode(p) : `Photo ${i + 1}`}${said}` };
+      });
+      const allCoded = photoUrls.length > 0 && photoUrls.every((p) => p.code);
+      const itemsLine = photoUrls.length
+        ? `On WhatsApp the ${photoUrls.length === 1 ? "photo follows" : `${photoUrls.length} photos follow`} this message, ${photoUrls.length === 1 ? "with its label" : "each with its label"}. All of them are on the Evidence tab of your job.`
         : null;
+      // 1 Oct 2026, founder: "it should be clear what the client should do
+      // next." The two replies that do something are named, and so is the
+      // fact that nothing is approved without the code.
       const actionHint = clientPhone
-        ? `Reply with the code ${job.id} to approve, or just say what you think and we will pass it to the worker.`
-        : "Review it and reply from your portal.";
+        ? `Next, reply here with one of these:\n1. Approve: send only the code ${job.id}.\n2. Not right, or a question: say it in your own words${allCoded ? `, starting with the photo's label if it is about one, for example "${photoUrls[0].code} the corner is not sealed"` : ", and say which photo if it is about one"}. It goes to your tradesperson.\n3. Not ready to approve: reply NO. Nothing is approved, and the report waits for you.\nNothing is approved until you send the code. The report is also on your job:`
+        : "Next: look at the report, then approve it or say what is not right, on your job:";
       line = [workerSays, aiSays, itemsLine, `${actionHint} ${roomLink}`].filter(Boolean).join("\n\n");
 
       // For a client outside WhatsApp's 24 hour window (client-template.ts).
@@ -1949,7 +1975,7 @@ Deno.serve(async (req: Request) => {
           ].join("\n")
         : [
             `Your message about ${job.title} has gone to your tradesperson.`,
-            `They reply within ${DISPUTE_DAYS} days.`,
+            `They reply within ${DISPUTE_HOURS} hours.`,
             `Sorted? Say so on the job. Not fixed? Bring Yaadly in there: ${roomLink}`,
             `Nothing on the job is approved until it is sorted.`,
           ].join("\n");
@@ -1986,6 +2012,29 @@ Deno.serve(async (req: Request) => {
       if (!d?.reply) return json({ ok: true, kind, told: false, reason: "No reply on this dispute." });
       subject = `Your tradesperson replied: ${job.title}`;
       line = replyForClient(String(job.id), String(job.title ?? ""), String(d.reply), roomLink);
+    } else if (kind === "dispute_stepped_in" || kind === "dispute_stepped_in_worker" || kind === "dispute_chase_client") {
+      // Yaadly stepping in on its own, or the one chase (20261001120000).
+      // Read off the row by id, so a stray call cannot send words that are
+      // no longer true.
+      const { data: d } = await admin.from("disputes")
+        .select("state, escalated_by, client_chased_at").eq("id", String(meta.id ?? "")).eq("job_id", jobId).maybeSingle();
+      const title = String(job.title ?? job.id);
+      if (kind === "dispute_chase_client") {
+        if (!d || d.state !== "direct" || !d.client_chased_at) return json({ ok: true, kind, told: false, reason: "Not waiting on the client." });
+        subject = `Is it sorted? ${title}`;
+        line = chaseClient(String(job.id), title, roomLink);
+      } else {
+        if (!d || d.state !== "escalated" || !d.escalated_by) return json({ ok: true, kind, told: false, reason: "Not stepped in by Yaadly." });
+        const why = d.escalated_by as SteppedInWhy;
+        if (kind === "dispute_stepped_in") {
+          subject = `Yaadly has stepped in: ${title}`;
+          line = steppedInForClient(String(job.id), title, why, roomLink);
+        } else {
+          recipientEmail = String(job.worker_email ?? "").trim();
+          subject = `Yaadly has stepped in: ${title}`;
+          line = steppedInForWorker(String(job.id), title, why, roomLink);
+        }
+      }
     } else if (kind === "desk_alert") {
       // Monique, not a party. Founder, 13 Sep 2026: a problem on a job
       // "comes directly to my whatsapp and email". Fired by the triggers in
@@ -2040,9 +2089,17 @@ Deno.serve(async (req: Request) => {
             `${kinds ? `\n\nWhat: ${kinds}` : ""}\n\n"${clip(String(d.body ?? ""), limit)}"\n\n` +
             `The worker has been sent it and answers first. Nothing on the job can be approved while it is open.`;
         } else {
-          what = "a client has escalated a dispute";
-          pushTitle = "Yaadly: a dispute was escalated";
-          detail = (limit) => `The client on ${title} has escalated their dispute to Yaadly. It needs a person now.\n\n` +
+          // Who moved it, 1 Oct 2026: the alert said the client had
+          // escalated when the 48 hour timer had (20261001120000).
+          const { data: eb } = await admin.from("disputes").select("escalated_by").eq("id", rowId).maybeSingle();
+          const byTimer = eb?.escalated_by === "no_reply"
+            ? `The worker on ${title} did not reply within 48 hours, so the dispute has come to Yaadly on its own. The client and the worker have both been told. It needs a person now.`
+            : eb?.escalated_by === "client_silent"
+              ? `The client on ${title} did not say whether the worker's reply sorted it, 48 hours after being asked, so the dispute has come to Yaadly on its own. Both sides have been told. It needs a person now.`
+              : null;
+          what = byTimer ? "a dispute has come to Yaadly on its own" : "a client has escalated a dispute";
+          pushTitle = byTimer ? "Yaadly: a dispute came to you on the 48 hour rule" : "Yaadly: a dispute was escalated";
+          detail = (limit) => (byTimer ? `${byTimer}\n\n` : `The client on ${title} has escalated their dispute to Yaadly. It needs a person now.\n\n`) +
             `They raised: "${clip(String(d.body ?? ""), limit)}"\n\n` +
             (d.reply ? `The worker replied: "${clip(String(d.reply), limit)}"` : "The worker has not replied.") +
             `\n\nNothing on the job can be approved while it is open.`;
@@ -2112,34 +2169,27 @@ Deno.serve(async (req: Request) => {
         // when it was sent: approving raises the worker's payable, and a
         // named person at Yaadly pays it afterwards. The WhatsApp reply to
         // the same approval was corrected on 4 Sep; this one was missed.
-        `Your approval is recorded and the worker's payment is raised with Yaadly. Nothing else to do here: ${roomLink}`;
+        `Your approval is recorded and the worker's payment is raised with Yaadly. ${roomLink}\n\n` +
+        (job.status === "complete"
+          ? `Next: your tradesperson signs the Completion Report, and it comes to you here to read and keep.`
+          : `Next: nothing is needed from you. You hear here when your tradesperson sends the next report.`);
 
-      // Stage 7. Convert at handover, the founder's own words: offered at
-      // the moment the client approves and feels relief, at the founding
-      // rate, never by email later. Only on the job's FINAL stage
-      // (sync_job_status marks the job complete once stage reaches 5), not
-      // on every approval along the way: pitching this mid-job would read
-      // as premature on a job that is not actually finished yet. No
-      // billing exists to switch on here (Phase 1, sell judgment, CLAUDE.md
-      // 9), so this captures a reply for the founder to follow up with
-      // personally, it does not pretend to start anything on its own.
-      if (job.status === "complete" && job.worker_email) {
-        const { data: worker } = await admin.from("worker_profiles")
-          .select("name").ilike("worker_email", job.worker_email).maybeSingle();
-        const workerName = String(worker?.name ?? "").trim() || "the same worker";
-        line += `\n\nOne more thing, now that this is off your list. Want ${workerName} to keep an eye on the place going forward, without you having to ask again? ` +
-          `It's called the Yaad Report: a monthly WhatsApp update, 6 to 10 timestamped photos, a short walkthrough video, three lines on the property's condition, and what's changed since last time. ` +
-          `Founding rate is £350 a month, or one 12 month term instead of twelve separate decisions.\n\n` +
-          `Reply INTERESTED and Yaadly will follow up with how it works.`;
-      }
+      // The Yaad Report offer that sat here (Stage 7, convert at handover)
+      // was taken out on 1 Oct 2026, founder's instruction to fix it. It
+      // quoted £350 a month for a product that is not on the live menu
+      // (the Oversight Retainer is £495, Property Care £45 a visit) and
+      // asked for a reply of INTERESTED that nothing in yaad-inbound
+      // handled, so a client who answered it heard nothing back. An offer
+      // at handover can come back once it names a price on the menu and
+      // the reply has somewhere to go.
     } else if (kind === "worker_on_site") {
       const { data: arrival } = await admin.from("arrival_log")
         .select("stage, arrived_at")
         .eq("job_id", jobId).order("arrived_at", { ascending: false }).limit(1).maybeSingle();
       subject = `On site today: ${job.title}`;
       const arrivalLabel = await stageLabel(admin, jobId, arrival?.stage ?? job.stage ?? 1);
-      line = `Your worker checked in on site today for ${arrivalLabel} of ${job.title}. ` +
-        `Follow along here: ${roomLink}`;
+      line = `Your tradesperson checked in on site today for ${arrivalLabel} of ${job.title}. ` +
+        `Follow along here: ${roomLink}\n\nNext: nothing is needed from you. You hear here when your tradesperson sends a report.`;
     } else if (kind === "walkthrough_requested") {
       // 14 Sep 2026, founder: the worker is told by WhatsApp AND email that
       // a client has asked for a live video walkthrough. Fired by
@@ -2259,7 +2309,7 @@ Deno.serve(async (req: Request) => {
       subject = `Your Completion Report: ${job.title}`;
       line = `The Completion Report for ${job.title} is ready, signed by ${r.worker_signed_name || "the worker"}. ` +
         `Keep it with the house papers. If anything in it is wrong or missing, there is a button at the bottom to raise it: ` +
-        `${roomLink}/completion`;
+        `${roomLink}/completion\n\nNothing more is needed from you on this job.`;
     } else if (kind === "walkthrough_notes_ready") {
       subject = `Notes from your video walkthrough: ${job.title}`;
       line = `The worker has written up what came out of your video walkthrough on ${job.title}. ` +
@@ -2321,7 +2371,8 @@ Deno.serve(async (req: Request) => {
         // single word in that sentence is on the banned list, so the screen
         // could not see it.
         (workerReached ? `We have messaged the worker directly to check in. ` : `Yaadly is following it up with the worker. `) +
-        `Nothing about what you have paid or what you owe has changed, and you can raise anything here: ${roomLink}`;
+        `Nothing about what you have paid or what you owe has changed, and you can raise anything here: ${roomLink}\n\n` +
+        `Next: nothing is needed from you. You hear here when there is an update.`;
     } else if (kind.startsWith("addon_")) {
       // Extra work on a booked job (20260928235000). The trigger sends only
       // the add-on id and the revision it fired on; every word below is read
@@ -2376,7 +2427,7 @@ Deno.serve(async (req: Request) => {
       } else if (kind === "addon_agreed") {
         subject = `Extra work agreed: ${title}`;
         line = `On ${title}, you and your tradesperson have agreed the extra work: "${scope.slice(0, 200)}".\n\n` +
-          `Yaadly will send you its invoice for ${money(first + Math.round(first * 0.15))}${halves ? ", the first half" : ""}. Once it is paid the extra work can start. Your original job bill does not change.\n\n${extraLink}`;
+          `Yaadly will send you its invoice for ${money(first + Math.round(first * 0.15))}${halves ? ", the first half" : ""}. Once it is paid the extra work can start. Your original job bill does not change.\n\n${extraLink}\n\nNext: pay that invoice from the Money tab of your job once it is there.`;
       } else if (kind === "addon_agreed_worker") {
         subject = `Extra work agreed: ${title}`;
         line = [
@@ -2434,8 +2485,13 @@ Deno.serve(async (req: Request) => {
         ? `${APP_URL}/portal/jobs/${encodeURIComponent(jobId)}/pack?code=${encodeURIComponent(pack.confirm_code)}`
         : roomLink;
       subject = `Your Kickoff Pack is ready: ${job.title}`;
-      line = `The Kickoff Pack for ${job.title} is ready: scope, timeline, payment stages and the evidence checklist, all in one place. ` +
-        `Read it here: ${packLink}\n\nWhen you're ready to confirm your side, just reply to this message with ${jobId}.`;
+      // 1 Oct 2026, founder: the link to the pack in the portal has to stand
+      // out, so it is on its own line ahead of the ask to confirm. The same
+      // words go to both sides, so it names only the reply, which works for
+      // both; the client's page button is on that page for them to find.
+      line = `The Kickoff Pack for ${job.title} is ready. It sets out the scope, the timeline, the payment stages and the evidence checklist.\n\n` +
+        `Review the full pack in your Yaadly portal: ${packLink}\n\n` +
+        `Once you have read it and are happy, confirm your side by replying to this message with ${jobId}.`;
     }
 
     let emailed = false;
@@ -2514,7 +2570,11 @@ Deno.serve(async (req: Request) => {
     // there is one, and otherwise the approved update template with one true
     // line about what happened. Inside the window nothing changes.
     let clientTemplate: { sid: string; vars: Record<string, string> } | undefined;
-    if (recipientPhone && job && recipientPhone !== workerPhone && !workerTemplate) {
+    // Service bookings too, 1 Oct 2026: they carry no job, so the booking's
+    // own type and reference stand in for the title and code.
+    const tplTitle = isService ? String(svc?.type ?? "") : String(job?.title ?? "");
+    const tplId = isService ? String(svc?.id ?? "") : String(job?.id ?? "");
+    if (recipientPhone && (job || isService) && recipientPhone !== workerPhone && !workerTemplate) {
       // Only the kinds written for a client. A desk alert also sets a
       // template and keeps the order it was given, untouched by this.
       const summary = clientTemplateSummary(kind);
@@ -2533,7 +2593,7 @@ Deno.serve(async (req: Request) => {
               try { sid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { sid = String(st?.value ?? ""); }
             }
             if (/^HX[0-9a-f]{32}$/i.test(sid)) {
-              clientTemplate = { sid, vars: clientSummaryVars(String(job.title ?? ""), job.id, summary, roomLink) };
+              clientTemplate = { sid, vars: clientSummaryVars(tplTitle, tplId, summary, kind === "service_booked" ? codeLink : roomLink) };
             }
           }
         }
@@ -2556,7 +2616,7 @@ Deno.serve(async (req: Request) => {
       } else {
         wa = firstTemplate
           ? await sendTwilio(recipientPhone, "", "whatsapp", trace, [], firstTemplate, sendMeta)
-          : await sendTwilio(recipientPhone, waLine || line, "whatsapp", trace, attachPhotos, undefined, sendMeta);
+          : await sendTwilio(recipientPhone, waLine || line, "whatsapp", trace, labelledPhotos.length ? [] : attachPhotos, undefined, sendMeta);
       }
       // The rich, scope-carrying message could not be delivered at all,
       // specifically because it landed outside WhatsApp's 24 hour window:
@@ -2623,6 +2683,21 @@ Deno.serve(async (req: Request) => {
           if (!workerHeldBack) await recordNotSent(recipientPhone, "whatsapp", { ...sendMeta, kind: `${kind} bank details ask` });
           await sendPlainEmail(workerEmail, `Add your bank details: ${job.title ?? job.id}`, bankAsk, trace);
         }
+      }
+
+      // The labelled photographs, one message each, after the report and
+      // before the button, so the button arrives under the last photo. Only
+      // after the report went as WhatsApp free text, the same rule as the
+      // button. A photo that fails is recorded; the report and the portal
+      // still carry it.
+      if (labelledPhotos.length && !firstTemplate && wa.sent && wa.via === "twilio whatsapp") {
+        let sentPhotos = 0;
+        for (const ph of labelledPhotos) {
+          const r = await sendTwilio(recipientPhone, ph.caption, "whatsapp", trace, [ph.url], undefined, { ...sendMeta, kind: "labelled photo" });
+          if (r.sent) sentPhotos++;
+          else console.error(`labelled photo not sent for ${jobId}: ${r.reason ?? "unknown"}`);
+        }
+        root.setAttributes({ "yaadly.notify.labelled_photos_sent": sentPhotos });
       }
 
       // Never after a template: the client outside the window has been sent

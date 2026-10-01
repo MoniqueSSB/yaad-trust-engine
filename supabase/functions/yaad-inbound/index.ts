@@ -26,7 +26,7 @@ import { inboundText, wasTapped } from "./button-tap.ts";
 import { acknowledgementReply, answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith } from "./worker-question.ts";
 import { ARRIVAL_HOLD_MS, arrivalAsk, arrivalAskLapsed, arrivalStillWanted, cannotCheckIn, CHECK_IN_BEFORE_YOU_LEAVE, isPin, isSkip, saysCheckedIn } from "./arrival-ask.ts";
 import { checkInApplies } from "./arrival-rule.ts";
-import { answerClientQuestion, CLIENT_LIVE_STATUSES, CLIENT_OFF_SCRIPT_SYSTEM, clientWord, clientWordReply, GONE_TO_YAADLY, type LiveJob, nothingApproved, readsAsProblem } from "./client-lane.ts";
+import { answerClientQuestion, CLIENT_LIVE_STATUSES, CLIENT_OFF_SCRIPT_SYSTEM, clientWord, clientWordReply, declineReply, GONE_TO_YAADLY, isStop, type LiveJob, nothingApproved, readsAsProblem } from "./client-lane.ts";
 import { clockAnswer, needsAPerson, OFF_SCRIPT_CLOSE, OFF_SCRIPT_SYSTEM, screenOffScript } from "./off-script.ts";
 import { replyFromCard } from "./reply-from-card.ts";
 import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
@@ -4533,17 +4533,17 @@ Deno.serve(async (req: Request) => {
           root.setAttributes({ "yaadly.whatsapp_kickoff_confirm.job": kickoffTarget.id, "yaadly.whatsapp_kickoff_confirm.outcome": kErr ? "refused" : "confirmed" });
           if (kErr) return twiml(await refused(kErr, "Job agreement confirm", "Try again in a moment, or say \"talk to a person\"."));
           const row = Array.isArray(kResult) ? kResult[0] : kResult;
-          // The client's own next action has to be spelled out here: found
-          // live, testing this for real - "ready to be chosen" told the
-          // client nothing had gone wrong, but nothing told them what to
-          // do next, and choosing is a second, separate reply with the
-          // same code, not something that happens on its own. Worker
-          // confirmations get no such line: choosing is the client's
-          // action alone, and telling a worker to "reply again to book"
-          // would be false.
+          // The client's own next action has to be spelled out here.
+          // Corrected 1 Oct 2026: this used to tell the client to reply the
+          // code again to book. Since 9 Sep the client's acceptance books
+          // the job on its own (agree_quote_via_whatsapp calls
+          // _do_choose_worker), so the pack is confirmed on a job that is
+          // already booked, and a second reply matched nothing and fell
+          // through to intake. The next thing that happens is the job going
+          // live, the same on both sides.
           if (row?.both_confirmed) {
             return twiml(row.agreed_side === "client"
-              ? `Confirmed. Both sides have signed off on the Kickoff Pack for ${kickoffTarget.title}. Reply ${kickoffTarget.id} again to book them.`
+              ? `Confirmed. You and your tradesperson have both agreed the Kickoff Pack for ${kickoffTarget.title}.\nNothing more is needed from you on it. You get a message here when the job is live.`
               // The worker's side, in plain words (30 Sep 2026): "the job
               // agreement" is the Kickoff Pack, and "ready for the client to
               // choose" described the order before 9 Sep, when the client's
@@ -4675,6 +4675,17 @@ Deno.serve(async (req: Request) => {
             }, trace);
           };
 
+          // NO or STOP on a report waiting (1 Oct 2026). Only when exactly one
+          // of this client's jobs has a report waiting, so it is never a guess.
+          const waitingOn = live.filter((j) => j.status === "evidence");
+          const declined = waitingOn.length === 1 ? declineReply(said, waitingOn[0]) : null;
+          if (declined) {
+            root.setAttributes({ "yaadly.client_lane.outcome": "declined_to_approve", "yaadly.client_lane.job": waitingOn[0].id });
+            // A STOP is one Yaadly should know about, so a person can read
+            // the answer to "what made you stop" as it comes in.
+            if (isStop(said)) await tellYaadly("Client sent STOP on a report", `${waitingOn[0].id}: a client replied STOP on a report waiting for approval and has been asked why.`);
+            return twiml(declined);
+          }
           if (word) {
             root.setAttributes({ "yaadly.client_lane.outcome": `word_${word}` });
             return twiml(clientWordReply(word, live));
@@ -4739,7 +4750,14 @@ Deno.serve(async (req: Request) => {
           // says the worker is paid within seven days of approval. So
           // the old sentence told the client money had moved when it had not,
           // and set the worker up to be asked why it had not arrived.
-          return twiml(`Approved. ${label} of ${target.title} is confirmed and the worker's payment is raised. Nothing else for you to do on this stage.`);
+          // The next step, 1 Oct 2026 (founder: "it should be clear what the
+          // client should do next"). Read after the approval, so a final
+          // stage already shows the job complete.
+          const { data: after } = await supabase.from("jobs").select("status").eq("id", target.id).maybeSingle();
+          const next = after?.status === "complete"
+            ? "Next: your tradesperson signs the Completion Report, and it comes to you here to read and keep."
+            : "Next: nothing is needed from you. You hear here when your tradesperson sends the next report.";
+          return twiml(`Approved. ${label} of ${target.title} is confirmed and the worker's payment is raised.\n${next}`);
         }
 
         // Not a code, and exactly one job is waiting on this client's

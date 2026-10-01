@@ -37,6 +37,7 @@ const SUMMARY: Record<string, string | null> = {
   stage_signed_off_worker: "the client has signed off a stage. You are paid for it by bank transfer within 7 days. The next stage is on the job",
   worker_requested: "a client has asked for you by name",
   dispute_raised_worker: "the client has raised something about the work",
+  dispute_stepped_in_worker: "Yaadly has stepped in on the problem the client raised. Give your side on the job",
   materials_sent_worker: "Yaadly has sent you the materials money",
   worker_paid: "Yaadly has sent you a payment",
   walkthrough_requested: "the client has asked for a video walkthrough",

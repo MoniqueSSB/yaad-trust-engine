@@ -213,7 +213,7 @@ export async function raiseDispute(
     job_id: jobId, raised_by: (user.email ?? "").toLowerCase(),
     /* Founder, 30 Sep 2026: "it goes to the worker to solve, only when
        there is no resolve then it comes to me". Opens direct: the worker
-       replies, the client closes it or brings Yaadly in, and two days with
+       replies, the client closes it or brings Yaadly in, and 48 hours with
        no reply escalates on its own (20260930130000). This reverses the 28
        September rule that opened every dispute with Yaadly. */
     kinds: kinds.slice(0, 6), body: clean, state: "direct",

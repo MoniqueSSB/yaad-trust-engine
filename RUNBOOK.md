@@ -6583,3 +6583,18 @@ curl -s -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-crm-s
 2. Deploy from disk, main checked out and fetched: `yaad-inbound` (keeps `--no-verify-jwt`), `yaad-notify-client` (keeps `--no-verify-jwt`), `yaad-daily-checkin`, `yaad-job-health`, `yaad-desk-message`, `yaad-desk-reply`, `yaad-match`, `yaad-enquiry`, `yaad-portal-code`, `yaad-twilio-setup`. Read `supabase functions list` first and preserve each function's live `verify_jwt`; `_shared/twilio-status.ts` changed, so every function carrying a copy is in the list.
 3. A worker message held back because the worker has not written in 24 hours and no approved template exists is recorded as a failed delivery (code 63016) on the desk's "Did it arrive" page, and goes by SMS or email where the code has one. If a worker says they never heard, look there first.
 4. Templates in §61 switch on one at a time as Meta approves them; until then the fallbacks in step 3 apply.
+
+## 63. Client WhatsApp review and the 48 hour dispute rule (1 Oct 2026)
+
+The client lane now names every choice and ends every message with what happens next. Photos on a stage report arrive one message each, captioned with their label. NO or STOP on a waiting report holds it and nothing is approved; STOP also asks why and tells the desk. Service bookings reach WhatsApp outside the 24 hour window through the approved update template.
+
+Disputes run on 48 hours, checked every five minutes. No worker reply in 48 hours: Yaadly steps in and both sides are told. Worker replied, client silent for 48 hours: the client is chased once. Still silent 48 hours later: Yaadly steps in and both sides are told. The timer never closes a dispute.
+
+**To switch it on:** apply `20261001120000` (wrapped, `supabase db query --linked --project-ref leffyisvfvjwzilydlwf -f <file>`), then deploy `yaad-inbound` and `yaad-notify-client` from main with `--no-verify-jwt`, then deploy the app and let Pages publish `docs/`.
+
+**When something is wrong.**
+
+1. **Nothing happened at 48 hours:** `select jobname, schedule, active from cron.job where jobname = 'yaad-dispute-escalation';` must show `*/5 * * * *`.
+2. **A dispute moved but nobody was told:** `select id, state, escalated_by, replied_at, client_chased_at from disputes order by updated_at desc limit 5;`. `escalated_by` must be set for the parties to be told; a client's own NOT FIXED leaves it empty, and that path tells only the desk, as before.
+3. **"That is set by Yaadly":** a party tried to write `escalated_by` or `client_chased_at`. Only the timer writes them.
+4. **The client got the photos without labels:** the report went outside the 24 hour window as a template, which carries no photos. The Evidence tab has them.
