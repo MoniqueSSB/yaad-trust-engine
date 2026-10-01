@@ -1885,14 +1885,17 @@ Deno.serve(async (req: Request) => {
       const reportLabel = await stageLabel(admin, jobId, job.stage ?? 1);
       const workerSays = overrideText || `Photos have come in for ${reportLabel} of your job, ${job.title}.`;
       const aiSays = aiSummary ? `AI noticed: ${aiSummary}` : null;
-      const itemsLine = photoUrls.length > 1
-        ? `Items: ${photoUrls.map(itemCode).join(", ")}. Mention a code if your comment is about one specific photo.`
-        : null;
+      // The "Items: P1, P2. Mention a code..." line was taken out on 1 Oct
+      // 2026. The founder read it and could not tell what it meant, and the
+      // photos arrive on WhatsApp with no label on them, so a client had no
+      // way to know which one was P2. A client now says which photo in their
+      // own words. A code typed anyway is still matched (pickEvidenceItem).
+      const itemsLine = null;
       // 1 Oct 2026, founder: "it should be clear what the client should do
       // next." The two replies that do something are named, and so is the
       // fact that nothing is approved without the code.
       const actionHint = clientPhone
-        ? `Next, reply here with one of these:\n1. Approve: send only the code ${job.id}.\n2. Not right, or a question: say it in your own words and it goes to your tradesperson.\nNothing is approved until you send the code. The report is also on your job:`
+        ? `Next, reply here with one of these:\n1. Approve: send only the code ${job.id}.\n2. Not right, or a question: say it in your own words, and say which photo if it is about one, for example "the photo of the back wall". It goes to your tradesperson.\nNothing is approved until you send the code. The report is also on your job:`
         : "Next: look at the report, then approve it or say what is not right, on your job:";
       line = [workerSays, aiSays, itemsLine, `${actionHint} ${roomLink}`].filter(Boolean).join("\n\n");
 
