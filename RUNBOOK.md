@@ -24,6 +24,21 @@ Run it locally first. Then read which job failed on GitHub.
 
 ---
 
+## 1a. Main will not let you merge, or a push to main is refused
+
+Since 1 October 2026 the repository is private and `main` is protected. That is working as intended, not a fault. The rules, set in GitHub under Settings, Branches:
+
+- Every change reaches `main` through a pull request. A direct `git push` to `main` is refused, from any session, because every Claude session uses Monique's login and the rule applies to her too ("Do not allow bypassing").
+- The merge button stays locked until these eight CI checks pass: Engine tests (Python 3.11), Engine tests (Python 3.12), Edge Function typecheck, Web app (typecheck and tests), Admin desk script, New migrations sort last, Job taxonomy has not drifted, No secrets committed.
+- No approval is required, because GitHub will not let you approve your own pull request. Monique's merge click is the gate.
+- `main` cannot be deleted or force pushed.
+
+If a merge is locked, read which check is red and go to §1. Do not switch the protection off to get something through: fix the change.
+
+**If you rename a CI job in `.github/workflows/ci.yml`, update the required checks in the same change.** GitHub waits for a check by its exact name, so a renamed job leaves every pull request stuck at "Expected, waiting for status to be reported" forever. Read the current list with `gh api repos/MoniqueSSB/yaad-trust-engine/branches/main/protection --jq '[.required_status_checks.checks[].context]'`.
+
+---
+
 ## 2. The demo will not run
 
 ```bash
@@ -91,6 +106,8 @@ Rollback: redeploy the previous commit. Cloudflare also keeps prior Worker versi
 ## 5. The marketing site at yaadly.co.uk is down
 
 It is GitHub Pages serving `docs/` with `docs/CNAME` set to `yaadly.co.uk`. It has no build step, so a broken app deploy cannot take it down. If it is down, the cause is DNS, the CNAME file, or the Pages setting in the repository, in that order.
+
+**The site depends on GitHub Pro.** Since 1 October 2026 the repository is private, and GitHub only serves Pages from a private repository on a paid plan. If the Pro subscription lapses, Pages stops and the site goes down with no change to DNS or code. Check the plan at github.com/settings/billing before anything else.
 
 Before touching DNS, check the Cloudflare record still exists and note what it was. If GitHub's own "Enforce HTTPS" is on while the record is proxied through Cloudflare, you get a redirect loop: Cloudflare SSL on Full (strict) and Enforce HTTPS off is the combination that works.
 
