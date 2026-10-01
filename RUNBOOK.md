@@ -6598,3 +6598,14 @@ Disputes run on 48 hours, checked every five minutes. No worker reply in 48 hour
 2. **A dispute moved but nobody was told:** `select id, state, escalated_by, replied_at, client_chased_at from disputes order by updated_at desc limit 5;`. `escalated_by` must be set for the parties to be told; a client's own NOT FIXED leaves it empty, and that path tells only the desk, as before.
 3. **"That is set by Yaadly":** a party tried to write `escalated_by` or `client_chased_at`. Only the timer writes them.
 4. **The client got the photos without labels:** the report went outside the 24 hour window as a template, which carries no photos. The Evidence tab has them.
+
+## 64. Client and worker WhatsApp kept in step (1 Oct 2026)
+
+Every client message now has its worker counterpart saying the same thing. New for the client: `job_live` (the job is live, fired with `job_live_worker`) and `stage_paid` (a stage bill is paid, fired with `stage_paid_worker`). After an approval on a job billed by stage, both sides are told the next stage waits for its bill. When a client sends NO or STOP on a report, the worker is told; on STOP, not to start the next stage. A worker's dispute message says reply within 48 hours, which is what the timer counts.
+
+**To switch it on, in this order:** merge, deploy `yaad-notify-client` and `yaad-inbound` from main with `--no-verify-jwt`, then apply `20261001130000`. Applying first would send the two new kinds to a function that does not know them yet.
+
+**When something is wrong.**
+
+1. **The client was not told the job is live:** `select tgname from pg_trigger where tgname = 'trg_notify_client_job_live';` must return one row.
+2. **The worker was not told of a NO or STOP:** it goes as plain WhatsApp, so outside the worker's 24 hour window it fails after sending. The desk is told of every STOP.

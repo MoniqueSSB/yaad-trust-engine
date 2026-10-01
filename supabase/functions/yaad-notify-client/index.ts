@@ -54,7 +54,7 @@ import * as guardrails from "./guardrails.ts";
 import { checkAttrs, deskPack, runEvidenceChecks } from "./evidence-checks.ts";
 import { bookedPayLine, completionReportWorkerCopy, stagePaidWorkerText, workerEvidenceLines } from "./worker-copy.ts";
 import { checkInApplies } from "./arrival-rule.ts";
-import { bookedPaymentLines, clientSummaryVars, clientTemplateSummary, clientUpdateVars, quoteChoices } from "./client-template.ts";
+import { bookedPaymentLines, clientJobLive, clientStagePaid, clientSummaryVars, clientTemplateSummary, clientUpdateVars, nextAfterApproval, quoteChoices } from "./client-template.ts";
 import { recordAccepted, recordNotSent, type SendMeta, withMessagingService, withStatusCallback } from "./twilio-status.ts";
 import { hasWorkerTemplateDecision, insideWindow, samePhoneDigits, templateVar, WINDOW_MS, workerTemplateSummary } from "./worker-template.ts";
 import { approvedTemplateSid, lastInboundInWindow } from "./wa-window.ts";
@@ -80,7 +80,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "stage_signed_off_worker", "stage_paid_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied", "dispute_stepped_in", "dispute_stepped_in_worker", "dispute_chase_client"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "stage_signed_off_worker", "stage_paid_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied", "dispute_stepped_in", "dispute_stepped_in_worker", "dispute_chase_client", "job_live", "stage_paid"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -1517,8 +1517,8 @@ Deno.serve(async (req: Request) => {
       // down: a tradesperson with a full diary is not a failure and Yaadly
       // is not in the business of reporting on one to the other side.
       subject = `${job.title} is going out to more workers`;
-      line = `The worker you asked for on ${job.id} (${job.title}) cannot take it on right now, so it has gone out to the rest of the vetted network in ${job.parish ?? "your parish"} today. ` +
-        `Prices will start reaching you the same way. Nothing about your job has changed and you have not lost your place.`;
+      line = `The tradesperson you asked for on ${job.id} (${job.title}) cannot take it on right now, so it has gone out to the rest of the vetted network in ${job.parish ?? "your parish"} today. ` +
+        `Prices will start reaching you the same way. Nothing about your job has changed and you have not lost your place.\n\nNext: nothing is needed from you. Each price comes to you here.`;
     } else if (kind === "worker_requested") {
       // A client read this worker's profile and asked for them by name. The
       // whole point of the message is the clock: they have first refusal for
@@ -1626,6 +1626,33 @@ Deno.serve(async (req: Request) => {
       const paidLabel = await stageLabel(admin, jobId, paidStage);
       subject = `${paidLabel} is paid: ${job.title}`;
       line = stagePaidWorkerText(String(job.id), String(job.title ?? "your job"), paidLabel, roomLink);
+    } else if (kind === "job_live" || kind === "stage_paid") {
+      // The client's half of job_live_worker and stage_paid_worker, 1 Oct
+      // 2026 (client-template.ts). Fired by the same moments
+      // (20261001130000) and checked off the rows the same way, so a stray
+      // call cannot tell a client work has started when it has not.
+      if (!["in_progress", "evidence"].includes(String(job.status ?? "")) || !job.worker_email) {
+        root.setAttributes({ "yaadly.notify.outcome": "job_not_live" });
+        return json({ ok: true, kind, told: false, reason: "That job is not live with a tradesperson on it." });
+      }
+      if (kind === "job_live") {
+        const firstStage = Math.max(Number(job.stage ?? 0), 1);
+        const firstLabel = await stageLabel(admin, jobId, firstStage);
+        subject = `Your job is live: ${job.title}`;
+        line = clientJobLive(String(job.id), String(job.title ?? "Your job"), firstLabel, await stageBillPaid(admin, jobId, firstStage), roomLink);
+      } else {
+        const { data: inv } = await admin.from("invoices")
+          .select("id, status, stage, addon_id, part_of, starts_job")
+          .eq("id", String(meta.invoiceId ?? "")).eq("job_id", jobId).maybeSingle();
+        const paidStage = Number(inv?.stage ?? 0);
+        if (!inv || inv.status !== "paid" || paidStage < 1 || inv.addon_id || inv.part_of || inv.starts_job || paidStage !== Number(job.stage ?? 0)) {
+          root.setAttributes({ "yaadly.notify.outcome": "stage_paid_not_current" });
+          return json({ ok: true, kind, told: false, reason: "Not the stage being worked on a live job." });
+        }
+        const paidLabel = await stageLabel(admin, jobId, paidStage);
+        subject = `${paidLabel} is paid: ${job.title}`;
+        line = clientStagePaid(String(job.id), String(job.title ?? "Your job"), paidLabel);
+      }
     } else if (kind === "worker_paid") {
       // 14 Sep 2026. Fires when a person on the desk marks a worker's pay
       // invoice paid (mark_worker_paid, 20260914230000), after paying it from
@@ -1976,7 +2003,8 @@ Deno.serve(async (req: Request) => {
         : [
             `Your message about ${job.title} has gone to your tradesperson.`,
             `They reply within ${DISPUTE_HOURS} hours.`,
-            `Sorted? Say so on the job. Not fixed? Bring Yaadly in there: ${roomLink}`,
+            `Sorted? Reply SORTED ${job.id}, or say so on the job.`,
+            `Not fixed? Reply NOT FIXED ${job.id}, or bring Yaadly in on the job: ${roomLink}`,
             `Nothing on the job is approved until it is sorted.`,
           ].join("\n");
     } else if (kind === "dispute_raised_worker") {
@@ -2124,7 +2152,7 @@ Deno.serve(async (req: Request) => {
         if (!r) return json({ error: "No report on this job." }, 404);
         what = "a Completion Report was held";
         pushTitle = "Yaadly: a Completion Report was held";
-        detail = (limit) => `The Completion Report on ${title}, signed by ${r.worker_signed_name || "the worker"}, was held before it reached the client.\n\n` +
+        detail = (limit) => `The Completion Report on ${title}, signed by ${r.worker_signed_name || "your tradesperson"}, was held before it reached the client.\n\n` +
           `The screen found: ${clip(String(r.hold_reason ?? ""), limit)}\n\n` +
           `On the desk under Completion reports: release it unchanged, or send it back to the worker with your reason.`;
       } else {
@@ -2164,15 +2192,21 @@ Deno.serve(async (req: Request) => {
         .select("stage, approved_at")
         .eq("job_id", jobId).order("approved_at", { ascending: false }).limit(1).maybeSingle();
       subject = `Confirmed: stage ${approval?.stage ?? ""} approved`;
+      // In step with stage_signed_off_worker (1 Oct 2026): on a job billed by
+      // stage, the next stage waits for its bill.
+      const nextStageNum = Number(approval?.stage ?? 0) + 1;
+      const { data: bmode } = await admin.from("job_quotes").select("billing_mode")
+        .eq("job_id", jobId).eq("status", "accepted").limit(1).maybeSingle();
+      const byStageJob = bmode?.billing_mode === "by_stage";
+      const nextStagePaid = byStageJob ? await stageBillPaid(admin, jobId, nextStageNum) : true;
+      const nextLabelText = await stageLabel(admin, jobId, nextStageNum);
       line = `You approved stage ${approval?.stage ?? ""} of ${job.title}. ` +
         // "The worker is paid for it" until 29 Sep 2026, which was not true
         // when it was sent: approving raises the worker's payable, and a
         // named person at Yaadly pays it afterwards. The WhatsApp reply to
         // the same approval was corrected on 4 Sep; this one was missed.
-        `Your approval is recorded and the worker's payment is raised with Yaadly. ${roomLink}\n\n` +
-        (job.status === "complete"
-          ? `Next: your tradesperson signs the Completion Report, and it comes to you here to read and keep.`
-          : `Next: nothing is needed from you. You hear here when your tradesperson sends the next report.`);
+        `Your approval is recorded and your tradesperson's payment is raised with Yaadly. ${roomLink}\n\n` +
+        nextAfterApproval(job.status === "complete", byStageJob, nextLabelText, nextStagePaid);
 
       // The Yaad Report offer that sat here (Stage 7, convert at handover)
       // was taken out on 1 Oct 2026, founder's instruction to fix it. It
@@ -2312,7 +2346,7 @@ Deno.serve(async (req: Request) => {
         `${roomLink}/completion\n\nNothing more is needed from you on this job.`;
     } else if (kind === "walkthrough_notes_ready") {
       subject = `Notes from your video walkthrough: ${job.title}`;
-      line = `The worker has written up what came out of your video walkthrough on ${job.title}. ` +
+      line = `Your tradesperson has written up what came out of your video walkthrough on ${job.title}. ` +
         `Read them and confirm they are accurate here: ${roomLink}`;
     } else if (kind === "evidence_comment") {
       // The one kind in this file that tells the worker, not the client.
@@ -2370,7 +2404,7 @@ Deno.serve(async (req: Request) => {
         // 2026. Yaadly holds nobody's money (CLAUDE.md section 8), and no
         // single word in that sentence is on the banned list, so the screen
         // could not see it.
-        (workerReached ? `We have messaged the worker directly to check in. ` : `Yaadly is following it up with the worker. `) +
+        (workerReached ? `We have messaged your tradesperson directly to check in. ` : `Yaadly is following it up with your tradesperson. `) +
         `Nothing about what you have paid or what you owe has changed, and you can raise anything here: ${roomLink}\n\n` +
         `Next: nothing is needed from you. You hear here when there is an update.`;
     } else if (kind.startsWith("addon_")) {

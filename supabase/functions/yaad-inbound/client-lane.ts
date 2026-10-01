@@ -68,7 +68,9 @@ export function whereItStands(job: LiveJob): string {
     case "evidence":
       return `${name} has a report waiting for you. Nothing has been approved. To approve it, reply with only the code ${job.id}. If something is not right, say what, and it goes to your tradesperson or to Yaadly.`;
     case "disputed":
-      return `${name} has a problem open with Yaadly and a person is looking at it. Nothing on the job can be approved while it is open.`;
+      // Corrected 1 Oct 2026: a problem sits with the tradesperson first and
+      // comes to Yaadly only when it is not sorted (dispute-lane.ts).
+      return `${name} has a problem open. Your tradesperson sorts it first, and Yaadly steps in if it is not sorted. Nothing on the job can be approved while it is open.`;
     default:
       return `${name} is on record with Yaadly. Nothing is needed from you right now.`;
   }
@@ -232,3 +234,20 @@ export function nothingApproved(job: { id: string }): string {
 
 export const GONE_TO_YAADLY =
   "That has gone to Yaadly, and a person will come back to you here. It has not been sent to your tradesperson. Nothing on the job is approved in the meantime.";
+
+/** What comes after an approval, in step with the worker's own message
+ *  (stage_signed_off_worker). Kept the same as nextAfterApproval in
+ *  yaad-notify-client/client-template.ts; client-lane_test.ts reads both. */
+export function nextAfterApproval(final: boolean, byStage: boolean, nextLabel: string, nextPaid: boolean): string {
+  if (final) return "Next: your tradesperson signs the Completion Report, and it comes to you here to read and keep.";
+  if (!byStage || nextPaid) return "Next: nothing is needed from you. You hear here when your tradesperson sends the next report.";
+  return `Next: Yaadly sends the bill for ${nextLabel}. Your tradesperson starts it once it is paid, and you hear here when they do.`;
+}
+
+/** To the worker, when the client says NO or STOP on their report. The
+ *  worker was told "you hear here when they do"; this is that. */
+export function workerToldOfHold(jobId: string, title: string, stop: boolean): string {
+  return stop
+    ? `${jobId} (${title}): the client has asked to hold. Your report is not approved yet, so do not start the next stage. Yaadly has asked them why, and you hear here what they say.`
+    : `${jobId} (${title}): the client has looked at your report and has not approved it yet. Nothing is needed from you for now. If they say what is not right, it comes to you here.`;
+}

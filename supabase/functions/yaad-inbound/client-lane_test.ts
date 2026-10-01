@@ -133,3 +133,23 @@ Deno.test("NO with no report waiting, or inside a sentence, is left to the other
   assertEquals(declineReply("no the tiles are cracked", job("evidence")), null);
   assertEquals(declineReply("JOB-WEB-1", job("evidence")), null);
 });
+
+// In step with the worker, 1 Oct 2026.
+import { nextAfterApproval, workerToldOfHold } from "./client-lane.ts";
+import { nextAfterApproval as notifyNext } from "../yaad-notify-client/client-template.ts";
+
+Deno.test("what comes after an approval says the same in both functions, and matches the worker's rule", () => {
+  const cases: [boolean, boolean, string, boolean][] = [[true, false, "Stage 3", false], [false, false, "Stage 3", false], [false, true, "Stage 3", true], [false, true, "Stage 3", false]];
+  for (const [a, b, c, d] of cases) assertEquals(nextAfterApproval(a, b, c, d), notifyNext(a, b, c, d));
+  // By stage and unpaid: the client is told the bill comes first, as the worker is.
+  assert(/bill for Stage 3/.test(nextAfterApproval(false, true, "Stage 3", false)));
+  assert(/Completion Report/.test(nextAfterApproval(true, true, "x", false)));
+});
+
+Deno.test("the worker hears NO and STOP, and STOP says not to start the next stage", () => {
+  const stop = workerToldOfHold("JOB-WEB-1", "Roof", true);
+  const no = workerToldOfHold("JOB-WEB-1", "Roof", false);
+  assert(/do not start the next stage/.test(stop) && /asked them why/.test(stop), stop);
+  assert(/Nothing is needed from you/.test(no), no);
+  for (const t of [stop, no]) { assertEquals(guardrails.scan(t).length, 0, t); assert(!/[–—]/.test(t), t); }
+});
