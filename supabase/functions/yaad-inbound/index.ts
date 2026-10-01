@@ -26,7 +26,7 @@ import { inboundText, wasTapped } from "./button-tap.ts";
 import { acknowledgementReply, answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith } from "./worker-question.ts";
 import { ARRIVAL_HOLD_MS, arrivalAsk, arrivalAskLapsed, arrivalStillWanted, cannotCheckIn, CHECK_IN_BEFORE_YOU_LEAVE, isPin, isSkip, saysCheckedIn } from "./arrival-ask.ts";
 import { checkInApplies } from "./arrival-rule.ts";
-import { answerClientQuestion, CLIENT_LIVE_STATUSES, CLIENT_OFF_SCRIPT_SYSTEM, clientWord, clientWordReply, GONE_TO_YAADLY, type LiveJob, nothingApproved, readsAsProblem } from "./client-lane.ts";
+import { answerClientQuestion, CLIENT_LIVE_STATUSES, CLIENT_OFF_SCRIPT_SYSTEM, clientWord, clientWordReply, declineReply, GONE_TO_YAADLY, type LiveJob, nothingApproved, readsAsProblem } from "./client-lane.ts";
 import { clockAnswer, needsAPerson, OFF_SCRIPT_CLOSE, OFF_SCRIPT_SYSTEM, screenOffScript } from "./off-script.ts";
 import { replyFromCard } from "./reply-from-card.ts";
 import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
@@ -4675,6 +4675,14 @@ Deno.serve(async (req: Request) => {
             }, trace);
           };
 
+          // NO or STOP on a report waiting (1 Oct 2026). Only when exactly one
+          // of this client's jobs has a report waiting, so it is never a guess.
+          const waitingOn = live.filter((j) => j.status === "evidence");
+          const declined = waitingOn.length === 1 ? declineReply(said, waitingOn[0]) : null;
+          if (declined) {
+            root.setAttributes({ "yaadly.client_lane.outcome": "declined_to_approve", "yaadly.client_lane.job": waitingOn[0].id });
+            return twiml(declined);
+          }
           if (word) {
             root.setAttributes({ "yaadly.client_lane.outcome": `word_${word}` });
             return twiml(clientWordReply(word, live));

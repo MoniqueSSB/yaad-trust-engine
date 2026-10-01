@@ -102,3 +102,29 @@ Deno.test("the model is told to leave this job, its price and its progress to a 
   assert(/this particular job, its price, its progress, when it will finish/.test(CLIENT_OFF_SCRIPT_SYSTEM));
   assert(!/[–—]/.test(CLIENT_OFF_SCRIPT_SYSTEM));
 });
+
+// 1 Oct 2026, founder: NO, and STOP, when a client does not want to approve.
+import { declineReply } from "./client-lane.ts";
+
+Deno.test("NO on a waiting report says nothing was approved and what to do next", () => {
+  for (const said of ["no", "NO", "nope", "not yet", "hold on", "don't approve", "noo"]) {
+    const r = declineReply(said, job("evidence"));
+    assert(r && r.includes("Nothing has been approved on JOB-WEB-1"), said);
+    assert(/Next:/.test(r!) && /send only the code JOB-WEB-1/.test(r!), said);
+    assertEquals(guardrails.scan(r!).length, 0, r!);
+    assert(!/[–—]/.test(r!), r!);
+  }
+});
+
+Deno.test("STOP is answered as nothing approved, and says how to stop the messages", () => {
+  const r = declineReply("stop", job("evidence"))!;
+  assert(r.includes("Nothing has been approved"));
+  assert(/stop these WhatsApp messages/.test(r) && r.includes("tab=details"));
+  assert(!/stop these WhatsApp messages/.test(declineReply("no", job("evidence"))!));
+});
+
+Deno.test("NO with no report waiting, or inside a sentence, is left to the other lanes", () => {
+  assertEquals(declineReply("no", job("in_progress")), null);
+  assertEquals(declineReply("no the tiles are cracked", job("evidence")), null);
+  assertEquals(declineReply("JOB-WEB-1", job("evidence")), null);
+});

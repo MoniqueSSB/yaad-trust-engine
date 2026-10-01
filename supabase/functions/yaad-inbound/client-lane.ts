@@ -106,6 +106,39 @@ export function clientWordReply(word: Exclude<ClientWord, null>, jobs: LiveJob[]
   return `${lead}You have ${jobs.length} jobs with Yaadly: ${jobs.map((j) => j.id).join(", ")}. Say which one you mean, or open them in your portal: https://app.yaadly.co.uk/portal`;
 }
 
+// ── NO, and STOP, on a report waiting for approval ────────────────────────
+//
+// Founder, 1 October 2026: a client who does not want to approve needs a
+// reply that says so. The stage report names NO as the third choice.
+//
+// STOP is answered but never advertised. It is the standard word for leaving
+// a messaging list, and Twilio honours it on the text message fallback, so
+// telling a client to send it could cut them off from every later update.
+// A client who sends it anyway is told nothing was approved, and how to stop
+// the WhatsApp messages if that is what they meant.
+//
+// Runs ahead of clientWord(), which still reads a bare "no" as a stray word
+// on a job with nothing waiting.
+const DECLINE = /^(?:no|nah|nope|not yet|no not yet|no thanks|hold|hold on|wait|stop|don'?t approve|do not approve|not approved|not ready|not happy yet)[.!]*$/i;
+const DECLINE_P = new RegExp(DECLINE.source.replace(/([a-z])\1+/gi, "$1"), DECLINE.flags);
+
+/** The reply to NO or STOP when exactly this job has a report waiting.
+ *  Null for anything else, which then goes on to the lanes below. */
+export function declineReply(text: string, job: LiveJob): string | null {
+  const t = String(text ?? "").trim();
+  if (job.status !== "evidence") return null;
+  if (!DECLINE.test(t) && !DECLINE_P.test(pressDoubledLetters(t))) return null;
+  const lines = [
+    `Understood. Nothing has been approved on ${job.id}.`,
+    `Next: if something is not right, say what in your own words, and which photo if it is about one. It goes to your tradesperson to put right.`,
+    `If you just need more time, nothing more is needed now. The report waits for you. To approve it later, send only the code ${job.id}.`,
+  ];
+  if (/^stop\b/i.test(t)) {
+    lines.push(`If you meant stop these WhatsApp messages, remove your number on the Job details tab: ${PORTAL}${job.id}?tab=details Email updates carry on.`);
+  }
+  return lines.join("\n");
+}
+
 const PROBLEM =
   /\b(?:not happy|unhappy|not satisfied|dissatisfied|not right|not good|no good|not finished|not done|unfinished|wrong|poor|bad job|bad work|shoddy|sloppy|rubbish|terrible|awful|mess|messy|damage\w*|broke|broken|crack\w*|leak\w*|fault\w*|defect\w*|complain\w*|complaint|refund|dispute|rip\w* off|scam\w*|cheat\w*|overcharg\w*|did not turn up|didn'?t turn up|no show|never came|never turned up|stolen|missing|late again|redo|re-do|do it again|put it right|mash up|nuh good|nah good|nuh right)\b/i;
 

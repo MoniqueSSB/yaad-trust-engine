@@ -1895,7 +1895,7 @@ Deno.serve(async (req: Request) => {
       // next." The two replies that do something are named, and so is the
       // fact that nothing is approved without the code.
       const actionHint = clientPhone
-        ? `Next, reply here with one of these:\n1. Approve: send only the code ${job.id}.\n2. Not right, or a question: say it in your own words, and say which photo if it is about one, for example "the photo of the back wall". It goes to your tradesperson.\nNothing is approved until you send the code. The report is also on your job:`
+        ? `Next, reply here with one of these:\n1. Approve: send only the code ${job.id}.\n2. Not right, or a question: say it in your own words, and say which photo if it is about one, for example "the photo of the back wall". It goes to your tradesperson.\n3. Not ready to approve: reply NO. Nothing is approved, and the report waits for you.\nNothing is approved until you send the code. The report is also on your job:`
         : "Next: look at the report, then approve it or say what is not right, on your job:";
       line = [workerSays, aiSays, itemsLine, `${actionHint} ${roomLink}`].filter(Boolean).join("\n\n");
 
