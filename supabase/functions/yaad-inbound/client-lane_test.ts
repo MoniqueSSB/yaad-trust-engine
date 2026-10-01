@@ -116,11 +116,16 @@ Deno.test("NO on a waiting report says nothing was approved and what to do next"
   }
 });
 
-Deno.test("STOP is answered as nothing approved, and says how to stop the messages", () => {
+// Changed the same day on the founder's word: STOP holds the job, it does
+// not mean leave the messages.
+Deno.test("STOP holds the job: nothing approved, nothing moves on", () => {
   const r = declineReply("stop", job("evidence"))!;
-  assert(r.includes("Nothing has been approved"));
-  assert(/stop these WhatsApp messages/.test(r) && r.includes("tab=details"));
-  assert(!/stop these WhatsApp messages/.test(declineReply("no", job("evidence"))!));
+  assert(r.includes("Nothing on JOB-WEB-1 is approved") && /does not move on/.test(r), r);
+  assert(!/WhatsApp messages|tab=details/.test(r), r);
+  // And asks why, so Yaadly understands the stop.
+  assert(/what made you stop\?/.test(r), r);
+  assertEquals(guardrails.scan(r).length, 0, r);
+  assert(!/[–—]/.test(r), r);
 });
 
 Deno.test("NO with no report waiting, or inside a sentence, is left to the other lanes", () => {

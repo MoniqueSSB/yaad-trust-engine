@@ -26,7 +26,7 @@ import { inboundText, wasTapped } from "./button-tap.ts";
 import { acknowledgementReply, answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith } from "./worker-question.ts";
 import { ARRIVAL_HOLD_MS, arrivalAsk, arrivalAskLapsed, arrivalStillWanted, cannotCheckIn, CHECK_IN_BEFORE_YOU_LEAVE, isPin, isSkip, saysCheckedIn } from "./arrival-ask.ts";
 import { checkInApplies } from "./arrival-rule.ts";
-import { answerClientQuestion, CLIENT_LIVE_STATUSES, CLIENT_OFF_SCRIPT_SYSTEM, clientWord, clientWordReply, declineReply, GONE_TO_YAADLY, type LiveJob, nothingApproved, readsAsProblem } from "./client-lane.ts";
+import { answerClientQuestion, CLIENT_LIVE_STATUSES, CLIENT_OFF_SCRIPT_SYSTEM, clientWord, clientWordReply, declineReply, GONE_TO_YAADLY, isStop, type LiveJob, nothingApproved, readsAsProblem } from "./client-lane.ts";
 import { clockAnswer, needsAPerson, OFF_SCRIPT_CLOSE, OFF_SCRIPT_SYSTEM, screenOffScript } from "./off-script.ts";
 import { replyFromCard } from "./reply-from-card.ts";
 import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
@@ -4681,6 +4681,9 @@ Deno.serve(async (req: Request) => {
           const declined = waitingOn.length === 1 ? declineReply(said, waitingOn[0]) : null;
           if (declined) {
             root.setAttributes({ "yaadly.client_lane.outcome": "declined_to_approve", "yaadly.client_lane.job": waitingOn[0].id });
+            // A STOP is one Yaadly should know about, so a person can read
+            // the answer to "what made you stop" as it comes in.
+            if (isStop(said)) await tellYaadly("Client sent STOP on a report", `${waitingOn[0].id}: a client replied STOP on a report waiting for approval and has been asked why.`);
             return twiml(declined);
           }
           if (word) {
