@@ -1494,7 +1494,8 @@ Deno.serve(async (req: Request) => {
         `Yaadly's fee is ${money(feeJmd)}, the 15% Guarantee & Support on the labour.\n\n` +
         `You pay Yaadly, never the tradesperson. Yaadly pays them under its own agreement with them, so they never wait on you.\n\n` +
         bookedPaymentLines(q?.billing_mode === "by_stage", money(feeJmd), matJmd > 0 ? money(matJmd) : null, `${roomLink}?tab=money`) +
-        `\n\nYour approval is what closes each stage with Yaadly, once you have seen the evidence.`;
+        `\n\nYour approval is what closes each stage with Yaadly, once you have seen the evidence.` +
+        `\n\nNext: pay your invoice from the Money tab once it is there. You get a message here when the job is live.`;
     } else if (kind === "quote_not_selected") {
       // Founder, 13 Sep 2026: a worker whose quote closed because somebody
       // else was booked still sees the job, and this tells them so rather
@@ -1887,9 +1888,12 @@ Deno.serve(async (req: Request) => {
       const itemsLine = photoUrls.length > 1
         ? `Items: ${photoUrls.map(itemCode).join(", ")}. Mention a code if your comment is about one specific photo.`
         : null;
+      // 1 Oct 2026, founder: "it should be clear what the client should do
+      // next." The two replies that do something are named, and so is the
+      // fact that nothing is approved without the code.
       const actionHint = clientPhone
-        ? `Reply with the code ${job.id} to approve, or just say what you think and we will pass it to the worker.`
-        : "Review it and reply from your portal.";
+        ? `Next, reply here with one of these:\n1. Approve: send only the code ${job.id}.\n2. Not right, or a question: say it in your own words and it goes to your tradesperson.\nNothing is approved until you send the code. The report is also on your job:`
+        : "Next: look at the report, then approve it or say what is not right, on your job:";
       line = [workerSays, aiSays, itemsLine, `${actionHint} ${roomLink}`].filter(Boolean).join("\n\n");
 
       // For a client outside WhatsApp's 24 hour window (client-template.ts).
@@ -2117,7 +2121,10 @@ Deno.serve(async (req: Request) => {
         // when it was sent: approving raises the worker's payable, and a
         // named person at Yaadly pays it afterwards. The WhatsApp reply to
         // the same approval was corrected on 4 Sep; this one was missed.
-        `Your approval is recorded and the worker's payment is raised with Yaadly. Nothing else to do here: ${roomLink}`;
+        `Your approval is recorded and the worker's payment is raised with Yaadly. ${roomLink}\n\n` +
+        (job.status === "complete"
+          ? `Next: your tradesperson signs the Completion Report, and it comes to you here to read and keep.`
+          : `Next: nothing is needed from you. You hear here when your tradesperson sends the next report.`);
 
       // The Yaad Report offer that sat here (Stage 7, convert at handover)
       // was taken out on 1 Oct 2026, founder's instruction to fix it. It
@@ -2133,8 +2140,8 @@ Deno.serve(async (req: Request) => {
         .eq("job_id", jobId).order("arrived_at", { ascending: false }).limit(1).maybeSingle();
       subject = `On site today: ${job.title}`;
       const arrivalLabel = await stageLabel(admin, jobId, arrival?.stage ?? job.stage ?? 1);
-      line = `Your worker checked in on site today for ${arrivalLabel} of ${job.title}. ` +
-        `Follow along here: ${roomLink}`;
+      line = `Your tradesperson checked in on site today for ${arrivalLabel} of ${job.title}. ` +
+        `Follow along here: ${roomLink}\n\nNext: nothing is needed from you. You hear here when your tradesperson sends a report.`;
     } else if (kind === "walkthrough_requested") {
       // 14 Sep 2026, founder: the worker is told by WhatsApp AND email that
       // a client has asked for a live video walkthrough. Fired by
@@ -2254,7 +2261,7 @@ Deno.serve(async (req: Request) => {
       subject = `Your Completion Report: ${job.title}`;
       line = `The Completion Report for ${job.title} is ready, signed by ${r.worker_signed_name || "the worker"}. ` +
         `Keep it with the house papers. If anything in it is wrong or missing, there is a button at the bottom to raise it: ` +
-        `${roomLink}/completion`;
+        `${roomLink}/completion\n\nNothing more is needed from you on this job.`;
     } else if (kind === "walkthrough_notes_ready") {
       subject = `Notes from your video walkthrough: ${job.title}`;
       line = `The worker has written up what came out of your video walkthrough on ${job.title}. ` +
@@ -2316,7 +2323,8 @@ Deno.serve(async (req: Request) => {
         // single word in that sentence is on the banned list, so the screen
         // could not see it.
         (workerReached ? `We have messaged the worker directly to check in. ` : `Yaadly is following it up with the worker. `) +
-        `Nothing about what you have paid or what you owe has changed, and you can raise anything here: ${roomLink}`;
+        `Nothing about what you have paid or what you owe has changed, and you can raise anything here: ${roomLink}\n\n` +
+        `Next: nothing is needed from you. You hear here when there is an update.`;
     } else if (kind.startsWith("addon_")) {
       // Extra work on a booked job (20260928235000). The trigger sends only
       // the add-on id and the revision it fired on; every word below is read
@@ -2371,7 +2379,7 @@ Deno.serve(async (req: Request) => {
       } else if (kind === "addon_agreed") {
         subject = `Extra work agreed: ${title}`;
         line = `On ${title}, you and your tradesperson have agreed the extra work: "${scope.slice(0, 200)}".\n\n` +
-          `Yaadly will send you its invoice for ${money(first + Math.round(first * 0.15))}${halves ? ", the first half" : ""}. Once it is paid the extra work can start. Your original job bill does not change.\n\n${extraLink}`;
+          `Yaadly will send you its invoice for ${money(first + Math.round(first * 0.15))}${halves ? ", the first half" : ""}. Once it is paid the extra work can start. Your original job bill does not change.\n\n${extraLink}\n\nNext: pay that invoice from the Money tab of your job once it is there.`;
       } else if (kind === "addon_agreed_worker") {
         subject = `Extra work agreed: ${title}`;
         line = [

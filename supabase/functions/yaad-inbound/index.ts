@@ -4739,7 +4739,14 @@ Deno.serve(async (req: Request) => {
           // says the worker is paid within seven days of approval. So
           // the old sentence told the client money had moved when it had not,
           // and set the worker up to be asked why it had not arrived.
-          return twiml(`Approved. ${label} of ${target.title} is confirmed and the worker's payment is raised. Nothing else for you to do on this stage.`);
+          // The next step, 1 Oct 2026 (founder: "it should be clear what the
+          // client should do next"). Read after the approval, so a final
+          // stage already shows the job complete.
+          const { data: after } = await supabase.from("jobs").select("status").eq("id", target.id).maybeSingle();
+          const next = after?.status === "complete"
+            ? "Next: your tradesperson signs the Completion Report, and it comes to you here to read and keep."
+            : "Next: nothing is needed from you. You hear here when your tradesperson sends the next report.";
+          return twiml(`Approved. ${label} of ${target.title} is confirmed and the worker's payment is raised.\n${next}`);
         }
 
         // Not a code, and exactly one job is waiting on this client's
