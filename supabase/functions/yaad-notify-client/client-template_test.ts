@@ -55,8 +55,14 @@ Deno.test("the body the client summaries ride in names no role", () => {
 });
 
 Deno.test("a kind with no summary is not sent as a template", () => {
-  assertEquals(clientTemplateSummary("service_booked"), null);
+  // service_booked was the other example here until 1 Oct 2026, when the
+  // founder asked for service bookings to reach WhatsApp outside the window
+  // too. It now has a summary, asserted below; a worker kind still has none.
   assertEquals(clientTemplateSummary("booked_worker"), null);
+});
+
+Deno.test("service bookings have a line for outside the window", () => {
+  for (const k of ["service_booked", "service_confirmed", "service_live"]) assert(clientTemplateSummary(k), k);
 });
 
 // 1 Oct 2026, founder: the price message names three choices, and the booked

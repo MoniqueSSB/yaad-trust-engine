@@ -64,7 +64,7 @@ import { addonPdfUrl } from "./addon-link.ts";
 import { screenOwnWords } from "./own-words.ts";
 import { captionsLine, namedNextStep, noCaptionPrompt, plainDraft, reportSentReceipt, unearnedClaims, usableCaptions } from "./report-draft.ts";
 import { acceptedForClient, acceptedForWorker, offerForClient, PLATFORM_LABEL as WALK_PLATFORM } from "./walkthrough-offer.ts";
-import { DISPUTE_DAYS, problemForWorker, replyForClient } from "./dispute-lane.ts";
+import { DISPUTE_HOURS, problemForWorker, replyForClient } from "./dispute-lane.ts";
 import { applyLink, CHECK_REMINDER_SUBJECT, checkReminderText, jobDelayedWorkerText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -1975,7 +1975,7 @@ Deno.serve(async (req: Request) => {
           ].join("\n")
         : [
             `Your message about ${job.title} has gone to your tradesperson.`,
-            `They reply within ${DISPUTE_DAYS} days.`,
+            `They reply within ${DISPUTE_HOURS} hours.`,
             `Sorted? Say so on the job. Not fixed? Bring Yaadly in there: ${roomLink}`,
             `Nothing on the job is approved until it is sorted.`,
           ].join("\n");
@@ -2539,7 +2539,11 @@ Deno.serve(async (req: Request) => {
     // there is one, and otherwise the approved update template with one true
     // line about what happened. Inside the window nothing changes.
     let clientTemplate: { sid: string; vars: Record<string, string> } | undefined;
-    if (recipientPhone && job && recipientPhone !== workerPhone && !workerTemplate) {
+    // Service bookings too, 1 Oct 2026: they carry no job, so the booking's
+    // own type and reference stand in for the title and code.
+    const tplTitle = isService ? String(svc?.type ?? "") : String(job?.title ?? "");
+    const tplId = isService ? String(svc?.id ?? "") : String(job?.id ?? "");
+    if (recipientPhone && (job || isService) && recipientPhone !== workerPhone && !workerTemplate) {
       // Only the kinds written for a client. A desk alert also sets a
       // template and keeps the order it was given, untouched by this.
       const summary = clientTemplateSummary(kind);
@@ -2558,7 +2562,7 @@ Deno.serve(async (req: Request) => {
               try { sid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { sid = String(st?.value ?? ""); }
             }
             if (/^HX[0-9a-f]{32}$/i.test(sid)) {
-              clientTemplate = { sid, vars: clientSummaryVars(String(job.title ?? ""), job.id, summary, roomLink) };
+              clientTemplate = { sid, vars: clientSummaryVars(tplTitle, tplId, summary, kind === "service_booked" ? codeLink : roomLink) };
             }
           }
         }

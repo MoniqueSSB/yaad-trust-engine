@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { closedReply, DISPUTE_DAYS, problemForWorker, problemSent, readDisputeClose, replyForClient, replySent } from "./dispute-lane.ts";
+import { closedReply, DISPUTE_DAYS, DISPUTE_HOURS, problemForWorker, problemSent, readDisputeClose, replyForClient, replySent } from "./dispute-lane.ts";
 
 const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
 const JOB = "JOB-WEB-1789253807959";
@@ -27,7 +27,7 @@ Deno.test("every message is short lines, names the next step, and promises nothi
     for (const line of t.split("\n")) assert(line.length <= 120, `long line: ${line}`);
     assert(!/refund|compensation|you will be paid|guarantee|removed|penalt/i.test(t), t);
   }
-  assert(problemForWorker("J", "K", "x", "l").includes(`${DISPUTE_DAYS} days`) && problemSent("J", "x").includes(`${DISPUTE_DAYS} days`), "the two days are said to both sides");
+  assert(problemForWorker("J", "K", "x", "l").includes(`${DISPUTE_HOURS} hours`) && problemSent("J", "x").includes(`${DISPUTE_HOURS} hours`), "the 48 hours are said to both sides (founder, 1 Oct 2026: say 48 hours)");
   assert(problemSent("JOB-1", "x").includes("SORTED JOB-1") && problemSent("JOB-1", "x").includes("NOT FIXED JOB-1"));
   assert(/Nothing (on the job )?is approved/.test(problemSent("J", "x")) && /Nothing is approved/.test(problemForWorker("J", "K", "x", "l")), "approval stays stopped while it is open");
 });

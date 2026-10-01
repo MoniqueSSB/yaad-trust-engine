@@ -84,6 +84,13 @@ export function clientUpdateVars(jobTitle: string, jobId: string, words: string,
 const CLIENT_SUMMARY: Record<string, string> = {
   quote_arrived: "a price has come in for you to look at. Accept it, ask the tradesperson for a change, or review it in full on your job. Nothing is booked and nothing is charged until you accept",
   quote_recommended: "Yaadly has chosen a tradesperson and a price for you to look at. Nothing is booked until you accept",
+  // Service bookings (Deposit Protection Check, Visual Check and the rest of
+  // the menu), added 1 Oct 2026 on the founder's word. Until then a service
+  // client outside the window was sent free text, which Twilio accepts and
+  // then fails, so WhatsApp dropped with nothing recorded.
+  service_booked: "your booking is in. Nothing is charged and nothing starts until Yaadly confirms the scope and dates with you",
+  service_confirmed: "your booking is confirmed and the invoice is on its way by email. The work is scheduled once it is paid",
+  service_live: "your booking is now under way",
   quote_accepted: "your tradesperson is booked. Your invoice from Yaadly, with its fee shown, is on the Money tab of your job, and the job goes live once the first payment is made as your terms set out",
   request_declined: "the tradesperson you asked for cannot take it on, so it has gone out to the rest of the vetted network",
   evidence_report_confirmed: "your tradesperson has sent a report on the work, with photographs, for you to look at",
