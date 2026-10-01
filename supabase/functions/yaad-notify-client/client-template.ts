@@ -98,6 +98,8 @@ const CLIENT_SUMMARY: Record<string, string> = {
   worker_on_site: "your tradesperson checked in on site today",
   walkthrough_notes_ready: "the notes from your video walkthrough are ready to read",
   dispute_raised: "your message has gone to your tradesperson to sort first. Nothing on the job can be approved while it is open",
+  dispute_stepped_in: "Yaadly has stepped in on the problem you raised, and a person comes back to you here. Nothing on the job can be approved while it is open",
+  dispute_chase_client: "your tradesperson replied to what you raised. Say on the job whether it is sorted, or bring Yaadly in",
   dispute_replied: "your tradesperson has replied to what you raised. Say on the job whether it is sorted, or bring Yaadly in",
   completion_report_issued: "your Completion Report is ready to read and keep",
   job_delayed: "there has been no update for a few days, so Yaadly is checking in with your tradesperson",

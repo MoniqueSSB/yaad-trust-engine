@@ -64,7 +64,7 @@ import { addonPdfUrl } from "./addon-link.ts";
 import { screenOwnWords } from "./own-words.ts";
 import { captionsLine, namedNextStep, noCaptionPrompt, plainDraft, reportSentReceipt, unearnedClaims, usableCaptions } from "./report-draft.ts";
 import { acceptedForClient, acceptedForWorker, offerForClient, PLATFORM_LABEL as WALK_PLATFORM } from "./walkthrough-offer.ts";
-import { DISPUTE_HOURS, problemForWorker, replyForClient } from "./dispute-lane.ts";
+import { chaseClient, DISPUTE_HOURS, problemForWorker, replyForClient, type SteppedInWhy, steppedInForClient, steppedInForWorker } from "./dispute-lane.ts";
 import { applyLink, CHECK_REMINDER_SUBJECT, checkReminderText, jobDelayedWorkerText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -80,7 +80,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "stage_signed_off_worker", "stage_paid_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "stage_signed_off_worker", "stage_paid_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied", "dispute_stepped_in", "dispute_stepped_in_worker", "dispute_chase_client"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -1153,7 +1153,7 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
     }
-    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "stage_signed_off_worker" || kind === "stage_paid_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "stage_signed_off_worker" || kind === "stage_paid_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "dispute_stepped_in_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
@@ -1192,7 +1192,7 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "stage_signed_off_worker" || kind === "stage_paid_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "stage_signed_off_worker" || kind === "stage_paid_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "dispute_stepped_in_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested" || kind === "walkthrough_accepted_worker" || kind === "completion_report_worker" || kind === "addon_for_worker" || kind === "addon_agreed_worker" || kind === "addon_closed_worker" || kind === "addon_paid_worker") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -2012,6 +2012,29 @@ Deno.serve(async (req: Request) => {
       if (!d?.reply) return json({ ok: true, kind, told: false, reason: "No reply on this dispute." });
       subject = `Your tradesperson replied: ${job.title}`;
       line = replyForClient(String(job.id), String(job.title ?? ""), String(d.reply), roomLink);
+    } else if (kind === "dispute_stepped_in" || kind === "dispute_stepped_in_worker" || kind === "dispute_chase_client") {
+      // Yaadly stepping in on its own, or the one chase (20261001120000).
+      // Read off the row by id, so a stray call cannot send words that are
+      // no longer true.
+      const { data: d } = await admin.from("disputes")
+        .select("state, escalated_by, client_chased_at").eq("id", String(meta.id ?? "")).eq("job_id", jobId).maybeSingle();
+      const title = String(job.title ?? job.id);
+      if (kind === "dispute_chase_client") {
+        if (!d || d.state !== "direct" || !d.client_chased_at) return json({ ok: true, kind, told: false, reason: "Not waiting on the client." });
+        subject = `Is it sorted? ${title}`;
+        line = chaseClient(String(job.id), title, roomLink);
+      } else {
+        if (!d || d.state !== "escalated" || !d.escalated_by) return json({ ok: true, kind, told: false, reason: "Not stepped in by Yaadly." });
+        const why = d.escalated_by as SteppedInWhy;
+        if (kind === "dispute_stepped_in") {
+          subject = `Yaadly has stepped in: ${title}`;
+          line = steppedInForClient(String(job.id), title, why, roomLink);
+        } else {
+          recipientEmail = String(job.worker_email ?? "").trim();
+          subject = `Yaadly has stepped in: ${title}`;
+          line = steppedInForWorker(String(job.id), title, why, roomLink);
+        }
+      }
     } else if (kind === "desk_alert") {
       // Monique, not a party. Founder, 13 Sep 2026: a problem on a job
       // "comes directly to my whatsapp and email". Fired by the triggers in
@@ -2066,9 +2089,17 @@ Deno.serve(async (req: Request) => {
             `${kinds ? `\n\nWhat: ${kinds}` : ""}\n\n"${clip(String(d.body ?? ""), limit)}"\n\n` +
             `The worker has been sent it and answers first. Nothing on the job can be approved while it is open.`;
         } else {
-          what = "a client has escalated a dispute";
-          pushTitle = "Yaadly: a dispute was escalated";
-          detail = (limit) => `The client on ${title} has escalated their dispute to Yaadly. It needs a person now.\n\n` +
+          // Who moved it, 1 Oct 2026: the alert said the client had
+          // escalated when the 48 hour timer had (20261001120000).
+          const { data: eb } = await admin.from("disputes").select("escalated_by").eq("id", rowId).maybeSingle();
+          const byTimer = eb?.escalated_by === "no_reply"
+            ? `The worker on ${title} did not reply within 48 hours, so the dispute has come to Yaadly on its own. The client and the worker have both been told. It needs a person now.`
+            : eb?.escalated_by === "client_silent"
+              ? `The client on ${title} did not say whether the worker's reply sorted it, 48 hours after being asked, so the dispute has come to Yaadly on its own. Both sides have been told. It needs a person now.`
+              : null;
+          what = byTimer ? "a dispute has come to Yaadly on its own" : "a client has escalated a dispute";
+          pushTitle = byTimer ? "Yaadly: a dispute came to you on the 48 hour rule" : "Yaadly: a dispute was escalated";
+          detail = (limit) => (byTimer ? `${byTimer}\n\n` : `The client on ${title} has escalated their dispute to Yaadly. It needs a person now.\n\n`) +
             `They raised: "${clip(String(d.body ?? ""), limit)}"\n\n` +
             (d.reply ? `The worker replied: "${clip(String(d.reply), limit)}"` : "The worker has not replied.") +
             `\n\nNothing on the job can be approved while it is open.`;
