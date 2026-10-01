@@ -6609,3 +6609,13 @@ Every client message now has its worker counterpart saying the same thing. New f
 
 1. **The client was not told the job is live:** `select tgname from pg_trigger where tgname = 'trg_notify_client_job_live';` must return one row.
 2. **The worker was not told of a NO or STOP:** it goes as plain WhatsApp, so outside the worker's 24 hour window it fails after sending. The desk is told of every STOP.
+
+## Paying a worker who has no bank account (MoneyGram cash pick-up)
+
+1. Check it is switched on: `select value from app_settings where key = 'moneygram_payouts';` It stays `off` until MoneyGram Business has approved Yaadly Ltd. Turning it on is Monique's decision, and the "never cash" wording (portal, WhatsApp messages, Worker Guidelines) must change in the same go.
+2. The worker adds pick-up on `app.yaadly.co.uk/portal/worker/payouts`: name exactly as on their ID, and a parish. Nothing else is taken.
+3. Phone the worker on the number on file, check the name against their ID, press Call-back done. A changed name clears it.
+4. Send from Yaadly's MoneyGram Business account, never a personal one. The fee comes off the worker's pay.
+5. Phone the worker the pick-up reference. Never WhatsApp it, never email it, never type it on the desk.
+6. Mark paid with the MoneyGram transaction number from Yaadly's receipt and the fee: `mark_worker_paid(invoice, 'moneygram', transaction_number, fee)`. The worker's WhatsApp names the fee and what they collect.
+7. If it refuses: "switched off" means step 1; "has not given a name" means step 2; "Call-back done" means step 3; "transaction number" or "fee" means a value is missing. Do not work round a refusal.

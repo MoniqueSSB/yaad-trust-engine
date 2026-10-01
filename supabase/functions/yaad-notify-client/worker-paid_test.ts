@@ -34,3 +34,13 @@ Deno.test("it names no bank account and promises nothing about timing", () => {
   assert(!/account|ending|\bNCB\b|\bJN\b|Scotia/i.test(text), "the message now names a bank account");
   assert(!/today|tomorrow|within|working day/i.test(text), "the message now promises when the money lands");
 });
+
+// 20261001194258: MoneyGram cash pick-up. The worker is told the fee came off
+// their pay, and the pick-up reference never goes in a message: it is a key
+// to cash, so it is phoned.
+Deno.test("a MoneyGram pick-up states the fee and never prints a reference", () => {
+  assert(block.includes("paid_fee_pence"), "the message no longer reads the fee off the invoice");
+  assert(/fee of \$\{amtOf\(fee\)\} came off/.test(block), "the worker is no longer told the fee came off their pay");
+  assert(/const ref = pickup \? "" :/.test(block), "a MoneyGram reference could now be printed in WhatsApp");
+  assert(/phone you with the pick-up reference/.test(block), "the worker is no longer told the reference comes by phone");
+});

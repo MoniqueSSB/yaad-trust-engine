@@ -6,6 +6,20 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-10-01 · A worker with no bank account can collect by MoneyGram cash pick-up
+
+**Decided by Monique, 1 Oct 2026**, reversing part of 14 Sep 2026 ("bank transfer only, never cash", "no Western Union"). Her reason: "i dont want to cut out those workers". A bank account was the only way to be paid, and nothing told a worker that before they joined, so an unbanked tradesperson would have found out after finishing the job. The Mirror Rule fails on the worker's side if the strongest informal workers cannot be paid at all.
+
+**Why MoneyGram and not Western Union.** She asked for Western Union first, then said it "has to done from my business account not my personal". Western Union's and MoneyGram's normal online sending is for individuals, so the sender on record would be her. MoneyGram Business disburses to overseas contractors in a company's name; we found no Western Union route that does that for cash pick-up. "Yes do the Money gram one."
+
+**What was built (`20261001194258`).** A switch, `app_settings moneygram_payouts`, off until MoneyGram Business has approved Yaadly Ltd. A worker gives only the name on their ID and a parish (`set_cash_pickup()`); changing either clears the call-back, the same as new bank details. `mark_worker_paid()` gains `moneygram`, refused unless the switch is on, the worker gave a pick-up name, the call-back is done, the client has paid, and a MoneyGram transaction number and the fee are given. The fee is stored on the invoice (`paid_fee_pence`), written once.
+
+**The worker pays the fee, and is told before choosing.** Her instruction: "fee are deducted from their total". The payment page says so beside the option, and the WhatsApp payment message names the fee and what they collect. Challenged in chat: the unbanked worker pays more than a banked one for the same work. She accepted it as their choice, told up front.
+
+**The pick-up reference is never stored or messaged.** It is a key to cash. WhatsApp messages to Yaadly's number are filed as job evidence, so the reference is phoned. The desk records MoneyGram's transaction number from Yaadly's receipt instead.
+
+**Not done, on purpose.** Materials money stays bank transfer or Stripe (her call). The desk's Pay workers view has no MoneyGram button yet. "Never cash" still appears in eight worker-facing places, including the signed Worker Guidelines (WG 1.7) and the Meta templates submitted 30 Sep; those change when the switch goes on, with her wording, and the templates are left alone so they do not go back into Meta's queue. MoneyGram is a new third party receiving a worker's name: her decision, made here.
+
 ## 2026-09-29 · A camera note is left out of the draft; the daily check-in goes in the morning with its button
 
 **Decided by Monique, 29 Sep 2026 ("fix all").**
