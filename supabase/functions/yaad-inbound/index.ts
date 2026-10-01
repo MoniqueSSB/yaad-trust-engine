@@ -23,7 +23,7 @@ import { shouldEscapeLane, wantsAPerson, wantsFreshJob } from "./escape-hatch.ts
 import { samePhone, digitsOf } from "./phone.ts";
 import { Deadline } from "./deadline.ts";
 import { inboundText, wasTapped } from "./button-tap.ts";
-import { acknowledgementReply, answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith } from "./worker-question.ts";
+import { acknowledgementReply, answerWorkerJobQuestion, answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith, type WorkerJob } from "./worker-question.ts";
 import { ARRIVAL_HOLD_MS, arrivalAsk, arrivalAskLapsed, arrivalStillWanted, cannotCheckIn, CHECK_IN_BEFORE_YOU_LEAVE, isPin, isSkip, saysCheckedIn } from "./arrival-ask.ts";
 import { checkInApplies } from "./arrival-rule.ts";
 import { answerClientQuestion, CLIENT_LIVE_STATUSES, CLIENT_OFF_SCRIPT_SYSTEM, clientWord, clientWordReply, declineReply, GONE_TO_YAADLY, isStop, nextAfterApproval, workerToldOfHold, type LiveJob, nothingApproved, readsAsProblem } from "./client-lane.ts";
@@ -1920,6 +1920,28 @@ async function answerOffScript(question: string, deadline: Deadline, trace: Trac
   }
 }
 
+/** The job as answerWorkerJobQuestion() needs it. Null on any miss, which
+ *  only means the job-aware answers are skipped. */
+async function loadWorkerJob(supabase: SettingsReader, jobId: string): Promise<WorkerJob | null> {
+  if (!jobId) return null;
+  try {
+    const db = supabase as unknown as { from: (t: string) => any };
+    const { data: j } = await db.from("jobs").select("id, title, status, stage").eq("id", jobId).maybeSingle();
+    if (!j) return null;
+    let stagePaid = true;
+    const { data: q } = await db.from("job_quotes").select("billing_mode").eq("job_id", jobId).eq("status", "accepted").limit(1).maybeSingle();
+    if (q?.billing_mode === "by_stage") {
+      const { data: inv } = await db.from("invoices").select("id").eq("job_id", jobId)
+        .eq("stage", Math.max(Number(j.stage ?? 0), 1)).eq("status", "paid").is("addon_id", null)
+        .or("payable_to.is.null,payable_to.eq.yaadly").limit(1).maybeSingle();
+      stagePaid = Boolean(inv);
+    }
+    return { id: String(j.id), title: String(j.title ?? ""), status: String(j.status ?? ""), stagePaid };
+  } catch (_) {
+    return null;
+  }
+}
+
 async function answerOrRaiseWorkerQuestion(
   supabase: SettingsReader,
   msg: { text: string; from: string; channel: string },
@@ -1930,6 +1952,10 @@ async function answerOrRaiseWorkerQuestion(
   // fixed answer or the desk, and never a model call it could not time.
   opts: { deadline?: Deadline; paused?: boolean } = {},
 ): Promise<string> {
+  // The job-aware answers first (1 Oct 2026, the worker's half of the
+  // client's fixed answers), then the fixed ones that need no job.
+  const jobAnswer = answerWorkerJobQuestion(msg.text, await loadWorkerJob(supabase, jobId));
+  if (jobAnswer) return `${jobAnswer} ${stillWanted}`;
   const canned = answerWorkerQuestion(msg.text);
   if (canned) return `${canned} ${stillWanted}`;
   const clock = clockAnswer(msg.text);
