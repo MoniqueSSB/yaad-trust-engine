@@ -54,7 +54,7 @@ import * as guardrails from "./guardrails.ts";
 import { checkAttrs, deskPack, runEvidenceChecks } from "./evidence-checks.ts";
 import { bookedPayLine, completionReportWorkerCopy, stagePaidWorkerText, workerEvidenceLines } from "./worker-copy.ts";
 import { checkInApplies } from "./arrival-rule.ts";
-import { clientSummaryVars, clientTemplateSummary, clientUpdateVars } from "./client-template.ts";
+import { bookedPaymentLines, clientSummaryVars, clientTemplateSummary, clientUpdateVars, quoteChoices } from "./client-template.ts";
 import { recordAccepted, recordNotSent, type SendMeta, withMessagingService, withStatusCallback } from "./twilio-status.ts";
 import { hasWorkerTemplateDecision, insideWindow, samePhoneDigits, templateVar, WINDOW_MS, workerTemplateSummary } from "./worker-template.ts";
 import { approvedTemplateSid, lastInboundInWindow } from "./wa-window.ts";
@@ -1335,12 +1335,13 @@ Deno.serve(async (req: Request) => {
       // nobody is booked until both sides have confirmed.
       // 9 Sep 2026, founder: "the only person that needs to accept is the
       // client." One reply books; the worker's quote is their agreement.
-      const bookHint = clientPhone
-        ? `Reply ${job.id} to accept this price and book ${workerName}. Or `
-        : "";
+      // 1 Oct 2026, founder: the message has to say the client can accept,
+      // go back or review the price. Three choices, named, each with where
+      // it is done (quoteChoices). Accepting by reply only with a phone.
       line = `A price has come in on your Yaadly job, ${job.title}. ` +
         `${workerName} quoted it and your all-in price from Yaadly is ${priceText}: ${bill.breakdown}.${scopeLine} ` +
-        `You pay Yaadly, never the tradesperson. Nothing is booked and nothing is charged until you choose. ${bookHint}see it here: ${codeLink}`;
+        `You pay Yaadly, never the tradesperson.\n\n` +
+        quoteChoices(job.id, String(workerName), Boolean(clientPhone), codeLink, roomLink);
       const contentSid = Deno.env.get("TWILIO_CONTENT_SID_QUOTE") ?? "";
       if (contentSid) {
         waTemplate = {
@@ -1367,12 +1368,10 @@ Deno.serve(async (req: Request) => {
       const proposal = String(q?.note ?? "").trim();
       const scopeLine = proposal ? ` They propose: "${proposal.slice(0, 300)}"` : "";
       subject = `Yaadly has chosen your tradesperson: ${job.title}`;
-      const bookHint = clientPhone
-        ? `Reply ${job.id} to accept this price and book ${workerName}. Or `
-        : "";
       line = `You asked Yaadly to pick the tradesperson for ${job.title}. ${chooser} has read the quotes and chosen ${workerName}.${whyLine}${scopeLine} ` +
         `Your all-in price from Yaadly is ${money(bill.total)}: ${bill.breakdown}. ` +
-        `You pay Yaadly, never the tradesperson. Nothing is booked and nothing is charged until you accept this price. ${bookHint}see it here: ${codeLink}`;
+        `You pay Yaadly, never the tradesperson.\n\n` +
+        quoteChoices(job.id, String(workerName), Boolean(clientPhone), codeLink, roomLink);
     } else if (kind === "booked_worker") {
       // 9 Sep 2026. The worker's quote is their agreement, so the client's
       // acceptance books them with no reply from their side. That makes
@@ -1383,7 +1382,7 @@ Deno.serve(async (req: Request) => {
       // them, at their price less 5%, and nothing starts until the client's
       // invoice to Yaadly is paid, which a person marks by hand.
       const { data: q } = await admin.from("job_quotes")
-        .select("worker_name, labour_jmd, materials_jmd")
+        .select("worker_name, labour_jmd, materials_jmd, billing_mode")
         .eq("job_id", jobId).eq("status", "accepted")
         .order("updated_at", { ascending: false }).limit(1).maybeSingle();
       const m = Math.round(Number(q?.materials_jmd ?? 0));
@@ -1476,7 +1475,7 @@ Deno.serve(async (req: Request) => {
       // and matches the worker FAQ rather than inventing new payment
       // language.
       const { data: q } = await admin.from("job_quotes")
-        .select("worker_name, labour_jmd, materials_jmd")
+        .select("worker_name, labour_jmd, materials_jmd, billing_mode")
         .eq("job_id", jobId).eq("status", "accepted")
         .order("updated_at", { ascending: false }).limit(1).maybeSingle();
       subject = `Booked: ${job.title}`;
@@ -1485,11 +1484,17 @@ Deno.serve(async (req: Request) => {
       // invoice, sent separately, marked paid by a person before anything
       // moves. Saying "the worker is on site" here would be wrong now.
       const accepted = allInPrice(q?.labour_jmd ?? 0, q?.materials_jmd ?? 0);
-      line = `${q?.worker_name ?? "Your worker"} is booked on ${job.id} (${job.title}). ` +
+      // 1 Oct 2026, founder: the fee shown on its own, a link to the full
+      // invoice, and what has to be paid before the job goes live, per the
+      // terms (bookedPaymentLines in client-template.ts).
+      const feeJmd = Math.round(Math.round(Number(q?.labour_jmd) || 0) * 0.15);
+      const matJmd = Math.round(Number(q?.materials_jmd) || 0);
+      line = `${q?.worker_name ?? "Your tradesperson"} is booked on ${job.id} (${job.title}).\n\n` +
         `Your all-in price from Yaadly is ${money(accepted.total)}: ${accepted.breakdown}. ` +
-        `You pay Yaadly, not the worker: Yaadly engages and pays them. ` +
-        `Your invoice for the job is on its way separately, one price covering the work, materials at cost and Yaadly's Guarantee & Support fee. ` +
-        `The job goes live once that is paid. Yaadly pays the worker under our own agreement with him, so he never waits on you. Your approval is what closes each stage with us, once you have seen the evidence. ${roomLink}`;
+        `Yaadly's fee is ${money(feeJmd)}, the 15% Guarantee & Support on the labour.\n\n` +
+        `You pay Yaadly, never the tradesperson. Yaadly pays them under its own agreement with them, so they never wait on you.\n\n` +
+        bookedPaymentLines(q?.billing_mode === "by_stage", money(feeJmd), matJmd > 0 ? money(matJmd) : null, `${roomLink}?tab=money`) +
+        `\n\nYour approval is what closes each stage with Yaadly, once you have seen the evidence.`;
     } else if (kind === "quote_not_selected") {
       // Founder, 13 Sep 2026: a worker whose quote closed because somebody
       // else was booked still sees the job, and this tells them so rather
@@ -2114,24 +2119,14 @@ Deno.serve(async (req: Request) => {
         // the same approval was corrected on 4 Sep; this one was missed.
         `Your approval is recorded and the worker's payment is raised with Yaadly. Nothing else to do here: ${roomLink}`;
 
-      // Stage 7. Convert at handover, the founder's own words: offered at
-      // the moment the client approves and feels relief, at the founding
-      // rate, never by email later. Only on the job's FINAL stage
-      // (sync_job_status marks the job complete once stage reaches 5), not
-      // on every approval along the way: pitching this mid-job would read
-      // as premature on a job that is not actually finished yet. No
-      // billing exists to switch on here (Phase 1, sell judgment, CLAUDE.md
-      // 9), so this captures a reply for the founder to follow up with
-      // personally, it does not pretend to start anything on its own.
-      if (job.status === "complete" && job.worker_email) {
-        const { data: worker } = await admin.from("worker_profiles")
-          .select("name").ilike("worker_email", job.worker_email).maybeSingle();
-        const workerName = String(worker?.name ?? "").trim() || "the same worker";
-        line += `\n\nOne more thing, now that this is off your list. Want ${workerName} to keep an eye on the place going forward, without you having to ask again? ` +
-          `It's called the Yaad Report: a monthly WhatsApp update, 6 to 10 timestamped photos, a short walkthrough video, three lines on the property's condition, and what's changed since last time. ` +
-          `Founding rate is £350 a month, or one 12 month term instead of twelve separate decisions.\n\n` +
-          `Reply INTERESTED and Yaadly will follow up with how it works.`;
-      }
+      // The Yaad Report offer that sat here (Stage 7, convert at handover)
+      // was taken out on 1 Oct 2026, founder's instruction to fix it. It
+      // quoted £350 a month for a product that is not on the live menu
+      // (the Oversight Retainer is £495, Property Care £45 a visit) and
+      // asked for a reply of INTERESTED that nothing in yaad-inbound
+      // handled, so a client who answered it heard nothing back. An offer
+      // at handover can come back once it names a price on the menu and
+      // the reply has somewhere to go.
     } else if (kind === "worker_on_site") {
       const { data: arrival } = await admin.from("arrival_log")
         .select("stage, arrived_at")
@@ -2434,8 +2429,13 @@ Deno.serve(async (req: Request) => {
         ? `${APP_URL}/portal/jobs/${encodeURIComponent(jobId)}/pack?code=${encodeURIComponent(pack.confirm_code)}`
         : roomLink;
       subject = `Your Kickoff Pack is ready: ${job.title}`;
-      line = `The Kickoff Pack for ${job.title} is ready: scope, timeline, payment stages and the evidence checklist, all in one place. ` +
-        `Read it here: ${packLink}\n\nWhen you're ready to confirm your side, just reply to this message with ${jobId}.`;
+      // 1 Oct 2026, founder: the link to the pack in the portal has to stand
+      // out, so it is on its own line ahead of the ask to confirm. The same
+      // words go to both sides, so it names only the reply, which works for
+      // both; the client's page button is on that page for them to find.
+      line = `The Kickoff Pack for ${job.title} is ready. It sets out the scope, the timeline, the payment stages and the evidence checklist.\n\n` +
+        `Review the full pack in your Yaadly portal: ${packLink}\n\n` +
+        `Once you have read it and are happy, confirm your side by replying to this message with ${jobId}.`;
     }
 
     let emailed = false;

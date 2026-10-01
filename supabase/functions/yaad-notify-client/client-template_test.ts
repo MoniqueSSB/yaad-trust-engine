@@ -58,3 +58,33 @@ Deno.test("a kind with no summary is not sent as a template", () => {
   assertEquals(clientTemplateSummary("service_booked"), null);
   assertEquals(clientTemplateSummary("booked_worker"), null);
 });
+
+// 1 Oct 2026, founder: the price message names three choices, and the booked
+// message shows the fee, links the invoice and says what starts the job.
+import { bookedPaymentLines, quoteChoices } from "./client-template.ts";
+
+Deno.test("the price message names accept, go back and review, each with where it is done", () => {
+  const withPhone = quoteChoices("JOB-WEB-1", "Andre", true, "https://p/price", "https://p/job");
+  assert(/Accept: reply JOB-WEB-1/.test(withPhone));
+  assert(/Go back to Andre: ask for a change/.test(withPhone) && withPhone.includes("https://p/job"));
+  assert(/Review: .*https:\/\/p\/price/.test(withPhone));
+  assert(/Nothing is booked and nothing is charged until you accept/.test(withPhone));
+  // No phone on the job: accepting by reply is not offered.
+  assert(!/reply JOB-WEB-1/.test(quoteChoices("JOB-WEB-1", "Andre", false, "https://p/price", "https://p/job")));
+  assertEquals(guardrails.scan(withPhone).length, 0);
+  assert(!/[–—]/.test(withPhone));
+});
+
+Deno.test("the booked message says what starts the job, for both billing modes", () => {
+  const full = bookedPaymentLines(false, "J$4,500", "J$10,000", "https://p/job?tab=money");
+  assert(/paid in full, as your terms set out/.test(full) && /fee of J\$4,500/.test(full));
+  assert(full.includes("https://p/job?tab=money") && /review the full invoice/i.test(full));
+  const staged = bookedPaymentLines(true, "J$4,500", null, "https://p/job?tab=money");
+  assert(/first bill is paid: Yaadly's Guarantee & Support fee of J\$4,500\./.test(staged));
+  assert(/each stage, the first included, is paid before it starts/.test(staged));
+  for (const t of [full, staged]) {
+    assertEquals(guardrails.scan(t).length, 0, t);
+    assert(!/[–—]/.test(t));
+    assert(!/\b(?:held|holding|escrow|today|tomorrow|within)\b/i.test(t), t);
+  }
+});

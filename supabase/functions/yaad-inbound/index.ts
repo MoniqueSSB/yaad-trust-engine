@@ -4533,17 +4533,17 @@ Deno.serve(async (req: Request) => {
           root.setAttributes({ "yaadly.whatsapp_kickoff_confirm.job": kickoffTarget.id, "yaadly.whatsapp_kickoff_confirm.outcome": kErr ? "refused" : "confirmed" });
           if (kErr) return twiml(await refused(kErr, "Job agreement confirm", "Try again in a moment, or say \"talk to a person\"."));
           const row = Array.isArray(kResult) ? kResult[0] : kResult;
-          // The client's own next action has to be spelled out here: found
-          // live, testing this for real - "ready to be chosen" told the
-          // client nothing had gone wrong, but nothing told them what to
-          // do next, and choosing is a second, separate reply with the
-          // same code, not something that happens on its own. Worker
-          // confirmations get no such line: choosing is the client's
-          // action alone, and telling a worker to "reply again to book"
-          // would be false.
+          // The client's own next action has to be spelled out here.
+          // Corrected 1 Oct 2026: this used to tell the client to reply the
+          // code again to book. Since 9 Sep the client's acceptance books
+          // the job on its own (agree_quote_via_whatsapp calls
+          // _do_choose_worker), so the pack is confirmed on a job that is
+          // already booked, and a second reply matched nothing and fell
+          // through to intake. The next thing that happens is the job going
+          // live, the same on both sides.
           if (row?.both_confirmed) {
             return twiml(row.agreed_side === "client"
-              ? `Confirmed. Both sides have signed off on the Kickoff Pack for ${kickoffTarget.title}. Reply ${kickoffTarget.id} again to book them.`
+              ? `Confirmed. You and your tradesperson have both agreed the Kickoff Pack for ${kickoffTarget.title}.\nNothing more is needed from you on it. You get a message here when the job is live.`
               // The worker's side, in plain words (30 Sep 2026): "the job
               // agreement" is the Kickoff Pack, and "ready for the client to
               // choose" described the order before 9 Sep, when the client's

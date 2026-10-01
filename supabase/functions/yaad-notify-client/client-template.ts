@@ -82,9 +82,9 @@ export function clientUpdateVars(jobTitle: string, jobId: string, words: string,
 // nothing about money having moved. A kind that is not here is not sent as
 // a template and goes by email, as it did before.
 const CLIENT_SUMMARY: Record<string, string> = {
-  quote_arrived: "a price has come in for you to look at. Nothing is booked and nothing is charged until you choose",
+  quote_arrived: "a price has come in for you to look at. Accept it, ask the tradesperson for a change, or review it in full on your job. Nothing is booked and nothing is charged until you accept",
   quote_recommended: "Yaadly has chosen a tradesperson and a price for you to look at. Nothing is booked until you accept",
-  quote_accepted: "your tradesperson is booked. Your invoice from Yaadly follows separately and the job goes live once that is paid",
+  quote_accepted: "your tradesperson is booked. Your invoice from Yaadly, with its fee shown, is on the Money tab of your job, and the job goes live once the first payment is made as your terms set out",
   request_declined: "the tradesperson you asked for cannot take it on, so it has gone out to the rest of the vetted network",
   evidence_report_confirmed: "your tradesperson has sent a report on the work, with photographs, for you to look at",
   stage_released: "your approval of the stage is recorded",
@@ -116,4 +116,50 @@ export function clientSummaryVars(jobTitle: string, jobId: string, summary: stri
     "2": oneLine(summary, 300),
     "3": link,
   };
+}
+
+// ── the price message: three choices, named ───────────────────────────────
+//
+// Founder, 1 October 2026: the price message has to state that the client
+// can accept, go back or review the price. Until then it said "reply to
+// accept, or see it here", which read as one choice.
+//
+// Each choice says where it is done. Accepting by reply needs a phone on the
+// job; asking for a change is the "Ask for a change" link on the job in the
+// portal (AskForChange.tsx), which goes to the tradesperson and changes
+// nothing until they answer. There is no WhatsApp door for a change request,
+// so this does not promise one.
+export function quoteChoices(jobId: string, workerName: string, hasPhone: boolean, priceLink: string, jobLink: string): string {
+  return [
+    `What you can do:`,
+    hasPhone
+      ? `1. Accept: reply ${jobId} to accept this price and book ${workerName}.`
+      : `1. Accept: on the price page: ${priceLink}`,
+    `2. Go back to ${workerName}: ask for a change before you accept, with "Ask for a change" on your job: ${jobLink}`,
+    `3. Review: the full price, the breakdown and what they propose: ${priceLink}`,
+    ``,
+    `Nothing is booked and nothing is charged until you accept.`,
+  ].join("\n");
+}
+
+// ── the booked message: the fee, the invoice, and what starts the job ─────
+//
+// Founder, 1 October 2026: the booked message has to show the overall fee,
+// send the client to the full invoice, and say the job goes live once
+// Yaadly's fee and the first payment are made as the terms set out.
+//
+// Two billing modes exist (raise_job_client_invoice, 20260929100000):
+//   in_full:  one invoice for the whole price; the job goes live when it is paid.
+//   by_stage: a start bill (the whole 15% fee, never split, plus materials at
+//             cost) makes the job live; each stage, the first included, is
+//             billed before it starts.
+// Amounts are passed in already formatted. No date is promised.
+export function bookedPaymentLines(
+  byStage: boolean, feeText: string, materialsText: string | null, moneyLink: string,
+): string {
+  const start = byStage
+    ? `The job goes live once the first bill is paid: Yaadly's Guarantee & Support fee of ${feeText}${materialsText ? ` and the materials at cost, ${materialsText}` : ""}. ` +
+      `The work is then billed stage by stage, and each stage, the first included, is paid before it starts, as your terms set out.`
+    : `The job goes live once your invoice is paid in full, as your terms set out. It is one price covering the work, ${materialsText ? "materials at cost and " : ""}Yaadly's Guarantee & Support fee of ${feeText}.`;
+  return `${start}\n\nTap to review the full invoice on the Money tab of your job: ${moneyLink}`;
 }
