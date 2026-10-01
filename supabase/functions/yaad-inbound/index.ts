@@ -26,7 +26,7 @@ import { inboundText, wasTapped } from "./button-tap.ts";
 import { acknowledgementReply, answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith } from "./worker-question.ts";
 import { ARRIVAL_HOLD_MS, arrivalAsk, arrivalAskLapsed, arrivalStillWanted, cannotCheckIn, CHECK_IN_BEFORE_YOU_LEAVE, isPin, isSkip, saysCheckedIn } from "./arrival-ask.ts";
 import { checkInApplies } from "./arrival-rule.ts";
-import { answerClientQuestion, CLIENT_LIVE_STATUSES, CLIENT_OFF_SCRIPT_SYSTEM, clientWord, clientWordReply, declineReply, GONE_TO_YAADLY, isStop, type LiveJob, nothingApproved, readsAsProblem } from "./client-lane.ts";
+import { answerClientQuestion, CLIENT_LIVE_STATUSES, CLIENT_OFF_SCRIPT_SYSTEM, clientWord, clientWordReply, declineReply, GONE_TO_YAADLY, isStop, nextAfterApproval, workerToldOfHold, type LiveJob, nothingApproved, readsAsProblem } from "./client-lane.ts";
 import { clockAnswer, needsAPerson, OFF_SCRIPT_CLOSE, OFF_SCRIPT_SYSTEM, screenOffScript } from "./off-script.ts";
 import { replyFromCard } from "./reply-from-card.ts";
 import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
@@ -4553,7 +4553,7 @@ Deno.serve(async (req: Request) => {
           // No message fires when the other side confirms, so none is
           // promised. The one that does fire is the job going live.
           return twiml(row?.agreed_side === "client"
-            ? `Confirmed on your side for ${kickoffTarget.title}. Waiting on the tradesperson to confirm theirs.`
+            ? `Confirmed on your side for ${kickoffTarget.title}. Waiting on the tradesperson to confirm theirs.\nNext: nothing is needed from you. You get a message here when the job is live.`
             : `Confirmed on your side: the job agreement for ${kickoffTarget.title}.\nNothing more is needed from you on it. You get a message here when the job is live.`);
         }
       }
@@ -4684,6 +4684,16 @@ Deno.serve(async (req: Request) => {
             // A STOP is one Yaadly should know about, so a person can read
             // the answer to "what made you stop" as it comes in.
             if (isStop(said)) await tellYaadly("Client sent STOP on a report", `${waitingOn[0].id}: a client replied STOP on a report waiting for approval and has been asked why.`);
+            // The worker was told "you hear here when they decide" when their
+            // report went (reportSentReceipt). This is that, 1 Oct 2026.
+            const { data: wj } = await supabase.from("jobs").select("worker_email").eq("id", waitingOn[0].id).maybeSingle();
+            if (wj?.worker_email) {
+              const { data: wp } = await supabase.from("worker_profiles").select("phone").ilike("worker_email", wj.worker_email).maybeSingle();
+              if (wp?.phone) {
+                await sendWhatsAppTo(String(wp.phone), workerToldOfHold(waitingOn[0].id, waitingOn[0].title, isStop(said)), trace,
+                  { kind: "client hold passed to worker", job_id: waitingOn[0].id });
+              }
+            }
             return twiml(declined);
           }
           if (word) {
@@ -4753,11 +4763,23 @@ Deno.serve(async (req: Request) => {
           // The next step, 1 Oct 2026 (founder: "it should be clear what the
           // client should do next"). Read after the approval, so a final
           // stage already shows the job complete.
+          // In step with the worker's own message (stage_signed_off_worker,
+          // 1 Oct 2026): on a job billed by stage the next stage waits for
+          // its bill, and the client is told so.
           const { data: after } = await supabase.from("jobs").select("status").eq("id", target.id).maybeSingle();
-          const next = after?.status === "complete"
-            ? "Next: your tradesperson signs the Completion Report, and it comes to you here to read and keep."
-            : "Next: nothing is needed from you. You hear here when your tradesperson sends the next report.";
-          return twiml(`Approved. ${label} of ${target.title} is confirmed and the worker's payment is raised.\n${next}`);
+          const nextNum = Number(target.stage ?? 1) + 1;
+          const { data: bmode } = await supabase.from("job_quotes").select("billing_mode")
+            .eq("job_id", target.id).eq("status", "accepted").limit(1).maybeSingle();
+          const byStage = bmode?.billing_mode === "by_stage";
+          let nextPaid = true;
+          if (byStage) {
+            const { data: nb } = await supabase.from("invoices").select("id")
+              .eq("job_id", target.id).eq("stage", nextNum).eq("status", "paid").is("addon_id", null)
+              .or("payable_to.is.null,payable_to.eq.yaadly").limit(1).maybeSingle();
+            nextPaid = Boolean(nb);
+          }
+          const next = nextAfterApproval(after?.status === "complete", byStage, await stageLabel(supabase, target.id, nextNum), nextPaid);
+          return twiml(`Approved. ${label} of ${target.title} is confirmed and your tradesperson's payment is raised.\n${next}`);
         }
 
         // Not a code, and exactly one job is waiting on this client's
@@ -4805,8 +4827,8 @@ Deno.serve(async (req: Request) => {
           // The hatch is only useful if somebody knows it is there.
           const alsoNewJob = ' If this was about a different property, say "new job" and I will start a fresh one.';
           return twiml(notified
-            ? `Got it, passed on to the worker on ${job.id}. They'll get back to you.${alsoNewJob}`
-            : `Got it, on record against ${job.id}. We could not reach the worker directly just now, but it is saved and Yaadly can follow up.${alsoNewJob}`);
+            ? `Got it, passed on to your tradesperson on ${job.id}. They'll get back to you.${alsoNewJob}`
+            : `Got it, on record against ${job.id}. We could not reach your tradesperson directly just now, but it is saved and Yaadly can follow up.${alsoNewJob}`);
         }
       }
 

@@ -91,6 +91,8 @@ const CLIENT_SUMMARY: Record<string, string> = {
   service_booked: "your booking is in. Nothing is charged and nothing starts until Yaadly confirms the scope and dates with you",
   service_confirmed: "your booking is confirmed and the invoice is on its way by email. The work is scheduled once it is paid",
   service_live: "your booking is now under way",
+  job_live: "your job is live and your tradesperson has been told. The job shows what happens next",
+  stage_paid: "your payment for the next stage is received and your tradesperson has been told to start it",
   quote_accepted: "your tradesperson is booked. Your invoice from Yaadly, with its fee shown, is on the Money tab of your job, and the job goes live once the first payment is made as your terms set out",
   request_declined: "the tradesperson you asked for cannot take it on, so it has gone out to the rest of the vetted network",
   evidence_report_confirmed: "your tradesperson has sent a report on the work, with photographs, for you to look at",
@@ -171,4 +173,47 @@ export function bookedPaymentLines(
       `The work is then billed stage by stage, and each stage, the first included, is paid before it starts, as your terms set out.`
     : `The job goes live once your invoice is paid in full, as your terms set out. It is one price covering the work, ${materialsText ? "materials at cost and " : ""}Yaadly's Guarantee & Support fee of ${feeText}.`;
   return `${start}\n\nTap to review the full invoice on the Money tab of your job: ${moneyLink}`;
+}
+
+// ── kept in step with the worker, 1 Oct 2026 ──────────────────────────────
+//
+// Founder: "make sure this aligns to the worker whatsapp work flow." Read
+// side by side, the client was promised "a message here when the job is
+// live" and none existed; on a job billed by stage the worker was told the
+// next stage waits for the client's payment while the client was told
+// nothing was needed; and the client heard nothing when a stage payment
+// cleared, though the worker was told to start. These are the client's half
+// of job_live_worker, stage_signed_off_worker and stage_paid_worker.
+
+/** The job has gone live. The client's half of job_live_worker. */
+export function clientJobLive(jobId: string, title: string, firstLabel: string, firstPaid: boolean, link: string): string {
+  return [
+    `${title} (${jobId}) is live. Your payment to Yaadly is received, and your tradesperson has been told.`,
+    firstPaid
+      ? `They start with ${firstLabel}.`
+      : `${firstLabel} starts once its bill is paid. It is on the Money tab of your job: ${link}?tab=money`,
+    ``,
+    firstPaid
+      ? `Next: nothing is needed from you. You hear here when your tradesperson sends a report.`
+      : `Next: pay the bill for ${firstLabel} once it is there. You hear here when your tradesperson starts it.`,
+  ].join("\n");
+}
+
+/** A stage bill is paid. The client's half of stage_paid_worker. */
+export function clientStagePaid(jobId: string, title: string, label: string): string {
+  return [
+    `${title} (${jobId}): your payment for ${label} is received, and your tradesperson has been told to start it.`,
+    ``,
+    `Next: nothing is needed from you. You hear here when they send a report.`,
+  ].join("\n");
+}
+
+/** What comes after an approval, in step with stage_signed_off_worker: on a
+ *  job billed by stage, the next stage is not started until its bill is paid,
+ *  and the worker is told exactly that. Kept the same as nextAfterApproval in
+ *  yaad-inbound/client-lane.ts. */
+export function nextAfterApproval(final: boolean, byStage: boolean, nextLabel: string, nextPaid: boolean): string {
+  if (final) return "Next: your tradesperson signs the Completion Report, and it comes to you here to read and keep.";
+  if (!byStage || nextPaid) return "Next: nothing is needed from you. You hear here when your tradesperson sends the next report.";
+  return `Next: Yaadly sends the bill for ${nextLabel}. Your tradesperson starts it once it is paid, and you hear here when they do.`;
 }

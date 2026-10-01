@@ -53,7 +53,7 @@ export function problemForWorker(jobId: string, title: string, body: string, por
     `This is yours to sort first.`,
     `Reply here with what you will do and when. It goes to the client.`,
     `Or reply on the job: ${portalLink}`,
-    `Not sorted in ${DISPUTE_HOURS} hours? Yaadly steps in.`,
+    `Reply within ${DISPUTE_HOURS} hours, or Yaadly steps in.`,
     ``,
     `Nothing is approved until it is sorted.`,
     `Stages already signed off stay signed off.`,
@@ -62,7 +62,7 @@ export function problemForWorker(jobId: string, title: string, body: string, por
 
 /** To the worker, once their reply has gone. */
 export function replySent(reply: string): string {
-  return `Sent to the client:\n"${reply.slice(0, 300)}"\n\nThey say here if it is sorted.`;
+  return `Sent to the client:\n"${reply.slice(0, 300)}"\n\nThey say here if it is sorted. If they do not, Yaadly follows it up with them.`;
 }
 
 /** To the client, carrying the worker's reply. */

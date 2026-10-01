@@ -94,3 +94,19 @@ Deno.test("the booked message says what starts the job, for both billing modes",
     assert(!/\b(?:held|holding|escrow|today|tomorrow|within)\b/i.test(t), t);
   }
 });
+
+import { clientJobLive, clientStagePaid } from "./client-template.ts";
+
+Deno.test("the client hears the job is live and a stage is paid, as the worker does", () => {
+  const paid = clientJobLive("JOB-1", "Roof", "Stage 1", true, "https://p/job");
+  const unpaid = clientJobLive("JOB-1", "Roof", "Stage 1", false, "https://p/job");
+  assert(/is live/.test(paid) && /They start with Stage 1/.test(paid) && /Next: nothing is needed/.test(paid));
+  assert(/starts once its bill is paid/.test(unpaid) && unpaid.includes("https://p/job?tab=money") && /Next: pay the bill/.test(unpaid));
+  const sp = clientStagePaid("JOB-1", "Roof", "Stage 2");
+  assert(/payment for Stage 2 is received/.test(sp) && /told to start it/.test(sp));
+  for (const t of [paid, unpaid, sp]) {
+    assertEquals(guardrails.scan(t).length, 0, t);
+    assert(!/[–—]/.test(t));
+    assert(!/\b(?:held|holding|escrow|today|tomorrow|within)\b/i.test(t), t);
+  }
+});
