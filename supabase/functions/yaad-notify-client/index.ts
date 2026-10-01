@@ -1219,6 +1219,9 @@ Deno.serve(async (req: Request) => {
     let reportSignLink = "";
     let photoUrls: EvidencePhoto[] = [];
     let attachPhotos: string[] = [];
+    // Each photograph as its own WhatsApp message, its label as the caption,
+    // so a client can tell P1 from P2 (1 Oct 2026). Set by the stage report.
+    let labelledPhotos: { url: string; caption: string }[] = [];
     // Only quote_arrived has an approved WhatsApp Content Template
     // (yaadly_quote_landed_v2); see the header comment for why it is the
     // one kind that may reuse it, and only as a fallback for the specific
@@ -1885,17 +1888,28 @@ Deno.serve(async (req: Request) => {
       const reportLabel = await stageLabel(admin, jobId, job.stage ?? 1);
       const workerSays = overrideText || `Photos have come in for ${reportLabel} of your job, ${job.title}.`;
       const aiSays = aiSummary ? `AI noticed: ${aiSummary}` : null;
-      // The "Items: P1, P2. Mention a code..." line was taken out on 1 Oct
-      // 2026. The founder read it and could not tell what it meant, and the
-      // photos arrive on WhatsApp with no label on them, so a client had no
-      // way to know which one was P2. A client now says which photo in their
-      // own words. A code typed anyway is still matched (pickEvidenceItem).
-      const itemsLine = null;
+      // Labelled photographs, 1 Oct 2026, founder: "give the photo labels so
+      // it is clear which is which." Until then the photos rode together on
+      // the report with no caption, and a list "Items: P1, P2" sat in the
+      // text with nothing on the photos to match it. Now each goes as its
+      // own message straight after the report, captioned with its code, the
+      // worker's answer to before or after, and the worker's own label when
+      // it passes the same screen as the report. A reply naming the code is
+      // matched to that photo (pickEvidenceItem in yaad-inbound).
+      labelledPhotos = photoUrls.map((p, i) => {
+        const own = String(p.label ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
+        const said = own && !/^\d+$/.test(own) && screenOwnWords(own).ok ? `: ${own}` : "";
+        return { url: p.url, caption: `${p.code ? itemCode(p) : `Photo ${i + 1}`}${said}` };
+      });
+      const allCoded = photoUrls.length > 0 && photoUrls.every((p) => p.code);
+      const itemsLine = photoUrls.length
+        ? `On WhatsApp the ${photoUrls.length === 1 ? "photo follows" : `${photoUrls.length} photos follow`} this message, ${photoUrls.length === 1 ? "with its label" : "each with its label"}. All of them are on the Evidence tab of your job.`
+        : null;
       // 1 Oct 2026, founder: "it should be clear what the client should do
       // next." The two replies that do something are named, and so is the
       // fact that nothing is approved without the code.
       const actionHint = clientPhone
-        ? `Next, reply here with one of these:\n1. Approve: send only the code ${job.id}.\n2. Not right, or a question: say it in your own words, and say which photo if it is about one, for example "the photo of the back wall". It goes to your tradesperson.\n3. Not ready to approve: reply NO. Nothing is approved, and the report waits for you.\nNothing is approved until you send the code. The report is also on your job:`
+        ? `Next, reply here with one of these:\n1. Approve: send only the code ${job.id}.\n2. Not right, or a question: say it in your own words${allCoded ? `, starting with the photo's label if it is about one, for example "${photoUrls[0].code} the corner is not sealed"` : ", and say which photo if it is about one"}. It goes to your tradesperson.\n3. Not ready to approve: reply NO. Nothing is approved, and the report waits for you.\nNothing is approved until you send the code. The report is also on your job:`
         : "Next: look at the report, then approve it or say what is not right, on your job:";
       line = [workerSays, aiSays, itemsLine, `${actionHint} ${roomLink}`].filter(Boolean).join("\n\n");
 
@@ -2567,7 +2581,7 @@ Deno.serve(async (req: Request) => {
       } else {
         wa = firstTemplate
           ? await sendTwilio(recipientPhone, "", "whatsapp", trace, [], firstTemplate, sendMeta)
-          : await sendTwilio(recipientPhone, waLine || line, "whatsapp", trace, attachPhotos, undefined, sendMeta);
+          : await sendTwilio(recipientPhone, waLine || line, "whatsapp", trace, labelledPhotos.length ? [] : attachPhotos, undefined, sendMeta);
       }
       // The rich, scope-carrying message could not be delivered at all,
       // specifically because it landed outside WhatsApp's 24 hour window:
@@ -2634,6 +2648,21 @@ Deno.serve(async (req: Request) => {
           if (!workerHeldBack) await recordNotSent(recipientPhone, "whatsapp", { ...sendMeta, kind: `${kind} bank details ask` });
           await sendPlainEmail(workerEmail, `Add your bank details: ${job.title ?? job.id}`, bankAsk, trace);
         }
+      }
+
+      // The labelled photographs, one message each, after the report and
+      // before the button, so the button arrives under the last photo. Only
+      // after the report went as WhatsApp free text, the same rule as the
+      // button. A photo that fails is recorded; the report and the portal
+      // still carry it.
+      if (labelledPhotos.length && !firstTemplate && wa.sent && wa.via === "twilio whatsapp") {
+        let sentPhotos = 0;
+        for (const ph of labelledPhotos) {
+          const r = await sendTwilio(recipientPhone, ph.caption, "whatsapp", trace, [ph.url], undefined, { ...sendMeta, kind: "labelled photo" });
+          if (r.sent) sentPhotos++;
+          else console.error(`labelled photo not sent for ${jobId}: ${r.reason ?? "unknown"}`);
+        }
+        root.setAttributes({ "yaadly.notify.labelled_photos_sent": sentPhotos });
       }
 
       // Never after a template: the client outside the window has been sent
