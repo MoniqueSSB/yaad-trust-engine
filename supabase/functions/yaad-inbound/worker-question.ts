@@ -236,3 +236,63 @@ export function answerWorkerQuestion(text: string): string | null {
   }
   return null;
 }
+
+// ── the client's fixed answers, on the worker's side ──────────────────────
+//
+// Founder, 1 Oct 2026: "these fixed answers should be on the worker sides
+// also." The client can ask where the job stands, how approval works, where
+// to see things, how to complain and how to stop the messages, and gets a
+// fixed answer each time (client-lane.ts). These are the worker's half,
+// answering from the worker's side of the same facts. Fixed strings, no
+// amount, no date. Pay is still answered by PAY_REQUEST_ANSWER and the pay
+// sentence above, unchanged.
+
+export type WorkerJob = { id: string; title: string; status: string; stagePaid: boolean };
+
+const WORKER_PORTAL = "https://app.yaadly.co.uk/portal/jobs/";
+
+/** Where the job stands, from the worker's side, and what is wanted from
+ *  them. The same statuses whereItStands() reads for the client. */
+export function workerWhereItStands(job: WorkerJob): string {
+  const name = `${job.title || "Your job"} (${job.id})`;
+  switch (job.status) {
+    case "awaiting_payment":
+      return `${name} is booked. Do not start yet: the client pays Yaadly first, and you get a message here when they have.`;
+    case "in_progress":
+      return job.stagePaid
+        ? `${name} is live. Send photos and videos as you go, and say what each one shows. Nothing else is waiting on you.`
+        : `${name} is live, but this stage starts once the client has paid for it. Do not start it yet: you get a message here when they have.`;
+    case "evidence":
+      return `${name} has work waiting for the client's approval. If a draft report is waiting on you, reply 1 to send it. Otherwise nothing is needed from you, and you hear here when the client decides.`;
+    case "disputed":
+      return `${name} has a problem open from the client. Reply here with what you will do and when, within 48 hours of it being raised, or Yaadly steps in. If you have replied, nothing more is needed until the client answers. Nothing is approved until it is sorted.`;
+    case "complete":
+      return `${name} is signed off. Yaadly pays you for the last stage by bank transfer within 7 days. Never cash.`;
+    default:
+      return `${name} is on record with Yaadly. Nothing is needed from you right now.`;
+  }
+}
+
+/** The worker's fixed answers that need the job. Null means none fits, and
+ *  the caller goes on to answerWorkerQuestion(), the facts, then a person. */
+export function answerWorkerJobQuestion(text: string, job: WorkerJob | null): string | null {
+  const t = String(text ?? "").toLowerCase();
+  if (asksForPayment(t)) return null;
+  const link = job ? `${WORKER_PORTAL}${job.id}` : "https://app.yaadly.co.uk/portal";
+  if (/\b(?:where (?:are we|is it|is the job|is my job|we deh)|status|any (?:news|update)|what(?:'s| is) next|what happens (?:now|next)|next step|what (?:do|should) (?:i|mi) (?:do|need to do)|(?:can|should|shall) (?:i|mi) start|mi fi start|start (?:now|yet))\b/.test(t)) {
+    return job ? workerWhereItStands(job) : null;
+  }
+  if (/\b(?:how (?:do|does|will|is) .{0,20}(?:approv|sign(?:ed)? off)|who approves|when .{0,20}approv|approval|sign ?off)\b/.test(t)) {
+    return "The client approves each stage from your report and photographs, on WhatsApp or in their portal. Nothing you send reaches them until you confirm the draft. Once a stage is approved, a named person at Yaadly signs it off and you are paid by bank transfer within 7 days. Never cash.";
+  }
+  if (/\b(?:see|view|find|open|where (?:is|are)) (?:the |my |di )?(?:job|report|reports|photos?|pictures?|evidence|kickoff pack|pack|agreement|scope)\b/.test(t)) {
+    return `Everything on the job is in your portal: the scope, the Kickoff Pack, your photographs and reports: ${link}`;
+  }
+  if (/\b(?:something (?:is )?wrong|problem on site|raise (?:a |an )?(?:problem|issue|complaint)|make a complaint|not (?:what|as) (?:was )?(?:described|said|agreed)|site (?:is )?different|(?:client|customer|owner) (?:is )?(?:complaining|unhappy|vex))\b/.test(t)) {
+    return "If the client has raised a problem with you, reply here with what you will do and when, within 48 hours, or Yaadly steps in. For anything else that is wrong, including a site that is not what the job described, say \"talk to a person\" and then say what it is. A person at Yaadly picks it up.";
+  }
+  if (/\b(?:stop|change|update|new) (?:these |the |my |mi )?(?:whatsapp|messages|number|phone)\b/.test(t)) {
+    return "WhatsApp is how Yaadly reaches you about your jobs. To change the number, say \"talk to a person\" and someone at Yaadly updates it with you.";
+  }
+  return null;
+}
