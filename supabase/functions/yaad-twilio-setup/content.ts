@@ -452,15 +452,24 @@ export const COMPLETION_REPORT_BODY =
   "Yaadly: your Completion Report for {{1}} is ready.\n\nIt is your document. Open it here, no login needed: {{2}}\n\nSign it, change your words, or raise an issue. It goes to the client only when you sign.";
 
 /** "You are cleared", from worker-cleared.ts, as a template. The email is
- *  left out: a template carries as little personal detail as it can. */
+ *  left out: a template carries as little personal detail as it can.
+ *  v2, 2 Oct 2026: v1 was rejected by Meta with no reason given. v1 was
+ *  short and the link sat mid sentence, so v2 gives the link its own line
+ *  after full sentences of fixed text, the shape v1 of the Completion
+ *  Report was approved in. Same two variables, so no sender change. */
 export const WORKER_CLEARED_BODY =
-  "Yaadly: you are cleared, {{1}}. Welcome.\n\nJobs are on the board. Log in here with your email and we send you a code: {{2}}\n\nPay is by bank transfer within 7 days of sign off. Never cash.";
+  "Hi {{1}}, this is Yaadly. Your checks are complete and you are now cleared to price jobs with us.\n\nTo see the jobs on the board, sign in to your Yaadly account with your email address and we will send you a code.\n\nSign in here: {{2}}\n\nYou are paid by bank transfer within 7 days of sign off, never in cash.";
 
-/** The reminder to finish the check, day 3 and day 10. {{2}} is the line
- *  that changes: "Your check is still waiting." the first time, "Last
- *  reminder from us. Your check is still waiting." the second. */
+/** The reminder to finish the check, day 3 and day 10. v2, 2 Oct 2026:
+ *  v1 was rejected by Meta with no reason given. v1 put a whole sentence
+ *  in {{2}}, and Meta rejects variables that carry the message itself, so
+ *  v2 has two variables only, the name and the link, and the same words
+ *  for both reminders. The text message and the email still say "Last
+ *  reminder from us" the second time (worker-cleared.ts). Referees are
+ *  optional, founder 2 Oct 2026: without them, a video of the worker
+ *  talking through their skills. */
 export const CHECK_REMINDER_BODY =
-  "Hi {{1}}, it is Yaadly. {{2}}\n\nWhat is left: your ID, your TRN, three people who can vouch for you, and the Guidelines to sign. About ten minutes on your phone: {{3}}\n\nUntil it is done you cannot price jobs. Questions? Ask here.";
+  "Hi {{1}}, this is Yaadly. Your worker check with us is not finished yet.\n\nWhat is left: your ID, your TRN, and the Guidelines to sign. Three people who can vouch for you are optional; if you do not have them, a short video of you talking through your skills gets you on the board. Referees are still needed before jobs over £500. It takes about ten minutes on your phone.\n\nFinish it here: {{2}}\n\nUntil it is done you cannot price jobs. If you have a question, reply to this message.";
 
 /** The job health nudge at 72 quiet hours, from yaad-job-health. It asks
  *  for evidence and does not ask for a check-in: checking in asks, it never
@@ -489,14 +498,14 @@ export const META_WORKER_TEMPLATES: readonly MetaWorkerTemplate[] = [
     variables: { "1": SAMPLE_JOB, "2": "https://app.yaadly.co.uk/sign/JOB-WEB-1789253807959?t=sample" },
   },
   {
-    slug: "worker-cleared", name: "yaadly_worker_cleared_v1", setting: "twilio_content_sid_worker_cleared",
+    slug: "worker-cleared", name: "yaadly_worker_cleared_v2", setting: "twilio_content_sid_worker_cleared",
     sender: "yaad-notify-client, worker_cleared", body: WORKER_CLEARED_BODY,
     variables: { "1": "Marcus", "2": "https://app.yaadly.co.uk/portal/sign-in" },
   },
   {
-    slug: "check-reminder", name: "yaadly_worker_check_reminder_v1", setting: "twilio_content_sid_worker_check_reminder",
+    slug: "check-reminder", name: "yaadly_worker_check_reminder_v2", setting: "twilio_content_sid_worker_check_reminder",
     sender: "yaad-notify-client, worker_check_reminder", body: CHECK_REMINDER_BODY,
-    variables: { "1": "Marcus", "2": "Your check is still waiting.", "3": "https://app.yaadly.co.uk/apply?app=sample&token=sample&ref=sample" },
+    variables: { "1": "Marcus", "2": "https://app.yaadly.co.uk/apply?app=sample&token=sample&ref=sample" },
   },
   {
     slug: "job-quiet", name: "yaadly_worker_job_quiet_v1", setting: "twilio_content_sid_worker_job_quiet",
