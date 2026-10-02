@@ -1661,7 +1661,7 @@ Deno.serve(async (req: Request) => {
       // paid, so a stray or repeated call cannot tell a worker money is coming
       // that is not. Yaadly stores no worker bank details, so the message carries none.
       const { data: inv } = await admin.from("invoices")
-        .select("id, status, total_pence, currency, stage, period_label, paid_method, paid_reference")
+        .select("id, status, total_pence, currency, stage, period_label, paid_method, paid_reference, paid_fee_pence")
         .eq("id", String(meta.invoiceId ?? "")).eq("job_id", jobId).eq("payable_to", "worker").maybeSingle();
       if (inv?.status !== "paid") {
         root.setAttributes({ "yaadly.notify.outcome": "worker_pay_not_paid" });
@@ -1669,14 +1669,24 @@ Deno.serve(async (req: Request) => {
       }
       const cur = String(inv.currency ?? "JMD").toUpperCase();
       // JMD is stored as whole dollars in total_pence; anything else is pence.
-      const amt = cur === "JMD" ? money(Number(inv.total_pence)) : `${cur} ${(Number(inv.total_pence) / 100).toFixed(2)}`;
+      const amtOf = (n: number) => cur === "JMD" ? money(n) : `${cur} ${(n / 100).toFixed(2)}`;
+      const amt = amtOf(Number(inv.total_pence));
+      // 20261001194258: MoneyGram cash pick-up, for a worker with no bank
+      // account. The fee comes off their pay and they are told so. The
+      // pick-up reference is a key to cash: it is phoned to the worker and
+      // never put in a message, so no reference is printed for MoneyGram.
+      const pickup = inv.paid_method === "moneygram";
+      const fee = Number(inv.paid_fee_pence ?? 0);
       // 20260916120000: stripe means a bank transfer too, made through Stripe.
-      const how = inv.paid_method === "bank_transfer" ? " by bank transfer" : inv.paid_method === "stripe" ? " by bank transfer through Stripe" : "";
-      const ref = String(inv.paid_reference ?? "").trim();
+      const how = inv.paid_method === "bank_transfer" ? " by bank transfer" : inv.paid_method === "stripe" ? " by bank transfer through Stripe" : pickup ? " by MoneyGram for cash pick-up" : "";
+      const ref = pickup ? "" : String(inv.paid_reference ?? "").trim();
       const what = String(inv.period_label ?? "").trim() || (inv.stage ? `stage ${inv.stage}` : "the work");
       subject = `Payment sent: ${job.title}`;
       line = [
         `Yaadly has sent you ${amt}${how}.`,
+        ...(pickup
+          ? [`The MoneyGram fee of ${amtOf(fee)} came off, so you collect ${amtOf(Number(inv.total_pence) - fee)}. Yaadly will phone you with the pick-up reference. Take your ID.`]
+          : []),
         `For ${what} on ${job.title} (${job.id})${ref ? `, reference ${ref}` : ""}.`,
         `Invoice ${inv.id} now shows as paid: ${roomLink}`,
       ].join("\n");

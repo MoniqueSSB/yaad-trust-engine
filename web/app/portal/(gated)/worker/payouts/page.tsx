@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { BankDetailsForm } from "@/components/portal/BankDetailsForm";
+import { CashPickupForm } from "@/components/portal/CashPickupForm";
 import { PayoutSetupButton } from "@/components/portal/PayoutSetupButton";
 import { checkPayoutSetup, startPayoutSetup, type PayoutState } from "@/app/portal/payout-actions";
 
@@ -14,8 +15,10 @@ export const metadata = { title: "How Yaadly pays you · Yaadly" };
 /**
  * How Yaadly pays a worker.
  *
- * Two ways, both bank transfer in J$ to the worker's own Jamaican account,
- * never cash (founder, 14 Sep 2026). Yaadly stores no bank details either way.
+ * Two ways by bank transfer in J$ to the worker's own Jamaican account
+ * (founder, 14 Sep 2026), and, for a worker with no bank account, MoneyGram
+ * cash pick-up (founder, 1 Oct 2026, 20261001194258: "i dont want to cut out
+ * those workers"). Yaadly stores no bank details either way.
  *
  *  1. Stripe (16 Sep 2026, back on the page once Global Payouts was found
  *     enabled and Jamaica offered). The worker types their details into
@@ -24,7 +27,12 @@ export const metadata = { title: "How Yaadly pays you · Yaadly" };
  *  2. Wise (20260914240000). The worker types their details here and they
  *     go straight to Yaadly's Wise account; Yaadly keeps only Wise's id.
  *
- * Either way nobody is paid until a person at Yaadly has called the worker
+ *  3. MoneyGram cash pick-up, sent from Yaadly's MoneyGram Business account.
+ *     The worker gives only the name on their ID and a parish. The fee comes
+ *     off their pay and the page says so before they choose. Switched off
+ *     (app_settings moneygram_payouts) until MoneyGram approves Yaadly.
+ *
+ * Every way, nobody is paid until a person at Yaadly has called the worker
  * back to check the details, and new details need a fresh call-back.
  */
 const STRIPE_WORDS: Record<PayoutState, { title: string; detail: string; button: string }> = {
@@ -73,9 +81,12 @@ export default async function Payouts({
   const supabase = await createClient();
   const { data } = await supabase
     .from("worker_profiles")
-    .select("wise_recipient_set_at,bank_callback_at,stripe_recipient_status")
+    .select("wise_recipient_set_at,bank_callback_at,stripe_recipient_status,cash_pickup_name,cash_pickup_parish")
     .eq("worker_user", user.id)
     .maybeSingle();
+  const { data: pickupOn } = await supabase.rpc("moneygram_payouts_on");
+  const pickupName = (data?.cash_pickup_name as string | null | undefined) ?? null;
+  const pickupParish = (data?.cash_pickup_parish as string | null | undefined) ?? null;
   const setAt = (data?.wise_recipient_set_at as string | null | undefined) ?? null;
   const checkedAt = (data?.bank_callback_at as string | null | undefined) ?? null;
 
@@ -87,7 +98,7 @@ export default async function Payouts({
 
   const callback = checkedAt
     ? `Checked by phone on ${day(checkedAt)}. Yaadly can pay you.`
-    : (setAt || stripeState !== "none")
+    : (setAt || stripeState !== "none" || pickupName)
       ? "Yaadly will call you on the number we have for you to check your details before any money goes."
       : "";
 
@@ -98,8 +109,9 @@ export default async function Payouts({
       </Link>
       <h1 className="mt-4 font-display text-[clamp(26px,4vw,38px)] uppercase leading-none">How Yaadly pays you</h1>
       <p className="mt-3 max-w-[62ch] text-[14px] leading-relaxed text-mute">
-        Yaadly pays you in J$ by bank transfer, into your own Jamaican bank account. Yaadly does not pay in cash, and
-        it does not keep your bank details: you give them to Stripe or to Wise, the services Yaadly pays through.
+        Yaadly pays you in J$ by bank transfer, into your own Jamaican bank account. It does not keep your bank
+        details: you give them to Stripe or to Wise, the services Yaadly pays through. No bank account? You can
+        collect your pay in cash by MoneyGram instead, further down.
       </p>
       {callback && (
         <p className="mt-3 max-w-[62ch] text-[13px] leading-relaxed text-ink">{callback}</p>
@@ -127,6 +139,24 @@ export default async function Payouts({
         <p className="mt-4 text-[12.5px] leading-relaxed text-dim">
           Rather not type them at all? Yaadly can take them on a call instead.
         </p>
+      </section>
+
+      <section className="mt-4 rounded-2xl border border-line bg-panel p-5">
+        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
+          {pickupName ? `Cash pick-up: ${pickupName}, ${pickupParish ?? ""}` : "No bank account? MoneyGram cash pick-up"}
+        </p>
+        <p className="mt-2 text-[13.5px] leading-relaxed text-ink">
+          Yaadly sends your pay by MoneyGram and you collect it in cash at a MoneyGram agent, with your ID. Cash pick-up
+          costs a transfer fee, and that fee comes off your pay. Bank transfer has no fee to you.
+        </p>
+        <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
+          Yaadly will phone you with the pick-up reference. It is never sent by WhatsApp or email.
+        </p>
+        {pickupOn || pickupName ? (
+          <CashPickupForm name={pickupName} parish={pickupParish} />
+        ) : (
+          <p className="mt-3 text-[12.5px] font-bold leading-relaxed text-mute">Coming soon. Yaadly will tell you when it opens.</p>
+        )}
       </section>
 
       <p className="mt-5 max-w-[62ch] text-[12.5px] leading-relaxed text-dim">
