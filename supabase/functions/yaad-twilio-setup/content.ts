@@ -469,7 +469,7 @@ export const WORKER_CLEARED_BODY =
  *  optional, founder 2 Oct 2026: without them, a video of the worker
  *  talking through their skills. */
 export const CHECK_REMINDER_BODY =
-  "Hi {{1}}, this is Yaadly. Your worker check with us is not finished yet.\n\nWhat is left: your ID, your TRN, and the Guidelines to sign. Three people who can vouch for you are optional; if you do not have them, a short video of you talking through your skills does the same job. It takes about ten minutes on your phone.\n\nFinish it here: {{2}}\n\nUntil it is done you cannot price jobs. If you have a question, reply to this message.";
+  "Hi {{1}}, this is Yaadly. Your worker check with us is not finished yet.\n\nWhat is left: your ID, your TRN, and the Guidelines to sign. Three people who can vouch for you are optional; if you do not have them, a short video of you talking through your skills gets you on the board. Referees are still needed before jobs over £500. It takes about ten minutes on your phone.\n\nFinish it here: {{2}}\n\nUntil it is done you cannot price jobs. If you have a question, reply to this message.";
 
 /** The job health nudge at 72 quiet hours, from yaad-job-health. It asks
  *  for evidence and does not ask for a check-in: checking in asks, it never

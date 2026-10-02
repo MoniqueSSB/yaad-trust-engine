@@ -205,8 +205,8 @@ const WHO: { yes: string; why: string }[] = [
     why: "You are asked for a TRN later. It is how you are paid as your own business rather than as somebody's staff." },
   { yes: "You take at least one of the eighteen trades, or you can name your own",
     why: "Your trades come from the same list a client picks from. That is the only reason a client's roofing job and your roofing profile find each other." },
-  { yes: "You are willing to be identity checked, and to have three referees telephoned",
-    why: "The call happens before you can take work over £500. Nobody reaches a client's gate unverified." },
+  { yes: "You are willing to be identity checked",
+    why: "Three referees are optional. Without them, a short video of you talking through your skills gets you on the board. The referees are telephoned before you can take work over £500, inside an occupied home, or holding keys. Nobody reaches a client's gate unverified." },
 ];
 
 /* Years at the trade, as four bands rather than a free number (founder's
@@ -263,16 +263,16 @@ const LATER_STEPS: Step[] = [
     p: "Government photo ID, then a <b>photo this page takes through your camera</b>, and a <b>short video where you turn your face slowly left to right</b>. Both are captured here, in front of us, rather than picked from your files. Then your TRN and proof of address dated within three months.",
     note: "A file proves somebody holds a document. A turn taken in front of us proves somebody was sitting there when it was sent. If your browser will not hand over a camera we say so on the row, take an upload instead, and a person checks that one by hand." },
 { phase: 2, n: "References", body: "refs",
-    h: "Three people who will vouch for you",
-    p: "Past clients, or trades you have worked alongside. Paste a WhatsApp message where they say what you did, or give a name and number. <b>Either is enough to get you on the board.</b> Before you can take the bigger jobs we telephone them, so tell them to expect a call.",
-    note: "A forwarded message gets you moving today. The phone call happens before the jobs over £500, because a message can be written by anybody and a conversation cannot." },
+    h: "Three people who will vouch for you, optional",
+    p: "Past clients, or trades you have worked alongside. Paste a WhatsApp message where they say what you did, or give a name and number. <b>Referees are optional.</b> If you do not have them, the video of you talking through your skills on the identity screen gets you on the board instead.",
+    note: "The bigger jobs still need referees: before work over £500, inside an occupied home, or holding keys, we telephone all three, because a message can be written by anybody and a conversation cannot." },
 { phase: 2, n: "Sign the guidelines", body: "sign",
     h: "The Worker Guidelines, signed once",
     p: "How quoting works, what evidence you owe on every job, how you get paid, and what loses you the platform. You sign the current version once, not once per job. If the wording is ever revised you are asked to sign the new version before your next job.",
     note: "Written with a timestamp and the exact consent sentence. No edit, no delete." },
 { phase: 2, n: "Save it", body: "live",
     h: "Save what you have added",
-    p: "Your application is already with the desk. This adds what you have just done to it: your ID check, your referees and your signature.",
+    p: "Your application is already with the desk. This adds what you have just done to it: your ID check, your referees or your skills video, and your signature.",
     note: "Free to join, free to quote, win or lose. Your price is agreed with you per job, before you start." },
 ];
 
@@ -292,7 +292,11 @@ const CHECKS: Check[] = [
   { k: "id",     b: "Government photo ID",     s: "Live photo and a left-to-right video turn" },
   { k: "id2",    b: "TRN verified",            s: "Matched to the name on the ID" },
   { k: "id3",    b: "Proof of address",        s: "Dated within three months" },
-  { k: "refs",   b: "3 referees", s: "A message they sent, or a name and number we can call", req: true },
+  /* Founder, 2 Oct 2026: referees are optional. Without them, the video of
+     the worker talking through their skills (intro_video) gets them on the
+     board. Referees are still telephoned before the top tier (over £500,
+     occupied homes, keys), enforced at the publish gate, not here. */
+  { k: "refs",   b: "3 referees, or your skills video", s: "A message or a number for each referee, or a short video of you talking through your skills", req: true },
   { k: "sign",   b: "Worker Guidelines signed", s: "The current version, once" },
   { k: "live",   b: "Profile published",       s: "You are on the board" },
 ];
@@ -905,6 +909,7 @@ export function JoinFlow() {
      them or something they actually said. The phone call still happens before
      top tier, which is enforced at the publish gate rather than here. */
   const refsDone = refs.every((r) => (r.name.trim() && r.phone.trim()) || r.quote.trim());
+  const skillsVideo = has("intro_video");
 
   const done: Record<string, boolean> = {
     form: step1Ready,
@@ -917,7 +922,7 @@ export function JoinFlow() {
       : has("photo_id") && has("selfie_with_id") && has("face_video"),
     id2: has("trn"),
     id3: has("proof_of_address"),
-    refs: refsDone,
+    refs: refsDone || skillsVideo,
     sign: signed && signedName.trim().length > 1,
     live: false,
   };
@@ -959,7 +964,7 @@ export function JoinFlow() {
             {[
               ["Your identity check", done.id],
               ["Your TRN", done.id2],
-              ["Your referees", done.refs],
+              [refsDone ? "Your referees" : "Your referees, or your skills video", done.refs],
               ["The Worker Guidelines, signed", done.sign],
             ].map(([label, ok]) => (
               <li key={String(label)} className="flex items-start gap-2">
@@ -1019,7 +1024,7 @@ export function JoinFlow() {
             <b className="text-[15px] text-ink">What happens next</b>
             <ol className="mt-3 grid gap-2 text-[13.5px] leading-relaxed text-mute">
               <li><b className="text-ink">1.</b> A real person reads your application. Not a machine.</li>
-              <li><b className="text-ink">2.</b> Your check: your ID, TRN, three referees, and sign the Guidelines. Below, when you are ready.</li>
+              <li><b className="text-ink">2.</b> Your check: your ID, TRN, and sign the Guidelines. Three referees are optional; without them, a short video of you talking through your skills. Below, when you are ready.</li>
               <li><b className="text-ink">3.</b> You hear back on WhatsApp, either way. No silence.</li>
               <li><b className="text-ink">4.</b> Once cleared, jobs come to you on WhatsApp. Quote in writing. Always free.</li>
               <li><b className="text-ink">5.</b> Win a quote and we walk you through how the job runs.</li>
@@ -1078,9 +1083,9 @@ export function JoinFlow() {
               <span className="text-dim" aria-hidden="true">•</span>
               <span className="text-dim">
                 <b>Referees.</b>{" "}
-                {done.refs
+                {refsDone
                   ? "Given, and not telephoned yet. The calls happen before the jobs over £500."
-                  : "Not given yet. We telephone them before the jobs over £500."}
+                  : "Optional. Without them, your skills video gets you on the board. We telephone referees before the jobs over £500."}
               </span>
             </li>
             <li className="flex items-start gap-2">
@@ -1108,7 +1113,7 @@ export function JoinFlow() {
         <div className="mt-6 rounded-2xl border border-line bg-panel p-5">
           <b className="text-[15px] text-ink">Want to get ahead of it?</b>
           <p className="mt-2 text-[13.5px] leading-relaxed text-mute">
-            Your ID check, your referees and the Worker Guidelines are the next
+            Your ID check, your referees or skills video, and the Worker Guidelines are the next
             things we ask for, and we normally chase them on WhatsApp once a
             person has read your application. You can do them now instead. It
             makes no difference to the decision, only to how fast it lands.
@@ -1252,7 +1257,7 @@ export function JoinFlow() {
                 </div>
               ))}
               <div className="px-4 py-3 text-[12.5px] leading-relaxed text-dim">
-                ID, TRN, proof of address and three referees come{" "}
+                ID, TRN, proof of address and referees (or a skills video) come{" "}
                 <b className="font-semibold text-mute">after</b> a person says
                 yes. Do not go hunting for any of it now. What applying gets you
                 is a real person reading it and a straight answer, which is the
@@ -1531,7 +1536,11 @@ export function JoinFlow() {
 
             {d.body === "id" && (
               <div className="grid gap-3">
-                {/* Thirty seconds, and the only thing on this page a client
+                {/* Founder, 2 Oct 2026: two minutes, with sound, and it now
+                    stands in for the referees (see CHECKS). Before that it
+                    was thirty seconds and recorded no sound at all.
+
+                    The only thing on this page a client
                     ever sees. Everything else here is a check somebody at the
                     desk reads once; this is the tradesperson in their own
                     voice, which is worth more to a woman in London deciding
@@ -1546,16 +1555,18 @@ export function JoinFlow() {
                     and is never sent to a model. */}
                 <div className="rounded-xl border border-line bg-bg px-4 py-3">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <b className="text-[13.5px]">Say hello, thirty seconds</b>
-                    <span className="src ok">Optional</span>
+                    <b className="text-[13.5px]">Talk us through your skills, up to two minutes</b>
+                    <span className={refsDone ? "src ok" : "src req"}>{refsDone ? "Optional" : "Or three referees"}</span>
                   </div>
                   <p className="mt-1 mb-3 text-[12px] leading-relaxed text-dim">
-                    Your name, your trade, how long you have been doing it, and
-                    one job you were proud of. No script and no need to dress
-                    up. <b className="text-mute">This is the one thing on this
-                    page a client actually sees.</b>
+                    Your name, your trade, how long you have been doing it, what
+                    you can do, and one job you were proud of. No script and no
+                    need to dress up. <b className="text-mute">If you do not have
+                    three referees, this gets you on the board instead.</b> It is
+                    also the one thing on this page a client can see, and only if
+                    you say yes below.
                   </p>
-                  <LiveCapture kind="video" label="A short introduction" seconds={30}
+                  <LiveCapture kind="video" label="Your skills, in your own words" seconds={120} audio
                     doc="intro_video" docs={docs} onFile={upload} />
                 </div>
 
@@ -1752,13 +1763,13 @@ export function JoinFlow() {
                 <div className="rounded-xl border border-line2 bg-bg px-4 py-3 text-[12.5px] leading-relaxed">
                   <b className="text-ink">Three referees, and each one needs
                   either a number or something they said</b>{" "}
-                  <span className={refsDone ? "src ok" : "src req"}>
-                    {refsDone ? "All three answered" : "Needed to be published"}
+                  <span className={refsDone || skillsVideo ? "src ok" : "src req"}>
+                    {refsDone ? "All three answered" : skillsVideo ? "Optional, your skills video is in" : "Referees or your skills video"}
                   </span>
                   <p className="mt-2 text-mute">
-                    You can leave this screen part done and send what you have.
-                    It does not stop you here, and it does stop your profile
-                    going public, so it is worth finishing.
+                    {skillsVideo
+                      ? "Your skills video is enough to get you on the board, so this screen is optional. Referees are still needed before the jobs over £500, inside an occupied home, or holding keys."
+                      : "Optional if you record the short video of you talking through your skills on the identity screen. Without either, your profile cannot go public. You can leave this part done and send what you have."}
                   </p>
                 </div>
                 {refs.map((r, i) => {
@@ -1803,7 +1814,8 @@ export function JoinFlow() {
                   <b className="text-mute">A message or a number, whichever you
                   have.</b> A forwarded WhatsApp message is enough to get you on
                   the board. We telephone your referees before you can take work
-                  over £500, so tell them a call is coming.
+                  over £500, inside an occupied home, or holding keys, so tell
+                  them a call is coming.
                 </p>
               </div>
             )}
@@ -1917,7 +1929,7 @@ export function JoinFlow() {
                       {[
                         ["01", "A person reads it, inside 24 hours.", "A straight answer either way, by the contact you gave."],
                         ["02", "Then the check starts.", "Your photo ID, your TRN and a proof of address dated in the last three months. We chase these on WhatsApp."],
-                        ["03", "Three referees, then the board.", "We telephone them before you can take work over £500. Your profile stays held back from clients until the checks clear."],
+                        ["03", "Referees or a skills video, then the board.", "Referees are optional: a short video of you talking through your skills does instead. We telephone referees before you can take work over £500. Your profile stays held back from clients until the checks clear."],
                       ].map(([i, t, dd]) => (
                         <div key={i} className="flex gap-3 text-[13.5px] leading-normal text-mute">
                           <span className="w-[18px] flex-none pt-0.5 font-mono text-[11px] font-semibold text-goldb">{i}</span>
@@ -2354,12 +2366,15 @@ function Progress({ n, total, name }: { n: number; total: number; name: string }
    what gets sent: the recorder hands back "video/webm;codecs=vp8" and the
    bucket's allow-list is an exact match on "video/webm". */
 const VIDEO_TRY = ["video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+/* With sound, name the audio codec too: "codecs=vp8" alone can record a
+   silent file from a stream that has a microphone on it. */
+const VIDEO_AUDIO_TRY = ["video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
 const EXT_OF: Record<string, string> = { "video/mp4": "mp4", "video/webm": "webm" };
 const bare = (m: string) => m.split(";")[0].trim().toLowerCase();
 
-function pickVideoType(): string {
+function pickVideoType(audio = false): string {
   if (typeof MediaRecorder === "undefined") return "";
-  for (const t of VIDEO_TRY) if (MediaRecorder.isTypeSupported(t)) return t;
+  for (const t of audio ? VIDEO_AUDIO_TRY : VIDEO_TRY) if (MediaRecorder.isTypeSupported(t)) return t;
   return "";
 }
 
@@ -2384,7 +2399,7 @@ const stamp = () => new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 type CamPhase = "idle" | "opening" | "live" | "counting" | "blocked";
 
 function LiveCapture({
-  kind, label, doc, docs, onFile, seconds = 10,
+  kind, label, doc, docs, onFile, seconds = 10, audio = false,
 }: {
   kind: "photo" | "video";
   label: string;
@@ -2392,6 +2407,10 @@ function LiveCapture({
   docs: Record<string, DocState>;
   onFile: (d: DocType, f: File) => void;
   seconds?: number;
+  /* Sound for the skills video only. The ID captures stay silent: a face
+     turn needs no voice, and asking for the microphone there is a second
+     permission prompt for nothing. */
+  audio?: boolean;
 }) {
   const [phase, setPhase] = useState<CamPhase>("idle");
   const [why, setWhy] = useState("");
@@ -2461,7 +2480,7 @@ function LiveCapture({
     try {
       stream.current = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
+        audio,
       });
       setPhase("live");
     } catch (e) {
@@ -2499,10 +2518,13 @@ function LiveCapture({
   function startRecording() {
     const s = stream.current;
     if (!s) return;
-    const want = pickVideoType();
+    const want = pickVideoType(audio);
     let r: MediaRecorder;
     try {
-      r = new MediaRecorder(s, want ? { mimeType: want } : undefined);
+      // Capped so two minutes stays well under the 50MB upload limit
+      // (about 23MB at these rates); unset, a phone can record far higher.
+      const rate = audio ? { videoBitsPerSecond: 1_400_000, audioBitsPerSecond: 64_000 } : {};
+      r = new MediaRecorder(s, want ? { mimeType: want, ...rate } : (audio ? rate : undefined));
     } catch {
       release(); setPhase("blocked");
       setWhy("The browser refused to start a recording from its own camera.");
@@ -2522,7 +2544,7 @@ function LiveCapture({
         return;
       }
       setPhase("idle");
-      onFile(doc, new File([blob], `face-turn-${stamp()}.${EXT_OF[type] ?? "webm"}`, { type }));
+      onFile(doc, new File([blob], `${audio ? "skills" : "face-turn"}-${stamp()}.${EXT_OF[type] ?? "webm"}`, { type }));
     };
     rec.current = r;
     r.start();
