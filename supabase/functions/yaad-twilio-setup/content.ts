@@ -465,9 +465,11 @@ export const WORKER_CLEARED_BODY =
  *  in {{2}}, and Meta rejects variables that carry the message itself, so
  *  v2 has two variables only, the name and the link, and the same words
  *  for both reminders. The text message and the email still say "Last
- *  reminder from us" the second time (worker-cleared.ts). */
+ *  reminder from us" the second time (worker-cleared.ts). Referees are
+ *  optional, founder 2 Oct 2026: without them, a video of the worker
+ *  talking through their skills. */
 export const CHECK_REMINDER_BODY =
-  "Hi {{1}}, this is Yaadly. Your worker check with us is not finished yet.\n\nWhat is left: your ID, your TRN, three people who can vouch for you, and the Guidelines to sign. It takes about ten minutes on your phone.\n\nFinish it here: {{2}}\n\nUntil it is done you cannot price jobs. If you have a question, reply to this message.";
+  "Hi {{1}}, this is Yaadly. Your worker check with us is not finished yet.\n\nWhat is left: your ID, your TRN, and the Guidelines to sign. Three people who can vouch for you are optional; if you do not have them, a short video of you talking through your skills does the same job. It takes about ten minutes on your phone.\n\nFinish it here: {{2}}\n\nUntil it is done you cannot price jobs. If you have a question, reply to this message.";
 
 /** The job health nudge at 72 quiet hours, from yaad-job-health. It asks
  *  for evidence and does not ask for a check-in: checking in asks, it never

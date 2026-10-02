@@ -39,14 +39,17 @@ export const WORKER_CLEARED_SUBJECT = "You are cleared. Welcome to Yaadly.";
  *  anybody not yet published, and never a third time. Says what is left and
  *  what it unlocks, and nothing about how the decision will go. The link is
  *  the same one the six questions hand out, built here because this
- *  function cannot import from yaad-inbound. */
+ *  function cannot import from yaad-inbound. Referees are optional, founder
+ *  2 Oct 2026: without them, a video of the worker talking through their
+ *  skills. */
 export function checkReminderText(name: string, link: string, nth: number): string {
   const first = (name ?? "").trim().split(/\s+/)[0] ?? "";
   return [
     `Hi${first ? ` ${first}` : ""}, it is Yaadly.`,
     ``,
     nth >= 2 ? `Last reminder from us. Your check is still waiting.` : `Your check is still waiting.`,
-    `Your ID. Your TRN. Three people who can vouch for you. Sign the Guidelines.`,
+    `Your ID. Your TRN. Sign the Guidelines.`,
+    `Three people who can vouch for you are optional. If you do not have them, send a short video of you talking through your skills.`,
     `About ten minutes, on your phone:`,
     link,
     ``,
