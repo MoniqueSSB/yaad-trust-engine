@@ -5645,6 +5645,16 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 
 **Setting a Stripe key without mangling it.** Three attempts on 19 to 20 Sep went in wrong: the placeholder word typed literally twice, then a truncated paste ("malformed API Key" in the `yaad-payout-setup` logs). What worked: copy the key in Stripe, then `supabase secrets set --project-ref leffyisvfvjwzilydlwf STRIPE_SECRET_KEY="$(pbpaste | tr -d '[:space:]')"`. Check it took by pressing Set up with Stripe on the worker page and reading the function logs; a live key opens Stripe's real form on the live account.
 
+## A worker's Stripe details change: the call-back is cleared (20261002102157)
+
+**What it is.** Since 2 Oct 2026 a call-back counts only for the Stripe details that were there when it was done. Setting up Stripe for the first time, a replaced Stripe recipient, or a different bank account inside Stripe (the worker can change it in Stripe's own form without anything else changing) all clear the call-back, the same as new Wise details. `yaad-payout-send` pays only the bank account recorded in `worker_profiles.stripe_payout_method_id`, Stripe's id for it, never a bank detail.
+
+1. **Deploy order:** apply `20261002102157`, then from `main` deploy `yaad-payout-setup` and `yaad-payout-send` (`supabase functions deploy <name> --project-ref leffyisvfvjwzilydlwf`, no `--no-verify-jwt` on either). Functions deployed before the migration fail closed: the sender cannot read the new column and refuses every Stripe payout.
+2. **"The bank account Stripe holds for X is not the one that was there at their last call-back."** The worker changed their bank account in Stripe, or this is the first Stripe payout since the change went in. The call-back has already been cleared. Phone them on the number on file, check their details, press **Call-back done**, then **Pay with Stripe** again.
+3. **A worker was called back, then shows under Bank details to check again.** They set up or changed Stripe since. Call again. That is the rule working, not a fault.
+4. **What the call-back cannot check for a Stripe worker.** Yaadly never sees a Stripe worker's account, so there is nothing on the desk to read back to them. The rule above makes sure the account paid is the one that was there at the call; it does not prove that account is theirs. See DECISIONS.md, 2 Oct 2026.
+5. **Proving it holds:** `supabase/tests/pglite/stripe_callback_run.mjs`, run as its header says. 27 lines, all PASS.
+
 ## A worker cannot be paid because the client has not paid (20260917180000, 20260919160000)
 
 **What it is.** Founder decision, 17 Sep 2026: nobody is paid for work until the client's bill for that work is marked paid. On **Pay workers** each owed row shows a **Client paid?** column (paid, or not yet with the short reason; the database's full sentence and the job's client bills are on that chip's tooltip), who approved the stage, and three links: **Pay invoice**, **Job invoices**, **Job record**.

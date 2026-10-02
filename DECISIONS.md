@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-10-02 · A worker's changed Stripe details clear the call-back, and Stripe pays only the account that was there at the call
+
+**Why.** Founder, 2 Oct 2026: "commit and pr", then "also fix anything outstanding". A review of the call-back found it blind to Stripe in two ways. `worker_bank_callback_guard()` cleared the call-back for new Wise details and new pick-up details but not for a new `stripe_recipient_id`, so a worker called back on Wise could set up Stripe with another account and still be paid on the old call. And once a worker has a Stripe recipient, the setup page hands them Stripe's update form, where the bank account can change while the recipient id stays the same; `yaad-payout-send` paid whatever account Stripe held at the moment of sending. Both are the case the call-back exists for: somebody in a worker's login putting in their own account. Read live on 2 Oct 2026: no worker had a Stripe recipient and no Stripe payout had gone out, so nobody was paid either way.
+
+**How (`20261002102157`, `yaad-payout-setup`, `yaad-payout-send`).** A new column, `worker_profiles.stripe_payout_method_id`, holds Stripe's id for the bank account it would pay the worker. A trigger of its own, `trg_worker_bank_callback_stripe`, clears the call-back whenever that id or the recipient id changes. The setup function records the id when the worker returns from Stripe's form, so a change clears the call-back before anybody phones. The sender compares it on every quote and every send; a different account is recorded (clearing the call-back) and refused. Stripe's payment names the account explicitly, so the money goes to the account that was checked.
+
+**Why a separate trigger.** Restating the guard a third time would have made this migration and `20261001194258` overwrite each other by order of application. Triggers fire in name order, so this one runs after the guard, whichever version is live.
+
+**What is still open, and is the founder's call.** For a Stripe worker the call-back has nothing to read back: Yaadly never sees the account, and the desk's "read back bank, branch, last four digits" step has no figures to read from. This change guarantees the account paid is the one that existed at the call, not that it is the worker's. Closing that means showing the caller something from Stripe (for example the last four digits, read live, never stored), which is a data decision and a desk change.
+
+**No human gate moved.** One refusal was added; none was removed. A named person still records every call-back and presses every payment.
+
 ## 2026-10-01 · A worker with no bank account can collect by MoneyGram cash pick-up
 
 **Decided by Monique, 1 Oct 2026**, reversing part of 14 Sep 2026 ("bank transfer only, never cash", "no Western Union"). Her reason: "i dont want to cut out those workers". A bank account was the only way to be paid, and nothing told a worker that before they joined, so an unbanked tradesperson would have found out after finishing the job. The Mirror Rule fails on the worker's side if the strongest informal workers cannot be paid at all.
