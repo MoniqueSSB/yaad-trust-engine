@@ -10744,15 +10744,28 @@ function payBlockShort(reason){
 // The pay invoice Pay workers should scroll to and light up once it loads.
 let WP_FOCUS = null;
 
+// 20261001194258 adds the MoneyGram pick-up columns. Until it is applied they
+// do not exist, so each read falls back to the columns it had before rather
+// than losing the whole view.
+const WP_INV_COLS = "id,job_id,stage,period_label,total_pence,currency,status,sent_at,paid_at,paid_by,paid_method,paid_reference,worker_email";
+const WP_PROFILE_COLS = "worker_email,name,phone,wise_recipient_set_at,bank_callback_at,bank_callback_by,stripe_recipient_status";
+function readPayInvoices(cols){
+  return sb.from("invoices").select(cols)
+    .eq("payable_to", "worker").neq("status", "void")
+    .order("sent_at", { ascending: true, nullsFirst: false }).limit(200);
+}
+async function readWorkerPayProfiles(emails){
+  const r = await sb.from("worker_profiles").select(WP_PROFILE_COLS + ",cash_pickup_name,cash_pickup_parish,cash_pickup_set_at").in("worker_email", emails);
+  return r.error ? sb.from("worker_profiles").select(WP_PROFILE_COLS).in("worker_email", emails) : r;
+}
+
 async function loadWorkerPay(keepMsg){
   const host = $("wpBody");
   if (!keepMsg) say("wpMsg", "", "");
   host.innerHTML = `<div class="empty"><b>Reading worker pay invoices&hellip;</b></div>`;
 
-  const { data: invs, error } = await sb.from("invoices")
-    .select("id,job_id,stage,period_label,total_pence,currency,status,sent_at,paid_at,paid_by,paid_method,paid_reference,worker_email")
-    .eq("payable_to", "worker").neq("status", "void")
-    .order("sent_at", { ascending: true, nullsFirst: false }).limit(200);
+  let { data: invs, error } = await readPayInvoices(WP_INV_COLS + ",paid_fee_pence");
+  if (error) ({ data: invs, error } = await readPayInvoices(WP_INV_COLS));
   if (error) {
     host.innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>Could not read worker pay invoices</b><p>${esc(error.message)}</p></div></div>`;
     return;
@@ -10766,8 +10779,11 @@ async function loadWorkerPay(keepMsg){
   const emails = [...new Set([...list.map((i) => i.worker_email), ...(booked || []).map((j) => j.worker_email)].filter(Boolean))];
   const [{ data: jobs }, { data: workers }] = await Promise.all([
     jobIds.length ? sb.from("jobs").select("id,title,is_test").in("id", jobIds) : Promise.resolve({ data: [] }),
-    emails.length ? sb.from("worker_profiles").select("worker_email,name,phone,wise_recipient_set_at,bank_callback_at,bank_callback_by,stripe_recipient_status").in("worker_email", emails) : Promise.resolve({ data: [] }),
+    emails.length ? readWorkerPayProfiles(emails) : Promise.resolve({ data: [] }),
   ]);
+  // 20261001194258: whether MoneyGram cash pick-up is switched on. Off until
+  // MoneyGram Business has approved Yaadly. An error reads as off.
+  const { data: pickupOn } = await sb.rpc("moneygram_payouts_on");
   // Stripe payouts already sent for these invoices (20260916120000), so a
   // paid-by-Stripe row can show Stripe's own status, and a failed or returned
   // one shows red until a person deals with it.
@@ -10799,7 +10815,7 @@ async function loadWorkerPay(keepMsg){
     const w = workerByEmail.get(String(i.worker_email || "").toLowerCase());
     // 20260914240000: nobody is paid until a person has called them back.
     const bank = w && w.bank_callback_at
-      ? "bank details checked " + String(w.bank_callback_at).slice(0, 10)
+      ? (w.cash_pickup_name ? "pick-up name checked " : "bank details checked ") + String(w.bank_callback_at).slice(0, 10)
       : "call-back needed before paying";
     return `<b>${esc(who(i))}</b>` + sub_((i.worker_email || "") + " · " + bank);
   };
@@ -10868,6 +10884,14 @@ async function loadWorkerPay(keepMsg){
   const methodOf = (i) => {
     const w = workerByEmail.get(String(i.worker_email || "").toLowerCase()) || {};
     const stripe = stripeReady(i), wise = !!w.wise_recipient_set_at;
+    // 20261001194258: no bank account, so MoneyGram cash pick-up, sent from
+    // Yaadly's MoneyGram Business account. The fee comes off their pay.
+    if (w.cash_pickup_name) {
+      const where = "name on ID " + w.cash_pickup_name + (w.cash_pickup_parish ? ", collecting in " + w.cash_pickup_parish : "");
+      const also = stripe ? " They also set up Stripe." : wise ? " They also gave bank details in Wise." : "";
+      if (!pickupOn || (i.currency || "JMD") !== "JMD") return { stripe, wise, mg: false, text: "Asked for MoneyGram cash pick-up (" + where + "), but MoneyGram is switched off until MoneyGram Business approves Yaadly." + also };
+      return { stripe, wise, mg: true, text: "Has no bank account and asked for MoneyGram cash pick-up: " + where + ". The MoneyGram fee comes off their pay." + also };
+    }
     if (stripe && wise) return { stripe: true, wise: true, text: "Set up Stripe and gave bank details in Wise, so either works." };
     if (stripe) return { stripe: true, wise: false, text: "Set up a Stripe payout account, so this is paid through Stripe." };
     if (wise) return { stripe: false, wise: true, text: "Gave bank details in Wise on " + String(w.wise_recipient_set_at).slice(0, 10) + ", so this is paid by Wise to that recipient." };
@@ -10890,8 +10914,16 @@ async function loadWorkerPay(keepMsg){
     return `<div class="brow">
         ${m.stripe ? `<button class="btn" data-wp-stripe="${esc(i.id)}" data-wp-who="${esc(who(i))}" title="Shows Stripe's fee and rate first, and sends only when you confirm">Pay with Stripe</button>` : ""}
         ${m.wise ? `<a class="btn" href="https://wise.com/home" target="_blank" rel="noopener" data-wp-wise="${esc(i.id)}" title="Opens Wise in a new tab. Pay the recipient saved there, then confirm it here">Pay by Wise</a>` : ""}
+        ${m.mg ? `<button class="btn" data-wp-mg="${esc(i.id)}" title="Send it from Yaadly's MoneyGram Business account, then record it here">Pay by MoneyGram</button>` : ""}
       </div>
-      ${sub_((inCard ? "" : m.text + " ") + (m.stripe ? "Stripe asks you to confirm its fee and rate before it sends." : "") + (m.stripe && m.wise ? " " : "") + (m.wise ? "Pay in Wise, then confirm it here." : ""))}
+      ${sub_((inCard ? "" : m.text + " ") + (m.stripe ? "Stripe asks you to confirm its fee and rate before it sends." : "") + (m.stripe && m.wise ? " " : "") + (m.wise ? "Pay in Wise, then confirm it here." : "") + (m.mg ? " Send by MoneyGram, phone them the pick-up reference, then record it here." : ""))}
+      ${m.mg ? `<div data-wp-mgpanel="${esc(i.id)}" style="display:none;margin-top:8px">
+        ${sub_("Sent it from Yaadly's MoneyGram Business account? Record it here. Phone them the pick-up reference. Never type it here or WhatsApp it.")}
+        <input type="text" placeholder="MoneyGram transaction number" data-wp-mgref="${esc(i.id)}" style="width:100%;max-width:220px;margin:4px 0">
+        <input type="number" min="0" step="1" inputmode="numeric" placeholder="MoneyGram fee, J$" data-wp-mgfee="${esc(i.id)}" style="width:100%;max-width:160px;margin:4px 0">
+        <div data-wp-mgnet="${esc(i.id)}">${sub_("Type the fee to see what they collect.")}</div>
+        <button class="btn" data-wp-mgsent="${esc(i.id)}" data-wp-total="${esc(String(i.total_pence))}" data-wp-who="${esc(who(i))}">Confirm the MoneyGram payment</button>
+      </div>` : ""}
       ${m.wise ? `<div data-wp-wisepanel="${esc(i.id)}" style="display:none;margin-top:8px">
         ${sub_("Paid them in the Wise tab? Record it here.")}
         <input type="text" placeholder="Wise reference, optional" data-wp-ref="${esc(i.id)}" style="width:100%;max-width:200px;margin:4px 0">
@@ -10924,7 +10956,9 @@ async function loadWorkerPay(keepMsg){
   }).join("");
 
   const paidRows = paid.map((i) => {
-    const how = i.paid_method === "bank_transfer" ? "by bank transfer" : i.paid_method === "stripe" ? "by Stripe" : "marked paid";
+    const how = i.paid_method === "bank_transfer" ? "by bank transfer" : i.paid_method === "stripe" ? "by Stripe" : i.paid_method === "moneygram" ? "by MoneyGram pick-up" : "marked paid";
+    const mgFee = i.paid_method === "moneygram" && i.paid_fee_pence != null
+      ? sub_("fee " + feeAmt(i.paid_fee_pence, i.currency) + " off their pay, they collected " + feeAmt(Number(i.total_pence) - Number(i.paid_fee_pence), i.currency)) : "";
     const ref = String(i.paid_reference || "").trim();
     const sp = i.paid_method === "stripe" ? payoutByInv.get(i.id) : null;
     // Stripe's own word on the payout, as last read. Red until a person has dealt with a failed or returned one.
@@ -10945,7 +10979,7 @@ async function loadWorkerPay(keepMsg){
       <td>${forCell(i)}</td>
       <td class="num">${feeAmt(i.total_pence, i.currency)}</td>
       <td>${spChip}${sp ? ` <button class="btn" data-wp-refresh="${esc(i.id)}" title="Ask Stripe where this payout is">Check</button>` : ""}</td>
-      <td>${esc(how)}${ref && !sp ? ", ref " + esc(ref) : ""}, ${esc(String(i.paid_at || "").slice(0, 10))}${sub_(i.paid_by || "")}${spDetail ? sub_(spDetail) : ""}${sp && sp.receipt_url ? ` <a href="${esc(sp.receipt_url)}" target="_blank" rel="noopener">receipt</a>` : ""}</td>
+      <td>${esc(how)}${ref && !sp ? ", ref " + esc(ref) : ""}, ${esc(String(i.paid_at || "").slice(0, 10))}${sub_(i.paid_by || "")}${mgFee}${spDetail ? sub_(spDetail) : ""}${sp && sp.receipt_url ? ` <a href="${esc(sp.receipt_url)}" target="_blank" rel="noopener">receipt</a>` : ""}</td>
     </tr>`;
   }).join("");
 
@@ -10957,7 +10991,8 @@ async function loadWorkerPay(keepMsg){
     .filter((w) => !w.bank_callback_at);
   const checkRows = toCheck.map((w) => {
     const name = w.name || (booked || []).find((j) => String(j.worker_email).toLowerCase() === String(w.worker_email).toLowerCase())?.worker_name || w.worker_email;
-    const given = w.wise_recipient_set_at ? "Gave their details in Wise on " + String(w.wise_recipient_set_at).slice(0, 10) + ". Check them in Wise, Recipients." : "No details through the portal yet: take them by phone.";
+    const given = w.cash_pickup_name ? "Asked for MoneyGram cash pick-up on " + String(w.cash_pickup_set_at || "").slice(0, 10) + ": name on ID " + w.cash_pickup_name + (w.cash_pickup_parish ? ", collecting in " + w.cash_pickup_parish : "") + ". Check the name matches their ID exactly."
+      : w.wise_recipient_set_at ? "Gave their details in Wise on " + String(w.wise_recipient_set_at).slice(0, 10) + ". Check them in Wise, Recipients." : "No details through the portal yet: take them by phone.";
     return `<tr>
       <td><b>${esc(name)}</b>${sub_(w.worker_email || "")}</td>
       <td>${esc(w.phone || "no phone on file")}</td>
@@ -10967,8 +11002,8 @@ async function loadWorkerPay(keepMsg){
   }).join("");
   const checkCard = toCheck.length ? `
     <div class="card">
-      <div class="chd"><h3>Bank details to check: ${toCheck.length}</h3></div>
-      <p class="vsub">Phone each worker on the number on file, read back their bank, branch, the last four digits and the name, and check the name matches their ID. Then press Call-back done. Until then, Mark as sent will not work for them.</p>
+      <div class="chd"><h3>Payment details to check: ${toCheck.length}</h3></div>
+      <p class="vsub">Phone each worker on the number on file. For bank details, read back their bank, branch, the last four digits and the name. For cash pick-up, check the name matches their ID exactly. Then press Call-back done. Until then, they cannot be marked paid.</p>
       <div class="tw"><table><thead><tr><th>Worker</th><th>Phone on file</th><th>Details</th><th></th></tr></thead><tbody>${checkRows}</tbody></table></div>
     </div>` : "";
 
@@ -11016,6 +11051,46 @@ async function loadWorkerPay(keepMsg){
     a.addEventListener("click", () => {
       const p = host.querySelector(`[data-wp-wisepanel="${a.dataset.wpWise}"]`);
       if (p) p.style.display = "";
+    });
+  });
+
+  // Pay by MoneyGram (20261001194258). Shows the confirm underneath, like
+  // Wise: send first, record second. The fee comes off the worker's pay, so
+  // the panel shows what they collect as the fee is typed. Recording it is
+  // the same mark_worker_paid, which checks everything again.
+  host.querySelectorAll("[data-wp-mg]").forEach((b) => b.addEventListener("click", () => {
+    const p = host.querySelector(`[data-wp-mgpanel="${b.dataset.wpMg}"]`);
+    if (p) p.style.display = "";
+  }));
+  host.querySelectorAll("[data-wp-mgfee]").forEach((inp) => inp.addEventListener("input", () => {
+    const id = inp.dataset.wpMgfee;
+    const btn = host.querySelector(`[data-wp-mgsent="${id}"]`);
+    const out = host.querySelector(`[data-wp-mgnet="${id}"]`);
+    const total = Number(btn.dataset.wpTotal), fee = Number(inp.value);
+    out.innerHTML = inp.value === "" ? sub_("Type the fee to see what they collect.")
+      : !Number.isInteger(fee) || fee < 0 || fee >= total ? sub_("The fee must be whole J$ and less than " + jmdFmt(total) + ".")
+      : sub_("They collect " + jmdFmt(total - fee) + " (" + jmdFmt(total) + " less the " + jmdFmt(fee) + " fee).");
+  }));
+  host.querySelectorAll("[data-wp-mgsent]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.wpMgsent, name = btn.dataset.wpWho, total = Number(btn.dataset.wpTotal);
+      const ref = ((host.querySelector(`[data-wp-mgref="${id}"]`) || {}).value || "").trim();
+      const feeTxt = ((host.querySelector(`[data-wp-mgfee="${id}"]`) || {}).value || "").trim();
+      const fee = Number(feeTxt);
+      if (!ref) { say("wpMsg", "err", "Type the MoneyGram transaction number from Yaadly's receipt. Not the pick-up reference."); return; }
+      if (feeTxt === "" || !Number.isInteger(fee) || fee < 0 || fee >= total) { say("wpMsg", "err", "Type the MoneyGram fee in whole J$. It must be less than " + jmdFmt(total) + "."); return; }
+      if (!confirm(`Mark ${jmdFmt(total)} as sent to ${name} by MoneyGram cash pick-up, transaction ${ref}?\n\nThe fee of ${jmdFmt(fee)} comes off their pay, so they collect ${jmdFmt(total - fee)}.\n\nThis marks ${id} paid and sends ${name} a WhatsApp naming the fee and saying you will phone the pick-up reference. It cannot be changed afterwards. Only press it once the MoneyGram transfer has gone.`)) return;
+      btn.disabled = true;
+      try {
+        const { error: e } = await sb.rpc("mark_worker_paid", { p_invoice: id, p_method: "moneygram", p_ref: ref, p_fee: fee });
+        if (e) throw e;
+        say("wpMsg", "ok", `Marked ${jmdFmt(total)} as sent to ${name} by MoneyGram, transaction ${ref}. They collect ${jmdFmt(total - fee)}. Now phone them the pick-up reference.`);
+      } catch (e) {
+        let hint = e.message;
+        if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
+        say("wpMsg", "err", hint);
+      }
+      await loadWorkerPay(true);
     });
   });
 
