@@ -4,7 +4,7 @@
 // Run: deno test --allow-read supabase/functions/
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { isStripeHostedUrl, recipientBody, recipientState } from "./payout.ts";
+import { defaultPayoutMethod, isStripeHostedUrl, recipientBody, recipientState } from "./payout.ts";
 
 Deno.test("a worker is ready only when local bank payouts are active", () => {
   assertEquals(recipientState(null), "none");
@@ -32,4 +32,11 @@ Deno.test("the recipient is a person in Jamaica, paid to a local bank, and carri
   assertEquals(b.display_name, "Devon");
   assertEquals(recipientBody("devon@example.com", "").display_name, "devon@example.com");
   assert(!/account_number|routing|branch|iban/i.test(JSON.stringify(b)), "Yaadly must not send bank details; the worker types them into Stripe");
+});
+
+Deno.test("the bank account recorded is Stripe's default for the worker, or nothing", () => {
+  assertEquals(defaultPayoutMethod({ configuration: { recipient: { default_outbound_destination: { id: "jmba_1" } } } }), "jmba_1");
+  assertEquals(defaultPayoutMethod({ configuration: { recipient: { default_outbound_destination: { id: "" } } } }), null);
+  assertEquals(defaultPayoutMethod({ id: "acct_1" }), null);
+  assertEquals(defaultPayoutMethod(null), null);
 });

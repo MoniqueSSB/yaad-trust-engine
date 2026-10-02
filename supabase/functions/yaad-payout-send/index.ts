@@ -26,7 +26,8 @@
  * WHAT IT NEVER DOES. Send without a person's second click. Send on a timer,
  * on evidence passing, or because a quote looked fine. Touch a bank detail:
  * the worker typed theirs into Stripe's form; Yaadly holds only Stripe's ids.
- * Pay anybody whose bank details have not been checked by phone.
+ * Pay anybody whose bank details have not been checked by phone, or pay a
+ * bank account other than the one there at their last call-back.
  *
  * LIVE KEYS ARE REFUSED unless STRIPE_PAYOUTS_ALLOW_LIVE is exactly "yes",
  * the same switch yaad-payout-setup uses, separate from card payments.
@@ -47,6 +48,7 @@ import {
   pickFinancialAccount,
   pickPayoutMethod,
   moneyBody,
+  payoutMethodChanged,
   quoteUnavailable,
   recipientReady,
   statusFromPayout,
@@ -163,7 +165,7 @@ Deno.serve(async (req: Request) => {
 
     // ---------------------------------------------------------- the worker
     const { data: wp } = await admin.from("worker_profiles")
-      .select("name, stripe_recipient_id, stripe_recipient_status, bank_callback_at")
+      .select("name, stripe_recipient_id, stripe_recipient_status, stripe_payout_method_id, bank_callback_at")
       .ilike("worker_email", workerEmail).not("stripe_recipient_id", "is", null)
       .order("updated_at", { ascending: false }).limit(1).maybeSingle();
     const recipient = String(wp?.stripe_recipient_id ?? "");
@@ -192,6 +194,20 @@ Deno.serve(async (req: Request) => {
       payoutMethod = pms.ok ? pickPayoutMethod(acct.body, pms.body?.data ?? []) : null;
     }
     if (!payoutMethod) return fail(`Stripe has no bank account on file for ${wp?.name ?? workerEmail} that it can pay. Ask them to open "How Yaadly pays you" in their portal.`, 409);
+    // 20261002102157: pay only the bank account that was there when a person
+    // last phoned the worker. A worker can change the account inside Stripe's
+    // own form without the recipient id changing, so the call-back alone
+    // could not see it. A different account is recorded, which clears the
+    // call-back in the database, and nothing is quoted or sent until
+    // somebody phones them again. Fails closed: if the record cannot be
+    // written, nothing is sent either.
+    if (payoutMethodChanged(wp?.stripe_payout_method_id, payoutMethod)) {
+      const { error: pmErr } = await admin.from("worker_profiles")
+        .update({ stripe_payout_method_id: payoutMethod, stripe_recipient_checked_at: new Date().toISOString() })
+        .ilike("worker_email", workerEmail);
+      if (pmErr) return fail(`Could not check which bank account Stripe holds for ${wp?.name ?? workerEmail}, so nothing was sent: ${pmErr.message}`, 502);
+      return fail(`The bank account Stripe holds for ${wp?.name ?? workerEmail} is not the one that was there at their last call-back. Call them back on the number you have for them, check their bank details, and press Call-back done on Pay workers. Then press Pay with Stripe again.`, 409);
+    }
 
     // ---------------------------------------------------------- the account
     let fa: Record<string, unknown> | null = null;

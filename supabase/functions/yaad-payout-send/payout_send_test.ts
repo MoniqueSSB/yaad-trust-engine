@@ -10,6 +10,7 @@ import {
   moneyBody,
   paymentBody,
   pickFinancialAccount,
+  payoutMethodChanged,
   pickPayoutMethod,
   quoteUnavailable,
   recipientReady,
@@ -109,4 +110,12 @@ Deno.test("a payout's status is read back honestly, including why it failed", ()
   assertEquals(bad.status, "returned");
   assertEquals(bad.detail, "account_closed");
   assertEquals(statusFromPayout({ status: "something_new" }).status, "processing");
+});
+
+Deno.test("a worker is paid only to the bank account recorded when they were last called back", () => {
+  assert(!payoutMethodChanged("jmba_1", "jmba_1"), "the same account");
+  assert(payoutMethodChanged("jmba_1", "jmba_2"), "a different account");
+  assert(payoutMethodChanged(null, "jmba_1"), "nothing recorded yet");
+  assert(payoutMethodChanged(undefined, "jmba_1"), "nothing recorded yet");
+  assert(payoutMethodChanged("", "jmba_1"), "nothing recorded yet");
 });

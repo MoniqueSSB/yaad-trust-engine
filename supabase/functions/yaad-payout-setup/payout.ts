@@ -48,3 +48,17 @@ export function recipientBody(email: string, name: string) {
     include: ["configuration.recipient"],
   };
 }
+
+/**
+ * Stripe's id for the bank account it would pay this worker by default, read
+ * off the recipient, or null. An id, never a bank detail. Recorded in
+ * worker_profiles.stripe_payout_method_id, where a change clears the
+ * call-back (20261002102157), so an account changed inside Stripe's own form
+ * is not paid unchecked. yaad-payout-send compares the same id on every
+ * quote and every send.
+ */
+// deno-lint-ignore no-explicit-any
+export function defaultPayoutMethod(account: any): string | null {
+  const id = account?.configuration?.recipient?.default_outbound_destination?.id;
+  return typeof id === "string" && id ? id : null;
+}

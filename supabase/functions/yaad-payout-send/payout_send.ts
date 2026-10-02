@@ -198,3 +198,15 @@ export function statusFromPayout(obp: Any): {
 export function quoteUnavailable(status: number, body: Any): boolean {
   return status === 404 || body?.error?.code === "not_found";
 }
+
+/**
+ * Is the bank account Stripe would pay now the one recorded on the worker's
+ * profile? The call-back is cleared whenever that record changes
+ * (20261002102157), so "same" means it is the account that was there when a
+ * person last phoned the worker. Nothing recorded yet counts as changed: a
+ * call-back done before Yaadly knew which account Stripe held checked nothing
+ * about it.
+ */
+export function payoutMethodChanged(recorded: unknown, now: string): boolean {
+  return typeof recorded !== "string" || recorded === "" || recorded !== now;
+}

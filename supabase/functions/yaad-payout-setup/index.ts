@@ -16,7 +16,9 @@
  *             or email it, so it is only ever handed to the signed-in worker
  *             here, never put in a WhatsApp.
  *   "status"  Reads the recipient back from Stripe and records whether local
- *             bank payouts are active.
+ *             bank payouts are active, and Stripe's id for the bank account
+ *             it would pay them. A new id clears the call-back
+ *             (20261002102157).
  *
  * WHAT IT NEVER DOES. It sends no money and it never sees a bank detail.
  * Paying a worker is yaad-payout-send, a named person's click (CLAUDE.md §2).
@@ -32,7 +34,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { httpAttrs, SpanKind, Trace } from "./otel.ts";
 import { isLiveKey } from "./stripe.ts";
-import { DEFAULT_STRIPE_V2_VERSION, isStripeHostedUrl, recipientBody, recipientState } from "./payout.ts";
+import { DEFAULT_STRIPE_V2_VERSION, defaultPayoutMethod, isStripeHostedUrl, recipientBody, recipientState } from "./payout.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -112,7 +114,13 @@ Deno.serve(async (req: Request) => {
       const got = await stripe("GET", `/v2/core/accounts/${encodeURIComponent(acct)}?include=configuration.recipient`);
       if (!got.ok) return fail(NOT_NOW, 502);
       const state = recipientState(got.body);
-      await record({ stripe_recipient_status: state });
+      // The bank account Stripe would pay them. A different one from last
+      // time clears the call-back (20261002102157), so somebody phones the
+      // worker before an account changed in Stripe's form is ever paid.
+      // Nothing is written when Stripe names none: yaad-payout-send still
+      // compares on every quote and send, and refuses a mismatch.
+      const method = defaultPayoutMethod(got.body);
+      await record(method ? { stripe_recipient_status: state, stripe_payout_method_id: method } : { stripe_recipient_status: state });
       root.setAttributes({ "yaadly.payout.state": state });
       return done({ state }, 200);
     }
