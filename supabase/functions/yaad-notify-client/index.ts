@@ -1022,7 +1022,7 @@ Deno.serve(async (req: Request) => {
       // Read against the 24 hour window first (sendToWorker). No approved
       // template says "you are cleared", so outside it this goes by text
       // message and email, and the desk sees the WhatsApp was not sent.
-      // yaadly_worker_cleared_v1 (yaad-twilio-setup, META_WORKER_TEMPLATES):
+      // yaadly_worker_cleared_v2 (yaad-twilio-setup, META_WORKER_TEMPLATES):
       // used outside the window once Meta has approved it and the setting is
       // written. Until then, text message and email.
       const clearedSid = await approvedTemplateSid(admin, "TWILIO_CONTENT_SID_WORKER_CLEARED", "twilio_content_sid_worker_cleared");
@@ -1067,17 +1067,17 @@ Deno.serve(async (req: Request) => {
       // Sent days after they last wrote, so almost always outside the window.
       // No approved template fits; text message and email carry it, and the
       // desk sees the WhatsApp was not sent (sendToWorker).
-      // yaadly_worker_check_reminder_v1, once approved; {{2}} is the line that
-      // changes between the first reminder and the last.
+      // yaadly_worker_check_reminder_v2, once approved: the name and the
+      // link only. v1 carried the changing line as {{2}} and Meta rejected
+      // it, so the template says the same words both times; the text
+      // message and the email still say "Last reminder" the second time.
       const reminderSid = await approvedTemplateSid(admin, "TWILIO_CONTENT_SID_WORKER_CHECK_REMINDER", "twilio_content_sid_worker_check_reminder");
       const reminderFirst = String(app.name ?? "").trim().split(/\s+/)[0] ?? "";
-      const nth = Number(app.check_reminders ?? 1);
       const wa = phone
         ? await sendToWorker(admin, phone, text, trace, meta, reminderSid
           ? { sid: reminderSid, vars: {
               "1": templateVar(reminderFirst || "there", 60),
-              "2": nth >= 2 ? "Last reminder from us. Your check is still waiting." : "Your check is still waiting.",
-              "3": applyLink(APP_URL, String(app.id), String(app.upload_token), String(app.app_id)),
+              "2": applyLink(APP_URL, String(app.id), String(app.upload_token), String(app.app_id)),
             } }
           : undefined)
         : { sent: false, reason: "no phone on the application", outsideWindow: false };

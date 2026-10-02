@@ -6580,10 +6580,12 @@ curl -s -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-crm-s
 |---|---|---|---|
 | `daily-steps` | `yaadly_daily_steps_v1` | `twilio_content_sid_daily_steps` | `yaad-daily-checkin`, second message (stop carrying it in the worker update template) |
 | `completion-report` | `yaadly_worker_completion_report_v1` | `twilio_content_sid_worker_completion_report` | `yaad-notify-client`, `completion_report_worker` outside the window |
-| `worker-cleared` | `yaadly_worker_cleared_v1` | `twilio_content_sid_worker_cleared` | `yaad-notify-client`, `worker_cleared` |
-| `check-reminder` | `yaadly_worker_check_reminder_v1` | `twilio_content_sid_worker_check_reminder` | `yaad-notify-client`, `worker_check_reminder` |
+| `worker-cleared` | `yaadly_worker_cleared_v2` (v1 rejected 2 Oct 2026) | `twilio_content_sid_worker_cleared` | `yaad-notify-client`, `worker_cleared` |
+| `check-reminder` | `yaadly_worker_check_reminder_v2` (v1 rejected 2 Oct 2026) | `twilio_content_sid_worker_check_reminder` | `yaad-notify-client`, `worker_check_reminder` |
 | `job-quiet` | `yaadly_worker_job_quiet_v1` | `twilio_content_sid_worker_job_quiet` | `yaad-job-health`, the 72 hour nudge |
 | `draft-waiting` | `yaadly_worker_draft_waiting_v1` | `twilio_content_sid_worker_draft_waiting` | `yaad-notify-client`, `evidence_landed` outside the window |
+
+**2 October 2026: two rejected, resubmitted as v2.** Meta approved five of the seven and rejected `yaadly_worker_cleared_v1` and `yaadly_worker_check_reminder_v1`, both with "Unknown rejection reason". v2 of each gives the link its own line after full sentences of fixed text, and the check reminder no longer carries a sentence in a variable (it is now name and link only, so `yaad-notify-client` was changed and redeployed before resubmitting). Submit with `create-worker-template` for `worker-cleared` and `check-reminder`; the new SID overwrites the `_pending` key and the status action records it as before. If v2 is rejected too, the next name is v3, never an edit.
 
 **Order.** Deploy `yaad-twilio-setup` from disk first (it keeps its platform auth; do not pass `--no-verify-jwt`). Then steps 1 to 3 in any order. Then submit 4 and 5 the same day, because Meta takes a day or more. Switch each sender only after its status action says approved, one at a time, and send one test to your own number before the next.
 
