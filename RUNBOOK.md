@@ -6642,3 +6642,10 @@ The site now promises (payments, terms, FAQ): if a client goes quiet on a finish
 4. **A card hold on a service that will not be visited inside 7 days:** let it lapse or cancel it, and send a fresh link closer to the visit. See section 11. Never capture early to beat the deadline.
 
 Source: `[C] Payment Worked Example, 4 Oct 2026.md` in the YaadlyHub folder, and the ledger entry of the same date.
+
+## 66. Worker side at 7%: what to apply and deploy (4 Oct 2026)
+
+1. **Apply the migration** `20261004150246_the_worker_margin_is_seven_per_cent.sql` (wrapped, `supabase db query --linked --project-ref leffyisvfvjwzilydlwf -f <file>`). It records the switch time once, redefines the three payable functions, and moves `worker_guidelines_version` to 1.8.
+2. **Check it landed:** `select key, value from app_settings where key in ('worker_fee_7pc_from','worker_guidelines_version');` shows a timestamp and `1.8`. `select public.worker_fee_rate(now());` returns `0.07`; `select public.worker_fee_rate('2026-09-01');` returns `0.05`.
+3. **Deploy from main:** `yaad-notify-client` and `yaad-inbound` (both keep `--no-verify-jwt`), the desk, and the app. The app carries Worker Guidelines v1.8; until it is deployed, workers are asked to sign a version the database no longer accepts, so do the migration and the app deploy close together. **Blocked as of 4 Oct 2026:** main's app and `yaad-notify-client` also carry the MoneyGram work, which needs `20261001194258` applied first, so apply that one before this and deploy once.
+4. **If a worker says their pay is 2% short on an older job:** read `job_quotes.created_at` for that job against `worker_fee_7pc_from`. Before it, the payable must say 5%. If it says 7%, the payable was raised wrongly: void it and raise it again; do not edit the amount by hand.

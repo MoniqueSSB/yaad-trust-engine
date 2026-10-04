@@ -55,7 +55,7 @@ export function bookedPayLine(
   const l = Math.round(Number(quote.labour_jmd ?? 0));
   const m = Math.round(Number(quote.materials_jmd ?? 0));
   if (!(l > 0) && !(m > 0)) return null;
-  const labourPay = l - Math.round(l * 0.05);
+  const labourPay = l - Math.round(l * 0.07); // 7% from 4 Oct 2026 (was 5%)
   return `Your pay: ${money(labourPay)} for labour.${m ? ` Materials ${money(m)} at cost.` : ""} Total ${money(labourPay + m)}.`;
 }
 

@@ -1382,7 +1382,7 @@ Deno.serve(async (req: Request) => {
       // exists: read live the same day, nothing had ever told a worker they
       // were booked. Goes to the worker's phone (routed above). Says what is
       // true under the principal structure and no more: Yaadly engages
-      // them, at their price less 5%, and nothing starts until the client's
+      // them, at their price less 7%, and nothing starts until the client's
       // invoice to Yaadly is paid, which a person marks by hand.
       const { data: q } = await admin.from("job_quotes")
         .select("worker_name, labour_jmd, materials_jmd, billing_mode")
@@ -1395,7 +1395,7 @@ Deno.serve(async (req: Request) => {
       // Three points and the exact figures, founder instruction 30 Sep 2026:
       // "let the know the exact amount they will be paid they should not need
       // to calculate and make this 3 points and shorter". Labour is their
-      // quote less the 5% worker fee; materials pass through at cost.
+      // quote less the 7% worker fee; materials pass through at cost.
       // The check-in line only where a check-in is asked for (arrival-rule.ts):
       // where somebody is at home, that person is the record and the worker is
       // not asked. Worded as an ask, because it is one: a check-in never gates
@@ -1539,7 +1539,7 @@ Deno.serve(async (req: Request) => {
       // documents no partial release, the whole figure moves at once at
       // completion), the same moment raise_job_worker_pay_invoice() becomes
       // raisable. Deliberately does not name a figure: the worker's own
-      // pay is labour_jmd * 0.95 plus materials, and stating it here risks
+      // pay is labour_jmd * 0.93 plus materials, and stating it here risks
       // drifting from whatever the money page actually shows if either
       // changes independently.
       subject = `${job.title} is signed off`;
@@ -2444,7 +2444,7 @@ Deno.serve(async (req: Request) => {
       const first = halves ? Math.floor((amount + 1) / 2) : amount;
       const second = amount - first;
       const clientTotal = first + Math.round(first * 0.15) + (second ? second + Math.round(second * 0.15) : 0);
-      const workerPay = amount - Math.round(amount * 0.05);
+      const workerPay = amount - Math.round(amount * 0.07);
       const termsText = halves ? "half before the extra work starts and half once it is signed off" : "paid in full before the extra work starts";
       const scope = String(a.scope ?? "").slice(0, 700);
       const title = String(job.title ?? job.id);
@@ -2453,7 +2453,7 @@ Deno.serve(async (req: Request) => {
       if (kind === "addon_for_worker") {
         subject = `Extra work asked for: ${title}`;
         line = `On ${title}, the client has ${a.rev === 1 ? "asked for extra work" : "changed the extra work they asked for"} (version ${a.rev}):\n\n"${scope}"\n\n` +
-          `They are offering ${money(amount)} for it, ${termsText}. You would be paid ${money(workerPay)}, after Yaadly's 5%.\n\n` +
+          `They are offering ${money(amount)} for it, ${termsText}. You would be paid ${money(workerPay)}, after Yaadly's 7%.\n\n` +
           `Accept it, change it or turn it down on the job's Extra work tab: ${extraLink}\n\nDo not start the extra work until it is agreed and paid.`;
       } else if (kind === "addon_for_client") {
         subject = `Your tradesperson changed the extra work: ${title}`;

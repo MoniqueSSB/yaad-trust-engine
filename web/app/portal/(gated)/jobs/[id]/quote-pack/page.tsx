@@ -99,7 +99,7 @@ export default async function QuotePackPage({
      client a "Total" of labour plus materials, without Yaadly's 15%, so a
      client quoted J$100,000 read J$100,000 here and was invoiced J$115,000.
      The client's figures are clientBill(), the invoice's own arithmetic; the
-     worker's are their labour less 5%, as raise_job_worker_payable pays. */
+     worker's are their labour less 7%, as raise_job_worker_payable pays. */
   const bill = clientBill(quoteRow.labour_jmd, quoteRow.materials_jmd);
   const workerFee = Math.round(bill.labour * WORKER_FEE_RATE);
 
@@ -155,7 +155,7 @@ export default async function QuotePackPage({
             </div>
           ) : (
             <div className="flex justify-between gap-4">
-              <span className="text-mute">Less Yaadly&rsquo;s 5% of the labour</span>
+              <span className="text-mute">Less Yaadly&rsquo;s 7% of the labour</span>
               <span className="font-mono">&minus;{jmd(workerFee)}</span>
             </div>
           )}
