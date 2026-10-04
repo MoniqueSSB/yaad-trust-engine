@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Yaadly · Managed services. Eyes on your property in Jamaica</title>
-<meta name="description" content="You cannot be there. Someone should be, in writing. Deposit checks, condition reports, technical sign-off and monthly oversight on your property in Jamaica. The person who assesses the work is never the person who did it. Every price on the page.">
+<meta name="description" content="You cannot be there. Someone should be, in writing. Project setup checks, condition reports and monthly oversight on your property in Jamaica. The person who assesses the work is never the person who did it. Every price on the page.">
 <meta property="og:title" content="Yaadly · Managed services for property in Jamaica">
-<meta property="og:description" content="Deposit checks, condition reports, technical sign-off and monthly oversight. Timestamped evidence, checked against a written scope. Every price on the page.">
+<meta property="og:description" content="Project setup checks, condition reports and monthly oversight. Timestamped evidence, checked against a written scope. Every price on the page.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://yaadly.co.uk/services.html">
 <meta property="og:site_name" content="Yaadly">
@@ -337,10 +337,10 @@ footer {
 
     <div class="svcs-grid">
 
-      <!-- Deposit Protection Check -->
+      <!-- Project Setup Check -->
       <div class="svc-card featured rv">
         <span class="svc-badge">Start here</span>
-        <h3 class="svc-title">Deposit Protection Check</h3>
+        <h3 class="svc-title">Project Setup Check</h3>
         <div class="svc-list">
           <div><i></i><span>Your contractor and their quote, checked before you pay anybody</span></div>
           <div><i></i><span>Quote reviewed against real material costs and real day rates</span></div>
@@ -349,7 +349,7 @@ footer {
         </div>
         <div class="svc-foot">
           <span class="svc-price"><span class="price-main">£149</span> <span class="price-unit">fixed fee</span></span>
-          <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Deposit%20Protection%20Check%20for%20%C2%A3149." target="_blank" rel="noopener">Book this<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+          <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Project%20Setup%20Check%20for%20%C2%A3149." target="_blank" rel="noopener">Book this<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         </div>
         <div class="price-alt">Founding rate, first five clients. Standard £249.</div>
       </div>
@@ -386,27 +386,11 @@ footer {
         <div class="price-alt">Founding rate, first five clients. Standard £349.</div>
       </div>
 
-      <!-- Technical Sign-off -->
-      <div class="svc-card rv">
-        <h3 class="svc-title">Technical Sign-off</h3>
-        <div class="svc-list">
-          <div><i></i><span>Qualified trade inspector attends the stage</span></div>
-          <div><i></i><span>Workmanship judged against the standard for that trade</span></div>
-          <div><i></i><span>Pass, fail, or an itemised put right list</span></div>
-          <div><i></i><span>Photographic evidence supports each finding</span></div>
-        </div>
-        <div class="svc-foot">
-          <span class="svc-price"><span class="price-main">£245</span> <span class="price-unit">per sign-off</span></span>
-          <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Technical%20Sign-off." target="_blank" rel="noopener">Book this<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-        </div>
-        <div class="price-alt">Fixed fee, the same rate for everyone.</div>
-      </div>
-
       <!-- Property Care -->
       <div class="svc-card rv">
         <h3 class="svc-title">Property Care</h3>
         <div class="svc-list">
-          <div><i></i><span>Empty homes, rentals and Airbnbs</span></div>
+          <div><i></i><span>Lived-in homes, including an elder's own house, plus empty homes, rentals and short lets</span></div>
           <div><i></i><span>The same checklist run every attendance</span></div>
           <div><i></i><span>Full photographic set per visit</span></div>
           <div><i></i><span>Change tracked visit to visit</span></div>
@@ -464,10 +448,9 @@ footer {
       <div class="form-row">
         <div class="fgroup"><label for="bk-svc">Which service</label>
           <select id="bk-svc">
-            <option value="deposit">Deposit Protection Check</option>
+            <option value="deposit">Project Setup Check</option>
             <option value="visual">Visual Check</option>
             <option value="condition">Condition Report</option>
-            <option value="signoff">Technical Sign-off</option>
             <option value="retainer">Oversight Retainer</option>
             <option value="care">Property Care</option>
           </select>
@@ -691,7 +674,7 @@ const RET_LABELS = {
   weekly:      "Oversight Retainer, weekly, £895 a month"
 };
 
-const CTA_KEYS = [["Deposit%20Protection","deposit"],["Visual%20Check","visual"],["Condition%20Report","condition"],["Technical%20Sign-off","signoff"],["Property%20Care","care"],["Oversight%20Retainer","retainer"]];
+const CTA_KEYS = [["Project%20Setup%20Check","deposit"],["Visual%20Check","visual"],["Condition%20Report","condition"],["Property%20Care","care"],["Oversight%20Retainer","retainer"]];
 function updateCareTierRow(){
   $id("bk-care-tier-row").style.display = $id("bk-svc").value === "care" ? "" : "none";
   $id("bk-ret-tier-row").style.display = $id("bk-svc").value === "retainer" ? "" : "none";

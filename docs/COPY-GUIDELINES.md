@@ -157,7 +157,7 @@ Always make clear:
 
 ### Discounts, and the law
 
-A founding rate must be a real reduction against a price the standard rate has actually been. **Never publish a founding rate equal to the standard rate.** Presenting a discount off a price nobody can buy is a misleading action under the Digital Markets, Competition and Consumers Act 2024. If there is no discount, say "Fixed fee, the same rate for everyone", which is already used correctly on Technical Sign-off.
+A founding rate must be a real reduction against a price the standard rate has actually been. **Never publish a founding rate equal to the standard rate.** Presenting a discount off a price nobody can buy is a misleading action under the Digital Markets, Competition and Consumers Act 2024. If there is no discount, say "Fixed fee, the same rate for everyone", which is how Property Care is written.
 
 Prices must match on every page they appear. Homepage, services page, FAQ and any WhatsApp prefill message.
 
@@ -188,7 +188,7 @@ Booking link is `https://cal.com/yaadly/15min` everywhere. Not `cal.com/yaadly`.
 
 **No page puts a timeline on a report.** The deliverable is described as a **written verdict**, and that is all. No turnaround time, no target, no comparative speed claim, anywhere a client reads it.
 
-This paragraph used to require the opposite: a 72 hour target with its condition attached. Founder instruction, 5 September 2026, removed it from the hero stat bar, the trail step and the Deposit Protection Check card on `services.html`, and from the service track in the client portal. A rule mandating the promise while the pages no longer make it is how the promise walks back on, so the rule was inverted in the same change rather than left standing.
+This paragraph used to require the opposite: a 72 hour target with its condition attached. Founder instruction, 5 September 2026, removed it from the hero stat bar, the trail step and the Project Setup Check card on `services.html`, and from the service track in the client portal. A rule mandating the promise while the pages no longer make it is how the promise walks back on, so the rule was inverted in the same change rather than left standing.
 
 ---
 
@@ -214,7 +214,7 @@ escrow · held in escrow · held safely with a licensed provider · you release 
 - "Identity checked before they can quote."
 - "One price, agreed in writing before anything starts."
 - "Materials at cost, never marked up."
-- "A client in London pays what a client in Portmore pays."
+- "Every quote is measured against published Jamaican material costs and day rates." (The older line, "a client in London pays what a client in Portmore pays", was retired on 4 October 2026 on founder instruction: a job can carry real costs that come with distance, and the claim denied it. Say what is measured and show every added line instead.)
 - "If the work is wrong, you come to us."
 - "This is not a gap we are filling with a guess."
 
@@ -235,3 +235,11 @@ escrow · held in escrow · held safely with a licensed provider · you release 
 Privacy, terms and cancellation each open with a plain English summary before the formal wording. Anything genuinely unsettled says so on the page and names what is outstanding, rather than being filled with wording nobody has checked.
 
 Clauses needing a solicitor are marked in the page comments. As at 4 September 2026 that is: liability and its limits, the workmanship guarantee and its duration, governing law and jurisdiction for clients in the United States and Canada, retention periods including identity documents, and the statutory model cancellation form wording.
+
+## Technical Sign-off is retired from the menu (4 October 2026)
+
+Founder instruction: she cannot deliver it now. The two catalogue rows (`technical-signoff` and `job-technical-check`) are switched inactive rather than deleted, and the service card, the booking option, the terms list and the FAQ mention are removed from the site. The `technical_signoff` report kind stays in the database and in past reports, because reports already written under it must still render. Do not re-add the service to the site without a founder instruction.
+
+## Deposit Protection Check is now the Project Setup Check (4 October 2026)
+
+Founder instruction. The label changed everywhere a client can see it. The catalogue id stays `deposit-check`, so payment links, invoices and reports raised under the old name still resolve.

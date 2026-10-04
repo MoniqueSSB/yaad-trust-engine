@@ -2,7 +2,7 @@
   {
     "slug": "deposit-protection-check",
     "kind": "deposit_check",
-    "service": "Deposit Protection Check",
+    "service": "Project Setup Check",
     "title": "Before you send the deposit",
     "pages": 12
   },
