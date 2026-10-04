@@ -243,3 +243,9 @@ Founder instruction: she cannot deliver it now. The two catalogue rows (`technic
 ## Deposit Protection Check is now the Project Setup Check (4 October 2026)
 
 Founder instruction. The label changed everywhere a client can see it. The catalogue id stays `deposit-check`, so payment links, invoices and reports raised under the old name still resolve.
+
+## Only what can be bought today is on the site (4 October 2026)
+
+Founder instruction: services marked "from December 2026" come off the site until December. Removed: the Full Project Management card on `services.html`, its line in the two FAQ price lists and the two FAQ service lists, and its mention in the "who am I buying from" answers in the FAQ and in the terms. The On The Ground retainer was never on a page; its catalogue row `retainer-ground` is switched inactive.
+
+**To restore in December, when the pilot opens managed work:** put the Full Project Management card back on `services.html` (12 to 15% of build cost, minimum fee 2,500 pounds, you buy the job from Yaadly and Yaadly engages and pays the trades), restore "Full Project Management 12 to 15% of build cost" to the FAQ price lists and the WhatsApp assistant's price facts, restore "Property jobs and Full Project Management are sold by Yaadly Ltd" in the FAQ and "Jobs, Full Project Management and business services" in the terms, and set `retainer-ground` active again. Do not restore any of it without a founder instruction.
