@@ -11,7 +11,7 @@
  *
  * If the invoice function's arithmetic changes, change this with it, or the
  * page and the bill disagree again. The 15% is the locked client-side fee
- * (BridgeWorks_Ideas_Ledger, 9 Sep 2026 entry); the worker's 5% is not the
+ * (BridgeWorks_Ideas_Ledger, 9 Sep 2026 entry); the worker's 7% is not the
  * client's business and does not appear here.
  */
 export const CLIENT_FEE_RATE = 0.15;

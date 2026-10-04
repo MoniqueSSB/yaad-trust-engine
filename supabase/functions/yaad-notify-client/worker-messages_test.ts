@@ -194,7 +194,7 @@ Deno.test("no accepted quote means no pay figure, never J$0", () => {
   assertEquals(bookedPayLine(undefined, money), null);
   assertEquals(bookedPayLine({ labour_jmd: 0, materials_jmd: 0 }, money), null);
   assertEquals(bookedPayLine({ labour_jmd: 10000, materials_jmd: 2000 }, money),
-    "Your pay: J$9,500 for labour. Materials J$2,000 at cost. Total J$11,500.");
+    "Your pay: J$9,300 for labour. Materials J$2,000 at cost. Total J$11,300.");
   const b = branch("booked_worker");
   assert(b.includes("bookedPayLine(q, money)") && /payLine \? `` : null/.test(b), "the pay line is not optional");
   assert(!/Your pay: \$\{money/.test(b), "the old always-on figure is back");

@@ -39,8 +39,9 @@ describe("what the client pays", () => {
 });
 
 describe("what the worker is paid", () => {
-  test("the amount less 5%", () => {
-    assert.equal(a.addonWorkerPay(26000), 24700);
+  // 7% from 4 Oct 2026 (founder), was 5%: J$26,000 less J$1,820.
+  test("the amount less 7%", () => {
+    assert.equal(a.addonWorkerPay(26000), 24180);
   });
 });
 

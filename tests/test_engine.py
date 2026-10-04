@@ -133,9 +133,9 @@ def test_sane_quote_is_not_flagged_red() -> None:
 def test_fees_never_touch_materials() -> None:
     fees = bm.fee_breakdown(labour_gbp=100.0, materials_gbp=500.0)
     assert fees["client_fee_gbp"] == 15.0
-    assert fees["worker_fee_gbp"] == 5.0
+    assert fees["worker_fee_gbp"] == 7.0
     assert fees["client_pays_gbp"] == 615.0
-    assert fees["worker_receives_gbp"] == 95.0
+    assert fees["worker_receives_gbp"] == 93.0
 
 
 # --------------------------------------------------------------------- #

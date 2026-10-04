@@ -6,7 +6,8 @@
  * turns it down; an edit goes back to the client; nothing is booked until
  * both have agreed the same version. Once agreed it is billed on the job as
  * its own invoice, with Yaadly's 15% on top of the agreed amount, and the
- * worker is paid the amount less 5%, the same as the main job.
+ * worker is paid the amount less 7%, the same as the main job (5% on work agreed
+ * before 4 Oct 2026; the database decides that, see worker_fee_rate()).
  *
  * The money here must match _draft_addon_client_invoice() and
  * sign_off_addon() in that migration. If one changes, change the other, or
@@ -14,7 +15,7 @@
  */
 import { CLIENT_FEE_RATE } from "./client-bill";
 
-export const WORKER_FEE_RATE = 0.05;
+export const WORKER_FEE_RATE = 0.07;
 
 export type AddonStatus = "with_worker" | "with_client" | "agreed" | "declined" | "withdrawn" | "signed_off" | "cancelled";
 export type AddonTerms = "in_full" | "half_now_half_on_signoff";
@@ -38,7 +39,7 @@ export function addonClientBill(amountJmd: number, terms: AddonTerms) {
   };
 }
 
-/** What the worker is paid for it: the agreed amount less 5%. */
+/** What the worker is paid for it: the agreed amount less 7%. */
 export function addonWorkerPay(amountJmd: number) {
   const amount = Math.round(Number(amountJmd) || 0);
   return amount - Math.round(amount * WORKER_FEE_RATE);

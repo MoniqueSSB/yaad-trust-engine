@@ -54,8 +54,8 @@ const BENEFITS: { h: string; p: string }[] = [
     p: "Nothing to join, nothing per quote, nothing per lead, win or lose. You're never charged for a job you don't get.",
   },
   {
-    h: "Your price, less 5%",
-    p: "You set your labour price and Yaadly engages you at that price less 5%. Remote digital work is 10%. Nothing comes out of money of yours: you're Yaadly's subcontractor, so the client's payment was never yours. Materials are never fee'd, at cost is at cost, and there's no subscription.",
+    h: "Your price, less 7%",
+    p: "You set your labour price and Yaadly engages you at that price less 7%. Remote digital work is 10%. Nothing comes out of money of yours: you're Yaadly's subcontractor, so the client's payment was never yours. Materials are never fee'd, at cost is at cost, and there's no subscription.",
   },
   {
     h: "You set your own price",
@@ -158,7 +158,7 @@ export default function TradesInfo() {
         <div className="mt-5 grid grid-cols-1 gap-3.5 md:grid-cols-2">
           <div className="rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
             <b className="text-ink">What you’re paid:</b> you set your labour price, and Yaadly
-            engages you at that price less 5%. Remote digital work is 10% instead. You see both
+            engages you at that price less 7%. Remote digital work is 10% instead. You see both
             figures, your price and what Yaadly pays you, in writing before you accept anything, and
             neither moves afterwards. Materials carry no fee at all: they’re paid to you at cost
             before you buy them, once the client has paid for them, and you send the receipt

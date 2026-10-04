@@ -26,7 +26,7 @@ import { materialsReceipt } from "@/lib/portal/materials-receipt";
 import { DocStrip, type Doc } from "@/components/portal/DocStrip";
 import { TabBar, TABS, type TabKey } from "@/components/portal/TabBar";
 import { AddOnPanel, AddonApprove, type AddonInvoice, type AddonPhoto, type AddonRow } from "@/components/portal/AddOnPanel";
-import { addonClientBill, addonStateLine, addonWorkerPay, waitingOn } from "@/lib/jobs/addon";
+import { addonClientBill, addonStateLine, addonWorkerPay, waitingOn, WORKER_FEE_RATE } from "@/lib/jobs/addon";
 import { MoneyTrail, type TrailWorkerPay } from "@/components/portal/MoneyTrail";
 import { JobAddress } from "@/components/portal/JobAddress";
 import { JobWhatsApp } from "@/components/portal/JobWhatsApp";
@@ -608,7 +608,7 @@ export default async function JobRoom({
 
   const labour = won?.labour_jmd ?? null;
   const allIn = labour == null ? null : Math.round(labour * 1.15) + (won?.materials_jmd ?? 0);
-  const takeHome = labour == null ? null : Math.round(labour * 0.95) + (won?.materials_jmd ?? 0);
+  const takeHome = labour == null ? null : Math.round(labour * (1 - WORKER_FEE_RATE)) + (won?.materials_jmd ?? 0);
 
   const jobBase = "/portal/jobs/" + encodeURIComponent(job.id);
 
@@ -816,10 +816,10 @@ export default async function JobRoom({
      in parts can have one part paid while the fee is still owed. */
   const feeInvoice = invoices.find((i) => i.starts_job);
   const feeJmd = labour == null ? null : Math.round(labour * 0.15);
-  /* The worker's side is 5% (9 Sep 2026), the same figure takeHome uses.
+  /* The worker's side is 7% (4 Oct 2026, was 5% from 9 Sep), the same figure takeHome uses.
      The worker's money panel was handed feeJmd, the client's 15%, and so
      showed "Yaadly fee, deducted" at three times what is deducted. */
-  const workerFeeJmd = labour == null ? null : Math.round(labour * 0.05);
+  const workerFeeJmd = labour == null ? null : Math.round(labour * WORKER_FEE_RATE);
   const matReleases = (materialsRows ?? []) as {
     amount_jmd: number; released_at: string | null; stage: number | null; receipt_ref: string; sent_at: string | null;
   }[];

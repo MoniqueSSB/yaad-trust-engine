@@ -2254,7 +2254,7 @@ const VIEWS = [
       {h:"Labour", n:true, f:r => jmd(r.labour_jmd)},
       {h:"Materials", n:true, f:r => jmd(r.materials_jmd)},
       {h:"Client sees", n:true, f:r => jmd(Math.round(Number(r.labour_jmd||0) * 1.15) + Number(r.materials_jmd||0))},
-      {h:"Worker gets", n:true, f:r => jmd(Math.round(Number(r.labour_jmd||0) * 0.95) + Number(r.materials_jmd||0))},
+      {h:"Worker gets", n:true, f:r => jmd(Math.round(Number(r.labour_jmd||0) * 0.93) + Number(r.materials_jmd||0))},
       {h:"Against the others", f:r => quoteBand(r, ROWS.quotes || [])},
       {h:"Who picks", f:r => whoPicksChip(r)},
       {h:"State", f:r => tone_(r.status)},
@@ -2552,7 +2552,7 @@ const VIEWS = [
   // same version; its invoice is then DRAFTED here on Invoices for you to send.
   // The one decision on this page is sign-off, and it is yours: once the
   // add-on's invoice is paid and its photos are in, Sign off raises the
-  // worker's pay (the amount less 5%) and, on "half now, half later" terms,
+  // worker's pay (the amount less 7%) and, on "half now, half later" terms,
   // drafts the second invoice. A job cannot complete while any add-on is
   // still open or agreed and not signed off.
   { k:"addons", g:"Documents & money", label:"Add-ons", icon:"doc",
@@ -2577,7 +2577,7 @@ const VIEWS = [
         when:r => r.status === "agreed",
         rpc:"sign_off_addon",
         args:(r) => ({ p_addon:r.id }),
-        says:r => `Signs off ${r.job_id}'s add-on in your name, on the photos above. It raises the worker's pay at the agreed amount less 5% (${jmdFmt(r.amount_jmd - Math.round(r.amount_jmd * 0.05))}) for you to pay from Pay workers${r.terms === "in_full" ? "" : ", and drafts the second half of the client's invoice"}. Refused if the add-on's invoice is not marked paid or no photos have been filed.` },
+        says:r => `Signs off ${r.job_id}'s add-on in your name, on the photos above. It raises the worker's pay at the agreed amount less 7% (${jmdFmt(r.amount_jmd - Math.round(r.amount_jmd * 0.07))}) for you to pay from Pay workers${r.terms === "in_full" ? "" : ", and drafts the second half of the client's invoice"}. Refused if the add-on's invoice is not marked paid or no photos have been filed.` },
       // The one way out once both sides have agreed (20260929030000). Voids a
       // draft invoice itself; a sent one must be voided on Invoices first, and
       // anything paid is a refund decision the database will not make here.
@@ -5417,7 +5417,7 @@ function panelQuotes(rows){
     const low = Math.min(...qs.map(tot).filter(n => n > 0));
     const bars = qs.sort((a, b) => tot(a) - tot(b)).map(q => {
       const lab = Number(q.labour_jmd || 0), mat = Number(q.materials_jmd || 0);
-      const client = Math.round(lab * 1.15) + mat, worker = Math.round(lab * 0.95) + mat;
+      const client = Math.round(lab * 1.15) + mat, worker = Math.round(lab * 0.93) + mat;
       return `<div class="qrow">`
         + `<div class="qwho"><b>${esc(q.worker_name || q.worker_email || "unknown")}</b>${tot(q) === low && qs.length > 1 ? " " + chip_("ok", "lowest") : ""} ${tone_(q.status)}</div>`
         + `<div class="qbar"><i class="lab" style="width:${(100 * lab / max).toFixed(1)}%" title="Labour ${esc(jmd(lab))}"></i><i class="mat" style="width:${(100 * mat / max).toFixed(1)}%" title="Materials ${esc(jmd(mat))}"></i></div>`
@@ -5976,7 +5976,7 @@ const ADDON_STATE = { with_worker:"waiting on the worker", with_client:"waiting 
 // An add-on's drawer: where it stands, what each side gets, its invoices and
 // the photos filed on it, which are what sign-off is judged on.
 function addonStory_(r){
-  const fee = Math.round(r.amount_jmd * 0.15), pay = r.amount_jmd - Math.round(r.amount_jmd * 0.05);
+  const fee = Math.round(r.amount_jmd * 0.15), pay = r.amount_jmd - Math.round(r.amount_jmd * 0.07);
   const step = { with_worker:1, with_client:1, agreed:2, signed_off:4 }[r.status] || 0;
   const steps = ["Written by the client", "Agreed by both", "Paid and photographed", "Signed off"];
   const rail = `<div class="dlvrail">` + steps.map((t, i) => {
@@ -8834,8 +8834,8 @@ async function loadMoney(){
     <div class="card">
       <div class="kv">
         <span class="k2">Client, Guarantee and Support</span><span class="v2">15% on labour</span>
-        <span class="k2">Worker</span><span class="v2">engaged at quote less 5%</span>
-        <span class="k2">Blended</span><span class="v2">20%</span>
+        <span class="k2">Worker</span><span class="v2">engaged at quote less 7%</span>
+        <span class="k2">Blended</span><span class="v2">22%</span>
         <span class="k2">Materials</span><span class="v2">never fee'd</span>
         <span class="k2">Yaadly Remote, digital</span><span class="v2">10%</span>
         <span class="k2">Founding Pros, 90 days</span><span class="v2" style="color:var(--tealb)">worker side 0%</span>
@@ -9648,7 +9648,7 @@ const INV_TABS = [
     hint:"Money in, marked paid by you, newest first, one month at a time." },
   { k:"fees", label:"Agency fees", col:"#2BB3A3", has:() => false,
     hint:"" },
-  // 28 Sep 2026, founder: the 5% from tradespeople is its own section, and so
+  // 28 Sep 2026, founder: the worker fee (7% since 4 Oct, was 5%) from tradespeople is its own section, and so
   // is every worker's pay, job by job, so where a worker is owed is one look.
   { k:"wfees", label:"Worker fees", col:"#E0A93B", has:() => false,
     hint:"" },
@@ -9709,11 +9709,11 @@ function invSummary(clientInv){
 }
 
 // The same shape for Agency fees: one row per kind of fee, and when it is
-// taken. The 5% is never invoiced, so it has no "waiting" figure.
+// taken. The 7% is never invoiced, so it has no "waiting" figure.
 function invFeeSummary(which = "agency"){
   const f = invFees(), m = invMonthName();
   const rows = (which === "worker" ? [
-    { label:"Yaadly's 5% from tradespeople", list:f.worker, cols:[["kept"], null, ["due", "come"]] },
+    { label:"Yaadly's 7% from tradespeople", list:f.worker, cols:[["kept"], null, ["due", "come"]] },
   ] : [
     { label:"Yaadly's 15% on jobs", list:f.job, cols:[["paid"], ["out"], ["draft", "todo", "check"]] },
     { label:"Services", list:f.svc, cols:[["paid"], ["out"], ["draft"]] },
@@ -9811,7 +9811,7 @@ function invBalanceHtml(i){
 // Yaadly's own money in one place, and whether it has come in. Asked for on
 // 14 Sep 2026: "there needs to be a part inside for agency fees", "and that
 // being paid". What counts is her call, the same day: the 15% Guarantee &
-// Support fee on each job, every service invoice, and the 5% kept from each
+// Support fee on each job, every service invoice, and the 7% kept from each
 // tradesperson.
 //
 // The 15% is read off the invoice line that carries it, by is_fee or by the
@@ -9823,11 +9823,11 @@ function invBalanceHtml(i){
 // When each is taken, in her words: "the client it is one the job when it is
 // paid and the worker, once the job is finished we will deduct the 5 and pay
 // the rest". So the 15% is taken when the invoice carrying it is paid, the
-// same payment that starts the job, and the 5% is deducted once, at the end.
+// same payment that starts the job, and the 7% is deducted once, at the end.
 //
-// The 5% is on no invoice: a tradesperson's pay is their labour already less
-// 5%, on lines that mix labour and materials. So it is worked out from the
-// accepted quote, the same round(labour * 0.05) the payable functions use,
+// The 7% is on no invoice: a tradesperson's pay is their labour already less
+// 7%, on lines that mix labour and materials. So it is worked out from the
+// accepted quote, the same round(labour * 0.07) the payable functions use (worker_fee_rate()),
 // and counted as deducted once the job is complete and every pay invoice on
 // it is marked paid. It is today's rate; pay raised before 9 Sep 2026 was at
 // 12%. A figure worked out, not a record, and the screen says so.
@@ -9860,7 +9860,7 @@ function invFees(){
     const paid = pays.filter(p => p.status === "paid");
     const wst = j.status !== "complete" ? "come" : pays.length && paid.length === pays.length ? "kept" : "due";
     if (wst !== "kept" || invInMonth(paid.map(p => p.paid_at).sort().pop()))
-      worker.push({ j, q, pays, paid, currency: "JMD", total_pence: Math.round(labour * 0.05), state: wst });
+      worker.push({ j, q, pays, paid, currency: "JMD", total_pence: Math.round(labour * 0.07), state: wst });
   }
   for (const i of INV_LIST) {
     if (!i.job_id && (i.payable_to || "yaadly") === "yaadly" && i.status !== "void" && (i.status !== "paid" || invInMonth(i.paid_at)))
@@ -9925,7 +9925,7 @@ function invFeeTab(t, on){
 }
 
 function invFeeHint(which = "agency"){
-  if (which === "worker") return "Yaadly's 5% worker fee. It is kept out of what the tradesperson is paid, so it is never a payment going out and never an invoice of its own: the worker's pay invoice is their quoted labour less 5%. "
+  if (which === "worker") return "Yaadly's 7% worker fee. It is kept out of what the tradesperson is paid, so it is never a payment going out and never an invoice of its own: the worker's pay invoice is their quoted labour less 7%. "
     + "Worked out from each accepted quote at today's rate, not read from an invoice. The pay itself is on Worker pay.";
   return "Everything on this tab is money to Yaadly from clients. The 15% is taken when the client pays the invoice that carries it, which starts the job. Services are the whole price. Yaadly's 5% from tradespeople is on Worker fees.";
 }
@@ -9961,9 +9961,9 @@ function invFeeRows(q, which = "agency"){
     </tr>`));
 
   const ws = f.worker.filter(x => hit(x.j.id + " " + (x.j.title || "") + " " + (x.q.worker_name || "")));
-  if (ws.length) out.push(grp("Yaadly's 5%, kept out of each tradesperson's pay when the job is finished", ws, "kept in " + invMonthName(), "none kept in " + invMonthName() + " yet"), ...ws.map(x => `<tr>
-      <td><div class="jistagename">Yaadly's 5% from ${esc(x.q.worker_name || "the tradesperson")}</div><div class="ivtags">${chip(x.state)}</div></td>
-      <td><a href="#" data-ivjob="${esc(x.j.id)}">${esc(x.j.id)}</a><div class="jicond">${esc(x.j.title || "")} &middot; Yaadly keeps 5% of quoted labour ${jmdFmt(Number(x.q.labour_jmd) || 0)}, the tradesperson is paid the rest</div></td>
+  if (ws.length) out.push(grp("Yaadly's 7%, kept out of each tradesperson's pay when the job is finished", ws, "kept in " + invMonthName(), "none kept in " + invMonthName() + " yet"), ...ws.map(x => `<tr>
+      <td><div class="jistagename">Yaadly's 7% from ${esc(x.q.worker_name || "the tradesperson")}</div><div class="ivtags">${chip(x.state)}</div></td>
+      <td><a href="#" data-ivjob="${esc(x.j.id)}">${esc(x.j.id)}</a><div class="jicond">${esc(x.j.title || "")} &middot; Yaadly keeps 7% of quoted labour ${jmdFmt(Number(x.q.labour_jmd) || 0)}, the tradesperson is paid the rest</div></td>
       <td class="jistagepct">${x.j.status === "complete" ? "job finished" : "job not finished"}<br>${x.pays.length ? `${x.paid.length} of ${x.pays.length} pay invoice${x.pays.length === 1 ? "" : "s"} paid` : "no pay raised yet"}</td>
       <td class="num"><span class="jiamt">${curAmt(x.total_pence, x.currency)}</span></td>
       <td class="ivact">${x.pays.length ? `<button class="btn g" data-ivopen="${esc(x.pays[x.pays.length - 1].id)}">Open pay</button>` : ""}</td>
@@ -10107,7 +10107,7 @@ function renderInvoiceJob(){
   const fee15 = x.fee ? `${curAmt(x.fee.line_total_pence, x.fee.inv.currency)} on ${esc(x.fee.inv.id)}, ${esc(FEE_STATE[feeStateOf(x.fee.inv.status)][0])}`
     : q ? `${jmdFmt(Math.round(labour * 0.15))}, not billed yet` : "no accepted quote yet";
   const allPaid = pay.length && pay.every(p => p.status === "paid");
-  const fee5 = q ? `${jmdFmt(Math.round(labour * 0.05))}, ${j.status === "complete" ? (allPaid ? "deducted, rest paid" : "finished, pay not sent") : "job not finished"}` : "no accepted quote yet";
+  const fee5 = q ? `${jmdFmt(Math.round(labour * 0.07))}, ${j.status === "complete" ? (allPaid ? "deducted, rest paid" : "finished, pay not sent") : "job not finished"}` : "no accepted quote yet";
   const worker = (q && q.worker_name) || j.worker_name || "the tradesperson";
   const payAll = sum(pay), payPaid = sum(pay.filter(p => p.status === "paid"));
   const pa = (v) => curText(sumByCur(v)) || curAmt(0, "JMD");
@@ -10124,7 +10124,7 @@ function renderInvoiceJob(){
       + r("15% Guarantee &amp; Support", x.fee ? curAmt(x.fee.line_total_pence, x.fee.inv.currency) : q ? jmdFmt(Math.round(labour * 0.15)) : "none", x.fee && x.fee.inv.status === "paid" ? "ok" : "due")
       + `<div class="s">${x.fee ? esc(FEE_STATE[feeStateOf(x.fee.inv.status)][0]) + " on " + esc(x.fee.inv.id) : q ? "not billed yet" : "no accepted quote yet"}</div>`
       + (x.fee ? `<div class="s">${invFeeButtons(x.fee.inv, x.fee)}</div>` : "")
-      + r("5% from " + esc(worker), q ? jmdFmt(Math.round(labour * 0.05)) : "none", "")
+      + r("7% from " + esc(worker), q ? jmdFmt(Math.round(labour * 0.07)) : "none", "")
       + `<div class="s">${esc(q ? (j.status === "complete" ? (allPaid ? "deducted, rest paid" : "finished, pay not sent") : "job not finished") : "no accepted quote yet")}</div>`
     + `</div>`
     + `<div class="ivjm"><h5>${esc(worker)}</h5>`

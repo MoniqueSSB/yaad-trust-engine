@@ -19,7 +19,7 @@
  *  J$ amounts as integers, percents as integers. */
 export const PUBLISHED_POUNDS = new Set([45, 70, 95, 149, 245, 249, 349, 395, 495, 500, 595, 895, 1095, 2500]);
 export const PUBLISHED_JMD = new Set([3500, 4500]);
-export const PUBLISHED_PERCENTS = new Set([2, 5, 12, 15]);
+export const PUBLISHED_PERCENTS = new Set([2, 5, 7, 12, 15]);
 
 // Rewritten 4 September 2026. It used to say "Yaadly does not price the work
 // itself; a vetted worker quotes against the written scope", which was the
