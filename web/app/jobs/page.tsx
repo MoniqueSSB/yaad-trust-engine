@@ -378,7 +378,7 @@ export default async function Board({
                     word for word, so the two halves of the site say the same
                     thing to a visitor who lands straight on the board. */}
                 <p className="mt-4 max-w-[56ch] text-pretty text-[16.5px] leading-relaxed text-mute">
-                  Every listing here is a signed job with a real client behind it.{" "}
+                  Every live listing here is a real job from a real client, and each one shows whether the client has signed yet. A listing titled DEMO LISTING is an example, there so you can see what a job looks like.{" "}
                   <b className="font-semibold text-ink">
                     You buy the job from Yaadly, and nothing is signed off until you have seen the evidence.
                   </b>

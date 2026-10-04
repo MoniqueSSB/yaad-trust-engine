@@ -6631,3 +6631,14 @@ Every client message now has its worker counterpart saying the same thing. New f
 5. Phone the worker the pick-up reference. Never WhatsApp it, never email it, never type it on the desk.
 6. Mark paid with the MoneyGram transaction number from Yaadly's receipt and the fee: `mark_worker_paid(invoice, 'moneygram', transaction_number, fee)`. The worker's WhatsApp names the fee and what they collect.
 7. If it refuses: "switched off" means step 1; "has not given a name" means step 2; "Call-back done" means step 3; "transaction number" or "fee" means a value is missing. Do not work round a refusal.
+
+## 65. A client has not accepted a finished stage (4 Oct 2026)
+
+The site now promises (payments, terms, FAQ): if a client goes quiet on a finished stage, Yaadly reminds them twice, and after seven days with no answer a named person decides on the evidence whether the stage is done. Nothing does this automatically yet. It is a hand step, and a timer must never do it.
+
+1. **Day 2 and day 5 after the worker marks the stage complete:** remind the client on WhatsApp or by email, with a link to the evidence. Note the date on the job.
+2. **Day 7, still no answer and no complaint:** a named person opens the evidence pack, checks it against the agreed scope, and approves or holds the stage. Record who and why. If approved, the worker is paid within 7 days of that approval as normal.
+3. **If the client raised a problem at any point,** this section does not apply: section 63 does, and nothing further is paid on the job while the complaint is open.
+4. **A card hold on a service that will not be visited inside 7 days:** let it lapse or cancel it, and send a fresh link closer to the visit. See section 11. Never capture early to beat the deadline.
+
+Source: `[C] Payment Worked Example, 4 Oct 2026.md` in the YaadlyHub folder, and the ledger entry of the same date.
