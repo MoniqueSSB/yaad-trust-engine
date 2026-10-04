@@ -1,0 +1,41 @@
+<!doctype html>
+<!-- Source for the link preview image (1200 x 630) shown when yaadly.co.uk is
+     shared. render.sh writes it to docs/og-v2.png and docs/og.png. Change the
+     filename (v3, v4) when the picture changes: WhatsApp and Facebook keep
+     the old picture for a URL they have already seen.
+     Wording follows docs/COPY-GUIDELINES.md. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Yaadly link preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;0,9..144,400;1,9..144,200;1,9..144,300&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1200px;height:630px;overflow:hidden}
+body{
+  font-family:'IBM Plex Sans',sans-serif;color:#EEEEFF;-webkit-font-smoothing:antialiased;
+  background:
+    radial-gradient(800px 560px at 105% -10%,rgba(155,115,245,0.36),transparent 62%),
+    radial-gradient(700px 520px at -8% 115%,rgba(245,158,11,0.22),transparent 60%),
+    linear-gradient(180deg,#0D0D28,#07071A);
+  padding:56px 72px 52px;display:flex;flex-direction:column;
+}
+.brand{display:flex;align-items:center;gap:16px;font:400 38px 'Fraunces',serif}
+.brand img{width:60px;height:60px}
+h1{margin-top:44px;font:200 84px/1.03 'Fraunces',serif;letter-spacing:-0.03em}
+h1 em{font-style:italic;font-weight:300;background:linear-gradient(100deg,#C4AAFF,#FBBF24 85%);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.08em}
+p{margin-top:30px;font-size:27px;line-height:1.4;color:#9E9ECB;max-width:960px}
+p b{color:#EEEEFF;font-weight:500}
+.foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between}
+.url{font:500 27px 'IBM Plex Sans',sans-serif;display:flex;align-items:center;gap:12px}
+.url i{width:11px;height:11px;border-radius:50%;background:#9B73F5}
+.tag{font:400 19px 'IBM Plex Mono',monospace;color:#9E9ECB;letter-spacing:0.06em;text-transform:uppercase}
+</style>
+</head>
+<body>
+  <div class="brand"><img src="../yaadly-logo-master.png" alt="">Yaadly</div>
+  <h1>Property work in Jamaica,<br><em>managed while you're abroad.</em></h1>
+  <p><b>You buy the job from Yaadly at one agreed price.</b> Every stage is photographed, and a named person reviews the work before you accept.</p>
+  <div class="foot"><div class="url"><i></i>yaadly.co.uk</div><div class="tag">Launching in Kingston and Portmore</div></div>
+</body>
+</html>
