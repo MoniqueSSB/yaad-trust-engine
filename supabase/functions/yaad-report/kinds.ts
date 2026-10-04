@@ -1,9 +1,9 @@
-// The six services other than the Deposit Protection Check, drafted into the
+// The six services other than the Project Setup Check, drafted into the
 // layout of their blank templates (scripts/report-templates/services).
 //
 // Added 28 September 2026 on Monique's instruction: every service has a
 // template, and the agent drafts into it once the service is booked. The
-// Deposit Protection Check stays in index.ts where it was built.
+// Project Setup Check stays in index.ts where it was built.
 //
 // What each brief may and may not ask for. Every brief sits under the same
 // rules in SYSTEM (no rating, no verdict, no measurement, no figure, nothing
