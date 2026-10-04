@@ -1,0 +1,125 @@
+<!doctype html>
+<!-- Source for a five slide TikTok photo post (1080 x 1920), one slide per
+     ?p=1 to ?p=5. The first post on the Yaadly business page: the introduction.
+     Not published: brand/ is outside docs/. render.sh turns them into PNGs.
+     TikTok covers the top, the bottom third and the right edge with its own
+     buttons and caption, so the text stays inside the padding below.
+     Wording follows docs/COPY-GUIDELINES.md. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TikTok slides, reach out</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;0,9..144,400;1,9..144,200;1,9..144,300&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07071A; --bg2:#0D0D28;
+  --line:rgba(155,115,245,0.14); --line2:rgba(155,115,245,0.28);
+  --ink:#EEEEFF; --mute:#9E9ECB;
+  --purple:#9B73F5; --purpleb:#C4AAFF; --gold:#F59E0B; --goldb:#FBBF24;
+  --disp:'Fraunces',Georgia,serif;
+  --body:'IBM Plex Sans',-apple-system,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1080px;height:1920px;overflow:hidden;background:var(--bg)}
+.slide{
+  display:none;width:1080px;height:1920px;padding:230px 170px 440px 84px;flex-direction:column;
+  font-family:var(--body);color:var(--ink);-webkit-font-smoothing:antialiased;
+  background:
+    radial-gradient(1000px 800px at 105% -5%,rgba(155,115,245,0.34),transparent 62%),
+    radial-gradient(900px 800px at -10% 105%,rgba(245,158,11,0.20),transparent 60%),
+    linear-gradient(180deg,var(--bg2),var(--bg));
+}
+.slide.on{display:flex}
+.top{display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:18px;font-family:var(--disp);font-weight:400;font-size:44px}
+.brand img{width:70px;height:70px;display:block}
+.count{font:500 24px var(--mono);color:var(--mute);letter-spacing:0.08em}
+.eyebrow{
+  margin-top:120px;display:inline-flex;align-items:center;gap:14px;align-self:flex-start;
+  font:500 24px var(--mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--purpleb);
+  padding:14px 26px;border:1px solid var(--line2);border-radius:999px;background:rgba(155,115,245,0.07);
+}
+.eyebrow i{width:11px;height:11px;border-radius:50%;background:var(--goldb);box-shadow:0 0 18px var(--gold)}
+h1{margin-top:48px;font-family:var(--disp);font-weight:200;font-size:132px;line-height:1.03;letter-spacing:-0.03em}
+h1.m{font-size:104px}
+h1 em{
+  font-style:italic;font-weight:300;
+  background:linear-gradient(100deg,var(--purpleb),var(--goldb) 85%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.08em;
+}
+.lead{margin-top:52px;font-size:44px;line-height:1.35;color:var(--mute)}
+.lead b{color:var(--ink);font-weight:500}
+.rows{margin-top:56px;border-top:1px solid var(--line2)}
+.rows p{font-size:40px;line-height:1.28;padding:28px 0;border-bottom:1px solid var(--line)}
+.rows p b{font-weight:600;color:#fff}
+.rows.no p{color:var(--mute)}
+.rows.no p::before{content:"No ";color:var(--goldb);font-weight:600}
+.swipe{margin-top:auto;padding-top:36px;font:500 26px var(--mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--goldb)}
+.cta{margin-top:56px;border:1px solid rgba(251,191,36,0.5);border-radius:28px;background:rgba(245,158,11,0.07);padding:40px 44px}
+.cta b{display:block;font:300 62px/1.1 var(--disp);color:var(--goldb);letter-spacing:-0.02em}
+.cta span{display:block;margin-top:18px;font-size:36px;line-height:1.35;color:var(--ink)}
+</style>
+</head>
+<body>
+
+<section class="slide" id="p1">
+  <div class="top"><div class="brand"><img src="../yaadly-logo-master.png" alt="">Yaadly</div><div class="count">1 / 5</div></div>
+  <div class="eyebrow"><i></i>Meet Yaadly</div>
+  <h1>You sent the money. <em>Did the work happen?</em></h1>
+  <p class="lead">This is why Yaadly exists.</p>
+  <div class="swipe">Swipe &rarr;</div>
+</section>
+
+<section class="slide" id="p2">
+  <div class="top"><div class="brand"><img src="../yaadly-logo-master.png" alt="">Yaadly</div><div class="count">2 / 5</div></div>
+  <h1 class="m" style="margin-top:120px">This is how it<br><em>usually goes.</em></h1>
+  <div class="rows no">
+    <p>written list of the work.</p>
+    <p>price agreed in writing.</p>
+    <p>receipts for the materials.</p>
+    <p>photos you can trust.</p>
+  </div>
+  <p class="lead">And you find out <b>when you land.</b></p>
+  <div class="swipe">Swipe &rarr;</div>
+</section>
+
+<section class="slide" id="p3">
+  <div class="top"><div class="brand"><img src="../yaadly-logo-master.png" alt="">Yaadly</div><div class="count">3 / 5</div></div>
+  <div class="eyebrow"><i></i>So we built Yaadly</div>
+  <h1 class="m" style="font-size:80px">Property work in Jamaica,<br><em>managed while you're abroad.</em></h1>
+  <div class="rows" style="margin-top:44px">
+    <p><b>One agreed price.</b> You buy the job from Yaadly.</p>
+    <p><b>An identity checked tradesperson</b> does it.</p>
+    <p><b>Every stage is photographed</b> for you to see.</p>
+    <p><b>A named person reviews it</b> before you accept.</p>
+  </div>
+  <div class="swipe">Swipe &rarr;</div>
+</section>
+
+<section class="slide" id="p4">
+  <div class="top"><div class="brand"><img src="../yaadly-logo-master.png" alt="">Yaadly</div><div class="count">4 / 5</div></div>
+  <div class="eyebrow"><i></i>Who is behind it</div>
+  <h1 class="m">Founded by a<br><em>project manager.</em></h1>
+  <p class="lead"><b>Monique Sewell-Bennett.</b> London-born Jamaican, 7+ years managing construction projects in the UK.</p>
+  <p class="lead">She started Yaadly so owners abroad get prices based on realistic costs, <b>not priced higher because they are not local.</b></p>
+  <div class="swipe">Swipe &rarr;</div>
+</section>
+
+<section class="slide" id="p5">
+  <div class="top"><div class="brand"><img src="../yaadly-logo-master.png" alt="">Yaadly</div><div class="count">5 / 5</div></div>
+  <div class="eyebrow"><i></i>Launching in Kingston and Portmore</div>
+  <h1 class="m">Building or fixing<br><em>in Jamaica?</em></h1>
+  <div class="cta">
+    <b>Message us.</b>
+    <span>Tell us what the work is and where the property is. A person replies within one working day.</span>
+  </div>
+  <p class="lead">Or book a 15 minute call at <b>yaadly.co.uk</b></p>
+</section>
+
+<script>
+var p=new URLSearchParams(location.search).get('p')||'1';
+document.getElementById('p'+p).className='slide on';
+</script>
+</body>
+</html>

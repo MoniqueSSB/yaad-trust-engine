@@ -1,0 +1,86 @@
+<!doctype html>
+<!-- Source for the "What Yaadly is" social graphic. Not published: brand/ is
+     outside docs/. Open with ?s=story for the 1080 x 1920 version, no query
+     for the 1080 x 1350 feed version. render.sh turns both into PNGs.
+     Wording follows docs/COPY-GUIDELINES.md sections 1 to 3. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>What Yaadly is</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;0,9..144,400;1,9..144,200;1,9..144,300&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07071A; --bg2:#0D0D28;
+  --line:rgba(155,115,245,0.14); --line2:rgba(155,115,245,0.28);
+  --ink:#EEEEFF; --mute:#9E9ECB;
+  --purple:#9B73F5; --purpleb:#C4AAFF; --gold:#F59E0B; --goldb:#FBBF24;
+  --disp:'Fraunces',Georgia,serif;
+  --body:'IBM Plex Sans',-apple-system,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1080px;height:1350px;overflow:hidden}
+body{
+  font-family:var(--body);color:var(--ink);-webkit-font-smoothing:antialiased;
+  background:
+    radial-gradient(900px 700px at 105% -5%,rgba(155,115,245,0.34),transparent 62%),
+    radial-gradient(800px 700px at -10% 108%,rgba(245,158,11,0.20),transparent 60%),
+    linear-gradient(180deg,var(--bg2),var(--bg));
+  padding:84px 84px 76px;
+  display:flex;flex-direction:column;
+}
+.brand{display:flex;align-items:center;gap:20px;font-family:var(--disp);font-weight:400;font-size:46px;letter-spacing:-0.01em}
+.brand img{width:76px;height:76px;display:block}
+.eyebrow{
+  margin-top:96px;display:inline-flex;align-items:center;gap:14px;align-self:flex-start;
+  font:500 23px var(--mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--purpleb);
+  padding:13px 24px;border:1px solid var(--line2);border-radius:999px;background:rgba(155,115,245,0.07);
+}
+.eyebrow i{width:11px;height:11px;border-radius:50%;background:var(--goldb);box-shadow:0 0 18px var(--gold)}
+h1{
+  margin-top:44px;font-family:var(--disp);font-weight:200;
+  font-size:112px;line-height:1.02;letter-spacing:-0.03em;
+}
+h1 em{
+  font-style:italic;font-weight:300;
+  background:linear-gradient(100deg,var(--purpleb),var(--goldb) 85%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  padding-right:.08em;
+}
+.steps{margin-top:auto;border-top:1px solid var(--line2)}
+.step{display:flex;align-items:baseline;gap:30px;padding:27px 0;border-bottom:1px solid var(--line)}
+.step span{font:500 22px var(--mono);color:var(--goldb);letter-spacing:0.06em;flex:none;width:44px}
+.step p{font-size:35px;line-height:1.28;color:var(--ink);font-weight:400}
+.step p b{font-weight:600;color:#fff}
+.foot{margin-top:44px;display:flex;align-items:center;justify-content:space-between}
+.url{font:500 34px var(--body);color:var(--ink);display:flex;align-items:center;gap:14px}
+.url i{width:12px;height:12px;border-radius:50%;background:var(--purple)}
+.tag{font:400 21px var(--mono);color:var(--mute);letter-spacing:0.04em}
+
+/* 1080 x 1920. TikTok and Stories cover the top and bottom with their own
+   buttons, so everything sits inside the middle band. */
+html.story,html.story body{height:1920px}
+html.story body{padding:250px 84px 380px}
+html.story .eyebrow{margin-top:110px}
+html.story h1{font-size:118px;margin-top:52px}
+html.story .step{padding:36px 0}
+html.story .step p{font-size:36px}
+</style>
+<script>if(new URLSearchParams(location.search).get('s')==='story')document.documentElement.className='story'</script>
+</head>
+<body>
+  <div class="brand"><img src="../yaadly-logo-master.png" alt="">Yaadly</div>
+  <div class="eyebrow"><i></i>Launching in Kingston and Portmore</div>
+  <h1>Property work in Jamaica, <em>managed while you're abroad.</em></h1>
+  <div class="steps">
+    <div class="step"><span>01</span><p><b>One agreed price.</b> You buy the job from Yaadly.</p></div>
+    <div class="step"><span>02</span><p><b>An identity checked tradesperson</b> does it.</p></div>
+    <div class="step"><span>03</span><p><b>Every stage is photographed</b> for you to see.</p></div>
+    <div class="step"><span>04</span><p><b>A named person reviews it</b> before you accept.</p></div>
+  </div>
+  <div class="foot">
+    <div class="url"><i></i>yaadly.co.uk</div>
+    <div class="tag">UK &middot; US &middot; CANADA</div>
+  </div>
+</body>
+</html>
