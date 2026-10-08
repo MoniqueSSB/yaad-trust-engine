@@ -94,7 +94,15 @@
    app's SiteNav (same markup, measured), and with 80px of padding rather than
    48px the app needs a 1240px window, so the portal links hide at 1240px
    rather than 1180px, in both files, so the two headers hide them at the same
-   width. If an eighth tab is ever wanted, something has to come out. */
+   width. If an eighth tab is ever wanted, something has to come out.
+
+   8 Oct 2026: an eighth tab, "Prices", on Monique's instruction, and nothing
+   came out. It still fits above 1240px (measured: 5px to spare at 1245px).
+   Below that the portal links hide as before, but the row with the button
+   now overflowed between 820px and about 980px, pushing "Post a job" off the
+   edge (it already did so between 820px and about 920px before the tab). So
+   the two row layout below starts at 1024px rather than 820px, here and in
+   the app's SiteNav, and the job board's sticky filter bar moves with it. */
 .site-nav .navcta{
   flex-shrink:0; margin-left:12px; white-space:nowrap;
   display:inline-flex; align-items:center;
@@ -110,7 +118,7 @@
 @media(max-width:1240px){
   .site-nav .quiet-links{display:none}
 }
-@media(max-width:820px){
+@media(max-width:1024px){
   .site-nav .nav-in{flex-wrap:wrap; padding:8px 18px; gap:8px}
   .site-nav .brand{margin-right:auto}
   .site-nav .navcta{margin-left:0}

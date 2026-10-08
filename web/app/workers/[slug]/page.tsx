@@ -468,7 +468,7 @@ export default async function WorkerProfile({
         </div>
 
         {/* ── RAIL ───────────────────────────────────────────────── */}
-        <aside className="flex min-w-0 max-w-[316px] flex-[1_1_280px] flex-col gap-4 min-[821px]:sticky min-[821px]:top-[74px]">
+        <aside className="flex min-w-0 max-w-[316px] flex-[1_1_280px] flex-col gap-4 min-[1025px]:sticky min-[1025px]:top-[74px]">
           {/* Contact stays through one channel, on purpose: a job posted through
               Yaadly, never a phone number or an email on this page. That is also
               the only way a quote, evidence and payment end up tied to a real

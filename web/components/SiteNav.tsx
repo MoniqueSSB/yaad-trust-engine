@@ -78,7 +78,7 @@ export function SiteNav({
     "px-[6px] py-1.5 whitespace-nowrap text-[12px] text-dim transition hover:text-purpleb";
   return (
     <nav className="sticky top-0 z-50 border-b border-line bg-bg/85 backdrop-blur-[14px]">
-      <div className="flex min-h-[58px] flex-nowrap items-center px-10 max-[820px]:flex-wrap max-[820px]:gap-y-2 max-[820px]:px-[18px] max-[820px]:py-2">
+      <div className="flex min-h-[58px] flex-nowrap items-center px-10 max-[1024px]:flex-wrap max-[1024px]:gap-y-2 max-[1024px]:px-[18px] max-[1024px]:py-2">
         <a href={SITE} className="mr-auto flex shrink-0 items-center gap-2 font-display text-[18px] font-medium">
           <span className={`grid size-[30px] place-items-center rounded-[8px] text-[16px] font-bold text-white ${GRAD}`}>
             Y
@@ -87,10 +87,11 @@ export function SiteNav({
             Yaadly<span className="font-light text-mute">Hub</span>
           </b>
         </a>
-        <div className="flex items-center gap-0.5 max-[820px]:order-3 max-[820px]:w-full max-[820px]:overflow-x-auto">
+        <div className="flex items-center gap-0.5 max-[1024px]:order-3 max-[1024px]:w-full max-[1024px]:overflow-x-auto">
           <a href={`${SITE}/marketplace`} className={tab(false)}>Overview</a>
           <Link href="/jobs" className={tab(here === "market")}>Job board</Link>
           <a href={`${SITE}/services`} className={tab(false)}>Managed services</a>
+          <a href={`${SITE}/prices`} className={tab(false)}>Prices</a>
           <a href={`${SITE}/business`} className={tab(false)}>For business</a>
           <a href={`${SITE}/how-we-use-ai`} className={tab(false)}>How we use AI</a>
           <a href={`${SITE}/contact`} className={tab(false)}>Contact</a>
