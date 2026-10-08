@@ -75,11 +75,11 @@ JOB_BANDS: dict[str, PriceBand] = {
         note="One vendor only. Treat as indicative, not a benchmark.",
     ),
     "plumbing:unclog": PriceBand(
-        "Unclog drain", 1_664, 3_750, "medium", "UWI card 2019-20, inflated 30 to 50 percent",
+        "Unclog drain", 1_664, 3_500, "medium", "UWI card 2019-20, plus 30 to 40 percent",
         note="Base figures are dated. Inflation applied.",
     ),
     "plumbing:tank": PriceBand(
-        "Water tank install", 18_850, 21_750, "medium", "UWI card 2019-20, inflated 30 to 50 percent"
+        "Water tank install", 18_850, 20_300, "medium", "UWI card 2019-20, plus 30 to 40 percent"
     ),
     "grounds:monthly": PriceBand(
         "Gardener, monthly", 10_000, 25_000, "high", "Three corroborating sources"
