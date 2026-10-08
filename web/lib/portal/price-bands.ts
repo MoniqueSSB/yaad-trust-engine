@@ -148,21 +148,21 @@ export const PRICE_BENCHMARKS: PriceBenchmarks = {
     "plumbing:unclog": {
       "label": "Unclog drain",
       "low_jmd": 1664,
-      "high_jmd": 3500,
+      "high_jmd": 3750,
       "low_gbp": 8,
-      "high_gbp": 17,
+      "high_gbp": 18,
       "confidence": "medium",
-      "source": "UWI card 2019-20, plus 30 to 40 percent",
+      "source": "UWI card 2019-20, inflated 30 to 50 percent",
       "note": "Base figures are dated. Inflation applied."
     },
     "plumbing:tank": {
       "label": "Water tank install",
       "low_jmd": 18850,
-      "high_jmd": 20300,
+      "high_jmd": 21750,
       "low_gbp": 90,
-      "high_gbp": 97,
+      "high_gbp": 104,
       "confidence": "medium",
-      "source": "UWI card 2019-20, plus 30 to 40 percent",
+      "source": "UWI card 2019-20, inflated 30 to 50 percent",
       "note": ""
     },
     "grounds:monthly": {
