@@ -3,7 +3,7 @@
 // before they pay. Every client, property, person and finding in them is
 // invented, and each one says so on its first page and on every page.
 //
-//   cd scripts/report-templates && npm ci && node samples.js <out dir>
+//   cd scripts/report-templates && npm ci && node samples.js "<YaadlyHub>/Reports/Sample Reports"
 //
 // Writes "[C] <Service>, Sample Report.pdf" and ".docx" into <out dir>.
 // Refuses to build anything the gate rejects, the same as the templates.
