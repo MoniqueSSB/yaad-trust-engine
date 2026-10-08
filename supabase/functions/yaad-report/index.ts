@@ -79,7 +79,7 @@ You draft. A named person rates every finding, writes the verdict and signs. You
 // severity, a verdict, a measurement or a figure, and there is deliberately no
 // per-service exception mechanism for any of those.
 const BRIEFS: Record<string, string> = {
-  deposit_check: `SERVICE BRIEF: Deposit Protection Check.
+  deposit_check: `SERVICE BRIEF: Project Setup Check.
 
 This is a desk review of a contractor and their written quote, carried out before the client pays anybody anything. Usually nobody has visited the property. Your source material is the quote, the messages, what the client was told, what could and could not be confirmed about the contractor, and any photographs somebody on the ground sent.
 
