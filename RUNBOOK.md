@@ -6239,6 +6239,7 @@ transaction.
 4. `cp concierge/concierge.html concierge-deploy/public/index.html` if the desk changed, then deploy the desk as usual. The templates travel in `concierge-deploy/public/templates`.
 5. "Could not load the templates" on the desk means `templates/index.json` was not deployed with the desk. Check `concierge-deploy/public/templates` has it, then redeploy.
 6. The Deposit Protection Check template's checklist and payment terms are a copy of `DEPOSIT_CHECKLIST` and `PAYMENT_TERMS` in `yaad-report`. Change one, change the other.
+7. **Sample reports (8 Oct 2026).** A filled example of each service on the services page, with an invented client, property and people, marked SAMPLE on every page. The content is in `scripts/report-templates/samples/<service>.js`, filled into a copy of the blank template, so a template change carries into its sample. Rebuild with `cd scripts/report-templates && node samples.js "<the YaadlyHub Sample Reports folder>"`. Same gate as the templates. If it stops saying "no section" or "no table number", the template was restructured: move the fill to the new heading.
 
 ## 37. A quote pack draft: reading it, correcting it, printing it (28 Sep 2026)
 
