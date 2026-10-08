@@ -23,10 +23,11 @@ function* strings(v, where) {
   else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) yield* strings(x, `${where}.${k}`);
 }
 
-async function check() {
+// The same screens for any list of { slug, doc }. The filled sample reports
+// (samples.js) go through this too: a sample is page copy a client reads.
+async function screen(templates) {
   const { hasMeasurement } = await import(pathToFileURL(path.join(SHARED, "measurements.ts")).href);
   const guardrails = await import(pathToFileURL(path.join(SHARED, "guardrails.ts")).href);
-  const templates = require("./services");
   const problems = [];
   for (const t of templates) {
     for (const [text, where] of strings(t.doc, t.slug)) {
@@ -35,10 +36,15 @@ async function check() {
       if (/[–—]/.test(text)) problems.push(`${where}: carries a dash`);
     }
   }
-  return { templates, problems };
+  return problems;
 }
 
-module.exports = { check };
+async function check() {
+  const templates = require("./services");
+  return { templates, problems: await screen(templates) };
+}
+
+module.exports = { check, screen };
 
 if (require.main === module) {
   check().then(({ templates, problems }) => {
