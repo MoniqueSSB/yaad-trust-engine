@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Yaadly · What property work actually costs in Jamaica</title>
-<meta name="description" content="Real observed price ranges for property repair and maintenance work in Kingston and Portmore, Jamaica: materials, day rates, common jobs and builds, dated and sourced. We could find no other public price list in the corridor.">
+<meta name="description" content="Published price ranges for property repair and maintenance work in Jamaica: materials, day rates, common jobs and build limits, each with its source. Not a quote.">
 <link rel="canonical" href="https://yaadly.co.uk/prices.html">
 <meta property="og:title" content="What property work actually costs in Jamaica">
-<meta property="og:description" content="Materials, day rates, common jobs and builds in Kingston and Portmore. Real ranges, dated, sourced, never a quote.">
+<meta property="og:description" content="Materials, day rates, common jobs and build limits in Jamaica. Every figure sourced, never a quote.">
 <meta property="og:image" content="https://yaadly.co.uk/og-v2.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon-v1.png">
@@ -16,7 +16,27 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="yaadly.css">
-<link rel="stylesheet" href="nav.css?v=2">
+<link rel="stylesheet" href="nav.css?v=3">
+<style>
+/* Price guide / calculator tabs, prices page only. Added 8 Oct 2026. */
+.ptabs{display:flex;gap:6px;border-bottom:1px solid var(--l-line)}
+.ptabs button{appearance:none;background:none;border:1px solid transparent;border-bottom:none;border-radius:10px 10px 0 0;padding:10px 16px;font:600 14px var(--body);color:var(--l-mute);cursor:pointer;margin-bottom:-1px}
+.ptabs button[aria-selected="true"]{background:var(--l-bg);border-color:var(--l-line);color:var(--l-ink)}
+.ptabs button:hover{color:var(--l-ink)}
+.calc td input{width:84px;padding:7px 9px;border:1px solid var(--l-line2);border-radius:8px;font:500 14px var(--mono);color:var(--l-ink);background:#fff}
+.calc td input:focus{outline:2px solid var(--l-grad-teal);outline-offset:1px}
+.calc td .unit{display:block;font-size:12px;color:var(--l-dim);margin-top:2px}
+.calc-total{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--l-line);border:1px solid var(--l-line);border-radius:var(--r);overflow:hidden;margin-top:18px}
+.calc-total>div{background:var(--l-panel2);padding:14px 16px}
+.calc-total .k{font:700 11px var(--body);letter-spacing:1px;text-transform:uppercase;color:var(--l-mute)}
+.calc-total .v{font:600 20px var(--mono);color:var(--l-ink);margin-top:4px}
+table.ptable td:first-child{min-width:170px}
+.oldnote{display:block;margin-top:4px;font-size:12px;line-height:1.4;color:var(--l-amber)}
+td.src{font-size:12.5px;line-height:1.45;color:var(--l-mute);min-width:200px;max-width:340px}
+.src-none{color:var(--l-coral)}
+.calc td .src{display:block;font-size:12px;color:var(--l-dim);margin-top:3px}
+@media(max-width:640px){.calc-total{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
 
@@ -26,6 +46,7 @@
     <a class="vbtn" href="/marketplace">Overview</a>
     <a class="vbtn" href="https://app.yaadly.co.uk/jobs">Job board</a>
     <a class="vbtn" href="/services">Managed services</a>
+    <a class="vbtn on" href="/prices">Prices</a>
     <a class="vbtn" href="/business">For business</a>
     <a class="vbtn" href="/how-we-use-ai">How we use AI</a>
     <a class="vbtn" href="/contact">Contact</a>
@@ -43,54 +64,103 @@
   <p class="kick">What things actually cost</p>
   <h1 class="hx" style="font-size:clamp(28px,4.5vw,44px)">The price nobody <span class="g2">publishes.</span></h1>
   <p class="lead">Property work in Jamaica is priced privately, in WhatsApp messages, one owner at a time. That is exactly how an overseas owner ends up quoted more than the neighbour for the same job. This page is what we found when we went looking for a public number, researched directly from government tiers, vendor prices and dated rate cards, not invented and not smoothed over. <b>Every quote we review is measured against these numbers</b>, and anything added on top, our fee or a cost that genuinely comes with the work, is shown as its own line rather than folded into the price.</p>
-  <p class="tiny" style="margin-top:10px">Researched 1 August 2026 · exchange rate used throughout £1 ≈ J$210, US$1 ≈ J$158 · refreshed quarterly, or sooner where noted.</p>
+  <p class="tiny" style="margin-top:10px">Researched 1 August 2026 · exchange rate used throughout £1 ≈ J$210, US$1 ≈ J$158 · refreshed quarterly, or sooner where noted. Every figure&rsquo;s source is in the Source column. Where a figure was not published this year, the row says today&rsquo;s price may be 30 to 40 percent more. Sources rechecked 8 October 2026: any figure we could not find a source for has been taken off.</p>
 
   <div class="rule soft" style="margin-top:20px;display:flex;gap:12px;align-items:flex-start">
     <div><b>What this page is.</b> Research into what building work costs in Jamaica on the open market, so you have something to check a quote against. <b>It is not a Yaadly price list.</b> Yaadly&rsquo;s own fixed fees are on the <a href="services.html#prices">services page</a>, and what Yaadly charges on a job is <a href="#fees">further down this page</a>.</div>
   </div>
   <div class="gapcard" style="margin-top:22px">
-    <b>The honest headline first: for several of the most common jobs, we could find no published price in Jamaica.</b> Not on a government site, not from a trade body, not from a single vendor we could find. Painting, a bathroom renovation, septic work and a block wall by the foot are all priced privately, job by job, with nothing to check a quote against. That gap is the actual problem this page, and Yaadly itself, exists to close. Where a real number exists below, it is shown with its source and how confident it is. Where it does not, that is stated plainly rather than guessed at.
+    <b>The honest headline first: for some of the most common jobs, we could find no published price in Jamaica.</b> Not on a government site, not from a trade body, not from a single vendor we could find. A bathroom renovation and a block wall by the foot are priced privately, job by job, with nothing to check a quote against. That gap is the actual problem this page, and Yaadly itself, exists to close. Where a real number exists below, it is shown with its source and how confident it is. Where it does not, the figure is left off rather than guessed at.
   </div>
 </div></div>
 
+<div class="sect light" style="padding-top:8px;padding-bottom:0"><div class="wrap">
+  <div class="ptabs" role="tablist" aria-label="Prices">
+    <button role="tab" id="tab-guide" aria-controls="panel-guide" aria-selected="true">Price guide</button>
+    <button role="tab" id="tab-calc" aria-controls="panel-calc" aria-selected="false">Cost calculator</button>
+  </div>
+</div></div>
+
+<div id="panel-calc" role="tabpanel" aria-labelledby="tab-calc" hidden>
+<div class="sect light"><div class="wrap">
+  <h2 class="hx">Cost calculator</h2>
+  <p class="lead">Put in how much of each material, and how many days of labour, and see the range the open market charges for it. <b>Every number comes straight from the price guide</b>, with the same sources and the same confidence ratings. Nothing is estimated on top.</p>
+  <div class="ptable-wrap"><table class="ptable calc">
+    <thead><tr><th>Item</th><th>How many</th><th>J$</th><th>&asymp; &pound;</th><th>Confidence</th></tr></thead>
+    <tbody id="calc-rows"></tbody>
+  </table></div>
+  <div class="calc-total" aria-live="polite">
+    <div><div class="k">Market range, J$</div><div class="v" id="tot-j">0</div></div>
+    <div><div class="k">Market range, &asymp; &pound;</div><div class="v" id="tot-g">0</div></div>
+    <div><div class="k">Weakest figure used</div><div class="v" id="tot-c" style="font-size:15px;padding-top:4px">Nothing added yet</div></div>
+  </div>
+  <p class="tiny" style="margin-top:12px">Exchange rate &pound;1 &asymp; J$210, as used throughout this page. Where the guide gives one figure rather than a range (zinc, a labourer&rsquo;s day), that figure is used at both ends. Masons, plumbers, electricians and carpenters are left out because we could find no public source for their day rate: we will not put a guess in its place.</p>
+  <div class="rule soft" style="margin-top:18px"><div><b>This is not a quote, and it is not what your job will cost.</b> It adds up market prices for the quantities you typed. It cannot see scope, access, wastage, transport or the condition of the site, and it does not know how many days the work really takes. Use it to sense check a quote you already have. If you book the work through Yaadly, materials are passed through at cost with the receipt, and our 15% fee is on labour only, shown as its own line on the quote.</div></div>
+  <div class="ctarow">
+    <a class="btn" href="https://app.yaadly.co.uk/jobs/new">Get a written quote</a>
+    <a class="btn ghost" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20quote%20I%20would%20like%20checked%20against%20real%20costs." target="_blank" rel="noopener">Have a quote checked</a>
+  </div>
+</div></div>
+</div>
+
+<div id="panel-guide" role="tabpanel" aria-labelledby="tab-guide">
 <div class="sect light"><div class="wrap">
   <h2 class="hx">Materials</h2>
   <p class="lead">The best corroborated numbers on this page: vendor price lists, cross checked.</p>
   <div class="ptable-wrap"><table class="ptable">
-    <thead><tr><th>Item</th><th>J$</th><th>≈ £</th><th>Confidence</th></tr></thead>
+    <thead><tr><th>Item</th><th>J$</th><th>≈ £</th><th>Confidence</th><th>Source</th></tr></thead>
     <tbody>
-      <tr><td>Cement, 42.5kg bag (Carib)</td><td class="num">1,400 to 2,000</td><td class="num">6.70 to 9.50</td><td><span class="conf high">High</span></td></tr>
-      <tr><td>6&quot; concrete block</td><td class="num">140 to 280</td><td class="num">0.67 to 1.33</td><td><span class="conf high">High</span></td></tr>
-      <tr><td>Steel rebar, per ton (½&quot;)</td><td class="num">115,000 to 145,000</td><td class="num">550 to 690</td><td><span class="conf high">High</span></td></tr>
-      <tr><td>Treated lumber 2×4, per ft</td><td class="num">~120</td><td class="num">~0.57</td><td><span class="conf medium">Medium</span></td></tr>
-      <tr><td>Plywood sheet</td><td class="num">3,450 to 7,190</td><td class="num">16 to 34</td><td><span class="conf high">High</span></td></tr>
-      <tr><td>Zinc roof sheet</td><td class="num">~5,000</td><td class="num">~24</td><td><span class="conf low">Low, single source</span></td></tr>
-      <tr><td>Emulsion paint, gallon (Berger)</td><td class="num">5,000 to 6,500</td><td class="num">24 to 31</td><td><span class="conf high">High</span></td></tr>
+      <tr><td>Cement, 42.5kg bag (Carib)</td><td class="num">1,442 to 1,700</td><td class="num">6.87 to 8.10</td><td><span class="conf high">High</span></td><td class="src"><a href="https://www.yaadroom.com/news/cost-of-building-materials-in-jamaica" target="_blank" rel="noopener">Yaadroom, Jan 2025</a> (J$1,442 to 1,611 before GCT) · <a href="https://www.hardwareandlumber.com/item/H22014727/CEMENT-PLUS-42-5KG-CARIB/" target="_blank" rel="noopener">Hardware &amp; Lumber</a> (J$1,656.09) · <a href="https://grahamshardware.store/products/carib-cement-1" target="_blank" rel="noopener">Graham&rsquo;s Hardware</a> (J$1,700)</td></tr>
+      <tr><td>6&quot; concrete block</td><td class="num">130 to 186.71</td><td class="num">0.62 to 0.89</td><td><span class="conf high">High</span></td><td class="src"><a href="https://grahamshardware.store/products/concrete-blocks" target="_blank" rel="noopener">Graham&rsquo;s Hardware</a> (J$130) · <a href="https://www.yaadroom.com/news/cost-of-building-materials-in-jamaica" target="_blank" rel="noopener">Yaadroom, Jan 2025</a> (J$140 to 180) · <a href="https://kbanltd.com/category/28-concrete-cement-masonry" target="_blank" rel="noopener">K-Ban</a> (J$186.71 plus tax)</td></tr>
+      <tr><td>Steel rebar, per ton (½&quot;)<span class="oldnote">Please be aware this price may be 30 to 40% more, as it is not a figure published this year.</span></td><td class="num">115,000 to 143,700</td><td class="num">548 to 684</td><td><span class="conf high">High</span></td><td class="src"><a href="https://www.yaadroom.com/news/cost-of-building-materials-in-jamaica" target="_blank" rel="noopener">Yaadroom, Jan 2025</a> (J$115,000 to 121,535) · <a href="https://www.electricaljamaica.com/post/construction-material-cost-in-jamaica-2024" target="_blank" rel="noopener">A D Dalling, Aug 2024</a> (J$136,860 to 143,700)</td></tr>
+      <tr><td>Treated lumber 2×4, 16 ft length</td><td class="num">1,927 to 2,250</td><td class="num">9.18 to 10.71</td><td><span class="conf medium">Medium</span></td><td class="src"><a href="https://www.yaadroom.com/news/cost-of-building-materials-in-jamaica" target="_blank" rel="noopener">Yaadroom, Jan 2025</a> (J$1,927) · <a href="https://grahamshardware.store/products/lumber-2x4x16-w-p-p-drtr-premium-treated" target="_blank" rel="noopener">Graham&rsquo;s Hardware</a> (J$2,250)</td></tr>
+      <tr><td>Plywood sheet, 5/8 inch</td><td class="num">3,450 to 7,014.75</td><td class="num">16.43 to 33.40</td><td><span class="conf high">High</span></td><td class="src"><a href="https://www.yaadroom.com/news/cost-of-building-materials-in-jamaica" target="_blank" rel="noopener">Yaadroom, Jan 2025</a> (J$3,450 to 3,960) · <a href="https://kbanltd.com/category/parent/70-ply-wood" target="_blank" rel="noopener">K-Ban</a> (J$4,600 form ply, J$7,014.75 dressed ply)</td></tr>
+      <tr><td>Zinc roof sheet</td><td class="num">~5,000</td><td class="num">~24</td><td><span class="conf low">Low, single source</span></td><td class="src"><a href="https://jamaica-gleaner.com/article/business/20251203/zinc-still-roofing-material-choice-storm-victims-restore-homes" target="_blank" rel="noopener">Jamaica Gleaner, Dec 2025</a></td></tr>
+      <tr><td>Emulsion paint, gallon (3.8 L)</td><td class="num">4,563.65 to 6,260.66</td><td class="num">21.73 to 29.81</td><td><span class="conf high">High</span></td><td class="src"><a href="https://grahamshardware.store/search?q=emulsion" target="_blank" rel="noopener">Graham&rsquo;s Hardware</a> (Magicote J$4,688.48, Berger 303 J$5,011.60, Berger Everglow J$6,161.28) · <a href="https://kbanltd.com/category/master/5-paint" target="_blank" rel="noopener">K-Ban</a> (BH Perma Flat J$4,563.65) · <a href="https://www.hardwareandlumber.com/department/285/Berger-Ever-Glow-2020/" target="_blank" rel="noopener">Hardware &amp; Lumber</a> (Berger Ever-Glow J$6,260.66)</td></tr>
+      <tr><td>8&quot; concrete block</td><td class="num">182.60 to 252.00</td><td class="num">0.87 to 1.20</td><td><span class="conf high">High</span></td><td class="src"><a href="https://grahamshardware.store/search?q=block" target="_blank" rel="noopener">Graham&rsquo;s Hardware</a> (J$182.60) · <a href="https://kbanltd.com/category/28-concrete-cement-masonry" target="_blank" rel="noopener">K-Ban</a> (J$252.00)</td></tr>
+      <tr><td>Zinc sheet, 10 to 12 ft</td><td class="num">2,222.44 to 2,700.00</td><td class="num">10.58 to 12.86</td><td><span class="conf high">High</span></td><td class="src"><a href="https://grahamshardware.store/search?q=zinc" target="_blank" rel="noopener">Graham&rsquo;s Hardware</a> (J$2,688.00 and J$2,700.00, gauge not stated) · <a href="https://kbanltd.com/category/master/20-roofing-gutters" target="_blank" rel="noopener">K-Ban</a> (28 gauge, J$2,222.44 and J$2,666.93)</td></tr>
+      <tr><td>Sand, per yard</td><td class="num">4,500.00 to 6,000.00</td><td class="num">21.43 to 28.57</td><td><span class="conf medium">Medium, one shop</span></td><td class="src"><a href="https://grahamshardware.store/search?q=sand" target="_blank" rel="noopener">Graham&rsquo;s Hardware</a> (all purpose J$4,500.00, washed J$5,739.13, granite J$6,000.00)</td></tr>
+      <tr><td>Crushed stone ¾&quot;, per yard</td><td class="num">4,000.00</td><td class="num">19.05</td><td><span class="conf medium">Medium, one shop</span></td><td class="src"><a href="https://grahamshardware.store/search?q=gravel" target="_blank" rel="noopener">Graham&rsquo;s Hardware</a></td></tr>
+      <tr><td>Tile adhesive (thinset), 50 lb / 22.7 kg bag</td><td class="num">1,648.50 to 3,601.90</td><td class="num">7.85 to 17.15</td><td><span class="conf high">High</span></td><td class="src"><a href="https://grahamshardware.store/search?q=thinset" target="_blank" rel="noopener">Graham&rsquo;s Hardware</a> (J$1,950.00 and J$3,000.00) · <a href="https://www.hardwareandlumber.com/products?pSearch=thinset" target="_blank" rel="noopener">Hardware &amp; Lumber</a> (J$1,648.50 to J$3,601.90)</td></tr>
+      <tr><td>PVC pressure pipe ½&quot;, about 20 ft</td><td class="num">834.99 to 849.00</td><td class="num">3.98 to 4.04</td><td><span class="conf high">High</span></td><td class="src"><a href="https://grahamshardware.store/search?q=pvc+pipe" target="_blank" rel="noopener">Graham&rsquo;s Hardware</a> (20 ft, J$834.99) · <a href="https://www.hardwareandlumber.com/products?pSearch=pvc%20pipe" target="_blank" rel="noopener">Hardware &amp; Lumber</a> (5.8 m, J$849.00)</td></tr>
+      <tr><td>Water tank, 400 gallon</td><td class="num">28,000.00 to 37,044.64</td><td class="num">133 to 176</td><td><span class="conf high">High</span></td><td class="src"><a href="https://grahamshardware.store/search?q=tank" target="_blank" rel="noopener">Graham&rsquo;s Hardware</a> (J$28,000.00) · <a href="https://www.hardwareandlumber.com/cat/1290/Water-Tank-+/" target="_blank" rel="noopener">Hardware &amp; Lumber</a> (J$37,044.64)</td></tr>
+      <tr><td>Water tank, 650 gallon</td><td class="num">41,000.00 to 54,320.63</td><td class="num">195 to 259</td><td><span class="conf high">High</span></td><td class="src"><a href="https://grahamshardware.store/search?q=tank" target="_blank" rel="noopener">Graham&rsquo;s Hardware</a> (J$41,000.00) · <a href="https://www.hardwareandlumber.com/cat/1290/Water-Tank-+/" target="_blank" rel="noopener">Hardware &amp; Lumber</a> (J$54,320.63)</td></tr>
     </tbody>
   </table></div>
-  <p class="tiny" style="margin-top:10px">Zinc is a single post-Hurricane Melissa (Oct 2025) news figure, not a vendor average, and is marked accordingly.</p>
+  <p class="tiny" style="margin-top:10px">Shop prices are as listed on each store&rsquo;s website, viewed 8 October 2026. None of the stores says whether GCT is included, and some items show as backordered. The ~J$5,000 zinc figure is a single post-Hurricane Melissa (Oct 2025) news report, not a shop price, and is marked accordingly.</p>
 </div></div>
 
 <div class="sect light"><div class="wrap">
   <h2 class="hx">Day rates</h2>
   <p class="lead">Thinner data here: Jamaica's labour market runs on WhatsApp quotes, not published rate cards.</p>
   <div class="ptable-wrap"><table class="ptable">
-    <thead><tr><th>Trade</th><th>J$ per day</th><th>≈ £ per day</th><th>Confidence</th></tr></thead>
+    <thead><tr><th>Trade</th><th>J$ per day</th><th>≈ £ per day</th><th>Confidence</th><th>Source</th></tr></thead>
     <tbody>
-      <tr><td>General labourer</td><td class="num">~3,200</td><td class="num">~15</td><td><span class="conf medium">Medium</span></td></tr>
-      <tr><td>Skilled mason, Kingston metro</td><td class="num">7,000 to 12,000</td><td class="num">33 to 57</td><td><span class="conf medium">Medium, rising</span></td></tr>
-      <tr><td>Plumber, electrician, carpenter</td><td class="num">no reliable public figure</td><td class="num">n/a</td><td><span class="conf none">None</span></td></tr>
+      <tr><td>General (unskilled) labourer, 8 hour day<span class="oldnote">Please be aware this price may be 30 to 40% more, as it is not a figure published this year.</span></td><td class="num">4,841.28</td><td class="num">23.05</td><td><span class="conf medium">Medium, agreed industry rate</span></td><td class="src"><a href="https://web5.jamaica-gleaner.com/article/lead-stories/20250507/tension-sparks" target="_blank" rel="noopener">Jamaica Gleaner, May 2025</a> (&ldquo;$4,841.28 per eight-hour day agreed on in the 2025-2027 Joint Industrial Council&rdquo; agreement)</td></tr>
     </tbody>
   </table></div>
-  <p class="tiny" style="margin-top:10px">Where no day rate is published for a trade, mason range or above is the working assumption given the current trades shortage, filled in from real quotes as jobs run.</p>
-  <div class="ptable-wrap" style="margin-top:16px"><table class="ptable">
-    <thead><tr><th>Unit rate</th><th>J$</th><th>≈ £</th><th>Confidence</th></tr></thead>
+  <h3 class="hx" style="font-size:20px;margin-top:26px">What one employer pays its contractors</h3>
+  <p class="lead" style="font-size:15px">The University of the West Indies, Mona publishes the rates it pays contractors on its own estate. These are one employer&rsquo;s rates for 2024/2025, not a market average. Please be aware these prices may be 30 to 40% more, as they are not figures published this year.</p>
+  <div class="ptable-wrap"><table class="ptable">
+    <thead><tr><th>Rate</th><th>J$</th><th>≈ £</th><th>Source</th></tr></thead>
     <tbody>
-      <tr><td>Lay 4&quot; block, per sq yd</td><td class="num">~650</td><td class="num">~3.10</td><td><span class="conf medium">Medium, 2020-22 sheet</span></td></tr>
-      <tr><td>Lay 6&quot; block, per sq yd</td><td class="num">~820</td><td class="num">~3.90</td><td><span class="conf medium">Medium, 2020-22 sheet</span></td></tr>
-      <tr><td>Lay 8&quot; block, per sq yd</td><td class="num">~950</td><td class="num">~4.50</td><td><span class="conf medium">Medium, 2020-22 sheet</span></td></tr>
-      <tr><td>Cast column, each</td><td class="num">~2,020</td><td class="num">~9.60</td><td><span class="conf medium">Medium, 2020-22 sheet</span></td></tr>
-      <tr><td>Tiling labour, per sq ft</td><td class="num">~160</td><td class="num">~0.76</td><td><span class="conf low">Low, anecdote</span></td></tr>
+      <tr><td>Painter, Grade A, per hour</td><td class="num">789.55</td><td class="num">3.76</td><td class="src"><a href="https://www.mona.uwi.edu/emd/building-rates" target="_blank" rel="noopener">UWI Mona, Building Rates 2024/2025</a></td></tr>
+      <tr><td>Painter, Grade B, per hour</td><td class="num">716.87</td><td class="num">3.41</td><td class="src"><a href="https://www.mona.uwi.edu/emd/building-rates" target="_blank" rel="noopener">UWI Mona, Building Rates 2024/2025</a></td></tr>
+      <tr><td>Carpenter, Grade B, per hour</td><td class="num">705.07</td><td class="num">3.36</td><td class="src"><a href="https://www.mona.uwi.edu/emd/building-rates" target="_blank" rel="noopener">UWI Mona, Building Rates 2024/2025</a></td></tr>
+      <tr><td>Welder, per hour</td><td class="num">877.18</td><td class="num">4.18</td><td class="src"><a href="https://www.mona.uwi.edu/emd/building-rates" target="_blank" rel="noopener">UWI Mona, Building Rates 2024/2025</a></td></tr>
+      <tr><td>External wall painting, two coats, per m²</td><td class="num">224</td><td class="num">1.07</td><td class="src"><a href="https://www.mona.uwi.edu/emd/building-rates" target="_blank" rel="noopener">UWI Mona, Building Rates 2024/2025</a></td></tr>
+      <tr><td>Tiling, remove and replace, per m²</td><td class="num">3,413 to 4,100</td><td class="num">16.25 to 19.52</td><td class="src"><a href="https://www.mona.uwi.edu/emd/building-rates" target="_blank" rel="noopener">UWI Mona, Building Rates 2024/2025</a> (12&quot; tiles J$3,413, 4&quot; tiles J$4,100)</td></tr>
+      <tr><td>Grills installed in masonry openings, per m²</td><td class="num">2,809 to 3,233</td><td class="num">13.38 to 15.40</td><td class="src"><a href="https://www.mona.uwi.edu/emd/building-rates" target="_blank" rel="noopener">UWI Mona, Building Rates 2024/2025</a> (over 8 ft J$2,809, under 8 ft J$3,233)</td></tr>
+    </tbody>
+  </table></div>
+  <p class="tiny" style="margin-top:10px">The unit rates come from a contractors&rsquo; rate sheet last updated in December 2019, so each row carries a note that today&rsquo;s price may be 30 to 40 percent more.</p>
+  <div class="ptable-wrap" style="margin-top:16px"><table class="ptable">
+    <thead><tr><th>Unit rate</th><th>J$</th><th>≈ £</th><th>Confidence</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr><td>Lay 4&quot; block, per sq yd<span class="oldnote">Please be aware this price may be 30 to 40% more, as it is not a figure published this year.</span></td><td class="num">~650</td><td class="num">~3.10</td><td><span class="conf medium">Medium, 2020-22 sheet</span></td><td class="src"><a href="https://www.my-island-jamaica.com/support-files/independent_contractors_rate_sheet_2022.pdf" target="_blank" rel="noopener">Independent Contractors Rate Sheet 2020-22</a> (ground floor)</td></tr>
+      <tr><td>Lay 6&quot; block, per sq yd<span class="oldnote">Please be aware this price may be 30 to 40% more, as it is not a figure published this year.</span></td><td class="num">~820</td><td class="num">~3.90</td><td><span class="conf medium">Medium, 2020-22 sheet</span></td><td class="src"><a href="https://www.my-island-jamaica.com/support-files/independent_contractors_rate_sheet_2022.pdf" target="_blank" rel="noopener">Independent Contractors Rate Sheet 2020-22</a> (first floor and up; ground floor J$725)</td></tr>
+      <tr><td>Lay 8&quot; block, per sq yd<span class="oldnote">Please be aware this price may be 30 to 40% more, as it is not a figure published this year.</span></td><td class="num">~950</td><td class="num">~4.50</td><td><span class="conf medium">Medium, 2020-22 sheet</span></td><td class="src"><a href="https://www.my-island-jamaica.com/support-files/independent_contractors_rate_sheet_2022.pdf" target="_blank" rel="noopener">Independent Contractors Rate Sheet 2020-22</a> (first floor and up; ground floor J$800)</td></tr>
+      <tr><td>Cast column, each<span class="oldnote">Please be aware this price may be 30 to 40% more, as it is not a figure published this year.</span></td><td class="num">~2,020</td><td class="num">~9.60</td><td><span class="conf medium">Medium, 2020-22 sheet</span></td><td class="src"><a href="https://www.my-island-jamaica.com/support-files/independent_contractors_rate_sheet_2022.pdf" target="_blank" rel="noopener">Independent Contractors Rate Sheet 2020-22</a></td></tr>
     </tbody>
   </table></div>
 </div></div>
@@ -99,45 +169,46 @@
   <h2 class="hx">Common jobs</h2>
   <p class="lead">The anchors that actually exist. The three roof figures are what a government grant programme pays out per tier, not what a tradesperson quoted: treat them as a ceiling the state sets, not a market price.</p>
   <div class="ptable-wrap"><table class="ptable">
-    <thead><tr><th>Job</th><th>J$</th><th>≈ £</th><th>Confidence</th></tr></thead>
+    <thead><tr><th>Job</th><th>J$</th><th>≈ £</th><th>Confidence</th><th>Source</th></tr></thead>
     <tbody>
-      <tr><td>Minor roof repair</td><td class="num">75,000</td><td class="num">~357</td><td><span class="conf medium">Grant amount, not a market price (government ROOFS tier)</span></td></tr>
-      <tr><td>Major roof damage repair</td><td class="num">200,000</td><td class="num">~952</td><td><span class="conf medium">Grant amount, not a market price (government ROOFS tier)</span></td></tr>
-      <tr><td>Severe roof or structural reconstruction</td><td class="num">up to 500,000</td><td class="num">~2,381</td><td><span class="conf medium">Grant amount, not a market price (government ROOFS tier)</span></td></tr>
-      <tr><td>Window or door grill, custom</td><td class="num">25,000 to 30,000</td><td class="num">119 to 143</td><td><span class="conf low">Low, single seller, St Ann</span></td></tr>
-      <tr><td>Unclog a drain</td><td class="num">1,280 to 2,500</td><td class="num">6 to 12</td><td><span class="conf medium">Medium, dated, inflate 30 to 50%</span></td></tr>
-      <tr><td>Basin install</td><td class="num">~3,604</td><td class="num">~17</td><td><span class="conf medium">Medium, dated, inflate 30 to 50%</span></td></tr>
-      <tr><td>Water tank install</td><td class="num">~14,500</td><td class="num">~69</td><td><span class="conf medium">Medium, dated, inflate 30 to 50%</span></td></tr>
-      <tr><td>Bathtub install</td><td class="num">~14,416</td><td class="num">~69</td><td><span class="conf medium">Medium, dated, inflate 30 to 50%</span></td></tr>
-      <tr><td>Gardener, monthly</td><td class="num">10,000 to 25,000</td><td class="num">48 to 119</td><td><span class="conf high">High, three sources</span></td></tr>
+      <tr><td>Minor roof repair</td><td class="num">75,000</td><td class="num">~357</td><td><span class="conf medium">Grant amount, not a market price (government ROOFS tier)</span></td><td class="src"><a href="https://jis.gov.jm/information/get-the-facts/rebuilding-with-roofs/" target="_blank" rel="noopener">JIS, Rebuilding with ROOFS, Mar 2026</a></td></tr>
+      <tr><td>Major roof damage repair</td><td class="num">200,000</td><td class="num">~952</td><td><span class="conf medium">Grant amount, not a market price (government ROOFS tier)</span></td><td class="src"><a href="https://jis.gov.jm/information/get-the-facts/rebuilding-with-roofs/" target="_blank" rel="noopener">JIS, Rebuilding with ROOFS, Mar 2026</a></td></tr>
+      <tr><td>Severe roof or structural reconstruction</td><td class="num">up to 500,000</td><td class="num">~2,381</td><td><span class="conf medium">Grant amount, not a market price (government ROOFS tier)</span></td><td class="src"><a href="https://jis.gov.jm/information/get-the-facts/rebuilding-with-roofs/" target="_blank" rel="noopener">JIS, Rebuilding with ROOFS, Mar 2026</a></td></tr>
+      <tr><td>Unclog a drain<span class="oldnote">Please be aware this price may be 30 to 40% more, as it is not a figure published this year.</span></td><td class="num">1,280 to 2,500</td><td class="num">6 to 12</td><td><span class="conf medium">Medium, 2019-20 card</span></td><td class="src"><a href="https://www.mona.uwi.edu/emd/plumbing-rates" target="_blank" rel="noopener">UWI Mona plumbing rates 2019-20</a></td></tr>
+      <tr><td>Basin install<span class="oldnote">Please be aware this price may be 30 to 40% more, as it is not a figure published this year.</span></td><td class="num">~3,604</td><td class="num">~17</td><td><span class="conf medium">Medium, 2019-20 card</span></td><td class="src"><a href="https://www.mona.uwi.edu/emd/plumbing-rates" target="_blank" rel="noopener">UWI Mona plumbing rates 2019-20</a></td></tr>
+      <tr><td>Water tank install<span class="oldnote">Please be aware this price may be 30 to 40% more, as it is not a figure published this year.</span></td><td class="num">~14,500</td><td class="num">~69</td><td><span class="conf medium">Medium, 2019-20 card</span></td><td class="src"><a href="https://www.mona.uwi.edu/emd/plumbing-rates" target="_blank" rel="noopener">UWI Mona plumbing rates 2019-20</a></td></tr>
+      <tr><td>Bathtub install<span class="oldnote">Please be aware this price may be 30 to 40% more, as it is not a figure published this year.</span></td><td class="num">~14,416</td><td class="num">~69</td><td><span class="conf medium">Medium, 2019-20 card</span></td><td class="src"><a href="https://www.mona.uwi.edu/emd/plumbing-rates" target="_blank" rel="noopener">UWI Mona plumbing rates 2019-20</a></td></tr>
+      <tr><td>Septic tank installed, 300 gallon, labour included</td><td class="num">178,356</td><td class="num">849</td><td><span class="conf low">Low, single company</span></td><td class="src"><a href="https://plumwizja.com" target="_blank" rel="noopener">Plumwiz, 2026</a> (tank J$98,356, labour J$80,000)</td></tr>
+      <tr><td>Septic tank installed, 500 gallon, labour included</td><td class="num">251,000</td><td class="num">1,195</td><td><span class="conf low">Low, single company</span></td><td class="src"><a href="https://plumwizja.com" target="_blank" rel="noopener">Plumwiz, 2026</a></td></tr>
+      <tr><td>Septic tank installed, 750 gallon, labour included</td><td class="num">419,000</td><td class="num">1,995</td><td><span class="conf low">Low, single company</span></td><td class="src"><a href="https://plumwizja.com" target="_blank" rel="noopener">Plumwiz, 2026</a></td></tr>
+      <tr><td>Septic tank installed, 1,500 gallon, labour included</td><td class="num">850,068</td><td class="num">4,048</td><td><span class="conf low">Low, single company</span></td><td class="src"><a href="https://plumwizja.com" target="_blank" rel="noopener">Plumwiz, 2026</a></td></tr>
+      <tr><td>House painting, Kingston, interior, per sq ft of wall</td><td class="num">250 to 550</td><td class="num">1.19 to 2.62</td><td><span class="conf low">Low, one shop</span></td><td class="src"><a href="https://malcolmshardware.com/blog/house-painting-cost-kingston-2026" target="_blank" rel="noopener">Malcolm&rsquo;s Hardware, Sep 2026</a> (paint, labour and preparation)</td></tr>
+      <tr><td>House painting, Kingston, one room</td><td class="num">25,000 to 55,000</td><td class="num">119 to 262</td><td><span class="conf low">Low, one shop</span></td><td class="src"><a href="https://malcolmshardware.com/blog/house-painting-cost-kingston-2026" target="_blank" rel="noopener">Malcolm&rsquo;s Hardware, Sep 2026</a></td></tr>
+      <tr><td>Tiling labour, per sq ft<span class="oldnote">Please be aware this price may be 30 to 40% more, as it is not a figure published this year.</span></td><td class="num">400 to 900</td><td class="num">1.90 to 4.29</td><td><span class="conf low">Low, single company, Hanover</span></td><td class="src"><a href="https://vondohandypros.com/services/tiling.html" target="_blank" rel="noopener">Vondo Handy Pros, 2025</a></td></tr>
     </tbody>
   </table></div>
-  <p class="tiny" style="margin-top:10px">The plumbing call-out figures come from a 2019-20 UWI price card. Nothing since has replaced it, so we carry it forward with an explicit 30 to 50 percent inflation adjustment rather than quoting it as current.</p>
+  <p class="tiny" style="margin-top:10px">The plumbing figures come from a 2019-20 UWI price card. Nothing since has replaced it, so each row carries a note that today&rsquo;s price may be 30 to 40 percent more.</p>
 </div></div>
 
 <div class="sect light"><div class="wrap">
   <h2 class="hx">Builds and renovations</h2>
-  <p class="lead">Bigger projects, corroborated at the top line from multiple build-cost sources.</p>
+  <p class="lead">For a whole build we found one quantity surveyor&rsquo;s estimate, one builder&rsquo;s kit prices and the government&rsquo;s own loan limits. Build costs per square foot for a house are not on this page because we could not find a source for them.</p>
   <div class="ptable-wrap"><table class="ptable">
-    <thead><tr><th>Scope</th><th>J$</th><th>≈ £ / US$</th></tr></thead>
+    <thead><tr><th>Scope</th><th>J$</th><th>≈ £ / US$</th><th>Source</th></tr></thead>
     <tbody>
-      <tr><td>New build, budget tier, per sq ft</td><td class="num">8,000 to 12,000</td><td class="num">£38 to 57</td></tr>
-      <tr><td>New build, standard, per sq ft</td><td class="num">14,000 to 20,500</td><td class="num">£67 to 98</td></tr>
-      <tr><td>New build, high spec Kingston, per sq ft</td><td class="num">28,000 to 35,000</td><td class="num">£133 to 167</td></tr>
-      <tr><td>2 bed, ~900 sq ft, complete</td><td class="num">12.8m to 18.5m</td><td class="num">US$81,000 to 117,000</td></tr>
-      <tr><td>Basic 3 bed shell</td><td class="num">~5.5m</td><td class="num">~£26,000</td></tr>
-      <tr><td>NHT build-on-own-land ceiling, single</td><td class="num">11m</td><td class="num">£52,400</td></tr>
-      <tr><td>NHT build-on-own-land ceiling, joint</td><td class="num">17m</td><td class="num">£81,000</td></tr>
-      <tr><td>Utilities connection, new build</td><td class="num">800,000 to 2,000,000</td><td class="num">£3,800 to 9,500</td></tr>
+      <tr><td>One bedroom studio, about 750 sq ft, built and finished</td><td class="num">23.5m to 26.5m</td><td class="num">£111,905 to £126,190</td><td class="src"><a href="https://jamaicaobserver.com/2026/01/11/one-bedroom-house-starter-kit/" target="_blank" rel="noopener">Jamaica Observer, Jan 2026</a> (a quantity surveyor&rsquo;s estimate, plus about 5% contingency)</td></tr>
+      <tr><td>H&amp;L modular home kit, 1 bed<span class="oldnote">Please be aware this price may be 30 to 40% more, as it is not a figure published this year.</span></td><td class="num">from 4.1m</td><td class="num">£19,524</td><td class="src"><a href="https://jamaicaobserver.com/2025/05/07/hl-introduces-modular-homes-affordable-prices/" target="_blank" rel="noopener">Jamaica Observer, May 2025</a> (kit only: land, foundation and labour not included, GCT excluded)</td></tr>
+      <tr><td>H&amp;L modular home kit, 3 bed<span class="oldnote">Please be aware this price may be 30 to 40% more, as it is not a figure published this year.</span></td><td class="num">from 8.9m</td><td class="num">£42,381</td><td class="src"><a href="https://jamaicaobserver.com/2025/05/07/hl-introduces-modular-homes-affordable-prices/" target="_blank" rel="noopener">Jamaica Observer, May 2025</a></td></tr>
+      <tr><td>NHT build-on-own-land ceiling, single</td><td class="num">11m</td><td class="num">£52,400</td><td class="src"><a href="https://www.nht.gov.jm/loan-limits" target="_blank" rel="noopener">NHT loan limits, Jul 2025</a></td></tr>
+      <tr><td>NHT build-on-own-land ceiling, joint</td><td class="num">17m</td><td class="num">£81,000</td><td class="src"><a href="https://www.nht.gov.jm/loan-limits" target="_blank" rel="noopener">NHT loan limits, Jul 2025</a></td></tr>
     </tbody>
   </table></div>
-  <p class="tiny" style="margin-top:10px">Building permits run roughly J$90,000 per square metre base, plus a 0.02 percent admin charge on the total project value.</p>
 </div></div>
 
 <div class="sect light"><div class="wrap">
   <h2 class="hx">Where the data runs out</h2>
   <div class="gapcard">
-    <p><b>Painting, bathroom renovation, septic work and a block wall priced by the foot: we found no published price for any of them when this page was researched.</b> Four separate research passes looked, on 1 August 2026, and they covered these four jobs, not every trade. Every price for this work happens in a private WhatsApp message between one owner and one tradesperson, which is precisely the arrangement that lets an overseas owner be quoted more than a neighbour would pay for identical work, with nothing to check it against.</p>
+    <p><b>A bathroom renovation and a block wall priced by the foot: we have found no published price for either.</b> We looked on 1 August 2026 and again on 8 October 2026. Every price for this work happens in a private WhatsApp message between one owner and one tradesperson, which is precisely the arrangement that lets an overseas owner be quoted more than a neighbour would pay for identical work, with nothing to check it against.</p>
     <p style="margin-top:10px">This is not a gap we are filling with a guess. It is the reason a benchmark like this one has to be built from job data rather than found on a shelf: every quote reviewed through Yaadly from here adds a real, dated data point to it.</p>
   </div>
 </div></div>
@@ -168,9 +239,11 @@
   </div>
 </div></div>
 
+</div><!-- /panel-guide -->
+
 <footer><div class="wrap"><div class="fgrid">
   <span>Professional services by the founder. Jobs and business services by Yaadly Ltd, England and Wales, no. 17358077.</span>
-  <span class="tiny">Sources: Jamaica ROOFS grant programme tiers, Berger and Carib vendor price lists, a 2020-22 mason unit-rate sheet, a 2019-20 UWI plumbing price card (inflation adjusted), NHT build-cost ceilings, and direct research across four independent passes, 1 August 2026. Refreshed quarterly. Not construction advice, and not a quote.</span>
+  <span class="tiny">Sources: Every figure is linked to its source in the tables above. Researched 1 August 2026, sources rechecked 8 October 2026, and any figure we could not source has been taken off this page. Refreshed quarterly. Not construction advice, and not a quote.</span>
   <div class="flinks">
     <a href="/">Home</a>
     <a href="marketplace.html">Overview</a>
@@ -188,6 +261,81 @@
   </div>
 </div></div></footer>
 
+<script>
+/* Cost calculator. Every row below is copied from the tables on this page,
+   no other source, and nothing is interpolated: lo and hi are the published
+   range, or the single published figure at both ends. Change a price in the
+   table and change it here in the same commit. Rows with no public figure are
+   left out on purpose (CLAUDE.md section 5). */
+(function(){
+  var FX=210;
+  var ROWS=[
+    {n:'Cement, 42.5kg bag (Carib)',u:'bags',lo:1442,hi:1700,c:'high',s:'Yaadroom, Hardware & Lumber, Graham’s Hardware'},
+    {n:'6" concrete block',u:'blocks',lo:130,hi:186.71,c:'high',s:'Graham\u2019s Hardware, Yaadroom, K-Ban'},
+    {n:'Steel rebar (½")',u:'tons',lo:115000,hi:143700,c:'high',step:'0.1',s:'Yaadroom, A D Dalling',old:1},
+    {n:'Treated lumber 2×4, 16 ft',u:'lengths',lo:1927,hi:2250,c:'medium',s:'Yaadroom, Graham’s Hardware'},
+    {n:'Plywood sheet, 5/8 inch',u:'sheets',lo:3450,hi:7014.75,c:'high',s:'Yaadroom, K-Ban'},
+    {n:'Zinc roof sheet',u:'sheets',lo:5000,hi:5000,c:'low',s:'Jamaica Gleaner, Dec 2025'},
+    {n:'8" concrete block',u:'blocks',lo:182.60,hi:252,c:'high',s:'Graham\u2019s Hardware, K-Ban'},
+    {n:'Emulsion paint, gallon',u:'gallons',lo:4563.65,hi:6260.66,c:'high',s:'Graham\u2019s Hardware, K-Ban, Hardware & Lumber'},
+    {n:'Sand, per yard',u:'yards',lo:4500,hi:6000,c:'medium',s:'Graham\u2019s Hardware'},
+    {n:'General labourer, 8 hour day',u:'days',lo:4841.28,hi:4841.28,c:'medium',s:'industry agreement 2025 to 2027, reported by the Jamaica Gleaner',old:1}
+  ];
+  var LABEL={high:'High',medium:'Medium',low:'Low, single source'};
+  var RANK={high:3,medium:2,low:1};
+  function j(v){v=Math.round(v*100)/100;return v%1?v.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2}):v.toLocaleString('en-GB')}
+  function g(v){var x=v/FX;return x<100?x.toFixed(2):Math.round(x).toLocaleString('en-GB')}
+  function range(lo,hi,f){return lo===hi?f(lo):f(lo)+' to '+f(hi)}
+  var body=document.getElementById('calc-rows');
+  ROWS.forEach(function(r,i){
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td>'+r.n.replace(/"/g,'&quot;')+(r.old?'<span class="oldnote">Please be aware this price may be 30 to 40% more, as it is not a figure published this year.</span>':'')+'<span class="src">'+(r.s==='No source'?'No source':'Source: '+r.s+'. Links in the Price guide tab.')+'</span></td>'+
+      '<td><input type="number" min="0" inputmode="decimal" step="'+(r.step||'1')+'" value="" placeholder="0" aria-label="How many '+r.u+' of '+r.n.replace(/"/g,'&quot;')+'" data-i="'+i+'"><span class="unit">'+r.u+'</span></td>'+
+      '<td class="num" id="cj'+i+'">'+range(r.lo,r.hi,j)+' each</td>'+
+      '<td class="num" id="cg'+i+'">'+range(r.lo,r.hi,g)+' each</td>'+
+      '<td><span class="conf '+r.c+'">'+LABEL[r.c]+'</span></td>';
+    body.appendChild(tr);
+  });
+  function calc(){
+    var lo=0,hi=0,worst=null;
+    ROWS.forEach(function(r,i){
+      var el=body.querySelector('input[data-i="'+i+'"]');
+      var q=parseFloat(el.value);
+      var cj=document.getElementById('cj'+i),cg=document.getElementById('cg'+i);
+      if(!(q>0)){cj.textContent=range(r.lo,r.hi,j)+' each';cg.textContent=range(r.lo,r.hi,g)+' each';return}
+      lo+=r.lo*q;hi+=r.hi*q;
+      cj.textContent=range(r.lo*q,r.hi*q,j);cg.textContent=range(r.lo*q,r.hi*q,g);
+      if(!worst||RANK[r.c]<RANK[worst.c])worst=r;
+    });
+    document.getElementById('tot-j').textContent=range(lo,hi,j);
+    document.getElementById('tot-g').textContent=range(lo,hi,g);
+    document.getElementById('tot-c').textContent=worst?LABEL[worst.c]+' ('+worst.n+')':'Nothing added yet';
+  }
+  body.addEventListener('input',calc);
+
+  var tabs={guide:document.getElementById('tab-guide'),calc:document.getElementById('tab-calc')};
+  var panels={guide:document.getElementById('panel-guide'),calc:document.getElementById('panel-calc')};
+  function show(k,push){
+    Object.keys(tabs).forEach(function(t){
+      tabs[t].setAttribute('aria-selected',String(t===k));
+      panels[t].hidden=(t!==k);
+    });
+    if(push)history.replaceState(null,'',k==='calc'?'#calculator':location.pathname);
+  }
+  tabs.guide.addEventListener('click',function(){show('guide',true)});
+  tabs.calc.addEventListener('click',function(){show('calc',true)});
+  function fromHash(){
+    if(location.hash==='#calculator')show('calc',false);
+    else if(location.hash){
+      show('guide',false);
+      var t=document.getElementById(location.hash.slice(1));
+      if(t)t.scrollIntoView();
+    }
+  }
+  window.addEventListener('hashchange',fromHash);
+  fromHash();
+})();
+</script>
 <script src="yaadly.js" defer></script>
 <script src="chat.js" defer></script>
 </body>

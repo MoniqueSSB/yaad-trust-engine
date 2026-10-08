@@ -440,12 +440,12 @@ export default async function Board({
       </header>
 
       {/* ── FILTER BAR ─────────────────────────────────────────────
-          Sticky only from 821px up. SiteNav is sticky at top-0 and 58px tall,
-          but it wraps to two rows below 820px (max-[820px]:flex-wrap), so a
+          Sticky only from 1025px up. SiteNav is sticky at top-0 and 58px tall,
+          but it wraps to two rows below 1024px (max-[1024px]:flex-wrap), so a
           fixed 58px offset would park this bar over the header on a phone,
           which is the one screen a worker actually reads the board on. */}
       {!showWorkers && (
-        <div className="z-30 border-b border-line bg-bg/90 backdrop-blur-[10px] min-[821px]:sticky min-[821px]:top-[58px]">
+        <div className="z-30 border-b border-line bg-bg/90 backdrop-blur-[10px] min-[1025px]:sticky min-[1025px]:top-[58px]">
           <div className="flex flex-wrap items-center gap-3.5 px-10 py-3.5 max-[820px]:px-5">
             {/* A plain GET form, no client bundle. The board is force-dynamic
                 and the whole page is a server component, so search costs a
@@ -538,7 +538,7 @@ export default async function Board({
               </div>
             </div>
 
-            <aside className="flex min-w-0 max-w-[316px] flex-[1_1_280px] flex-col gap-4 min-[821px]:sticky min-[821px]:top-[86px]">
+            <aside className="flex min-w-0 max-w-[316px] flex-[1_1_280px] flex-col gap-4 min-[1025px]:sticky min-[1025px]:top-[86px]">
               <div className="rounded-[18px] border border-line bg-linear-to-b from-[rgba(19,19,50,0.8)] to-[rgba(12,12,38,0.6)] p-5">
                 <span className="font-mono-app text-[10px] font-semibold uppercase tracking-[0.18em] text-dim">How verification works</span>
                 <div className="mt-3.5 flex flex-col gap-3.5">
@@ -816,7 +816,7 @@ export default async function Board({
               )}
             </div>
 
-            <aside className="flex min-w-0 max-w-[316px] flex-[1_1_280px] flex-col gap-4 min-[821px]:sticky min-[821px]:top-[144px]">
+            <aside className="flex min-w-0 max-w-[316px] flex-[1_1_280px] flex-col gap-4 min-[1025px]:sticky min-[1025px]:top-[144px]">
               {/* Monique's call, 6 Sep 2026: the alerts panel ships, but it
                   collects something. The button opens WhatsApp with the
                   message half written, which lands in yaad-inbound where a
