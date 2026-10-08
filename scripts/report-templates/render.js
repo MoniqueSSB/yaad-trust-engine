@@ -14,6 +14,10 @@ const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 // ---------------------------------------------------------------- HTML
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const rich = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+// A signature line is a label, or on a filled sample a [label, what is written on the line].
+const signPair = (k) => (Array.isArray(k) ? k : [k, ""]);
+// The reference in the page header: blank on a template, filled on a sample.
+const refText = (doc) => doc.reference || doc.code + "-________";
 
 function htmlBlock(b) {
   if (b.h) return `<h2${b.pb === false ? "" : ""}>${esc(b.h)}</h2>`;
@@ -41,7 +45,7 @@ function htmlBlock(b) {
     return `<table class="grid${t.tall ? " tall" : ""}${rows.length <= 9 ? " keep" : ""}"><colgroup>${w.map((x) => `<col style="width:${((x / tot) * 100).toFixed(2)}%">`).join("")}</colgroup><thead><tr>${t.head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c, j) => `<td${j === 0 && t.firstBold ? ' class="fb"' : ""}>${c === "" ? "&nbsp;" : rich(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
   }
   if (b.lines) return `<div class="lines">${b.label ? `<div class="lab">${esc(b.label)}</div>` : ""}${"<div class=\"ln\"></div>".repeat(b.lines)}</div>`;
-  if (b.sign) return `<div class="sign" style="grid-template-columns:repeat(${b.sign.length},1fr)">${b.sign.map((k) => `<div class="sg"><div class="sl"></div><div class="lab">${esc(k)}</div></div>`).join("")}</div>`;
+  if (b.sign) return `<div class="sign" style="grid-template-columns:repeat(${b.sign.length},1fr)">${b.sign.map(signPair).map(([k, v]) => `<div class="sg"><div class="sl">${v ? `<span class="sv">${esc(v)}</span>` : ""}</div><div class="lab">${esc(k)}</div></div>`).join("")}</div>`;
   if (b.grid) return `<div class="gridpad" style="height:${b.grid.height || 200}mm">${b.grid.label ? `<div class="gl">${esc(b.grid.label)}</div>` : ""}<div class="north">N<br>&#8593;</div></div>`;
   if (b.contents) return `<table class="toc">${b.contents.map(([l, t, d]) => `<tr><td class="tl">${esc(l)}</td><td>${esc(t)}</td><td class="td">${esc(d)}</td></tr>`).join("")}</table>`;
   throw new Error("unknown block " + JSON.stringify(b).slice(0, 80));
@@ -51,8 +55,8 @@ function html(doc) {
   const logo = "data:image/png;base64," + LOGO.toString("base64");
   const CSS = `
 @page { size:A4; margin:18mm 16mm 18mm 16mm;
-  @top-left { content:"Yaadly  \\00B7  ${doc.service}"; font:600 7.5pt 'Menlo',monospace; letter-spacing:.12em; text-transform:uppercase; color:#5c6070; }
-  @top-right { content:"Reference ${doc.code}-________"; font:600 7.5pt 'Menlo',monospace; letter-spacing:.08em; color:#5c6070; }
+  @top-left { content:"Yaadly  \\00B7  ${doc.service}${doc.sample ? "  \\00B7  Sample" : ""}"; font:600 7.5pt 'Menlo',monospace; letter-spacing:.12em; text-transform:uppercase; color:#5c6070; }
+  @top-right { content:"Reference ${refText(doc)}"; font:600 7.5pt 'Menlo',monospace; letter-spacing:.08em; color:#5c6070; }
   @bottom-left { content:"${doc.footer}"; font:7pt 'Helvetica Neue',Arial,sans-serif; color:#5c6070; }
   @bottom-right { content:"Page " counter(page) " of " counter(pages); font:7.5pt 'Helvetica Neue',Arial,sans-serif; color:#5c6070; } }
 ${doc.compact ? '' : '@page :first { @top-left{content:none} @top-right{content:none} @bottom-left{content:none} @bottom-right{content:none} }'}
@@ -81,7 +85,9 @@ table{border-collapse:collapse;width:100%}
 .chip{display:inline-block;font:700 6.8pt 'Menlo',monospace;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:var(--t);border-radius:20px;padding:3px 9px}
 .tick{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:8px 0 12px}.tk{display:flex;gap:9px;border:1px solid #dcdde5;padding:9px;break-inside:avoid}.box{flex:0 0 13px;height:13px;border:1.4px solid #15161c;margin-top:1px}.tkd{font-size:8pt;color:#5c6070}
 .lines{margin:6px 0 12px}.ln{border-bottom:1px solid #c9cad4;height:8.5mm}
-.sign{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0 8px;break-inside:avoid}.sl{border-bottom:1px solid #15161c;height:12mm;margin-bottom:4px}
+.sign{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0 8px;break-inside:avoid}.sl{border-bottom:1px solid #15161c;height:12mm;margin-bottom:4px;display:flex;align-items:flex-end}.sv{font:italic 12pt Georgia,serif;padding-bottom:2px}
+.status span.on{border-color:#0f6b63;color:#0f6b63}.status span.on:before{background:#0f6b63;border-color:#0f6b63}
+.wm{position:fixed;top:45%;left:0;right:0;text-align:center;font:700 96pt Georgia,serif;letter-spacing:.2em;color:rgba(199,122,23,.07);transform:rotate(-30deg);pointer-events:none;z-index:-1}
 .gridpad{position:relative;border:1px solid #9ea0ad;margin:6px 0 10px;background-color:#fff;background-image:linear-gradient(#e3e4ea 1px,transparent 1px),linear-gradient(90deg,#e3e4ea 1px,transparent 1px);background-size:5mm 5mm;break-inside:avoid}
 .gridpad .gl{position:absolute;left:6px;top:5px;font:700 6.8pt 'Menlo',monospace;letter-spacing:.12em;text-transform:uppercase;color:#5c6070;background:#fff;padding:1px 4px}
 .gridpad .north{position:absolute;right:8px;top:6px;width:9mm;height:12mm;border:1px solid #9ea0ad;border-radius:5mm;background:#fff;text-align:center;font:700 8pt/1.2 Georgia,serif;padding-top:1mm}
@@ -91,10 +97,10 @@ table{border-collapse:collapse;width:100%}
   const cover = `<section class="cover"><div class="brand"><img src="${logo}"><span>Yaad<i>ly</i></span></div>
 <div class="kick">${esc(doc.service)}</div><h1>${esc(doc.title)}</h1><p class="blurb">${esc(doc.blurb)}</p>
 ${htmlBlock({ kv: doc.coverFields, cols: 2 })}
-<div class="status">${doc.statuses.map((s) => `<span>${esc(s)}</span>`).join("")}</div>
+<div class="status">${doc.statuses.map((s) => `<span${s === doc.statusOn ? ' class="on"' : ""}>${esc(s)}</span>`).join("")}</div>
 <div class="by">${rich(doc.preparedBy)}</div></section><div class="pb"></div>`;
   const head = doc.compact ? `<div class="compact"><div><div class="brand" style="border:0;padding:0"><img src="${logo}"><span>Yaad<i>ly</i></span></div><div class="kick" style="margin-top:10px">${esc(doc.service)}</div><h1>${esc(doc.title)}</h1></div></div>` : cover;
-  return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><title>${esc(doc.service)} template</title><style>${CSS}</style></head><body>${head}${doc.blocks.map(htmlBlock).join("\n")}</body></html>`;
+  return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><title>${esc(doc.service)} ${doc.sample ? "sample report" : "template"}</title><style>${CSS}</style></head><body>${doc.sample ? '<div class="wm">SAMPLE</div>' : ""}${head}${doc.blocks.map(htmlBlock).join("\n")}</body></html>`;
 }
 
 // ---------------------------------------------------------------- DOCX
@@ -169,8 +175,8 @@ function docxBlock(b) {
   if (b.sign) {
     const w = widthsDxa(Array(b.sign.length).fill(1));
     return [new D.Table({ width: { size: CW, type: D.WidthType.DXA }, columnWidths: w, rows: [
-      new D.TableRow({ height: { value: 700, rule: D.HeightRule.ATLEAST }, children: b.sign.map((_, j) => cell([para("", { after: 0 })], w[j], { borders: { ...noBorders, bottom: { style: D.BorderStyle.SINGLE, size: 6, color: C.ink } } })) }),
-      new D.TableRow({ children: b.sign.map((k, j) => cell([label(k)], w[j], { borders: noBorders })) }),
+      new D.TableRow({ height: { value: 700, rule: D.HeightRule.ATLEAST }, children: b.sign.map(signPair).map(([, v], j) => cell([para(v, { after: 0, font: "Georgia", size: 22 })], w[j], { valign: D.VerticalAlign.BOTTOM, borders: { ...noBorders, bottom: { style: D.BorderStyle.SINGLE, size: 6, color: C.ink } } })) }),
+      new D.TableRow({ children: b.sign.map(signPair).map(([k], j) => cell([label(k)], w[j], { borders: noBorders })) }),
     ] }), para("", { after: 100 })];
   }
   if (b.grid) {
@@ -205,7 +211,7 @@ function docx(doc) {
     new D.Paragraph({ spacing: { after: 240 }, children: [new D.TextRun({ text: doc.title, font: "Georgia", size: 60 })] }),
     para(doc.blurb, { font: "Georgia", size: 24, color: C.mute, after: 400 }),
     ...docxBlock({ kv: doc.coverFields, cols: 2 }),
-    para(doc.statuses.map((s) => "☐ " + s).join("      "), { size: 16, bold: true, color: C.mute, font: "Courier New", caps: true, after: 1400 }),
+    para(doc.statuses.map((s) => (s === doc.statusOn ? "☒ " : "☐ ") + s).join("      "), { size: 16, bold: true, color: C.mute, font: "Courier New", caps: true, after: 1400 }),
     new D.Paragraph({ border: { top: { style: D.BorderStyle.SINGLE, size: 4, color: C.line, space: 6 } }, children: runs(doc.preparedBy, { size: 16, color: C.mute }) }),
     new D.Paragraph({ children: [new D.PageBreak()] }),
   ];
@@ -215,15 +221,15 @@ function docx(doc) {
     new D.Paragraph({ spacing: { after: 160 }, border: { bottom: { style: D.BorderStyle.SINGLE, size: 10, color: C.ink, space: 6 } }, children: [new D.TextRun({ text: doc.title, font: "Georgia", size: 40 })] }),
   ];
   const hdr = new D.Header({ children: [new D.Paragraph({ tabStops: [{ type: D.TabStopType.RIGHT, position: CW }], border: { bottom: { style: D.BorderStyle.SINGLE, size: 4, color: C.line, space: 4 } }, children: [
-    new D.TextRun({ text: "YAADLY  ·  " + doc.service.toUpperCase(), font: "Courier New", size: 14, bold: true, color: C.mute }),
-    new D.TextRun({ text: "\tReference " + doc.code + "-________", font: "Courier New", size: 14, bold: true, color: C.mute }),
+    new D.TextRun({ text: "YAADLY  ·  " + doc.service.toUpperCase() + (doc.sample ? "  ·  SAMPLE" : ""), font: "Courier New", size: 14, bold: true, color: C.mute }),
+    new D.TextRun({ text: "\tReference " + refText(doc), font: "Courier New", size: 14, bold: true, color: C.mute }),
   ] })] });
   const ftr = new D.Footer({ children: [new D.Paragraph({ tabStops: [{ type: D.TabStopType.RIGHT, position: CW }], children: [
     new D.TextRun({ text: doc.footer, size: 14, color: C.mute }),
     new D.TextRun({ children: ["\tPage ", D.PageNumber.CURRENT, " of ", D.PageNumber.TOTAL_PAGES], size: 14, color: C.mute }),
   ] })] });
   return new D.Document({
-    creator: "Yaadly", title: doc.service + " report template",
+    creator: "Yaadly", title: doc.service + (doc.sample ? " sample report" : " report template"),
     styles: { default: { document: { run: { font: "Arial", size: 19, color: C.ink } } } },
     sections: [{ properties: { titlePage: !doc.compact, page: { size: { width: PAGE_W, height: 16838 }, margin: { top: 1020, bottom: 1020, left: MARG, right: MARG, header: 500, footer: 500 } } },
       headers: { default: hdr, first: new D.Header({ children: [new D.Paragraph("")] }) },
