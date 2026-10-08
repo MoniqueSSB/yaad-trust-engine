@@ -378,6 +378,8 @@ async function runDraft(draftId: string, intake: Record<string, unknown>, trace:
         { term: "Who pulls permits and building approvals", placeholder: "[Client | Contractor, to be confirmed for this job and this parish]" },
         { term: "Dispute process if either side disagrees on the evidence", placeholder: "[Yaadly's Resolution Center process, wording pending solicitor review]" },
         { term: "What happens if a hidden defect is found once work opens up", placeholder: "[Change order process, wording pending solicitor review]" },
+        { term: "Tools, consumables, transport and waste", placeholder: "[Included in the contractor's price. Yaadly does not reimburse breakages, spoiled materials or over-ordering. Standard wording pending solicitor review]" },
+        { term: "Materials or fittings supplied by the client", placeholder: "[Outside any workmanship guarantee. Standard wording pending solicitor review]" },
       ],
     };
 
