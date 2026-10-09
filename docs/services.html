@@ -586,9 +586,9 @@ footer {
              bump START_NOW_VERSION, in one commit. -->
         <label class="bk-consent" for="bk-start-now">
           <input type="checkbox" id="bk-start-now">
-          <span class="pts"><b>Start my visit now.</b>If I cancel within 14 days, I pay for any work already done.</span>
+          <span class="pts"><b>Start my visit now.</b>If I cancel within 14 days, I get a refund, less any work already done.</span>
         </label>
-        <div class="bk-consent-note">Not ticked? We wait 14 days, then you pay and we visit. <a href="/cancellation" target="_blank" rel="noopener">What this means</a>.</div>
+        <div class="bk-consent-note">Not ticked? We wait 14 days, then you pay and we visit. Cancel before then and you pay nothing. <a href="/cancellation" target="_blank" rel="noopener">What this means</a>.</div>
         <button class="btn btn-primary" id="bk-send" style="width:100%;justify-content:center" onclick="sendBooking()">Book it, nothing charged yet</button>
         <div id="bk-status" style="margin-top:10px;font-size:13.5px;line-height:1.6"></div>
       </div>
@@ -758,7 +758,7 @@ const SUBSCRIPTION_SERVICES = new Set(["retainer"]);
    Change the copy in the form and this string together, in one commit. */
 const START_NOW_VERSION = "start-now-v2";
 /* v2, 9 Oct 2026: same substance in plainer words, founder instruction. */
-const START_NOW_WORDING = "Start my visit now. If I cancel within 14 days, I pay for any work already done.";
+const START_NOW_WORDING = "Start my visit now. If I cancel within 14 days, I get a refund, less any work already done.";
 
 /* One visit / monthly switch on the Visual Check card. Without script the
    one visit price shows and the monthly terms are still in their dropdown. */
