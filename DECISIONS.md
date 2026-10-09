@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-10-09 · Three services on the page, Visual Check as the hero; public names change, internal ids do not
+
+**Decided by Monique, 9 Oct 2026.** Visual Check and Property Care read as the same visit at two prices, so they became one service: Visual Check, £95 a visit founding, £150 standard, or a monthly plan at £100 a month for one visit a month. The page shows three services: Visual Check, Before You Pay Check, and Managed Work. Condition Report, Property Care and the Oversight Retainer come off the page and are switched inactive in `service_catalogue` (`20261009120000`); nothing had been booked against any of them.
+
+**Display name, not a rename.** Before You Pay Check is the public name of the Project Setup Check. The catalogue id (`deposit-check`), the catalogue name, the report kind and its templates all still say Project Setup Check, because it was renamed once already on 4 Oct and a third rename through the database, Stripe, HubSpot and the report templates would cost more than it buys. The card carries "Your project setup check" underneath, so the two names meet on the page.
+
+**Managed Work** is what was Full Project Management: the client buys the job from Yaadly Ltd, Yaadly engages and pays the trades, and the worker is only paid once a named person has checked the evidence. Quoted after scope and a first conversation, open for enquiry now, no structural or high-risk work until technical advisers are in place. No catalogue row on purpose: it is never bookable or payable from the page.
+
+**Visual Check records, it does not rate or advise.** Founder's instruction, after a draft that said "rated with advice" was pulled back because that is professional advice and PI cover is unconfirmed. The only next steps offered are the monthly plan and bringing in the right trade.
+
+**The monthly plan** has a catalogue row (`visual-monthly`) so the desk can invoice it, but no booking key and no card link: it is agreed in writing over WhatsApp, on the terms published at `docs/services.html#monthly` and summarised in `docs/terms.html`. The two copies move together.
+
+**The WhatsApp assistant** (`yaad-inbound/faq.ts`) quotes the same three services, and `price-figures.ts` publishes £100 and £150 in the same commit, per its own rule.
+
+**No human gate moved.**
+
 ## 2026-10-02 · A worker's changed Stripe details clear the call-back, and Stripe pays only the account that was there at the call
 
 **Why.** Founder, 2 Oct 2026: "commit and pr", then "also fix anything outstanding". A review of the call-back found it blind to Stripe in two ways. `worker_bank_callback_guard()` cleared the call-back for new Wise details and new pick-up details but not for a new `stripe_recipient_id`, so a worker called back on Wise could set up Stripe with another account and still be paid on the old call. And once a worker has a Stripe recipient, the setup page hands them Stripe's update form, where the bank account can change while the recipient id stays the same; `yaad-payout-send` paid whatever account Stripe held at the moment of sending. Both are the case the call-back exists for: somebody in a worker's login putting in their own account. Read live on 2 Oct 2026: no worker had a Stripe recipient and no Stripe payout had gone out, so nobody was paid either way.
