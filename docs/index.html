@@ -241,6 +241,28 @@ h1.display em{
 .door.gold .door-cta{color:#1A0F00;background:linear-gradient(135deg,#FBBF24,#F59E0B);box-shadow:0 0 30px rgba(245,158,11,0.28)}
 .door:hover .door-cta{filter:brightness(1.06)}
 
+/* What an owner can buy, four choices, founder decision 9 Oct 2026: a
+   posted job is one fixed-price repair, Managed Work is a larger job scoped
+   in a conversation first. Prices sit on the card they belong to. */
+.picks{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));
+  gap:14px;position:relative;z-index:1;
+  border-top:1px solid var(--line);padding:clamp(28px,3.6vw,44px) 0;
+  opacity:0;animation:fadeup .7s 1s ease forwards;
+}
+.pick{
+  display:flex;flex-direction:column;gap:8px;padding:22px 20px;
+  border:1px solid var(--line2);border-radius:20px;background:var(--panel);
+  color:inherit;transition:border-color .2s,transform .2s;
+}
+.pick:hover{border-color:rgba(155,115,245,0.6);transform:translateY(-3px)}
+.pick-title{font-family:var(--disp);font-weight:300;font-size:clamp(22px,2.2vw,27px);letter-spacing:-0.015em;color:var(--ink)}
+.pick-for{font-size:14px;color:var(--mute);line-height:1.5;flex:1}
+.pick-price{font:600 12.5px var(--mono);color:var(--goldb);line-height:1.5}
+.pick-price span{color:var(--dim);font-weight:400}
+.pick-go{font-size:14px;font-weight:700;color:var(--purpleb)}
+@media (prefers-reduced-motion:reduce){.picks{opacity:1;animation:none}}
+
 /* The business row, one quiet line, never competing with the two doors.
    It points companies at /business and makes no claim about who pays whom:
    since 9 September 2026 the site has one money story, the client pays
@@ -358,7 +380,7 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
         <span class="w"><i style="animation-delay:.60s"><em>from</em></i></span>
         <span class="w"><i style="animation-delay:.68s"><em>abroad.</em></i></span>
       </h1>
-      <p class="sub">Repairs, maintenance and property care in Jamaica, arranged and documented for owners in the UK, the US and Canada. <b>You buy the job from Yaadly</b>, an identity checked tradesperson does it, every stage is photographed, and a named person at Yaadly reviews the finished work before you accept it.</p>
+      <p class="sub">Repairs and maintenance in Jamaica, arranged and documented for owners in the UK, the US and Canada. <b>You buy the job from Yaadly</b>, an identity checked tradesperson does it, and a named person at Yaadly checks the evidence against the agreed scope. <b>The worker is only paid once that check is done.</b></p>
       <!-- WhatsApp owns the secondary slot on every consumer page, per
            docs/COPY-GUIDELINES.md section 5. The Ask Yaadly launcher from
            chat.js is not a CTA and does not take this slot. -->
@@ -368,7 +390,68 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
       </div>
     </div>
 
-    <div class="crew">
+    <h2 class="vh">What you can buy from Yaadly</h2>
+    <div class="picks">
+      <a class="pick" href="https://app.yaadly.co.uk/jobs/new">
+        <span class="pick-title">Post a job</span>
+        <span class="pick-for">One repair at one fixed price. Free to post; you pay the quote you accept.</span>
+        <span class="pick-price">Free to post</span>
+        <span class="pick-go">Post a job &rarr;</span>
+      </a>
+      <a class="pick" href="/services#prices">
+        <span class="pick-title">Visual Check</span>
+        <span class="pick-for">See your building as it is today, from wherever you live. Or keep an eye on it every month.</span>
+        <span class="pick-price">&pound;95 a visit <span>founding, &pound;150 standard</span><br>&pound;100 a month <span>monthly plan</span></span>
+        <span class="pick-go">Book a Visual Check &rarr;</span>
+      </a>
+      <a class="pick" href="/services#prices">
+        <span class="pick-title">Before You Pay Check</span>
+        <span class="pick-for">You already have a contractor and a quote. Have them checked before you commit.</span>
+        <span class="pick-price">&pound;149 <span>founding, &pound;249 standard</span></span>
+        <span class="pick-go">Book a Before You Pay Check &rarr;</span>
+      </a>
+      <a class="pick" href="/services#contact">
+        <span class="pick-title">Managed Work</span>
+        <span class="pick-for">A bigger job, scoped with you in a conversation first. Not structural or high-risk work for now.</span>
+        <span class="pick-price">Quoted <span>after scope and a first conversation</span></span>
+        <span class="pick-go">Discuss Managed Work &rarr;</span>
+      </a>
+    </div>
+
+    <h2 class="vh">Property maintenance in Jamaica: choose your route into Yaadly</h2>
+    <div class="doors" id="doors">
+
+      <!-- DOOR 1: PROPERTY OWNERS -->
+      <a class="door" href="https://app.yaadly.co.uk/jobs/new">
+        <span class="door-who">For property owners</span>
+        <h3 class="door-title">Get work done</h3>
+        <span class="door-chips">
+          <span class="chip">Post a job free</span>
+          <span class="chip ac">Checks from &pound;95</span>
+          <span class="chip ac">Managed Work</span>
+        </span>
+        <span class="door-cta">Start a project <span>&rarr;</span></span>
+      </a>
+
+      <!-- DOOR 2: TRADESPEOPLE -->
+      <a class="door gold" href="https://app.yaadly.co.uk/apply">
+        <span class="door-who">For tradespeople in Jamaica</span>
+        <h3 class="door-title">Join as a worker</h3>
+        <span class="door-chips">
+          <span class="chip">Identity checked once</span>
+          <span class="chip ac">Free to join</span>
+          <span class="chip ac">No fee to quote</span>
+        </span>
+        <span class="door-cta">Join as a worker <span>&rarr;</span></span>
+      </a>
+
+    </div>
+
+    <div class="bizrail">
+      <span><b>Acting for a company?</b> Checklists, site visits and written reports, under your brand.</span>
+      <a href="/business">Yaadly for business <span class="ar">&rarr;</span></a>
+    </div>
+      <div class="crew">
       <div class="crew-top"></div>
       <h2 class="vh">How Yaadly manages property work in Jamaica: four AI assistants draft, one named person decides</h2>
       <div class="crew-row">
@@ -413,40 +496,7 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
       </div>
     </div>
 
-    <h2 class="vh">Property maintenance in Jamaica: choose your route into Yaadly</h2>
-    <div class="doors" id="doors">
-
-      <!-- DOOR 1: PROPERTY OWNERS -->
-      <a class="door" href="https://app.yaadly.co.uk/jobs/new">
-        <span class="door-who">For property owners</span>
-        <h3 class="door-title">Get work done</h3>
-        <span class="door-chips">
-          <span class="chip">Post a job free</span>
-          <span class="chip ac">Visual Check &pound;95</span>
-          <span class="chip ac">Before You Pay Check &pound;149</span>
-        </span>
-        <span class="door-cta">Start a project <span>&rarr;</span></span>
-      </a>
-
-      <!-- DOOR 2: TRADESPEOPLE -->
-      <a class="door gold" href="https://app.yaadly.co.uk/apply">
-        <span class="door-who">For tradespeople in Jamaica</span>
-        <h3 class="door-title">Join as a worker</h3>
-        <span class="door-chips">
-          <span class="chip">Identity checked once</span>
-          <span class="chip ac">Free to join</span>
-          <span class="chip ac">No fee to quote</span>
-        </span>
-        <span class="door-cta">Join as a worker <span>&rarr;</span></span>
-      </a>
-
-    </div>
-
-    <div class="bizrail">
-      <span><b>Acting for a company?</b> Checklists, site visits and written reports, under your brand.</span>
-      <a href="/business">Yaadly for business <span class="ar">&rarr;</span></a>
-    </div>
-  </div>
+</div>
 </section>
 
 <a class="wa-float" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20property%20in%20Jamaica%20and%20I%20would%20like%20to%20talk%20about%20it." target="_blank" rel="noopener" aria-label="Message Yaadly on WhatsApp">
