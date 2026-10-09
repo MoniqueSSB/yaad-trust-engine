@@ -24,238 +24,125 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;0,9..144,400;1,9..144,200;1,9..144,300;1,9..144,400&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:#07071A; --bg2:#0D0D28;
-  --panel:rgba(155,115,245,0.05); --panel2:rgba(155,115,245,0.09);
-  --line:rgba(155,115,245,0.14); --line2:rgba(155,115,245,0.28);
+  --bg:#07071A; --bg2:#0D0D28; --bg3:#17133A;
+  --line:rgba(155,115,245,0.16); --line2:rgba(155,115,245,0.28);
   /* Text tiers retuned 3 Sep 2026, same values as docs/yaadly.css and
-     web/app/globals.css. On --bg: ink 17.4:1, mute 7.8:1, dim 5.0:1. The old
-     mute 4.8:1 and dim 2.2:1 put the supporting copy below AA. Change all
-     three files together or the site drifts against itself. */
+     web/app/globals.css. On --bg: ink 17.4:1, mute 7.8:1, dim 5.0:1.
+     Change all three files together or the site drifts against itself. */
   --ink:#EEEEFF; --mute:#9E9ECB; --dim:#7C7CA6;
   --purple:#9B73F5; --purpleb:#C4AAFF; --gold:#F59E0B; --goldb:#FBBF24;
-  --grad:linear-gradient(135deg,#7B4FE0,#9B73F5 45%,#F59E0B);
+  --grad:linear-gradient(90deg,#7B4FE0,#9B73F5 55%,#F59E0B);
   --disp:'Fraunces',Georgia,serif;
   --body:'IBM Plex Sans',-apple-system,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
 }
+/* 9 Oct 2026: rebuilt from the founder's "YaadlyHub Home Page" design canvas.
+   Hero with three numbered lines, three choice cards with Visual Check lit as
+   the hero service, the crew drawn as plain boxes ending at the gate, and the
+   worker route as one gold ruled line. The site nav, the footer links and the
+   bottom left WhatsApp button were kept from the old page on purpose: the
+   design left them out, and without them the rest of the site and the legal
+   pages are unreachable from the front door. */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html::before{
-  content:'';position:fixed;inset:0;z-index:200;pointer-events:none;opacity:.35;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-html::after{
-  content:'';position:fixed;inset:0;z-index:199;pointer-events:none;
-  background:radial-gradient(ellipse at 50% 30%,transparent 55%,rgba(3,3,12,0.45) 100%);
-}
 body{font-family:var(--body);background:var(--bg);color:var(--ink);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
-a{color:var(--purple);text-decoration:none}
-.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+a{color:var(--purpleb);text-decoration:none}
+a:hover{color:var(--ink)}
+.wrap{max-width:1200px;margin:0 auto;padding:0 32px}
+@media(max-width:640px){.wrap{padding:0 20px}}
 .vh{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.arrow{width:16px;height:16px;flex:none}
 
-/* NAV */
-
-/* PAGE */
-.stage{position:relative;overflow:hidden;padding:60px 0 64px}
-/* Mobile first screen, 3 Sep 2026: eyebrow, headline, one line of support
-   and both buttons must fit an 812px phone without a scroll. */
-@media(max-width:640px){.stage{padding:30px 0 48px}.head{padding-bottom:30px}}
-/* Hero glow. Until 6 Sep 2026 this was two orbs that tracked the mouse. The
-   "Crew" design replaced them with two fixed radials sitting behind the
-   headline, so the parallax listener at the foot of this page came out in the
-   same change. Nothing here moves. */
-.stage-glow{
-  position:absolute;top:0;left:0;right:0;height:660px;pointer-events:none;
-  background:
-    radial-gradient(ellipse 900px 460px at 50% 0%,rgba(155,115,245,0.18),transparent 62%),
-    radial-gradient(ellipse 640px 400px at 50% 10%,rgba(245,158,11,0.10),transparent 58%);
-}
-
-.head{text-align:center;max-width:900px;margin:0 auto;position:relative;z-index:1;padding-bottom:clamp(34px,5vw,54px)}
-/* The eyebrow lost its pill on 6 Sep 2026. One row, one blipping dot, and the
-   dot blips three times and stops rather than pulsing forever. */
+/* HERO */
+.hero{padding:clamp(40px,7vw,96px) 0 clamp(40px,5vw,72px);display:flex;flex-direction:column;gap:clamp(22px,2.4vw,28px)}
 .eyebrow{
-  display:inline-flex;align-items:center;gap:9px;
-  font:600 11px var(--mono);letter-spacing:.16em;text-transform:uppercase;
-  color:var(--purpleb);margin-bottom:22px;
+  align-self:flex-start;display:inline-flex;align-items:center;gap:8px;
+  padding:7px 13px;border-radius:999px;border:1px solid rgba(155,115,245,0.3);background:var(--bg2);
+  font:400 12px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--purpleb);
 }
-.eyebrow .dot{width:5px;height:5px;border-radius:50%;background:var(--gold);flex:none;animation:blip 1.8s 3 forwards}
-/* Must sit after .eyebrow, not in the .stage phone block above it: that rule
-   sets font-size and this one sets the font shorthand, so whichever comes last
-   wins. On a 320px screen the eyebrow is one line at 10px and two at 11px. */
-@media(max-width:640px){.eyebrow{font-size:10px;letter-spacing:.12em;margin-bottom:16px}}
-@keyframes blip{0%{opacity:.3}50%{opacity:1}100%{opacity:1}}
+.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--goldb);flex:none}
+@media(max-width:640px){.eyebrow{font-size:10.5px}}
 h1.display{
-  font-family:var(--disp);font-weight:200;line-height:1.02;
-  font-size:clamp(38px,6.4vw,78px);letter-spacing:-0.03em;
-  max-width:24ch;margin:0 auto 24px;text-wrap:pretty;
+  max-width:980px;font-family:var(--disp);font-weight:300;
+  font-size:clamp(40px,6vw,80px);line-height:1.06;letter-spacing:-0.025em;text-wrap:pretty;
 }
-h1.display .w{display:inline-block;overflow:hidden;vertical-align:bottom}
-h1.display .w i{display:inline-block;font-style:inherit;transform:translateY(110%);animation:wordup .7s cubic-bezier(.2,.8,.2,1) forwards}
 h1.display em{
-  font-style:italic;font-weight:300;
-  background:var(--grad);background-size:220% 220%;
+  font-style:italic;
+  background:linear-gradient(90deg,#9B73F5,#C4AAFF 45%,#FBBF24);
   -webkit-background-clip:text;background-clip:text;color:transparent;
-  animation:gradshift 9s ease-in-out infinite;
 }
-@keyframes wordup{to{transform:translateY(0)}}
-@keyframes gradshift{0%,100%{background-position:0% 40%}50%{background-position:95% 60%}}
-.sub{font-size:clamp(16px,1.5vw,19px);color:var(--mute);max-width:58ch;margin:0 auto;opacity:0;animation:fadeup .7s .7s ease forwards}
-.sub b{color:var(--ink)}
+.steps{list-style:none;max-width:720px;display:flex;flex-direction:column;gap:12px;font-size:clamp(16px,1.4vw,19px);line-height:1.5}
+.steps li{display:flex;align-items:baseline;gap:clamp(14px,1.2vw,16px)}
+.steps .n{flex:none;font:400 clamp(12px,1vw,14px) var(--mono);color:var(--purpleb)}
+.steps .n.gold{color:var(--goldb)}
+.steps strong{font-weight:600}
+.cta{display:flex;flex-wrap:wrap;gap:14px;padding-top:6px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:56px;padding:0 30px;border-radius:14px;font-weight:600;font-size:17px;text-decoration:none;transition:filter .15s}
+.btn.primary{background:var(--grad);color:var(--bg)}
+.btn.primary:hover{filter:brightness(1.08);color:var(--bg)}
+/* WhatsApp owns the secondary slot on every consumer page, per
+   docs/COPY-GUIDELINES.md section 5. */
+.btn.wa{border:1px solid rgba(155,115,245,0.32);background:var(--bg2);color:var(--ink);font-weight:500}
+.btn.wa:hover{border-color:var(--purpleb)}
+.wdot{width:8px;height:8px;border-radius:50%;background:#25D366;flex:none}
+@media(max-width:640px){.cta{flex-direction:column}.btn{width:100%;height:54px;font-size:16px}}
 
-/* Hero buttons. .btn is copied from yaadly.css rather than linked, because
-   this page carries its own :root and the rest of that sheet with it would
-   restyle the hero. Same values; change both or the site drifts. */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--grad);color:#fff;font:700 15px var(--body);padding:15px 28px;border-radius:100px;border:1px solid transparent;cursor:pointer;text-decoration:none;text-align:center;box-shadow:0 0 30px rgba(155,115,245,0.28);transition:.15s}
-.btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
-/* The secondary slot belongs to WhatsApp on every consumer page, per
-   docs/COPY-GUIDELINES.md section 5. The bordered ghost button it used to
-   wear became a plain link with the WhatsApp green against it on 6 Sep 2026,
-   so the one filled button on the screen stays the primary. */
-.btn.wa{background:none;border:none;box-shadow:none;color:var(--ink);font-weight:600;gap:10px;padding:14px 6px}
-.btn.wa .wdot{width:20px;height:20px;border-radius:50%;background:#25D366;flex:none}
-.btn.wa:hover{color:var(--purpleb);filter:none}
-.cta{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;margin-top:32px;position:relative;z-index:1;opacity:0;animation:fadeup .7s .85s ease forwards}
-@media(max-width:640px){.cta{flex-direction:column;align-items:stretch;margin-top:24px}.btn{width:100%;padding:14px 20px}}
-@keyframes fadeup{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+/* CHOICE CARDS. Visual Check is the hero service (founder, 9 Oct 2026), so it
+   is the lit card. Founder decisions the same day: the Post a job card came
+   off, and the hero button was renamed from Start a project to Post a job so
+   that route is plain. The Before You Pay Check is not on the homepage at
+   all: it lives on /services only. */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;align-items:stretch}
+.card{display:flex;flex-direction:column;gap:12px;padding:26px;border-radius:20px;border:1px solid rgba(155,115,245,0.26);background:var(--bg2)}
+@media(max-width:640px){.card{padding:22px}}
+.card h2{font-family:var(--disp);font-weight:300;font-size:28px;line-height:1.15;color:var(--ink)}
+.card p{flex:1;font-size:15px;line-height:1.55;color:var(--mute)}
+.card .tag{font:400 13px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--goldb);line-height:1.5}
+.card .tag.small{font-size:12.5px;letter-spacing:.06em}
+.card .go{display:flex;align-items:center;gap:8px;min-height:44px;font-weight:500;font-size:15px}
+.card.hero{border-color:rgba(196,170,255,0.6);background:linear-gradient(180deg,var(--bg3),var(--bg2));box-shadow:0 0 0 4px rgba(155,115,245,0.08),0 22px 48px rgba(123,79,224,0.2)}
+.prices{display:flex;flex-direction:column;gap:6px}
+.price{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px}
+.price .big{font:500 20px var(--mono);color:var(--goldb)}
+.price .mid{font:500 15px var(--mono);color:var(--goldb)}
+.price .note{font:400 12px var(--mono);color:var(--mute)}
+.book{display:flex;align-items:center;justify-content:center;gap:8px;height:48px;margin-top:4px;border-radius:12px;background:var(--purple);font-weight:600;font-size:15px;color:var(--bg)}
+.book:hover{color:var(--bg);filter:brightness(1.08)}
 
-/* THE CREW. Four assistants across a wire, then the gate. Added 6 Sep 2026
-   from the "Yaadly Home - Crew" design. This band is the governing rule of the
-   whole product drawn as a picture: the assistants draft, and a named person
-   decides. The pips run the wire three times and stop, and the whole band is
-   flattened by the reduced-motion block at the foot of this sheet. */
-.crew{padding:0 0 clamp(28px,3.6vw,46px);position:relative;z-index:1}
-.crew-top{height:1px;margin-bottom:clamp(26px,3.6vw,44px);background:linear-gradient(90deg,rgba(155,115,245,0.4),rgba(245,158,11,0.35) 60%,transparent)}
-.crew-row{display:flex;align-items:flex-start;gap:clamp(10px,1.4vw,20px);flex-wrap:wrap}
-.crew-agents{flex:1 1 440px;position:relative;display:flex;align-items:flex-start;gap:clamp(6px,1vw,18px)}
-.crew-wire{
-  position:absolute;left:4%;right:calc(-1 * clamp(10px,1.4vw,20px));top:28px;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(155,115,245,0.5) 8%,rgba(155,115,245,0.5) 82%,rgba(245,158,11,0.6));
-}
-.crew-pip{
-  position:absolute;top:25px;left:4%;width:7px;height:7px;border-radius:50%;opacity:0;
-  background:var(--purpleb);box-shadow:0 0 12px var(--purple);
-  animation:flow 3.6s cubic-bezier(.4,0,.7,1) 3 forwards;
-}
-.crew-pip.gold{background:var(--goldb);box-shadow:0 0 12px var(--gold)}
-@keyframes flow{0%{left:4%;opacity:0}8%{opacity:1}78%{opacity:1}94%{left:99%;opacity:0}100%{left:99%;opacity:0;visibility:hidden}}
-.crew-agent{flex:1 1 118px;min-width:104px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;position:relative;z-index:1}
-.crew-badge{
-  width:58px;height:58px;border-radius:50%;flex:none;
-  border:1px solid var(--line2);
-  background:radial-gradient(circle,rgba(155,115,245,0.16),var(--bg) 78%);
-  display:grid;place-items:center;font:600 15px var(--mono);color:var(--purpleb);
-  box-shadow:0 0 0 6px var(--bg),0 0 22px rgba(155,115,245,0.22);
-}
-.crew-name{font-family:var(--disp);font-weight:300;font-size:clamp(19px,2vw,25px);letter-spacing:-0.015em;color:var(--ink)}
-.crew-note{font-size:13.5px;color:var(--mute);line-height:1.45}
-.crew-note a{font-weight:600;color:var(--goldb);white-space:nowrap}
-.crew-note a:hover{opacity:.8}
-.crew-gate{flex:0 0 auto;display:flex;flex-direction:column;gap:10px;max-width:230px;position:relative;z-index:1}
-.crew-gate-top{display:flex;align-items:center;gap:14px}
-.crew-bar{
-  width:3px;height:58px;border-radius:3px;flex:none;
-  margin-left:calc(-1 * clamp(10px,1.4vw,20px));
-  background:linear-gradient(180deg,var(--goldb),var(--gold));
-  box-shadow:0 0 20px rgba(245,158,11,0.6);
-  animation:gatepulse 3.6s ease-in-out 3 forwards;
-}
-@keyframes gatepulse{0%,72%,100%{box-shadow:0 0 20px rgba(245,158,11,0.45)}82%{box-shadow:0 0 34px rgba(245,158,11,0.95)}}
-.crew-y{
-  width:58px;height:58px;border-radius:50%;flex:none;
-  border:1px solid rgba(245,158,11,0.55);
-  background:radial-gradient(circle,rgba(245,158,11,0.22),var(--bg) 78%);
-  display:grid;place-items:center;
-  font-family:var(--disp);font-size:24px;font-weight:300;color:var(--goldb);
-  box-shadow:0 0 0 6px var(--bg);animation:halo 3.6s ease-in-out 3 forwards;
-}
-@keyframes halo{0%,70%,100%{box-shadow:0 0 0 6px var(--bg),0 0 0 6px rgba(245,158,11,0.3)}85%{box-shadow:0 0 0 6px var(--bg),0 0 0 18px rgba(245,158,11,0)}}
-.crew-say{display:flex;flex-direction:column;gap:8px}
-.crew-say .crew-name{white-space:nowrap}
-/* Two breakpoints, both measured rather than guessed. Below about 732px the
-   gate no longer fits beside a 440px run of assistants and drops to its own
-   row, so the connecting bar goes and a hairline takes its place. Below 560px
-   four badges across would each be under 120px wide, so they become a 2x2 and
-   the wire is dropped: a wire that only reaches half the crew says the wrong
-   thing. Neither breakpoint may be widened without checking the page still
-   does not scroll sideways on a 320px phone. */
-@media(max-width:740px){
-  .crew-gate{flex:1 1 100%;max-width:none;margin-top:20px;padding-top:20px;border-top:1px solid var(--line)}
-  .crew-bar{display:none}
-}
-@media(max-width:560px){
-  .crew-agents{flex-wrap:wrap;gap:26px 12px}
-  .crew-agent{flex:1 1 calc(50% - 6px);min-width:0}
-  .crew-wire,.crew-pip{display:none}
+/* BUSINESS PANEL */
+.biz{margin-top:clamp(32px,4.5vw,64px);padding:clamp(18px,2vw,24px) clamp(20px,2.2vw,28px);border-radius:20px;border:1px solid rgba(155,115,245,0.3);background:var(--bg2);font-size:clamp(14px,1.2vw,16px);line-height:1.6;color:var(--mute)}
+.biz a{font-weight:500;white-space:nowrap}
+
+/* THE CREW. The governing rule of the product as a picture: four assistants
+   draft, and a named person decides at the gate. A row of boxes on a wide
+   screen, a vertical line of them on a phone. Nothing moves. */
+.crew{margin-top:clamp(44px,5vw,72px);display:flex;flex-direction:column;gap:20px}
+.crew-row{list-style:none;display:flex;align-items:center}
+.crew-box{flex:1 1 150px;min-width:0;padding:16px 18px;border-radius:16px;border:1px solid rgba(155,115,245,0.26);background:var(--bg2)}
+.crew-box .k{font:400 12px var(--mono);letter-spacing:.12em;color:var(--purpleb)}
+.crew-box .d{margin-top:6px;font-size:14px;line-height:1.45;color:var(--mute)}
+.crew-link{flex:0 0 24px;height:1px;background:rgba(155,115,245,0.5)}
+.crew-link.last{flex-basis:40px;height:2px;background:linear-gradient(90deg,rgba(155,115,245,0.5),var(--gold))}
+.crew-gate{flex:1.4 1 220px;display:flex;align-items:center;gap:14px;padding:18px 20px;border-color:rgba(245,158,11,0.55);background:rgba(245,158,11,0.08)}
+.crew-gate .pip{flex:0 0 14px;height:14px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 5px rgba(245,158,11,0.18)}
+.crew-gate .k{color:var(--goldb)}
+.crew-gate .d{color:var(--ink)}
+.crew-more{align-self:flex-start;display:flex;align-items:center;gap:8px;min-height:44px;font-weight:500;font-size:15px}
+@media(max-width:860px){
+  .crew-row{flex-direction:column;align-items:stretch;padding-left:28px;position:relative}
+  .crew-row::before{content:'';position:absolute;left:6px;top:22px;bottom:22px;width:1px;background:linear-gradient(180deg,rgba(155,115,245,0.5) 75%,var(--gold))}
+  .crew-box{flex:none;position:relative;margin-bottom:10px}
+  .crew-box::before{content:'';position:absolute;left:-27px;top:20px;width:10px;height:10px;border-radius:50%;background:var(--purple)}
+  .crew-gate{margin-bottom:0}
+  .crew-gate::before{display:none}
+  .crew-gate .pip{position:absolute;left:-29px;top:50%;margin-top:-7px;width:14px}
+  .crew-link{display:none}
+  .crew-more{margin-left:28px}
 }
 
-/* TWO DOORS: owners and tradespeople. Was three, all of them client-side,
-   which is how the worker path ended up as a footnote. 3 Sep 2026.
-   Flattened to an editorial card the same day on founder feedback that pill
-   badges, rounded corners, watermark glows and hover lift read as playful.
-   6 Sep 2026 puts all four back, from the founder's own "Crew" design, which
-   is a deliberate reversal of that note and not an oversight: the flat card
-   sat badly under a hero and a crew band that are both lit. If the doors ever
-   read as playful again, this comment is where the argument is. */
-.doors{
-  display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
-  gap:clamp(18px,2.4vw,28px);position:relative;z-index:1;
-  border-top:1px solid var(--line);padding:clamp(34px,4.5vw,58px) 0;
-}
-.door{
-  --ac:var(--purple); --acb:var(--purpleb);
-  position:relative;overflow:hidden;
-  display:flex;flex-direction:column;gap:14px;
-  padding:clamp(26px,3vw,40px);
-  border:1px solid var(--line2);border-radius:26px;
-  background:linear-gradient(150deg,rgba(155,115,245,0.16),rgba(13,13,40,0.6) 58%);
-  color:inherit;
-  transition:transform .25s,border-color .25s,box-shadow .25s;
-}
-.door::before{
-  content:'';position:absolute;top:-70px;right:-60px;width:230px;height:230px;
-  border-radius:50%;pointer-events:none;
-  background:radial-gradient(circle,rgba(155,115,245,0.28),transparent 70%);
-}
-.door:hover{transform:translateY(-5px);border-color:rgba(155,115,245,0.6);box-shadow:0 22px 50px rgba(123,79,224,0.22)}
-.door.gold{
-  --ac:var(--gold); --acb:var(--goldb);
-  border-color:rgba(245,158,11,0.35);
-  background:linear-gradient(150deg,rgba(245,158,11,0.14),rgba(13,13,40,0.6) 58%);
-}
-.door.gold::before{background:radial-gradient(circle,rgba(245,158,11,0.22),transparent 70%)}
-.door.gold:hover{border-color:rgba(245,158,11,0.75);box-shadow:0 22px 50px rgba(245,158,11,0.18)}
-.door-who{font:600 10.5px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--acb);position:relative}
-.door-title{font-family:var(--disp);font-weight:300;font-size:clamp(34px,4vw,52px);line-height:1.02;letter-spacing:-0.025em;color:var(--ink);position:relative}
-.door-chips{display:flex;gap:8px;flex-wrap:wrap;position:relative}
-.chip{font:600 12px var(--mono);color:var(--ink);border:1px solid var(--line2);border-radius:100px;padding:6px 13px;white-space:nowrap;flex:none}
-.chip.ac{color:var(--acb)}
-.door.gold .chip{border-color:rgba(245,158,11,0.35)}
-.door-cta{
-  position:relative;margin-top:8px;align-self:flex-start;
-  display:inline-flex;align-items:center;justify-content:space-between;gap:14px;
-  padding:15px 24px;border-radius:100px;white-space:nowrap;
-  font-size:16px;font-weight:700;color:#fff;
-  background:var(--grad);box-shadow:0 0 30px rgba(155,115,245,0.32);
-  transition:filter .2s;
-}
-.door.gold .door-cta{color:#1A0F00;background:linear-gradient(135deg,#FBBF24,#F59E0B);box-shadow:0 0 30px rgba(245,158,11,0.28)}
-.door:hover .door-cta{filter:brightness(1.06)}
-
-/* The business row, one quiet line, never competing with the two doors.
-   It points companies at /business and makes no claim about who pays whom:
-   since 9 September 2026 the site has one money story, the client pays
-   Yaadly, per docs/COPY-GUIDELINES.md section 2. */
-.bizrail{
-  border-top:1px solid var(--line);padding:20px 0;
-  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
-  font-size:13.5px;color:var(--mute);line-height:1.6;
-  position:relative;z-index:1;
-  opacity:0;animation:fadeup .8s 1.4s ease forwards;
-}
-.bizrail b{color:var(--ink);font-weight:600}
-.bizrail a{font-weight:600;color:var(--purpleb);white-space:nowrap}
-.bizrail a .ar{display:inline-block;transition:transform .2s}
-.bizrail a:hover .ar{transform:translateX(3px)}
+/* WORKER LINE */
+.workers{margin-top:clamp(32px,3.4vw,48px);padding:clamp(18px,1.6vw,22px) 0;border-top:1px solid rgba(245,158,11,0.22);border-bottom:1px solid rgba(245,158,11,0.22);font-size:clamp(14px,1.2vw,16px);line-height:1.6;color:var(--mute)}
+.workers a{font-weight:500;color:var(--goldb);white-space:nowrap}
+.workers a:hover{color:var(--ink)}
 
 /* floating WhatsApp */
 /* Bottom LEFT since 2 Sep 2026: the bottom right corner belongs to the Ask
@@ -286,16 +173,16 @@ h1.display em{
 .wa-float:hover .wa-btn{transform:translateY(-2px);box-shadow:0 12px 34px rgba(37,211,102,0.45),0 6px 18px rgba(0,0,0,0.4)}
 .wa-float .wa-btn svg{width:26px;height:26px;fill:#fff}
 @media(max-width:640px){.wa-float{left:16px;bottom:16px}.wa-float .wa-label{display:none}}
-@media (prefers-reduced-motion: reduce){.wa-float .wa-btn{transition:none}}
 
-footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:var(--dim)}
+footer{margin-top:clamp(48px,5vw,72px);border-top:1px solid var(--line);background:var(--bg2);padding:clamp(32px,3.4vw,44px) 0 96px;font-size:12.5px;color:var(--dim)}
 .fgrid{display:flex;flex-direction:column;gap:12px}
+.fgrid .lead{font-size:14px;color:var(--ink)}
 .flinks{display:flex;flex-wrap:wrap;gap:6px 18px}
 .flinks a{color:var(--dim);font-size:12.5px}
 .flinks a:hover{color:var(--purple)}
 
 @media (prefers-reduced-motion: reduce){
-  *{animation-duration:.01ms !important;animation-delay:0ms !important}
+  *{animation-duration:.01ms !important;animation-delay:0ms !important;transition:none !important}
 }
 </style>
 <!-- Error monitoring (Sentry). Errors only, no tracing, no replay. PII is
@@ -341,113 +228,61 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
   <a class="navcta" href="https://app.yaadly.co.uk/jobs/new">Post a job</a>
 </div></nav>
 
-<section class="stage" id="stage">
-  <div class="stage-glow"></div>
+<main class="wrap">
+  <section class="hero">
+    <div class="eyebrow"><span class="dot"></span>Launching in Kingston and Portmore</div>
+    <h1 class="display">Property maintenance in Jamaica, <em>run for you from abroad</em>.</h1>
+    <ol class="steps">
+      <li><span class="n">01</span><span>You buy the job from Yaadly.</span></li>
+      <li><span class="n">02</span><span>An identity checked tradesperson does the work.</span></li>
+      <li><span class="n gold">03</span><span>A named person at Yaadly checks the evidence. <strong>Only then is the worker paid.</strong></span></li>
+    </ol>
+    <div class="cta">
+      <a class="btn primary" href="https://app.yaadly.co.uk/jobs/new">Post a job</a>
+      <a class="btn wa" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20property%20in%20Jamaica%20and%20I%20would%20like%20to%20talk%20about%20it." target="_blank" rel="noopener"><span class="wdot"></span>Message us on WhatsApp</a>
+    </div>
+  </section>
 
-  <div class="wrap">
-    <div class="head">
-      <div class="eyebrow"><span class="dot"></span>Launching in Kingston and Portmore</div>
-      <h1 class="display">
-        <span class="w"><i style="animation-delay:.05s">Property</i></span>
-        <span class="w"><i style="animation-delay:.11s">maintenance</i></span>
-        <span class="w"><i style="animation-delay:.17s">in</i></span>
-        <span class="w"><i style="animation-delay:.25s">Jamaica,</i></span><br>
-        <span class="w"><i style="animation-delay:.36s"><em>run</em></i></span>
-        <span class="w"><i style="animation-delay:.44s"><em>for</em></i></span>
-        <span class="w"><i style="animation-delay:.52s"><em>you</em></i></span>
-        <span class="w"><i style="animation-delay:.60s"><em>from</em></i></span>
-        <span class="w"><i style="animation-delay:.68s"><em>abroad.</em></i></span>
-      </h1>
-      <p class="sub">Repairs, maintenance and property care in Jamaica, arranged and documented for owners in the UK, the US and Canada. <b>You buy the job from Yaadly</b>, an identity checked tradesperson does it, every stage is photographed, and a named person at Yaadly reviews the finished work before you accept it.</p>
-      <!-- WhatsApp owns the secondary slot on every consumer page, per
-           docs/COPY-GUIDELINES.md section 5. The Ask Yaadly launcher from
-           chat.js is not a CTA and does not take this slot. -->
-      <div class="cta">
-        <a class="btn" href="https://app.yaadly.co.uk/jobs/new">Start a project</a>
-        <a class="btn wa" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20property%20in%20Jamaica%20and%20I%20would%20like%20to%20talk%20about%20it." target="_blank" rel="noopener"><span class="wdot"></span>Message us on WhatsApp</a>
+  <h2 class="vh">Choose what you need</h2>
+  <section class="cards">
+    <article class="card hero">
+      <h2>Visual Check</h2>
+      <p>See your building as it is today, from wherever you live. Or keep an eye on it every month.</p>
+      <div class="prices">
+        <div class="price"><span class="big">£95 a visit</span><span class="note">(founding, £150 standard)</span></div>
+        <div class="price"><span class="mid">£100 a month</span><span class="note">(monthly plan)</span></div>
       </div>
-    </div>
+      <a class="book" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Visual%20Check%20at%20the%20%C2%A395%20founding%20rate." target="_blank" rel="noopener">Book a Visual Check <svg class="arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg></a>
+    </article>
 
-    <div class="crew">
-      <div class="crew-top"></div>
-      <h2 class="vh">How Yaadly manages property work in Jamaica: four AI assistants draft, one named person decides</h2>
-      <div class="crew-row">
-        <div class="crew-agents">
-          <span class="crew-wire"></span>
-          <span class="crew-pip gold"></span>
-          <span class="crew-pip" style="animation-delay:1.2s"></span>
-          <span class="crew-pip" style="animation-delay:2.4s"></span>
+    <article class="card">
+      <h2>Managed Work</h2>
+      <p>A bigger job, scoped with you in a conversation first. Not structural or high-risk work for now.</p>
+      <div class="tag small">Quoted after scope and a first conversation</div>
+      <a class="go" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Discuss Managed Work <svg class="arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg></a>
+    </article>
+  </section>
 
-          <div class="crew-agent">
-            <span class="crew-badge">SC</span>
-            <span class="crew-name">Scope</span>
-            <span class="crew-note">Reads your message, writes it up</span>
-          </div>
-          <div class="crew-agent">
-            <span class="crew-badge">PA</span>
-            <span class="crew-name">Papers</span>
-            <span class="crew-note">Drafts the quote and agreement</span>
-          </div>
-          <div class="crew-agent">
-            <span class="crew-badge">EV</span>
-            <span class="crew-name">Evidence</span>
-            <span class="crew-note">Reads each stage photo</span>
-          </div>
-          <div class="crew-agent">
-            <span class="crew-badge">CH</span>
-            <span class="crew-name">Chase</span>
-            <span class="crew-note">Chases a job gone quiet</span>
-          </div>
-        </div>
+  <p class="biz">Acting for a company? Checklists, site visits and written reports, under your brand. <a href="/business">Yaadly for business</a></p>
 
-        <div class="crew-gate">
-          <div class="crew-gate-top">
-            <span class="crew-bar"></span>
-            <span class="crew-y">Y</span>
-          </div>
-          <div class="crew-say">
-            <span class="crew-name">The gate</span>
-            <span class="crew-note">Money, prices and verdicts, signed by a named person. <a href="/how-we-use-ai">How we use AI <span class="ar">&rarr;</span></a></span>
-          </div>
-        </div>
-      </div>
-    </div>
+  <section class="crew">
+    <h2 class="vh">How Yaadly manages property work in Jamaica: four AI assistants draft, one named person decides</h2>
+    <ol class="crew-row">
+      <li class="crew-box"><div class="k">SCOPE</div><div class="d">Reads your message, writes it up.</div></li>
+      <li class="crew-link" aria-hidden="true"></li>
+      <li class="crew-box"><div class="k">PAPERS</div><div class="d">Drafts the quote and agreement.</div></li>
+      <li class="crew-link" aria-hidden="true"></li>
+      <li class="crew-box"><div class="k">EVIDENCE</div><div class="d">Reads each stage photo.</div></li>
+      <li class="crew-link" aria-hidden="true"></li>
+      <li class="crew-box"><div class="k">CHASE</div><div class="d">Chases a job gone quiet.</div></li>
+      <li class="crew-link last" aria-hidden="true"></li>
+      <li class="crew-box crew-gate"><span class="pip" aria-hidden="true"></span><div><div class="k">THE GATE</div><div class="d">Money, prices and verdicts, signed by a named person.</div></div></li>
+    </ol>
+    <a class="crew-more" href="/how-we-use-ai">How we use AI <svg class="arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg></a>
+  </section>
 
-    <h2 class="vh">Property maintenance in Jamaica: choose your route into Yaadly</h2>
-    <div class="doors" id="doors">
-
-      <!-- DOOR 1: PROPERTY OWNERS -->
-      <a class="door" href="https://app.yaadly.co.uk/jobs/new">
-        <span class="door-who">For property owners</span>
-        <h3 class="door-title">Get work done</h3>
-        <span class="door-chips">
-          <span class="chip">Post a job free</span>
-          <span class="chip ac">Visual Check &pound;95</span>
-          <span class="chip ac">Before You Pay Check &pound;149</span>
-        </span>
-        <span class="door-cta">Start a project <span>&rarr;</span></span>
-      </a>
-
-      <!-- DOOR 2: TRADESPEOPLE -->
-      <a class="door gold" href="https://app.yaadly.co.uk/apply">
-        <span class="door-who">For tradespeople in Jamaica</span>
-        <h3 class="door-title">Join as a worker</h3>
-        <span class="door-chips">
-          <span class="chip">Identity checked once</span>
-          <span class="chip ac">Free to join</span>
-          <span class="chip ac">No fee to quote</span>
-        </span>
-        <span class="door-cta">Join as a worker <span>&rarr;</span></span>
-      </a>
-
-    </div>
-
-    <div class="bizrail">
-      <span><b>Acting for a company?</b> Checklists, site visits and written reports, under your brand.</span>
-      <a href="/business">Yaadly for business <span class="ar">&rarr;</span></a>
-    </div>
-  </div>
-</section>
+  <p class="workers">Tradesperson in Jamaica? Identity checked once, free to join, no fee to quote. <a href="https://app.yaadly.co.uk/apply">Join as a worker</a></p>
+</main>
 
 <a class="wa-float" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20property%20in%20Jamaica%20and%20I%20would%20like%20to%20talk%20about%20it." target="_blank" rel="noopener" aria-label="Message Yaadly on WhatsApp">
   <span class="wa-label">Message us on WhatsApp · a person replies within one working day</span>
