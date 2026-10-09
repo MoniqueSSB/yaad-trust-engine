@@ -6,6 +6,14 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-10-09 · Services page rebuilt: two services, dropdowns for the detail, consent wording v2
+
+**Decided by Monique, 9 Oct 2026, later the same day as the entry below, on a design canvas.** The Before You Pay Check comes off `docs/services.html`, which leaves Visual Check (the hero card, with a one visit / monthly switch) and Managed Work. Its `service_catalogue` row, its `deposit` key in `yaad-book-service`'s `BOOKABLE` map and its Stripe link are untouched: the page simply stops offering it, so restoring it is a page change only. **Still offering it, and not changed here:** `docs/faq.html`, `docs/index.html`, `docs/terms.html` and the WhatsApp assistant (`yaad-inbound/faq.ts`, and its price list). Those need their own change before the page and the rest of the site agree.
+
+The monthly plan terms, the contact form and "Who is behind it" are native `<details>` dropdowns rather than script driven, so they open with the keyboard and with script off; a link to `#monthly` or `#contact` opens its dropdown. The hero names the founder's role as oversight ("the founder oversees every job; local checkers and vetted trades do the work on site"), replacing "who does the work herself", on her correction. The receipt name, Yaadly Founder, is unchanged: who takes the money is a separate decision.
+
+**The early-start tick box was reworded and `START_NOW_VERSION` bumped to `start-now-v2`.** Same substance (the client asks for work to start inside the 14 days, and pays only for work already done if they cancel), plainer words, on her instruction. The form copy and `START_NOW_WORDING` changed in the same commit, as the comment beside them requires, so every booking still records the exact sentence that client saw, and v1 answers stay readable as v1. "Use our trades or bring your own" on Managed Work was held back until how a client's own worker is paid and vetted is settled.
+
 ## 2026-10-09 · Three services on the page, Visual Check as the hero; public names change, internal ids do not
 
 **Decided by Monique, 9 Oct 2026.** Visual Check and Property Care read as the same visit at two prices, so they became one service: Visual Check, £95 a visit founding, £150 standard, or a monthly plan at £100 a month for one visit a month. The page shows three services: Visual Check, Before You Pay Check, and Managed Work. Condition Report, Property Care and the Oversight Retainer come off the page and are switched inactive in `service_catalogue` (`20261009120000`); nothing had been booked against any of them.
