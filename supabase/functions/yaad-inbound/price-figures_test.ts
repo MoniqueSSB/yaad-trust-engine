@@ -34,8 +34,11 @@ Deno.test("a reply that was only a price becomes the fixed no-price sentence", (
   assertEquals(scan(NO_PRICE_SENTENCE), []);
 });
 
+// The example was £150 until 9 October 2026, when £150 became the published
+// standard Visual Check price. The rule under test is unchanged: one pound
+// off a published figure is still not on the list.
 Deno.test("close enough is not on the list", () => {
-  assertEquals(unpublishedFigures("from £150"), ["£150"]);
+  assertEquals(unpublishedFigures("from £151"), ["£151"]);
 });
 
 Deno.test("the FAQ facts pass their own guard and the banned-language screen", () => {
