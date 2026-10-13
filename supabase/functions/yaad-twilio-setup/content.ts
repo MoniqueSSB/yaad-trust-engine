@@ -456,9 +456,17 @@ export const COMPLETION_REPORT_BODY =
  *  v2, 2 Oct 2026: v1 was rejected by Meta with no reason given. v1 was
  *  short and the link sat mid sentence, so v2 gives the link its own line
  *  after full sentences of fixed text, the shape v1 of the Completion
- *  Report was approved in. Same two variables, so no sender change. */
+ *  Report was approved in. Same two variables, so no sender change.
+ *  v3, 13 Oct 2026, founder instruction: v2 was rejected too, again with
+ *  no reason. v1 and v2 both carried a link, "sign in" and "we will send
+ *  you a code" in one message, which is the shape of a phishing template
+ *  to an automated review, and v2 also talked about being paid. v3 keeps
+ *  the fact (you are on the board), says what arrives next, gives the
+ *  account link its own line, and ends with fixed text. Same two
+ *  variables, so no sender change. The text message and the email
+ *  (worker-cleared.ts) keep their own wording. */
 export const WORKER_CLEARED_BODY =
-  "Hi {{1}}, this is Yaadly. Your checks are complete and you are now cleared to price jobs with us.\n\nTo see the jobs on the board, sign in to your Yaadly account with your email address and we will send you a code.\n\nSign in here: {{2}}\n\nYou are paid by bank transfer within 7 days of sign off, never in cash.";
+  "Hi {{1}}, this is Yaadly. Your checks are complete and you are now on the Yaadly board.\n\nNew jobs that match your trade and parish will reach you here, and you price the ones you want.\n\nYour account: {{2}}\n\nReply to this message if you have a question.";
 
 /** The reminder to finish the check, day 3 and day 10. v2, 2 Oct 2026:
  *  v1 was rejected by Meta with no reason given. v1 put a whole sentence
@@ -498,7 +506,7 @@ export const META_WORKER_TEMPLATES: readonly MetaWorkerTemplate[] = [
     variables: { "1": SAMPLE_JOB, "2": "https://app.yaadly.co.uk/sign/JOB-WEB-1789253807959?t=sample" },
   },
   {
-    slug: "worker-cleared", name: "yaadly_worker_cleared_v2", setting: "twilio_content_sid_worker_cleared",
+    slug: "worker-cleared", name: "yaadly_worker_cleared_v3", setting: "twilio_content_sid_worker_cleared",
     sender: "yaad-notify-client, worker_cleared", body: WORKER_CLEARED_BODY,
     variables: { "1": "Marcus", "2": "https://app.yaadly.co.uk/portal/sign-in" },
   },
