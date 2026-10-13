@@ -737,8 +737,31 @@ Deno.serve(async (req: Request) => {
         { key: "meta_template_status_json", value: JSON.stringify(now) },
       ], { onConflict: "key" });
       if (changed.length) {
-        const { data: st } = await admin.from("app_settings").select("value").eq("key", "ntfy_topic").maybeSingle();
-        const topic = String(st?.value ?? "").trim().replace(/^"(.*)"$/, "$1");
+        const { data: cfgRows } = await admin.from("app_settings").select("key,value").in("key", ["ntfy_topic", "desk_phone"]);
+        const cfg: Record<string, string> = {};
+        for (const r of (cfgRows ?? []) as { key: string; value: string | null }[]) cfg[r.key] = String(r.value ?? "").trim().replace(/^"(.*)"$/, "$1");
+        const topic = cfg.ntfy_topic ?? "";
+        // Her own WhatsApp too (desk_phone, set 13 Oct 2026: "what number").
+        // Free text, so it lands while her 24 hour window with the Yaadly
+        // number is open and is refused otherwise; the push and the desk
+        // line carry it either way. Recorded on the desk's "Did it arrive"
+        // page like every other send. Never a client's or worker's number.
+        const deskTo = (cfg.desk_phone ?? "").replace(/\D/g, "");
+        const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
+        if (deskTo.length >= 7 && from && SID && TOK) {
+          try {
+            const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${SID}/Messages.json`, {
+              method: "POST",
+              headers: { Authorization: "Basic " + btoa(`${SID}:${TOK}`), "Content-Type": "application/x-www-form-urlencoded" },
+              body: withStatusCallback(new URLSearchParams({
+                To: `whatsapp:+${deskTo}`, From: from,
+                Body: `Yaadly desk: Meta answered on WhatsApp templates.\n${changed.join("\n")}\nApproved ones are switched on. Full list on the desk under Settings, meta_template_status.`,
+              })),
+              signal: AbortSignal.timeout(15000),
+            });
+            await recordAccepted(r, deskTo, "whatsapp", { kind: "meta template answer" });
+          } catch (e) { console.error("template answer to desk phone:", String(e)); }
+        }
         if (topic) {
           await fetch(`https://ntfy.sh/${topic}`, {
             method: "POST",

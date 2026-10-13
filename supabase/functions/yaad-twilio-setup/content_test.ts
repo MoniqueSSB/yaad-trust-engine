@@ -69,6 +69,7 @@ import {
   ALERT_PARISHES_BODY, ALERT_PARISHES_NAME, ALERT_TRADES_BODY, ALERT_TRADES_NAME, JOB_ALERT_BODY, JOB_ALERT_NAME,
   JOIN_ALERTS_BODY, JOIN_ALERTS_NAME, META_WORKER_TEMPLATES, metaWorkerApproval, metaWorkerContent,
   UPDATE_DRAFT_BODY, UPDATE_DRAFT_NAME,
+  STAGE_APPROVAL_BODY, QUOTE_ACCEPT_BODY, stageApprovalContent, quoteAcceptContent,
 } from "./content.ts";
 
 const DASH = /[\u2013\u2014]/;
@@ -128,3 +129,15 @@ Deno.test("no new body carries a dash or a banned word", () => {
     assert(!BANNED.test(b), b);
   }
 });
+
+Deno.test("the client decision buttons follow Meta's rules: no variable first or last, two buttons, the code as the payload", () => {
+  for (const [body, content] of [[STAGE_APPROVAL_BODY, stageApprovalContent()], [QUOTE_ACCEPT_BODY, quoteAcceptContent()]] as const) {
+    assert(!/^\s*\{\{/.test(body) && !/\}\}\s*[.]?\s*$/.test(body), "a variable sits first or last, which Meta rejects");
+    assert(!DASH.test(body) && !BANNED.test(body));
+    const actions = content.types["twilio/quick-reply"].actions;
+    assertEquals(actions.length, 2);
+    assertEquals(actions[0].id, "{{2}}", "the first button must carry the bare job code");
+    assert(/^(ASK|CHANGE) \{\{2\}\}$/.test(actions[1].id), "the second button must carry ASK or CHANGE plus the code");
+  }
+});
+

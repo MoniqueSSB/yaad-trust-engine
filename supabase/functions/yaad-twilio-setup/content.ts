@@ -379,10 +379,14 @@ export function walkAcceptContent() {
  *  Both are submitted to Meta as UTILITY, recorded as pending, and written
  *  live by the morning record-approvals job once approved. The report
  *  template is v2 of yaadly_stage_approval; v1 keeps going out inside the
- *  window until v2 is recorded. */
-export const STAGE_APPROVAL_NAME = "yaadly_stage_approval_v2";
+ *  window until v2 is recorded.
+ *  Later the same day: Meta rejected both at once, "Variables can't be at
+ *  the start or end of the template", because the job code sat last. Now
+ *  v3 and v2, with a fixed sentence after the code. The worker template
+ *  test already held this rule; these two are now under it too. */
+export const STAGE_APPROVAL_NAME = "yaadly_stage_approval_v3";
 export const STAGE_APPROVAL_BODY =
-  "Yaadly: there is a report on {{1}} waiting for your review. The photographs and your tradesperson's words are on the job in your portal.\n\nLook at the photographs before you approve. Tap Approve to record your sign off for this stage; tap Ask a question and a person at Yaadly answers.\n\nJob code, if you would rather type it: {{2}}";
+  "Yaadly: there is a report on {{1}} waiting for your review. The photographs and your tradesperson's words are on the job in your portal.\n\nLook at the photographs before you approve. Tap Approve to record your sign off for this stage; tap Ask a question and a person at Yaadly answers.\n\nJob code, if you would rather type it: {{2}}. Nothing is approved until you tap or type it.";
 export const STAGE_APPROVAL_APPROVAL = { name: STAGE_APPROVAL_NAME, category: "UTILITY" };
 export function stageApprovalContent() {
   return {
@@ -401,9 +405,9 @@ export function stageApprovalContent() {
   };
 }
 
-export const QUOTE_ACCEPT_NAME = "yaadly_quote_accept_v1";
+export const QUOTE_ACCEPT_NAME = "yaadly_quote_accept_v2";
 export const QUOTE_ACCEPT_BODY =
-  "Yaadly: a price is in on {{1}}. Your all-in price from Yaadly is {{3}}. The breakdown and what your tradesperson proposes are on the price page in the message before this one.\n\nTap Accept to accept this price and book your tradesperson. Tap Ask for a change to go back to them before you accept. Nothing is booked and nothing is charged until you accept.\n\nJob code, if you would rather type it: {{2}}";
+  "Yaadly: a price is in on {{1}}. Your all-in price from Yaadly is {{3}}. The breakdown and what your tradesperson proposes are on the price page in the message before this one.\n\nTap Accept to accept this price and book your tradesperson. Tap Ask for a change to go back to them before you accept. Nothing is booked and nothing is charged until you accept.\n\nJob code, if you would rather type it: {{2}}. Nothing is booked until you tap or type it.";
 export const QUOTE_ACCEPT_APPROVAL = { name: QUOTE_ACCEPT_NAME, category: "UTILITY" };
 export function quoteAcceptContent() {
   return {
