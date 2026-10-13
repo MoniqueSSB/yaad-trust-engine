@@ -359,6 +359,69 @@ export function walkAcceptContent() {
   };
 }
 
+/** The two client decision moments, as buttons, 13 Oct 2026. Founder:
+ *  "yes do two buttons."
+ *
+ *  Until today the stage report outside WhatsApp's 24 hour window went as
+ *  the plain client update template with a link, and the Approve button
+ *  (yaadly_stage_approval_v1, one button, read from the
+ *  TWILIO_CONTENT_SID_APPROVE secret) followed only inside the window. A
+ *  price arriving had no button at all.
+ *
+ *  A BUTTON IS NOT A NEW AUTHORITY. Each Approve or Accept carries the bare
+ *  job code as its payload, so a tap reaches yaad-inbound as the same string
+ *  a typed code does, through the same matchApprovingJob(), the same phone
+ *  check and the same RPC (button-tap.ts). The second button carries
+ *  "ASK <code>" or "CHANGE <code>", which no allowlist reads as agreement,
+ *  and yaad-inbound answers it by telling the client to say it in their own
+ *  words and by alerting the desk. Nothing is approved by either.
+ *
+ *  Both are submitted to Meta as UTILITY, recorded as pending, and written
+ *  live by the morning record-approvals job once approved. The report
+ *  template is v2 of yaadly_stage_approval; v1 keeps going out inside the
+ *  window until v2 is recorded. */
+export const STAGE_APPROVAL_NAME = "yaadly_stage_approval_v2";
+export const STAGE_APPROVAL_BODY =
+  "Yaadly: there is a report on {{1}} waiting for your review. The photographs and your tradesperson's words are on the job in your portal.\n\nLook at the photographs before you approve. Tap Approve to record your sign off for this stage; tap Ask a question and a person at Yaadly answers.\n\nJob code, if you would rather type it: {{2}}";
+export const STAGE_APPROVAL_APPROVAL = { name: STAGE_APPROVAL_NAME, category: "UTILITY" };
+export function stageApprovalContent() {
+  return {
+    friendly_name: STAGE_APPROVAL_NAME,
+    language: "en",
+    variables: { "1": "Replace stair rails (JOB-WEB-1789253807959)", "2": "JOB-WEB-1789253807959" },
+    types: {
+      "twilio/quick-reply": {
+        body: STAGE_APPROVAL_BODY,
+        actions: [
+          { title: "Approve", id: "{{2}}" },
+          { title: "Ask a question", id: "ASK {{2}}" },
+        ],
+      },
+    },
+  };
+}
+
+export const QUOTE_ACCEPT_NAME = "yaadly_quote_accept_v1";
+export const QUOTE_ACCEPT_BODY =
+  "Yaadly: a price is in on {{1}}. Your all-in price from Yaadly is {{3}}. The breakdown and what your tradesperson proposes are on the price page in the message before this one.\n\nTap Accept to accept this price and book your tradesperson. Tap Ask for a change to go back to them before you accept. Nothing is booked and nothing is charged until you accept.\n\nJob code, if you would rather type it: {{2}}";
+export const QUOTE_ACCEPT_APPROVAL = { name: QUOTE_ACCEPT_NAME, category: "UTILITY" };
+export function quoteAcceptContent() {
+  return {
+    friendly_name: QUOTE_ACCEPT_NAME,
+    language: "en",
+    variables: { "1": "Replace stair rails (JOB-WEB-1789253807959)", "2": "JOB-WEB-1789253807959", "3": "J$57,500" },
+    types: {
+      "twilio/quick-reply": {
+        body: QUOTE_ACCEPT_BODY,
+        actions: [
+          { title: "Accept", id: "{{2}}" },
+          { title: "Ask for a change", id: "CHANGE {{2}}" },
+        ],
+      },
+    },
+  };
+}
+
 /** The YES or NO question in the joining flow, as buttons. 30 Sep 2026.
  *  (The AI consent question was one of two; it went the same day: the read
  *  is automatic now, see join-lane.ts.) The

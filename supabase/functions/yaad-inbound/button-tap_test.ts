@@ -7,7 +7,7 @@
 // Run: deno test --allow-read supabase/functions/
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { inboundText, wasTapped } from "./button-tap.ts";
+import { inboundText, wasTapped, clientSecondButton } from "./button-tap.ts";
 import { matchApprovingJob } from "./approval-match.ts";
 
 const JOBS = [
@@ -75,3 +75,13 @@ Deno.test("a row picked from a list arrives as its id, never its title", () => {
   assert(!wasTapped("", ""));
   assert(!wasTapped(undefined, undefined));
 });
+
+Deno.test("the second client button names the job and the ask, and nothing else reads as one", () => {
+  assertEquals(clientSecondButton("ASK JOB-WEB-1789253807959"), { kind: "ask", jobId: "JOB-WEB-1789253807959" });
+  assertEquals(clientSecondButton("change job-wa-1757000000000"), { kind: "change", jobId: "JOB-WA-1757000000000" });
+  assertEquals(clientSecondButton("JOB-WEB-1789253807959"), null);
+  assertEquals(clientSecondButton("ASK"), null);
+  assertEquals(clientSecondButton("yes ASK JOB-WEB-1789253807959"), null);
+  assertEquals(clientSecondButton(""), null);
+});
+

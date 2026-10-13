@@ -52,3 +52,17 @@ export function inboundText(buttonPayload: unknown, body: unknown, listId?: unkn
   const payload = String(buttonPayload ?? "").trim() || String(listId ?? "").trim();
   return payload || String(body ?? "").trim();
 }
+
+/** The second button on a client template, 13 Oct 2026: "Ask a question"
+ *  on the stage report (payload `ASK <job code>`) and "Ask for a change" on
+ *  a price (payload `CHANGE <job code>`). Neither word is in the approval
+ *  allowlist, so neither can approve or accept anything; this only says
+ *  which job the client is asking about, and whether it is a question or a
+ *  change, so the reply and the desk alert can name it. Null for anything
+ *  else, including a bare code. */
+export function clientSecondButton(text: string): { kind: "ask" | "change"; jobId: string } | null {
+  const m = String(text ?? "").trim().match(/^(ASK|CHANGE)\s+(JOB-[A-Z0-9-]+)$/i);
+  if (!m) return null;
+  return { kind: m[1].toLowerCase() === "ask" ? "ask" : "change", jobId: m[2].toUpperCase() };
+}
+

@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { recordAccepted, withStatusCallback } from "./twilio-status.ts";
-import { CLIENT_UPDATE_APPROVAL, CLIENT_UPDATE_NAME, clientUpdateContent, ON_SITE_APPROVAL, ON_SITE_NAME, onSiteContent, REPORT_DRAFT_NAME, reportDraftContent, ALERT_PARISHES_NAME, ALERT_TRADES_NAME, alertParishesContent, alertTradesContent, UPDATE_DRAFT_NAME, updateDraftContent, WALK_ACCEPT_NAME, walkAcceptContent, JOIN_ALERTS_NAME, joinAlertsContent, JOB_ALERT_APPROVAL, JOB_ALERT_NAME, jobAlertContent, META_WORKER_TEMPLATES, metaWorkerApproval, metaWorkerContent, SECTION_MENU_APPROVAL, SECTION_MENU_NAME, sectionMenuContent, SIGN_REPORT_NAME, signReportContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
+import { STAGE_APPROVAL_APPROVAL, STAGE_APPROVAL_NAME, stageApprovalContent, QUOTE_ACCEPT_APPROVAL, QUOTE_ACCEPT_NAME, quoteAcceptContent, CLIENT_UPDATE_APPROVAL, CLIENT_UPDATE_NAME, clientUpdateContent, ON_SITE_APPROVAL, ON_SITE_NAME, onSiteContent, REPORT_DRAFT_NAME, reportDraftContent, ALERT_PARISHES_NAME, ALERT_TRADES_NAME, alertParishesContent, alertTradesContent, UPDATE_DRAFT_NAME, updateDraftContent, WALK_ACCEPT_NAME, walkAcceptContent, JOIN_ALERTS_NAME, joinAlertsContent, JOB_ALERT_APPROVAL, JOB_ALERT_NAME, jobAlertContent, META_WORKER_TEMPLATES, metaWorkerApproval, metaWorkerContent, SECTION_MENU_APPROVAL, SECTION_MENU_NAME, sectionMenuContent, SIGN_REPORT_NAME, signReportContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
 
 // A one-shot helper for creating Yaadly's WhatsApp content templates in
 // Twilio, 15 September 2026.
@@ -647,6 +647,29 @@ Deno.serve(async (req: Request) => {
       recorded = true;
     }
     return json({ name: t.name, sid, status, rejection_reason: wa.rejection_reason ?? null, recorded, setting: t.setting, sender: t.sender });
+  }
+
+  // The two client decision buttons, 13 Oct 2026 (content.ts). Created or
+  // found, submitted to Meta as UTILITY, recorded as pending. The morning
+  // record-approvals job writes twilio_content_sid_approve and
+  // twilio_content_sid_quote_accept once Meta approves; until then the
+  // senders keep doing what they did.
+  if (action === "create-stage-approval" || action === "create-quote-accept") {
+    const stage = action === "create-stage-approval";
+    const name = stage ? STAGE_APPROVAL_NAME : QUOTE_ACCEPT_NAME;
+    const pendingKey = stage ? "twilio_content_sid_approve_pending" : "twilio_content_sid_quote_accept_pending";
+    const existing = (await listAll()).find((c) => c.friendly_name === name);
+    let sid = existing?.sid ?? "";
+    if (!sid) {
+      const r = await call("/Content", { method: "POST", body: JSON.stringify(stage ? stageApprovalContent() : quoteAcceptContent()) });
+      if (!r.ok) return json({ error: "Twilio refused the template.", twilio: r }, 502);
+      sid = String((r.body as { sid?: string })?.sid ?? "");
+    }
+    if (!/^HX[0-9a-f]{32}$/i.test(sid)) return json({ error: "No ContentSid came back." }, 502);
+    const approval = await call(`/Content/${sid}/ApprovalRequests/whatsapp`, { method: "POST", body: JSON.stringify(stage ? STAGE_APPROVAL_APPROVAL : QUOTE_ACCEPT_APPROVAL) });
+    const { error } = await admin.from("app_settings").upsert({ key: pendingKey, value: JSON.stringify(sid) }, { onConflict: "key" });
+    if (error) return json({ error: `Template ${sid} exists but app_settings would not take it: ${error.message}` }, 500);
+    return json({ ok: true, name, sid, reused: Boolean(existing), pendingSetting: pendingKey, approval: { status: approval.status, body: approval.body } });
   }
 
   // Every pending template, checked and recorded in one go, 13 Oct 2026.
