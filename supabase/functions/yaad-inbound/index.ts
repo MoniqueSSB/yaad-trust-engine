@@ -22,7 +22,7 @@ import { stripPromises, unkeepableSentences } from "./promises.ts";
 import { shouldEscapeLane, wantsAPerson, wantsFreshJob } from "./escape-hatch.ts";
 import { samePhone, digitsOf } from "./phone.ts";
 import { Deadline } from "./deadline.ts";
-import { inboundText, wasTapped } from "./button-tap.ts";
+import { clientSecondButton, inboundText, wasTapped } from "./button-tap.ts";
 import { acknowledgementReply, answerWorkerJobQuestion, answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith, type WorkerJob } from "./worker-question.ts";
 import { ARRIVAL_HOLD_MS, arrivalAsk, arrivalAskLapsed, arrivalStillWanted, cannotCheckIn, CHECK_IN_BEFORE_YOU_LEAVE, isPin, isSkip, saysCheckedIn } from "./arrival-ask.ts";
 import { checkInApplies } from "./arrival-rule.ts";
@@ -4659,6 +4659,36 @@ Deno.serve(async (req: Request) => {
         root.setAttributes({ "yaadly.walkthrough.job": wantJob, "yaadly.walkthrough.outcome": accErr ? "accept_refused" : "accepted" });
         if (accErr) return twiml(await refused(accErr, "Walkthrough accept", "Try again in a moment, or accept it on your job in the Yaadly portal."));
         return twiml(acceptedForClient(String(row?.offer ?? ""), WALK_PLATFORM[String(row?.platform ?? "")] ?? "a video call", String(row?.link ?? "").trim() || null));
+      }
+
+      // ── the second button on a client template, 13 Oct 2026 ─────────────
+      //
+      // "Ask a question" on the stage report arrives as `ASK <code>`, "Ask
+      // for a change" on a price as `CHANGE <code>` (button-tap.ts). Neither
+      // word is agreement, so the approval and quote lanes above let both
+      // through untouched. The reply says plainly that nothing was approved
+      // or accepted, asks for the client's own words, and the desk is told
+      // which job and which button. Only the client's own number on that
+      // job gets this; anybody else falls through to the lanes below.
+      if (!deskHasThisNumber && !msg.media.length) {
+        const second = clientSecondButton(msg.text);
+        if (second) {
+          const { data: sj } = await supabase.from("jobs").select("id, title, client_phone").eq("id", second.jobId).maybeSingle();
+          if (sj && samePhone(String(sj.client_phone ?? ""), msg.from)) {
+            const change = second.kind === "change";
+            root.setAttributes({ "yaadly.client_button.job": sj.id, "yaadly.client_button.kind": second.kind });
+            await pushToDesk(supabase as unknown as SettingsReader, {
+              target: { channel: msg.channel, from_addr: msg.from || "unknown" },
+              title: `${change ? "Client wants a change before accepting" : "Client has a question on a report"}: ${sj.id}`,
+              priority: "high",
+              tags: "speech_balloon",
+              body: `${sj.id}: the client tapped ${change ? "Ask for a change" : "Ask a question"} on ${sj.title}. Their next message says what. Nothing was approved or accepted, and nothing was sent to the tradesperson.`,
+            }, trace);
+            return twiml(change
+              ? `Nothing is accepted and nothing is booked for ${sj.title}. Say here, in your own words, what you want changed before you accept, and Yaadly takes it to your tradesperson. Nothing is charged until you accept a price.`
+              : `Nothing is approved for ${sj.title}. Type your question here and a person at Yaadly answers. If it is about one photograph, start with that photo's label.`);
+          }
+        }
       }
 
       // ── a client on a live job, saying something that is not a code ───────

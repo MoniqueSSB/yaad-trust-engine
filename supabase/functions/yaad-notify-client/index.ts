@@ -1352,6 +1352,16 @@ Deno.serve(async (req: Request) => {
           vars: { "1": String(job.title ?? "your job"), "2": String(workerName), "3": priceText, "4": codeLink },
         };
       }
+      // 13 Oct 2026: Accept and Ask for a change as buttons
+      // (yaadly_quote_accept_v1, content.ts), following the price message
+      // inside the window and after the price template outside it. The
+      // Accept payload is the bare job code, so a tap is the same reply the
+      // message above already asks for, through the same agree_quote RPC.
+      // Nothing until the morning job records Meta's approval.
+      const acceptSid = await approvedTemplateSid(admin, "TWILIO_CONTENT_SID_QUOTE_ACCEPT", "twilio_content_sid_quote_accept");
+      if (acceptSid && clientPhone) {
+        approveButton = { sid: acceptSid, vars: { "1": templateVar(`${job.title ?? "your job"} (${job.id})`), "2": String(job.id), "3": priceText } };
+      }
     } else if (kind === "quote_recommended") {
       // 9 Sep 2026. The client asked Yaadly to pick. A named admin has put
       // one price to them (recommend_quote), and this is the first they hear
@@ -1986,7 +1996,18 @@ Deno.serve(async (req: Request) => {
       // button is a way of typing, not a new authority.
       //
       // Unset secret means no second message and nothing changes.
-      const approveSid = Deno.env.get("TWILIO_CONTENT_SID_APPROVE") ?? "";
+      // 13 Oct 2026: yaadly_stage_approval_v2 (Approve, Ask a question) is
+      // read from app_settings once the morning job records Meta's
+      // approval; the v1 secret stays as the fallback. Since the same day
+      // the button also follows the client template outside the window
+      // (see the send below), so a client who has not written in 24 hours
+      // gets the report and one tap, not a report and a login.
+      let approveSid = "";
+      {
+        const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_approve").maybeSingle();
+        try { approveSid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { approveSid = String(st?.value ?? ""); }
+        if (!/^HX[0-9a-f]{32}$/i.test(approveSid)) approveSid = Deno.env.get("TWILIO_CONTENT_SID_APPROVE") ?? "";
+      }
       if (approveSid && clientPhone) {
         approveButton = { sid: approveSid, vars: { "1": String(job.title ?? "your job"), "2": String(job.id) } };
       }
@@ -2747,7 +2768,10 @@ Deno.serve(async (req: Request) => {
       // Never after a template: the client outside the window has been sent
       // a line and a link and no photographs, and a lone Approve button asks
       // them to approve work they have not been shown.
-      if (approveButton && !firstTemplate && wa.sent && wa.via === "twilio whatsapp") {
+      // 13 Oct 2026: the button also follows a CLIENT template outside the
+      // window. It is an approved template itself, so it can. It never
+      // follows a worker template, and never a text message fallback.
+      if (approveButton && wa.sent && wa.via === "twilio whatsapp" && (!firstTemplate || (clientTemplate && firstTemplate === clientTemplate))) {
         const btn = await sendTwilio(recipientPhone, "", "whatsapp", trace, [], approveButton, { kind: "approve button", job_id: jobId });
         root.setAttributes({ "yaadly.notify.approve_button": btn.sent });
         if (!btn.sent) console.error(`approve button not sent for ${jobId}: ${btn.reason ?? "unknown"}`);

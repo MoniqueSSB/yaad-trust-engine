@@ -359,6 +359,69 @@ export function walkAcceptContent() {
   };
 }
 
+/** The two client decision moments, as buttons, 13 Oct 2026. Founder:
+ *  "yes do two buttons."
+ *
+ *  Until today the stage report outside WhatsApp's 24 hour window went as
+ *  the plain client update template with a link, and the Approve button
+ *  (yaadly_stage_approval_v1, one button, read from the
+ *  TWILIO_CONTENT_SID_APPROVE secret) followed only inside the window. A
+ *  price arriving had no button at all.
+ *
+ *  A BUTTON IS NOT A NEW AUTHORITY. Each Approve or Accept carries the bare
+ *  job code as its payload, so a tap reaches yaad-inbound as the same string
+ *  a typed code does, through the same matchApprovingJob(), the same phone
+ *  check and the same RPC (button-tap.ts). The second button carries
+ *  "ASK <code>" or "CHANGE <code>", which no allowlist reads as agreement,
+ *  and yaad-inbound answers it by telling the client to say it in their own
+ *  words and by alerting the desk. Nothing is approved by either.
+ *
+ *  Both are submitted to Meta as UTILITY, recorded as pending, and written
+ *  live by the morning record-approvals job once approved. The report
+ *  template is v2 of yaadly_stage_approval; v1 keeps going out inside the
+ *  window until v2 is recorded. */
+export const STAGE_APPROVAL_NAME = "yaadly_stage_approval_v2";
+export const STAGE_APPROVAL_BODY =
+  "Yaadly: there is a report on {{1}} waiting for your review. The photographs and your tradesperson's words are on the job in your portal.\n\nLook at the photographs before you approve. Tap Approve to record your sign off for this stage; tap Ask a question and a person at Yaadly answers.\n\nJob code, if you would rather type it: {{2}}";
+export const STAGE_APPROVAL_APPROVAL = { name: STAGE_APPROVAL_NAME, category: "UTILITY" };
+export function stageApprovalContent() {
+  return {
+    friendly_name: STAGE_APPROVAL_NAME,
+    language: "en",
+    variables: { "1": "Replace stair rails (JOB-WEB-1789253807959)", "2": "JOB-WEB-1789253807959" },
+    types: {
+      "twilio/quick-reply": {
+        body: STAGE_APPROVAL_BODY,
+        actions: [
+          { title: "Approve", id: "{{2}}" },
+          { title: "Ask a question", id: "ASK {{2}}" },
+        ],
+      },
+    },
+  };
+}
+
+export const QUOTE_ACCEPT_NAME = "yaadly_quote_accept_v1";
+export const QUOTE_ACCEPT_BODY =
+  "Yaadly: a price is in on {{1}}. Your all-in price from Yaadly is {{3}}. The breakdown and what your tradesperson proposes are on the price page in the message before this one.\n\nTap Accept to accept this price and book your tradesperson. Tap Ask for a change to go back to them before you accept. Nothing is booked and nothing is charged until you accept.\n\nJob code, if you would rather type it: {{2}}";
+export const QUOTE_ACCEPT_APPROVAL = { name: QUOTE_ACCEPT_NAME, category: "UTILITY" };
+export function quoteAcceptContent() {
+  return {
+    friendly_name: QUOTE_ACCEPT_NAME,
+    language: "en",
+    variables: { "1": "Replace stair rails (JOB-WEB-1789253807959)", "2": "JOB-WEB-1789253807959", "3": "J$57,500" },
+    types: {
+      "twilio/quick-reply": {
+        body: QUOTE_ACCEPT_BODY,
+        actions: [
+          { title: "Accept", id: "{{2}}" },
+          { title: "Ask for a change", id: "CHANGE {{2}}" },
+        ],
+      },
+    },
+  };
+}
+
 /** The YES or NO question in the joining flow, as buttons. 30 Sep 2026.
  *  (The AI consent question was one of two; it went the same day: the read
  *  is automatic now, see join-lane.ts.) The
@@ -456,9 +519,17 @@ export const COMPLETION_REPORT_BODY =
  *  v2, 2 Oct 2026: v1 was rejected by Meta with no reason given. v1 was
  *  short and the link sat mid sentence, so v2 gives the link its own line
  *  after full sentences of fixed text, the shape v1 of the Completion
- *  Report was approved in. Same two variables, so no sender change. */
+ *  Report was approved in. Same two variables, so no sender change.
+ *  v3, 13 Oct 2026, founder instruction: v2 was rejected too, again with
+ *  no reason. v1 and v2 both carried a link, "sign in" and "we will send
+ *  you a code" in one message, which is the shape of a phishing template
+ *  to an automated review, and v2 also talked about being paid. v3 keeps
+ *  the fact (you are on the board), says what arrives next, gives the
+ *  account link its own line, and ends with fixed text. Same two
+ *  variables, so no sender change. The text message and the email
+ *  (worker-cleared.ts) keep their own wording. */
 export const WORKER_CLEARED_BODY =
-  "Hi {{1}}, this is Yaadly. Your checks are complete and you are now cleared to price jobs with us.\n\nTo see the jobs on the board, sign in to your Yaadly account with your email address and we will send you a code.\n\nSign in here: {{2}}\n\nYou are paid by bank transfer within 7 days of sign off, never in cash.";
+  "Hi {{1}}, this is Yaadly. Your checks are complete and you are now on the Yaadly board.\n\nNew jobs that match your trade and parish will reach you here, and you price the ones you want.\n\nYour account: {{2}}\n\nReply to this message if you have a question.";
 
 /** The reminder to finish the check, day 3 and day 10. v2, 2 Oct 2026:
  *  v1 was rejected by Meta with no reason given. v1 put a whole sentence
@@ -467,9 +538,16 @@ export const WORKER_CLEARED_BODY =
  *  for both reminders. The text message and the email still say "Last
  *  reminder from us" the second time (worker-cleared.ts). Referees are
  *  optional, founder 2 Oct 2026: without them, a video of the worker
- *  talking through their skills. */
+ *  talking through their skills.
+ *  v3, 13 Oct 2026, founder instruction: Meta approved v2 but filed it
+ *  as MARKETING, which costs more per send and can be paused to people
+ *  who do not reply. v2 read as a nudge ("gets you on the board", "until
+ *  it is done you cannot price jobs"). v3 is a status update on an
+ *  application the person started: what is still needed, where to
+ *  complete it, how to ask. Same facts, same two variables, no sender
+ *  change. Meta decides the category; this is the shape UTILITY takes. */
 export const CHECK_REMINDER_BODY =
-  "Hi {{1}}, this is Yaadly. Your worker check with us is not finished yet.\n\nWhat is left: your ID, your TRN, and the Guidelines to sign. Three people who can vouch for you are optional; if you do not have them, a short video of you talking through your skills gets you on the board. Referees are still needed before jobs over £500. It takes about ten minutes on your phone.\n\nFinish it here: {{2}}\n\nUntil it is done you cannot price jobs. If you have a question, reply to this message.";
+  "Hi {{1}}, this is Yaadly. An update on your application: it is still incomplete.\n\nStill needed: your ID, your TRN, and the Guidelines to sign. Referees are optional at this stage; a short video of you talking through your skills can stand in for them. Referees are needed before jobs over £500.\n\nComplete your application here: {{2}}\n\nIf you have a question, reply to this message.";
 
 /** The job health nudge at 72 quiet hours, from yaad-job-health. It asks
  *  for evidence and does not ask for a check-in: checking in asks, it never
@@ -498,12 +576,12 @@ export const META_WORKER_TEMPLATES: readonly MetaWorkerTemplate[] = [
     variables: { "1": SAMPLE_JOB, "2": "https://app.yaadly.co.uk/sign/JOB-WEB-1789253807959?t=sample" },
   },
   {
-    slug: "worker-cleared", name: "yaadly_worker_cleared_v2", setting: "twilio_content_sid_worker_cleared",
+    slug: "worker-cleared", name: "yaadly_worker_cleared_v3", setting: "twilio_content_sid_worker_cleared",
     sender: "yaad-notify-client, worker_cleared", body: WORKER_CLEARED_BODY,
     variables: { "1": "Marcus", "2": "https://app.yaadly.co.uk/portal/sign-in" },
   },
   {
-    slug: "check-reminder", name: "yaadly_worker_check_reminder_v2", setting: "twilio_content_sid_worker_check_reminder",
+    slug: "check-reminder", name: "yaadly_worker_check_reminder_v3", setting: "twilio_content_sid_worker_check_reminder",
     sender: "yaad-notify-client, worker_check_reminder", body: CHECK_REMINDER_BODY,
     variables: { "1": "Marcus", "2": "https://app.yaadly.co.uk/apply?app=sample&token=sample&ref=sample" },
   },

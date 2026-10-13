@@ -54,9 +54,14 @@ Deno.test("a failed button never fails the notification", () => {
 });
 
 Deno.test("it stays inert until the template exists", () => {
-  // No secret, no second message, no behaviour change on the live number.
-  assert(
-    /const approveSid = Deno\.env\.get\("TWILIO_CONTENT_SID_APPROVE"\) \?\? "";\s*\n\s*if \(approveSid && clientPhone\)/.test(block),
-    "the button is no longer gated on the secret being configured",
-  );
+  // No template id, no second message, no behaviour change on the live
+  // number. Since 13 Oct 2026 the id comes from app_settings
+  // (twilio_content_sid_approve, written only once Meta approves v2) with
+  // the TWILIO_CONTENT_SID_APPROVE secret as the fallback; an id that is not
+  // shaped like a ContentSid is thrown away before the gate, so junk in the
+  // setting cannot switch the button on.
+  assert(block.includes('.eq("key", "twilio_content_sid_approve")'), "the button no longer reads the recorded template id");
+  assert(block.includes('Deno.env.get("TWILIO_CONTENT_SID_APPROVE")'), "the secret fallback is gone");
+  assert(/if \(!\/\^HX\[0-9a-f\]\{32\}\$\/i\.test\(approveSid\)\) approveSid = Deno\.env\.get/.test(block), "a badly shaped setting is no longer thrown away before the gate");
+  assert(/if \(approveSid && clientPhone\)/.test(block), "the button is no longer gated on a template id being configured");
 });
