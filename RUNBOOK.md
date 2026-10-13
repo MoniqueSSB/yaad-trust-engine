@@ -6582,7 +6582,7 @@ curl -s -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-crm-s
 | `daily-steps` | `yaadly_daily_steps_v1` | `twilio_content_sid_daily_steps` | `yaad-daily-checkin`, second message (stop carrying it in the worker update template) |
 | `completion-report` | `yaadly_worker_completion_report_v1` | `twilio_content_sid_worker_completion_report` | `yaad-notify-client`, `completion_report_worker` outside the window |
 | `worker-cleared` | `yaadly_worker_cleared_v3` (v1 rejected 2 Oct 2026, v2 rejected 13 Oct 2026) | `twilio_content_sid_worker_cleared` | `yaad-notify-client`, `worker_cleared` |
-| `check-reminder` | `yaadly_worker_check_reminder_v2` (v1 rejected 2 Oct 2026) | `twilio_content_sid_worker_check_reminder` | `yaad-notify-client`, `worker_check_reminder` |
+| `check-reminder` | `yaadly_worker_check_reminder_v3` (v1 rejected 2 Oct 2026; v2 approved 13 Oct but filed MARKETING, v3 resubmitted the same day as a status update) | `twilio_content_sid_worker_check_reminder` | `yaad-notify-client`, `worker_check_reminder` |
 | `job-quiet` | `yaadly_worker_job_quiet_v1` | `twilio_content_sid_worker_job_quiet` | `yaad-job-health`, the 72 hour nudge |
 | `draft-waiting` | `yaadly_worker_draft_waiting_v1` | `twilio_content_sid_worker_draft_waiting` | `yaad-notify-client`, `evidence_landed` outside the window |
 

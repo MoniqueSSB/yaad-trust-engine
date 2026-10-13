@@ -475,9 +475,16 @@ export const WORKER_CLEARED_BODY =
  *  for both reminders. The text message and the email still say "Last
  *  reminder from us" the second time (worker-cleared.ts). Referees are
  *  optional, founder 2 Oct 2026: without them, a video of the worker
- *  talking through their skills. */
+ *  talking through their skills.
+ *  v3, 13 Oct 2026, founder instruction: Meta approved v2 but filed it
+ *  as MARKETING, which costs more per send and can be paused to people
+ *  who do not reply. v2 read as a nudge ("gets you on the board", "until
+ *  it is done you cannot price jobs"). v3 is a status update on an
+ *  application the person started: what is still needed, where to
+ *  complete it, how to ask. Same facts, same two variables, no sender
+ *  change. Meta decides the category; this is the shape UTILITY takes. */
 export const CHECK_REMINDER_BODY =
-  "Hi {{1}}, this is Yaadly. Your worker check with us is not finished yet.\n\nWhat is left: your ID, your TRN, and the Guidelines to sign. Three people who can vouch for you are optional; if you do not have them, a short video of you talking through your skills gets you on the board. Referees are still needed before jobs over £500. It takes about ten minutes on your phone.\n\nFinish it here: {{2}}\n\nUntil it is done you cannot price jobs. If you have a question, reply to this message.";
+  "Hi {{1}}, this is Yaadly. An update on your application: it is still incomplete.\n\nStill needed: your ID, your TRN, and the Guidelines to sign. Referees are optional at this stage; a short video of you talking through your skills can stand in for them. Referees are needed before jobs over £500.\n\nComplete your application here: {{2}}\n\nIf you have a question, reply to this message.";
 
 /** The job health nudge at 72 quiet hours, from yaad-job-health. It asks
  *  for evidence and does not ask for a check-in: checking in asks, it never
@@ -511,7 +518,7 @@ export const META_WORKER_TEMPLATES: readonly MetaWorkerTemplate[] = [
     variables: { "1": "Marcus", "2": "https://app.yaadly.co.uk/portal/sign-in" },
   },
   {
-    slug: "check-reminder", name: "yaadly_worker_check_reminder_v2", setting: "twilio_content_sid_worker_check_reminder",
+    slug: "check-reminder", name: "yaadly_worker_check_reminder_v3", setting: "twilio_content_sid_worker_check_reminder",
     sender: "yaad-notify-client, worker_check_reminder", body: CHECK_REMINDER_BODY,
     variables: { "1": "Marcus", "2": "https://app.yaadly.co.uk/apply?app=sample&token=sample&ref=sample" },
   },
