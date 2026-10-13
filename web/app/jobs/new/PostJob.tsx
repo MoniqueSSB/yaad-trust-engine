@@ -914,7 +914,10 @@ export function PostJob({ initialTrade, initialParish, initialDesc, requestedWor
                   <b className="text-mute">Hidden from workers until you start a
                   chat with one. You control when it&rsquo;s shared.</b>{" "}
                   Either one is enough, you do not need both, and there is no
-                  password and no account at this stage.
+                  password and no account at this stage. Give a WhatsApp number
+                  and updates on this job reach you there as well as by email,
+                  once your portal is set up. You can remove it from the job at
+                  any time.
                 </p>
               </div>
             </div>
