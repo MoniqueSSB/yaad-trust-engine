@@ -707,6 +707,48 @@ Deno.serve(async (req: Request) => {
       }
       out.push({ setting: live, sid, status, category: wa.category ?? null, rejection_reason: wa.rejection_reason || null, recorded: wrote });
     }
+    // So she can track it, 13 Oct 2026 ("so who tells me", "so i can track
+    // it"). Two things, both written here and nowhere else:
+    //   app_settings.meta_template_status: one plain line per template,
+    //     rewritten on every run, shown on the desk under Settings.
+    //   a push to her phone (ntfy_topic) the first time a template's answer
+    //     changes to approved or rejected. The previous answers are kept in
+    //     meta_template_status_json so the same answer is never pushed twice.
+    // Neither sends anything to a client or a worker.
+    try {
+      const { data: prevRow } = await admin.from("app_settings").select("value").eq("key", "meta_template_status_json").maybeSingle();
+      let prev: Record<string, string> = {};
+      try { prev = JSON.parse(String(prevRow?.value ?? "{}")) as Record<string, string>; } catch (_) { prev = {}; }
+      const now: Record<string, string> = {};
+      const changed: string[] = [];
+      const lines: string[] = [];
+      for (const t of out) {
+        const setting = String(t.setting ?? "").replace(/^twilio_content_sid_/, "");
+        const status = String(t.status ?? "unknown");
+        now[setting] = status;
+        const cat = t.category ? ` (${String(t.category).toLowerCase()})` : "";
+        const why = t.rejection_reason ? `: ${String(t.rejection_reason)}` : "";
+        lines.push(`${setting}: ${status}${cat}${why}`);
+        if ((status === "approved" || status === "rejected") && prev[setting] !== status) changed.push(`${setting} ${status}${cat}${why}`);
+      }
+      const stamp = new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC";
+      await admin.from("app_settings").upsert([
+        { key: "meta_template_status", value: `Checked ${stamp}\n${lines.join("\n")}` },
+        { key: "meta_template_status_json", value: JSON.stringify(now) },
+      ], { onConflict: "key" });
+      if (changed.length) {
+        const { data: st } = await admin.from("app_settings").select("value").eq("key", "ntfy_topic").maybeSingle();
+        const topic = String(st?.value ?? "").trim().replace(/^"(.*)"$/, "$1");
+        if (topic) {
+          await fetch(`https://ntfy.sh/${topic}`, {
+            method: "POST",
+            headers: { Title: "WhatsApp templates: Meta answered", Priority: "default", Tags: "speech_balloon" },
+            body: `${changed.join("\n")}\nApproved ones are switched on. Full list on the desk under Settings, meta_template_status.`,
+            signal: AbortSignal.timeout(4000),
+          });
+        }
+      }
+    } catch (e) { console.error("template status note:", String(e)); }
     return json({ ok: true, checked: out.length, recorded, templates: out });
   }
 
