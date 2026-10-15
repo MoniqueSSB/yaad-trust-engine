@@ -1,3 +1,4 @@
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { createClient } from "@/lib/supabase/server";
 import { DraftEditor } from "@/components/draft/DraftEditor";
 
@@ -61,7 +62,10 @@ export default async function ReportDraft({
   return (
     <div className={shell + " grid gap-4"}>
       <div>
-        <p className={label}>Report to the client · {p.job.id} · stage {p.stage}</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className={label}>Report to the client · {p.job.id} · stage {p.stage}</p>
+          <ThemeToggle />
+        </div>
         <h1 className="mt-1 font-display text-[clamp(22px,3.5vw,30px)] uppercase leading-tight">{p.job.title}</h1>
       </div>
 

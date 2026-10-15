@@ -84,7 +84,7 @@ export function StageLedger({
      life explains itself rather than looking broken. */
   if (stages.length === 0) {
     return (
-      <section className="mb-3.5 rounded-2xl border border-line bg-linear-to-b from-[rgba(19,19,50,0.75)] to-[rgba(12,12,38,0.6)] px-5.5 py-5">
+      <section className="mb-3.5 rounded-2xl border border-line bg-linear-to-b from-[var(--card-top-75)] to-[var(--card-bot-60)] px-5.5 py-5">
         <h3 className="font-display text-[17px] font-normal tracking-[-0.01em]">The payment stages</h3>
         <div className="mt-3.5 rounded-2xl border border-dashed border-line2 bg-bg/30 px-5 py-7 text-center">
           <b className="mb-1 block text-[14px] font-semibold text-ink">No stages on this job yet</b>
@@ -100,7 +100,7 @@ export function StageLedger({
   }
 
   return (
-    <section className="mb-3.5 rounded-2xl border border-line bg-linear-to-b from-[rgba(19,19,50,0.75)] to-[rgba(12,12,38,0.6)] px-5.5 py-5">
+    <section className="mb-3.5 rounded-2xl border border-line bg-linear-to-b from-[var(--card-top-75)] to-[var(--card-bot-60)] px-5.5 py-5">
       <h3 className="font-display text-[17px] font-normal tracking-[-0.01em]">The payment stages</h3>
       <p className="mb-4 mt-1 text-[12.5px] text-dim">
         From the{" "}

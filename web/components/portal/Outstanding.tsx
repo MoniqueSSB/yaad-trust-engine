@@ -37,7 +37,7 @@ export function Outstanding({
     who === "you" ? "You" : who === "them" ? otherSideLabel : "Yaadly";
 
   return (
-    <section className="mt-4 overflow-hidden rounded-[18px] border border-line2 bg-[rgba(13,13,40,0.5)]">
+    <section className="mt-4 overflow-hidden rounded-[18px] border border-line2 bg-[var(--well-50)]">
       <LandOnLoad />
       <div className="flex items-center gap-3 border-b border-line bg-bg/40 px-4 py-2.5">
         <h2 className="text-[13px] font-bold">Everything outstanding</h2>

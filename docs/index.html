@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="theme-color" content="#F7F6FC">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Yaadly · Property work in Jamaica, managed while you're abroad</title>
 <meta name="description" content="Property maintenance and repairs in Jamaica, managed while you live abroad. You buy the job from Yaadly, we put an identity checked tradesperson on it, each stage is photographed, and a named person at Yaadly reviews the finished work before you accept it. Launching in Kingston and Portmore.">
@@ -203,7 +204,9 @@ footer{margin-top:clamp(48px,5vw,72px);border-top:1px solid var(--line);backgrou
     }catch(e){} return ev; } });
 })();
 </script>
-<link rel="stylesheet" href="nav.css?v=3">
+<link rel="stylesheet" href="nav.css?v=4">
+<link rel="stylesheet" href="theme.css?v=5">
+<script src="theme.js?v=3"></script>
 </head>
 <body>
 <div style="position:fixed;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(155,115,245,0.5) 30%,rgba(245,158,11,0.5) 70%,transparent);z-index:300;pointer-events:none"></div>
@@ -217,6 +220,7 @@ footer{margin-top:clamp(48px,5vw,72px);border-top:1px solid var(--line);backgrou
     <a class="vbtn" href="/prices">Prices</a>
     <a class="vbtn" href="/business">For business</a>
     <a class="vbtn" href="/how-we-use-ai">How we use AI</a>
+    <a class="vbtn" href="/faq">FAQ</a>
     <a class="vbtn" href="/contact">Contact</a>
     <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a call</a>
   </div>
@@ -225,6 +229,11 @@ footer{margin-top:clamp(48px,5vw,72px);border-top:1px solid var(--line);backgrou
     <a href="https://app.yaadly.co.uk/portal/worker">Worker portal</a>
     <a href="https://app.yaadly.co.uk/apply">Join as a pro</a>
   </div>
+  <button class="theme-btn" type="button" role="switch" aria-checked="false" aria-label="Dark mode">
+    <svg class="ico-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    <svg class="ico-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    <span class="knob" aria-hidden="true"></span>
+  </button>
   <a class="navcta" href="https://app.yaadly.co.uk/jobs/new">Post a job</a>
 </div></nav>
 
