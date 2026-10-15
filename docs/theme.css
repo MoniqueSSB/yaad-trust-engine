@@ -122,22 +122,45 @@ html[data-theme="light"] .yc-m a{color:var(--purpleb)}
 html[data-theme="light"] .yc-m.human i{color:var(--gold)}
 html[data-theme="light"] .yc-m.bad{color:#991B1B}
 
-/* ── The button itself, in the header beside Post a job ─────────────────── */
+/* ── The switch itself, in the header beside Post a job ─────────────────
+   A sliding knob on a track, sun on the left, moon on the right. The knob
+   sits on the sun on the light site and slides across to the moon on the
+   dark site, so both states are visible at once and the control reads as a
+   switch rather than as an icon. Monique's instruction, 15 Oct 2026, after
+   the first cut shipped a single sun/moon icon button. */
 .site-nav .theme-btn{
-  flex-shrink:0; margin-left:10px;
-  width:34px; height:34px; border-radius:50%;
-  display:inline-flex; align-items:center; justify-content:center;
-  background:transparent; border:1px solid var(--line2);
-  color:var(--mute); cursor:pointer; padding:0;
-  transition:color .15s, background .15s, border-color .15s;
+  position:relative; flex-shrink:0; margin-left:10px;
+  width:58px; height:30px; border-radius:100px;
+  display:inline-flex; align-items:center; justify-content:space-between;
+  padding:0 7px; cursor:pointer;
+  background:var(--panel2, rgba(155,115,245,0.09));
+  border:1px solid var(--line2);
+  transition:background .2s, border-color .2s;
 }
-.site-nav .theme-btn:hover{color:var(--ink); background:var(--panel2, rgba(155,115,245,0.09))}
+.site-nav .theme-btn:hover{border-color:var(--purple)}
 .site-nav .theme-btn:focus-visible{outline:2px solid var(--purple); outline-offset:2px}
-.site-nav .theme-btn svg{width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
-/* Dark page shows the sun (the thing you can switch to); light page shows the moon. */
-.site-nav .theme-btn .ico-moon{display:none}
-html[data-theme="light"] .site-nav .theme-btn .ico-sun{display:none}
-html[data-theme="light"] .site-nav .theme-btn .ico-moon{display:block}
+.site-nav .theme-btn svg{
+  position:relative; z-index:1;
+  width:15px; height:15px; fill:none; stroke:currentColor;
+  stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;
+  color:var(--dim); transition:color .2s;
+}
+.site-nav .theme-btn .knob{
+  position:absolute; top:3px; left:3px; z-index:0;
+  width:22px; height:22px; border-radius:50%;
+  background:var(--grad);
+  box-shadow:0 1px 4px rgba(21,20,46,0.25);
+  transition:transform .22s cubic-bezier(.4,0,.2,1);
+}
+/* Light site: knob covers the sun, moon is the dim option on the right. */
+.site-nav .theme-btn .ico-sun{color:#fff}
+/* Dark site: knob slides 28px across and covers the moon. */
+.site-nav .theme-btn[aria-checked="true"] .knob{transform:translateX(28px)}
+.site-nav .theme-btn[aria-checked="true"] .ico-sun{color:var(--dim)}
+.site-nav .theme-btn[aria-checked="true"] .ico-moon{color:#fff}
 @media(max-width:1024px){
   .site-nav .theme-btn{margin-left:0}
+}
+@media(prefers-reduced-motion:reduce){
+  .site-nav .theme-btn .knob{transition:none}
 }

@@ -9,8 +9,9 @@
       still there in full for anyone who presses the button. The visitor's
       operating system setting is deliberately not consulted.
 
-   2. Once the page is ready, wire the sun/moon button in the header. One
-      press flips the mode, saves it, and updates the button's spoken label.
+   2. Once the page is ready, wire the switch in the header: a sliding knob
+      between a sun and a moon. One press slides it, flips the mode, and
+      saves it.
 
    The saved choice lives in localStorage under "yaadly-theme". It is a
    display preference, not personal data, and never leaves the browser. */
@@ -26,10 +27,12 @@
     else { root.removeAttribute('data-theme'); }
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) { meta.setAttribute('content', mode === 'light' ? '#F7F6FC' : '#07071A'); }
+    /* The control is a switch: on means dark. Its label stays "Dark mode"
+       and aria-checked says which side it is on, so a screen reader hears
+       "Dark mode, switch, off" on the light site. */
     var btns = document.querySelectorAll('.theme-btn');
     for (var i = 0; i < btns.length; i++) {
-      btns[i].setAttribute('aria-label', mode === 'light' ? 'Switch to dark mode' : 'Switch to light mode');
-      btns[i].setAttribute('title', mode === 'light' ? 'Dark mode' : 'Light mode');
+      btns[i].setAttribute('aria-checked', mode === 'dark' ? 'true' : 'false');
     }
   }
   function current() {
