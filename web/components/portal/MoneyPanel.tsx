@@ -158,7 +158,7 @@ export function MoneyPanel({
 
   return (
     <>
-      <section className="mb-3.5 rounded-2xl border border-line bg-linear-to-b from-[rgba(19,19,50,0.75)] to-[rgba(12,12,38,0.6)] px-5.5 py-5">
+      <section className="mb-3.5 rounded-2xl border border-line bg-linear-to-b from-[var(--card-top-75)] to-[var(--card-bot-60)] px-5.5 py-5">
         <h3 className="font-display text-[17px] font-normal tracking-[-0.01em]">
           {side === "client" ? "What this job costs" : "What you are paid"}
         </h3>
@@ -296,7 +296,7 @@ export function MoneyPanel({
       {/* id="invoices", and "invoice-<id>" on each row, are where the
           outstanding list's "See the invoice" and "Invoice X is unpaid"
           land. */}
-      <section id="invoices" className="mb-3.5 scroll-mt-6 rounded-2xl border border-line bg-linear-to-b from-[rgba(19,19,50,0.75)] to-[rgba(12,12,38,0.6)] px-5.5 py-5">
+      <section id="invoices" className="mb-3.5 scroll-mt-6 rounded-2xl border border-line bg-linear-to-b from-[var(--card-top-75)] to-[var(--card-bot-60)] px-5.5 py-5">
         <h3 className="font-display text-[17px] font-normal tracking-[-0.01em]">
           {side === "client" ? "Your invoices" : "Your pay invoices"}
         </h3>
@@ -405,7 +405,7 @@ export function MoneyPanel({
         )}
       </section>
 
-      <section className="mb-3.5 rounded-2xl border border-line bg-linear-to-b from-[rgba(19,19,50,0.75)] to-[rgba(12,12,38,0.6)] px-5.5 py-5">
+      <section className="mb-3.5 rounded-2xl border border-line bg-linear-to-b from-[var(--card-top-75)] to-[var(--card-bot-60)] px-5.5 py-5">
         <h3 className="font-display text-[17px] font-normal tracking-[-0.01em]">How paying works</h3>
         <p className="mb-3.5 mt-1 text-[12.5px] text-dim">The same rules on every marketplace job.</p>
         <div className="grid gap-2.5 sm:grid-cols-2">

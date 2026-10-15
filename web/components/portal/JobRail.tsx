@@ -146,7 +146,7 @@ export function JobRail({
       </div>
 
       {workerName && (
-        <div className="rounded-2xl border border-line bg-[rgba(13,13,40,0.5)] px-4.5 py-4">
+        <div className="rounded-2xl border border-line bg-[var(--well-50)] px-4.5 py-4">
           <div className="mb-2.5 font-mono-app text-[9.5px] font-semibold uppercase tracking-[0.16em] text-dim">
             {side === "client" ? "Your tradesperson" : "You are the tradesperson"}
           </div>
@@ -162,7 +162,7 @@ export function JobRail({
         </div>
       )}
 
-      <div className="rounded-2xl border border-line bg-[rgba(13,13,40,0.5)] px-4.5 py-4">
+      <div className="rounded-2xl border border-line bg-[var(--well-50)] px-4.5 py-4">
         <div className="mb-2.5 font-mono-app text-[9.5px] font-semibold uppercase tracking-[0.16em] text-dim">This job</div>
         {/* These were links from 2 Sep 2026 but read as grey text: no shape,
             no sign of which section you were on, and a tap on the section you
