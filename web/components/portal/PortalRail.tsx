@@ -52,7 +52,7 @@ function FocusRing({ job, labels }: { job: Job; labels: Record<string, StatusLab
       href={job.next?.href ?? "/portal/jobs/" + encodeURIComponent(job.id)}
       className={
         "block rounded-2xl border p-4.5 transition " +
-        (waiting ? "border-gold/40 bg-gold/[0.05] hover:border-gold/70" : "border-line bg-[rgba(13,13,40,0.5)] hover:border-line2")
+        (waiting ? "border-gold/40 bg-gold/[0.05] hover:border-gold/70" : "border-line bg-[var(--well-50)] hover:border-line2")
       }
     >
       <span className={"block font-mono-app text-[9.5px] font-semibold uppercase tracking-[.16em] " + (waiting ? "text-goldb" : "text-dim")}>
@@ -96,7 +96,7 @@ function FocusRing({ job, labels }: { job: Job; labels: Record<string, StatusLab
 
 function Tiles({ cards, title = "Jobs" }: { cards: StatCard[]; title?: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-[rgba(13,13,40,0.5)] px-4.5 py-4">
+    <div className="rounded-2xl border border-line bg-[var(--well-50)] px-4.5 py-4">
       <div className="mb-3 font-mono-app text-[9.5px] font-semibold uppercase tracking-[.16em] text-dim">{title}</div>
       <div className="grid grid-cols-2 gap-2">
         {cards.map((c) => (
@@ -125,7 +125,7 @@ function ToPayCard({ pay, href }: { pay: ToPay; href: string | null }) {
     <div
       className={
         "rounded-2xl border p-4.5 " +
-        (none ? "border-line bg-[rgba(13,13,40,0.5)]" : "border-gold/30 bg-linear-to-br from-gold/[0.09] to-purple/[0.05]")
+        (none ? "border-line bg-[var(--well-50)]" : "border-gold/30 bg-linear-to-br from-gold/[0.09] to-purple/[0.05]")
       }
     >
       <div className={"mb-2.5 font-mono-app text-[9.5px] font-semibold uppercase tracking-[.16em] " + (none ? "text-dim" : "text-goldb")}>
