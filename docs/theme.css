@@ -1,10 +1,10 @@
 /* ── Light mode, one file, every page ────────────────────────────────────
-   Written 15 Oct 2026. The site is dark by default and stays dark by default.
-   When <html> carries data-theme="light" (set by theme.js from the visitor's
-   saved choice, or from the sun/moon button in the header), the rules below
-   swap the named colours every page already paints with. Nothing here changes
-   layout, copy or the dark design; take the attribute off and the site is
-   exactly what it was.
+   Written 15 Oct 2026. Light is the default (Monique, 15 Oct 2026): theme.js
+   puts data-theme="light" on <html> before first paint unless the visitor has
+   chosen dark with the sun/moon button in the header. When the attribute is
+   present, the rules below swap the named colours every page already paints
+   with. Nothing here changes layout, copy or the dark design; the dark site is
+   the page as written, and it is what a visitor who picks dark gets.
 
    Why one file and not per page: four pages (index, services, business,
    marketplace) carry their own :root block inline, eight load yaadly.css, and

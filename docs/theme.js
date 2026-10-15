@@ -4,11 +4,10 @@
    tiny and does two things:
 
    1. On load, read the saved choice ("light" or "dark") and put it on <html>
-      as data-theme. theme.css does the rest. No saved choice means dark,
-      which is the site as it has always been. The visitor's operating system
-      setting is deliberately not consulted: the design was built dark, and
-      switching people to light without being asked would change the site
-      under them.
+      as data-theme. theme.css does the rest. No saved choice means LIGHT,
+      Monique's decision on 15 Oct 2026. Dark is the original design and is
+      still there in full for anyone who presses the button. The visitor's
+      operating system setting is deliberately not consulted.
 
    2. Once the page is ready, wire the sun/moon button in the header. One
       press flips the mode, saves it, and updates the button's spoken label.
@@ -37,7 +36,7 @@
     return root.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
   }
 
-  apply(saved() === 'light' ? 'light' : 'dark');
+  apply(saved() === 'dark' ? 'dark' : 'light');
 
   document.addEventListener('DOMContentLoaded', function () {
     apply(current());
