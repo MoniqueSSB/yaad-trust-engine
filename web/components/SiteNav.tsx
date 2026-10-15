@@ -49,7 +49,7 @@ export function SiteNav({
   email,
   signOut,
 }: {
-  active?: "market" | "client" | "worker" | "join";
+  active?: "market" | "client" | "worker" | "join" | "supplier";
   email?: string | null;
   signOut?: () => Promise<void>;
 }) {
@@ -60,6 +60,7 @@ export function SiteNav({
   const here =
     active ??
     (path.startsWith("/portal/worker") ? "worker"
+      : path.startsWith("/portal/supplier") ? "supplier"
       : path.startsWith("/apply") ? "join"
       : path.startsWith("/jobs") ? "market"
       : path.startsWith("/portal") ? "client"

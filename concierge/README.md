@@ -47,8 +47,8 @@ the `VIEWS` registry in `concierge.html` if the count here matters to you.
 | Run the day | Overview, Intake, Jobs, Evidence, Stalled jobs, Quotes, Shortlist |
 
 | Run the day | Overview, The day, Intake, Jobs, Evidence, Stalled jobs, Quotes |
-| People | Applications, Workers, Clients, Reviews |
-| Documents & money | Kickoff packs, Quote Pack Drafts, Invoices, Materials tranches, Signatures, Money, Reports, Job files, Independent checks |
+| People | Applications, Workers, Clients, Suppliers, Reviews |
+| Documents & money | Kickoff packs, Quote Pack Drafts, Invoices, Materials, Signatures, Money, Reports, Job files, Independent checks |
 | Services | Services, Marketplace, Job photos |
 | Inbox | Conversations, Mid-chat, Calls, Enquiries, Waiting list, Feedback, Questions |
 | System | Settings, How the desk is doing, Health |

@@ -48,6 +48,11 @@ export default async function PortalDoor() {
 
   const { data: svc } = await supabase.from("services").select("id");
 
+  // A supplier (20261015120000): a hardware merchant Yaadly buys from on
+  // account. Bound here on the way in, same as the client claims above, so
+  // the first sign-in with the email the desk recorded lands on their portal.
+  const { data: supplierId } = await supabase.rpc("bind_my_supplier");
+
   // A quote with no booking still makes someone a worker on this door:
   // since 1 Sep 2026 a client can request a Kickoff Pack well before
   // choosing anyone, and jobs.worker_email alone no longer says that.
@@ -69,10 +74,13 @@ export default async function PortalDoor() {
 
   const isClient = asClient.length > 0 || hasServices;
   const isWorker = workerJobIds.size > 0;
+  const isSupplier = Boolean(supplierId);
 
   // One role only: skip the door entirely.
-  if (isClient && !isWorker) redirect("/portal/client");
-  if (isWorker && !isClient) redirect("/portal/worker");
+  const roles = [isClient, isWorker, isSupplier].filter(Boolean).length;
+  if (roles === 1 && isClient) redirect("/portal/client");
+  if (roles === 1 && isWorker) redirect("/portal/worker");
+  if (roles === 1 && isSupplier) redirect("/portal/supplier");
 
   return (
     <>
@@ -83,8 +91,8 @@ export default async function PortalDoor() {
         Which one today?
       </h1>
       <p className="mt-3 max-w-[62ch] text-[14px] leading-relaxed text-mute">
-        You are on jobs as both a client and a tradesperson. They are separate
-        portals because they answer different questions.
+        You are on jobs in more than one role. They are separate portals
+        because they answer different questions.
       </p>
 
       <div className="mt-7 grid gap-3 sm:grid-cols-2">
@@ -121,13 +129,28 @@ export default async function PortalDoor() {
             {workerJobIds.size} job{workerJobIds.size === 1 ? "" : "s"}
           </p>
         </Link>
+
+        {isSupplier ? (
+          <Link
+            href="/portal/supplier"
+            className="rounded-2xl border border-line bg-panel p-5 transition hover:border-teal"
+          >
+            <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
+              As a supplier
+            </p>
+            <b className="mt-2 block text-[16px]">Orders from Yaadly</b>
+            <p className="mt-2 text-[13.5px] leading-relaxed text-mute">
+              What has been ordered from you, what to do next, and what you have been paid.
+            </p>
+          </Link>
+        ) : null}
       </div>
 
       {/* This is where a new client with a stuck job lands, and it used to be
           a dead end: a sentence about drafts and nothing to press. Somebody
           standing here has one of exactly two problems, so it offers one route
           for each rather than leaving them to find the header. */}
-      {!isClient && !isWorker && (
+      {!isClient && !isWorker && !isSupplier && (
         <div className="mt-6 rounded-2xl border border-line bg-panel p-6">
           <b className="text-[15px]">Nothing here yet</b>
           <p className="mt-2 max-w-[62ch] text-[13.5px] leading-relaxed text-mute">
