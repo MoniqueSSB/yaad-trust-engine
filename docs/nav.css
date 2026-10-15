@@ -102,7 +102,15 @@
    now overflowed between 820px and about 980px, pushing "Post a job" off the
    edge (it already did so between 820px and about 920px before the tab). So
    the two row layout below starts at 1024px rather than 820px, here and in
-   the app's SiteNav, and the job board's sticky filter bar moves with it. */
+   the app's SiteNav, and the job board's sticky filter bar moves with it.
+
+   15 Oct 2026: a ninth tab, "FAQ", on Monique's instruction, after the
+   light and dark switch had already used up the spare width. With the portal
+   links showing, the row measured 1322px and ran off the edge at 1300px,
+   cutting "Post a job" in half. The portal links now hide at 1340px, and
+   the two row layout starts at 1100px rather than 1024px (the one row
+   measured about 1060px here and 30px more in the app), here, in theme.css,
+   in the app's SiteNav and globals.css, and on the job board's sticky bars. */
 .site-nav .navcta{
   flex-shrink:0; margin-left:12px; white-space:nowrap;
   display:inline-flex; align-items:center;
@@ -115,10 +123,10 @@
 /* Narrow screens. The old pages hid the menu entirely below their own
    breakpoint, which left a phone with a logo and nothing to navigate by. The
    tabs scroll sideways instead, so every page stays reachable. */
-@media(max-width:1240px){
+@media(max-width:1340px){
   .site-nav .quiet-links{display:none}
 }
-@media(max-width:1024px){
+@media(max-width:1100px){
   .site-nav .nav-in{flex-wrap:wrap; padding:8px 18px; gap:8px}
   .site-nav .brand{margin-right:auto}
   .site-nav .navcta{margin-left:0}
