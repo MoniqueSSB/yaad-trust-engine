@@ -55,7 +55,7 @@ export function MoneyTrail({
   const who = side === "worker" ? "you" : workerName;
 
   return (
-    <section className="mb-3.5 rounded-2xl border border-line bg-linear-to-b from-[rgba(19,19,50,0.75)] to-[rgba(12,12,38,0.6)] px-5.5 py-5">
+    <section className="mb-3.5 rounded-2xl border border-line bg-linear-to-b from-[var(--card-top-75)] to-[var(--card-bot-60)] px-5.5 py-5">
       <h3 className="font-display text-[17px] font-normal tracking-[-0.01em]">Where the money is</h3>
       <p className="mb-3 mt-1 text-[12.5px] text-dim">
         Everything paid in and paid out on this job, from the records. Yaadly marks each payment by hand, so a

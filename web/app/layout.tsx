@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -31,7 +32,17 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    /* suppressHydrationWarning because the boot script below writes
+       data-theme onto <html> before React arrives, and React must not treat
+       that attribute as a mismatch to repair. */
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta name="theme-color" content="#F7F6FC" />
+        {/* Light or dark before first paint, from the saved choice. See
+            lib/theme.ts. Inline on purpose: a script loaded by URL arrives
+            after the page has already painted dark. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body className={`${fraunces.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}>
         {children}
         {/* The Ask Yaadly chat, the same file the marketing site serves, so

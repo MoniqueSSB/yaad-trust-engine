@@ -167,7 +167,7 @@ export default async function WorkerProfile({
      exactly what it is there to say. */
   const saidThemselves = !!(wp.about || intro || works.length);
 
-  const card = "rounded-[20px] border border-line bg-linear-to-b from-[rgba(19,19,50,0.8)] to-[rgba(12,12,38,0.6)] p-5.5";
+  const card = "rounded-[20px] border border-line bg-linear-to-b from-[var(--card-top-80)] to-[var(--card-bot-60)] p-5.5";
   const label = "font-mono-app text-[10px] font-semibold uppercase tracking-[0.18em] text-dim";
 
   return (
@@ -180,7 +180,7 @@ export default async function WorkerProfile({
         <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-4">
 
           {/* ── WHO ─────────────────────────────────────────────── */}
-          <section className="flex flex-wrap items-start gap-5.5 rounded-[20px] border border-line bg-linear-to-b from-[rgba(19,19,50,0.9)] to-[rgba(12,12,38,0.75)] p-6">
+          <section className="flex flex-wrap items-start gap-5.5 rounded-[20px] border border-line bg-linear-to-b from-[var(--card-top-90)] to-[var(--card-bot-75)] p-6">
             {/* The initials block stays as the fallback rather than being replaced.
                 Most profiles will not have a photograph: the consent is opt in and
                 a worker who says no is not a worse worker, so the page has to look
@@ -474,7 +474,7 @@ export default async function WorkerProfile({
               the only way a quote, evidence and payment end up tied to a real
               job record instead of a WhatsApp thread nobody else can see. */}
           {!isSelf && (
-            <div className="rounded-[18px] border border-gold/30 bg-linear-to-b from-gold/10 to-[rgba(12,12,38,0.6)] p-5">
+            <div className="rounded-[18px] border border-gold/30 bg-linear-to-b from-gold/10 to-[var(--card-bot-60)] p-5">
               <span className="font-mono-app text-[10px] font-semibold uppercase tracking-[0.18em] text-goldb">
                 Work with {firstName}
               </span>
@@ -497,7 +497,7 @@ export default async function WorkerProfile({
             </div>
           )}
 
-          <div className="rounded-[18px] border border-line bg-linear-to-b from-[rgba(19,19,50,0.8)] to-[rgba(12,12,38,0.6)] p-5">
+          <div className="rounded-[18px] border border-line bg-linear-to-b from-[var(--card-top-80)] to-[var(--card-bot-60)] p-5">
             <span className="font-mono-app text-[10px] font-semibold uppercase tracking-[0.18em] text-dim">How the money works</span>
             {/* 03 is not the comp's. The comp said "Nothing pays out unapproved,
                 each stage releases only when you sign it off", which hands the

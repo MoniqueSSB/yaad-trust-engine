@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 /**
  * The one Yaadly header. Same markup, same order, same labels as
@@ -113,6 +114,10 @@ export function SiteNav({
         {email ? (
           <span className="ml-auto max-w-[220px] truncate pl-3 text-[12.5px] text-dim">{email}</span>
         ) : null}
+
+        {/* The light and dark switch sits where it does on the marketing
+            site: just before the one filled button in the header. */}
+        <ThemeToggle />
 
         {signOut ? (
           <form action={signOut}>

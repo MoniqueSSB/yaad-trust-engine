@@ -400,10 +400,10 @@ export default async function Board({
               is a number this page already had and did not have to invent. */}
           <div className="grid min-w-[280px] grid-cols-2 gap-3.5">
             {[
-              { n: jobs.length, label: "open to quote", one: "open to quote", tone: "text-ink", box: "border-line bg-linear-to-b from-[rgba(19,19,50,0.8)] to-[rgba(12,12,38,0.6)]" },
-              { n: statUrgent, label: "marked urgent", one: "marked urgent", tone: "text-goldb", box: "border-gold/30 bg-linear-to-b from-gold/[0.09] to-[rgba(12,12,38,0.6)]" },
-              { n: statParishes, label: "parishes covered", one: "parish covered", tone: "text-ink", box: "border-line bg-linear-to-b from-[rgba(19,19,50,0.8)] to-[rgba(12,12,38,0.6)]" },
-              { n: workers.length, label: "identity checked workers", one: "identity checked worker", tone: "text-green", box: "border-line bg-linear-to-b from-[rgba(19,19,50,0.8)] to-[rgba(12,12,38,0.6)]" },
+              { n: jobs.length, label: "open to quote", one: "open to quote", tone: "text-ink", box: "border-line bg-linear-to-b from-[var(--card-top-80)] to-[var(--card-bot-60)]" },
+              { n: statUrgent, label: "marked urgent", one: "marked urgent", tone: "text-goldb", box: "border-gold/30 bg-linear-to-b from-gold/[0.09] to-[var(--card-bot-60)]" },
+              { n: statParishes, label: "parishes covered", one: "parish covered", tone: "text-ink", box: "border-line bg-linear-to-b from-[var(--card-top-80)] to-[var(--card-bot-60)]" },
+              { n: workers.length, label: "identity checked workers", one: "identity checked worker", tone: "text-green", box: "border-line bg-linear-to-b from-[var(--card-top-80)] to-[var(--card-bot-60)]" },
             ].map((s) => (
               <div key={s.label} className={"min-w-[130px] rounded-[14px] border px-4 py-3.5 " + s.box}>
                 <b className={"block font-mono-app text-[26px] font-semibold tabular-nums " + s.tone}>{s.n}</b>
@@ -539,7 +539,7 @@ export default async function Board({
             </div>
 
             <aside className="flex min-w-0 max-w-[316px] flex-[1_1_280px] flex-col gap-4 min-[1025px]:sticky min-[1025px]:top-[86px]">
-              <div className="rounded-[18px] border border-line bg-linear-to-b from-[rgba(19,19,50,0.8)] to-[rgba(12,12,38,0.6)] p-5">
+              <div className="rounded-[18px] border border-line bg-linear-to-b from-[var(--card-top-80)] to-[var(--card-bot-60)] p-5">
                 <span className="font-mono-app text-[10px] font-semibold uppercase tracking-[0.18em] text-dim">How verification works</span>
                 <div className="mt-3.5 flex flex-col gap-3.5">
                   {[
@@ -559,7 +559,7 @@ export default async function Board({
                 {humanLine}
               </div>
 
-              <div className="rounded-[18px] border border-gold/28 bg-linear-to-b from-gold/10 to-[rgba(12,12,38,0.6)] p-5">
+              <div className="rounded-[18px] border border-gold/28 bg-linear-to-b from-gold/10 to-[var(--card-bot-60)] p-5">
                 <p className="font-display text-[20px] font-light leading-[1.25] tracking-[-0.015em]">Rather we picked for you?</p>
                 {/* The comp said "You still approve every stage", which under
                     the principal model overstates what the client's click
@@ -638,7 +638,7 @@ export default async function Board({
                       key={j.id}
                       id={j.id}
                       className={
-                        "group relative flex scroll-mt-32 flex-wrap gap-5 overflow-hidden rounded-[18px] border bg-linear-to-b from-[rgba(19,19,50,0.9)] to-[rgba(12,12,38,0.75)] px-5.5 pb-4.5 pt-5 shadow-[inset_0_1px_0_rgba(238,238,255,0.04)] transition duration-200 " +
+                        "group relative flex scroll-mt-32 flex-wrap gap-5 overflow-hidden rounded-[18px] border bg-linear-to-b from-[var(--card-top-90)] to-[var(--card-bot-75)] px-5.5 pb-4.5 pt-5 shadow-[inset_0_1px_0_rgba(238,238,255,0.04)] transition duration-200 " +
                         (urgent || fresh ? "border-gold/24 hover:border-gold/50" : "border-line hover:border-purple/40")
                       }
                     >
@@ -823,7 +823,7 @@ export default async function Board({
                   person already reads worker messages. No new table, no new
                   place for a phone number to sit, and no promise that the
                   alerts themselves exist yet. */}
-              <div className="rounded-[18px] border border-green/28 bg-linear-to-b from-green/[0.08] to-[rgba(12,12,38,0.6)] p-5">
+              <div className="rounded-[18px] border border-green/28 bg-linear-to-b from-green/[0.08] to-[var(--card-bot-60)] p-5">
                 <span className="inline-flex items-center gap-2 font-mono-app text-[10px] font-semibold uppercase tracking-[0.18em] text-green">
                   <i className="size-[5px] animate-pulse rounded-full bg-green" />
                   Launching soon
@@ -848,7 +848,7 @@ export default async function Board({
                 </a>
               </div>
 
-              <div className="rounded-[18px] border border-line bg-linear-to-b from-[rgba(19,19,50,0.8)] to-[rgba(12,12,38,0.6)] p-5">
+              <div className="rounded-[18px] border border-line bg-linear-to-b from-[var(--card-top-80)] to-[var(--card-bot-60)] p-5">
                 <span className="font-mono-app text-[10px] font-semibold uppercase tracking-[0.18em] text-dim">How quoting works</span>
                 <div className="mt-3.5 flex flex-col gap-3.5">
                   {/* 02 and 03 are NOT the comp's wording. The comp had "money
@@ -877,7 +877,7 @@ export default async function Board({
               </div>
 
               {vmode !== "worker" && (
-                <div className="rounded-[18px] border border-line2 bg-linear-to-b from-purple/10 to-[rgba(12,12,38,0.6)] p-5">
+                <div className="rounded-[18px] border border-line2 bg-linear-to-b from-purple/10 to-[var(--card-bot-60)] p-5">
                   <p className="font-display text-[20px] font-light leading-[1.25] tracking-[-0.015em]">Not verified yet?</p>
                   <p className="mt-2 text-[13.5px] leading-relaxed text-mute">
                     Pass identity and trade verification once, and every job on this board is yours to quote.
