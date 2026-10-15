@@ -131,6 +131,50 @@ html[data-theme="light"] .yc-m a{color:var(--purpleb)}
 html[data-theme="light"] .yc-m.human i{color:var(--gold)}
 html[data-theme="light"] .yc-m.bad{color:#991B1B}
 
+/* ── The "light" sections: prices, FAQ, terms, privacy, cancellation ────
+   Added 15 Oct 2026 (Monique: "only the header is going dark and light").
+   Those five pages paint their body in <div class="sect light">, which
+   yaadly.css draws from its own fixed white palette, the --l-* names. So the
+   switch moved the header and nothing else. Here the --l-* names follow the
+   switch instead: on the light site they take the same purple and gold
+   values as every other page, on the dark site the dark ones. The few
+   colours yaadly.css wrote as fixed hex inside .sect.light are redrawn for
+   each side below. */
+html[data-theme="light"]{
+  --l-bg:#F7F6FC; --l-panel2:#EFEBFA;
+  --l-line:rgba(123,79,224,0.16); --l-line2:rgba(123,79,224,0.30);
+  --l-ink:#0E0D22; --l-mute:#2F2E55; --l-dim:#45446E;
+  --l-amber:#92400E; --l-coral:#A51A1A;
+  --l-grad-teal:#4B22C0; --l-grad-amber:#B45309;
+}
+html:not([data-theme="light"]){
+  --l-bg:#07071A; --l-panel2:rgba(155,115,245,0.09);
+  --l-line:rgba(155,115,245,0.12); --l-line2:rgba(155,115,245,0.22);
+  --l-ink:#EEEEFF; --l-mute:#9E9ECB; --l-dim:#7C7CA6;
+  --l-amber:#F59E0B; --l-coral:#F87171;
+  --l-grad-teal:#C4AAFF; --l-grad-amber:#FBBF24;
+}
+/* Links in these sections match the rest of the site, purple, both sides. */
+html .sect.light a{color:var(--tealb)}
+html .sect.light a:hover{color:var(--ink)}
+
+/* Light side: badges and starred cards in the site's purple and gold. */
+html[data-theme="light"] .sect.light .conf.high{color:#4B22C0;background:rgba(123,79,224,0.10);border-color:rgba(123,79,224,0.30)}
+html[data-theme="light"] .sect.light .conf.medium{color:#92400E;background:#FBF1DC;border-color:rgba(180,83,9,0.30)}
+html[data-theme="light"] .sect.light .conf.low{color:#A51A1A;background:rgba(185,28,28,0.08);border-color:rgba(185,28,28,0.30)}
+html[data-theme="light"] .sect.light .svc.star{background:#FBF1DC;border-color:rgba(180,83,9,0.25)}
+html[data-theme="light"] .sect.light .gapcard{background:rgba(185,28,28,0.06)}
+html[data-theme="light"] .calc td input{background:#FFFFFF}
+
+/* Dark side: the same pieces in the dark site's own colours. */
+html:not([data-theme="light"]) .sect.light .gapcard{background:var(--redsoft);border-color:#542020}
+html:not([data-theme="light"]) .sect.light .gapcard b{color:#F3C9C9}
+html:not([data-theme="light"]) .sect.light .conf.high{color:var(--tealb);background:var(--soft);border-color:var(--softline)}
+html:not([data-theme="light"]) .sect.light .conf.medium{color:var(--mango);background:#1e1808;border-color:#4a3a14}
+html:not([data-theme="light"]) .sect.light .conf.low{color:var(--coral);background:#2a1a14;border-color:#4a2a1e}
+html:not([data-theme="light"]) .sect.light .svc.star{background:var(--soft);border-color:var(--softline)}
+html:not([data-theme="light"]) .calc td input{background:rgba(155,115,245,0.06)}
+
 /* ── The switch itself, in the header beside Post a job ─────────────────
    A sliding knob on a track, sun on the left, moon on the right. The knob
    sits on the sun on the light site and slides across to the moon on the
@@ -167,7 +211,7 @@ html[data-theme="light"] .yc-m.bad{color:#991B1B}
 .site-nav .theme-btn[aria-checked="true"] .knob{transform:translateX(28px)}
 .site-nav .theme-btn[aria-checked="true"] .ico-sun{color:var(--dim)}
 .site-nav .theme-btn[aria-checked="true"] .ico-moon{color:#fff}
-@media(max-width:1024px){
+@media(max-width:1100px){
   .site-nav .theme-btn{margin-left:0}
 }
 @media(prefers-reduced-motion:reduce){

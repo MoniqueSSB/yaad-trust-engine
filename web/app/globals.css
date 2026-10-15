@@ -175,7 +175,7 @@ html[data-theme="light"] .theme-btn .knob{background:linear-gradient(135deg,#4B2
 .theme-btn[aria-checked="true"] .knob{transform:translateX(28px)}
 .theme-btn[aria-checked="true"] .ico-sun{color:var(--color-dim)}
 .theme-btn[aria-checked="true"] .ico-moon{color:#fff}
-@media(max-width:1024px){ .theme-btn{margin-left:0} }
+@media(max-width:1100px){ .theme-btn{margin-left:0} }
 @media(prefers-reduced-motion:reduce){ .theme-btn .knob{transition:none} }
 
 /* ── Join as a pro, ported from the preview's #s-join ─────────────────── */
