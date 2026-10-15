@@ -18,6 +18,24 @@ Supabase connection: all data on these screens is illustrative.
 It exists to settle product and pricing decisions before they are built into
 `docs/index.html`.
 
+## supplier.html, the supplier lane for materials (15 October 2026)
+
+A second prototype file, separate from `index.html`. Three screens behind one
+switch: the desk's Materials view with a supplier lane beside the worker lane
+that is live today, a supplier portal behind the same `/portal` door as the
+client and worker portals, and a plain English note of what the lane adds to
+the tables and functions that already exist. The site terms have said since
+7 October that Yaadly buys materials from the merchant and pays the merchant
+directly; the database still runs the worker-buys rule. This page is the
+shape of the build that makes the terms true, drawn so the two can be
+compared before anything is built. Nothing is saved and no money moves.
+
+```bash
+python3 -m http.server 8934 --directory preview
+```
+
+Then open http://localhost:8934/supplier.html.
+
 ## Screens
 
 | Route | What it shows |

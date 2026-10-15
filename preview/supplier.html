@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Materials from a supplier, prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Prototype of the supplier lane for materials, 15 October 2026.
+   Nothing here talks to Supabase. Every job, supplier, name and figure is
+   invented. Two surfaces, both drawn in Yaadly's existing look so they can
+   be judged against what is already live:
+     1. the desk's Materials view (concierge.html, data-view="materials"),
+        extended with a supplier lane beside the worker lane it has today;
+     2. a supplier portal, a third portal behind the same /portal door the
+        client and worker portals already use.
+   Tokens are the shared brand values from concierge.html and web/app/globals.css. */
+:root{
+  --bg:#07071A; --panel:rgba(255,255,255,0.028); --panel2:rgba(255,255,255,0.05); --rail:#050512;
+  --line:rgba(155,115,245,0.11); --line2:rgba(155,115,245,0.22);
+  --ink:#EEEEFF; --mute:#9E9ECB; --dim:#7C7CA6;
+  --teal:#9B73F5; --tealb:#C4AAFF; --mango:#F59E0B; --coral:#F87171; --sand:#FBBF24; --green:#34D399;
+  --soft:rgba(155,115,245,0.07); --softline:rgba(155,115,245,0.2);
+  --disp:'Fraunces',Georgia,serif; --body:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.55 var(--body);-webkit-font-smoothing:antialiased}
+a{color:var(--tealb);text-decoration:none}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+:focus-visible{outline:2px solid var(--tealb);outline-offset:2px;border-radius:6px}
+.mono{font-family:var(--mono);font-size:12px}
+.demobar{background:linear-gradient(90deg,rgba(245,158,11,.14),rgba(155,115,245,.10));border-bottom:1px solid var(--softline);font-size:12.5px;color:var(--sand);padding:8px 20px;text-align:center}
+.demobar b{color:var(--ink)}
+.switch{display:flex;gap:6px;justify-content:center;padding:10px;border-bottom:1px solid var(--line);background:rgba(7,7,26,.96);position:sticky;top:0;z-index:30}
+.switch button{padding:7px 14px;border-radius:999px;border:1px solid var(--line2);color:var(--mute);font-weight:600;font-size:13px}
+.switch button.on{background:var(--soft);border-color:var(--softline);color:var(--ink)}
+.surface[hidden]{display:none}
+
+/* ---------------- the desk, borrowed from concierge.html ---------------- */
+.desk{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 90px)}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:16px 12px}
+.rail .grp{font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin:14px 8px 6px}
+.rail a{display:block;padding:7px 10px;border-radius:8px;color:var(--mute);font-size:13px}
+.rail a.on{background:var(--soft);color:var(--ink);border:1px solid var(--softline)}
+.rail a.new{color:var(--mango)}
+.view{padding:26px 28px 60px;max-width:1180px}
+h1.vh{font-family:var(--disp);text-transform:uppercase;font-weight:400;font-size:clamp(24px,3vw,32px);line-height:.95;letter-spacing:.005em}
+.vsub{color:var(--mute);font-size:13.5px;margin-top:7px;max-width:74ch;line-height:1.6}
+.vsub b{color:var(--ink)}
+table.jitable{width:100%;border-collapse:collapse;margin-top:18px;font-size:13px}
+.jitable th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);padding:8px 10px;border-bottom:1px solid var(--line2);font-weight:600}
+.jitable td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.jitable td:first-child{min-width:420px}
+.jitable td:nth-child(2){min-width:260px}
+.jitable .num{text-align:right}
+.jistagename{font-family:var(--mono);font-size:12.5px;color:var(--tealb)}
+.jistagepct{font-size:12px;color:var(--mute);margin-top:2px}
+.jicond{font-size:12.5px;color:var(--mute);line-height:1.6}
+.jiamt{font-family:var(--mono);font-size:13px}
+.jichip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:100px;font-size:10.5px;font-weight:700;white-space:nowrap;background:var(--panel2);color:var(--dim);border:1px solid var(--line)}
+.jichip .dot{width:6px;height:6px;border-radius:50%;display:inline-block;background:var(--dim)}
+.jichip.ready{background:#2b2210;color:var(--mango);border-color:#4a3a12}.jichip.ready .dot{background:var(--mango)}
+.jichip.raised{background:var(--soft);color:var(--tealb);border-color:var(--softline)}.jichip.raised .dot{background:var(--teal)}
+.jichip.paid{background:rgba(52,211,153,.08);color:var(--green);border-color:rgba(52,211,153,.3)}.jichip.paid .dot{background:var(--green)}
+.jichip.crit{background:rgba(248,113,113,.08);color:var(--coral);border-color:rgba(248,113,113,.3)}.jichip.crit .dot{background:var(--coral)}
+.lane{display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:.1em;padding:2px 7px;border-radius:5px;background:var(--panel2);color:var(--mute);margin-left:6px;vertical-align:1px}
+.lane.sup{color:var(--mango);background:rgba(245,158,11,.1)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:9px;font-weight:600;font-size:12.5px;border:1px solid var(--line2);background:var(--panel2);color:var(--ink)}
+.btn:hover{border-color:var(--tealb)}
+.btn.g{color:var(--mute)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:#0d0820}
+input,select,textarea{font:inherit;color:var(--ink);background:rgba(255,255,255,.04);border:1px solid var(--line2);border-radius:8px;padding:6px 9px;font-size:12.5px}
+label{font-size:11px;color:var(--dim);display:block;margin-bottom:3px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.steps{display:flex;flex-wrap:wrap;gap:3px;margin:6px 0 4px}
+.stp{font-size:10.5px;padding:2px 7px;line-height:1.5;border-radius:6px;border:1px solid var(--line);color:var(--dim);background:var(--panel)}
+.stp.done{color:var(--green);border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.06)}
+.stp.now{color:var(--mango);border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.08)}
+.stp.h{border-style:dashed}
+.rule{margin-top:22px;font-size:13px;color:var(--mute);border-left:3px solid var(--line2);padding:10px 14px;background:var(--panel)}
+.rule b{color:var(--ink)}
+.alert{margin-top:16px;padding:12px 14px;border-radius:10px;border:1px solid var(--line2);background:var(--panel);font-size:13px;color:var(--mute)}
+.alert b{color:var(--ink)}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:#141433;border:1px solid var(--softline);color:var(--ink);padding:10px 16px;border-radius:12px;font-size:13.5px;opacity:0;transition:.2s;z-index:70;pointer-events:none;max-width:90vw}
+.toast.on{opacity:1;transform:translateX(-50%)}
+
+/* ---------------- the portal, borrowed from web/app/portal ---------------- */
+.phead{border-bottom:1px solid var(--line);padding:14px 0}
+.pwrap{max-width:1100px;margin:0 auto;padding:0 20px}
+.phead .pwrap{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.pbrand{font-family:var(--disp);font-size:20px;font-weight:600}
+.pbrand small{display:block;font-family:var(--body);font-size:11px;color:var(--dim);font-weight:400;letter-spacing:.1em;text-transform:uppercase}
+.pnav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+.pnav button{padding:7px 12px;border-radius:999px;color:var(--mute);font-size:13px;font-weight:500}
+.pnav button.on{background:var(--soft);color:var(--ink);border:1px solid var(--softline)}
+.pwho{font-size:12.5px;color:var(--mute);text-align:right}
+.pwho b{display:block;color:var(--ink)}
+.pmain{padding:26px 0 60px}
+.pgrid{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start}
+@media (max-width:900px){.pgrid{grid-template-columns:1fr}.desk{grid-template-columns:1fr}.rail{display:none}}
+.ph1{font-family:var(--disp);font-weight:400;font-size:28px;letter-spacing:-.015em;line-height:1.15}
+.plead{color:var(--mute);font-size:14px;margin-top:6px;max-width:66ch}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.card + .card{margin-top:12px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{border:1px solid var(--line);border-radius:12px;padding:12px;background:rgba(13,13,40,.5)}
+.tile .n{font-family:var(--disp);font-size:26px;line-height:1}
+.tile .l{font-size:11.5px;color:var(--mute);margin-top:4px}
+.tile.gold{border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.06)}
+.tile.green{border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.05)}
+.eyebrow{font-family:var(--mono);font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.16em;color:var(--dim)}
+.eyebrow.gold{color:var(--sand)}
+.jobrow{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-top:1px solid var(--line);cursor:pointer}
+.jobrow:first-of-type{border-top:0}
+.jobrow:hover .jt{color:var(--tealb)}
+.jobrow .jt{font-weight:600;font-size:15px}
+.jobrow .js{font-size:12.5px;color:var(--mute);margin-top:2px}
+.jobrow .amt{margin-left:auto;text-align:right;white-space:nowrap}
+.jobrow .amt b{font-family:var(--mono);font-weight:500;display:block}
+.jobrow .amt span{font-size:11.5px;color:var(--dim)}
+.room{margin-top:14px}
+.room table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+.room th{text-align:left;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:6px 8px;border-bottom:1px solid var(--line2)}
+.room td{padding:7px 8px;border-bottom:1px solid var(--line)}
+.room td.num,.room th.num{text-align:right;font-family:var(--mono);font-size:12.5px}
+.kv{display:grid;grid-template-columns:140px 1fr;gap:5px 12px;font-size:13px;margin-top:10px}
+.kv dt{color:var(--dim)}.kv dd{color:var(--ink)}
+.next{margin-top:14px;padding:14px;border-radius:12px;border:1px solid rgba(245,158,11,.35);background:rgba(245,158,11,.05)}
+.next.quiet{border-color:var(--line);background:var(--panel)}
+.next .eyebrow{margin-bottom:6px}
+.msgs{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.msg{max-width:80%;padding:8px 12px;border-radius:12px;font-size:13.5px;background:var(--panel2);border:1px solid var(--line)}
+.msg.me{align-self:flex-end;background:rgba(155,115,245,.14);border-color:var(--softline)}
+.msg .m{display:block;font-size:11px;color:var(--dim);margin-top:3px;font-family:var(--mono)}
+.reply{display:flex;gap:8px;margin-top:10px}
+.reply input{flex:1}
+.stmt td.who{color:var(--dim);font-size:12px;white-space:nowrap}
+.note{font-size:12.5px;color:var(--mute);margin-top:10px}
+.foot{color:var(--dim);font-size:12.5px;margin-top:28px;border-top:1px solid var(--line);padding-top:14px}
+
+/* ---------------- the build note ---------------- */
+.plan{max-width:860px;margin:0 auto;padding:26px 20px 60px}
+.plan h2{font-family:var(--disp);font-weight:400;font-size:24px;margin:22px 0 8px}
+.plan p,.plan li{color:var(--mute);font-size:14px}
+.plan li{margin:6px 0 6px 18px}
+.plan b,.plan code{color:var(--ink)}
+.plan code{font-family:var(--mono);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="demobar">Prototype, not live. Every job, supplier, name and figure is invented. <b>Nothing is saved and no money moves.</b></div>
+<div class="switch">
+  <button class="on" data-s="desk">1 · The desk, Materials view</button>
+  <button data-s="portal">2 · The supplier's portal</button>
+  <button data-s="plan">3 · What this adds to what exists</button>
+</div>
+
+<!-- ======================================================= 1. THE DESK -->
+<div class="surface" id="s-desk">
+<div class="desk">
+  <nav class="rail">
+    <div class="grp">Run the day</div><a>Overview</a><a>The day</a><a>Intake</a><a>Jobs</a><a>Evidence</a><a>Quotes</a>
+    <div class="grp">People</div><a>Applications</a><a>Workers</a><a>Clients</a><a class="new">Suppliers</a>
+    <div class="grp">Documents &amp; money</div><a>Kickoff packs</a><a>Invoices</a><a>Pay workers <span class="lane">+ suppliers</span></a><a class="on">Materials</a><a>Signatures</a><a>Money</a>
+    <div class="grp">Inbox</div><a>Conversations</a><a>Enquiries</a>
+  </nav>
+  <section class="view">
+    <h1 class="vh">Materials</h1>
+    <p class="vsub">The materials line of an accepted quote, once the client has paid for it, and never fee'd on either side. Each job buys one of two ways, set on the job as <b>materials by</b>. <b>Worker buys:</b> exactly the lane that is live today, money released to the worker, receipt comes back afterwards. <b>Yaadly buys from a supplier:</b> the same release, made out to a supplier on account instead of the worker. The supplier confirms, the tradesperson collects with a code, the tradesperson films the goods in the client's nominated store (the materials evidence that already exists), and only then is the supplier's invoice paid, from Pay workers and suppliers, with the same call-back-first rule. The database refuses either lane until the client has said where materials are kept, and refuses any total above what the client has paid. Every release is stamped against you.</p>
+    <div id="mrBody"></div>
+    <div class="rule">⚖️ <b>The governing rule holds here:</b> releasing records a decision and moves no money. The supplier moves goods, never money. Matching the goods to the site evidence and marking an invoice paid are your clicks, one named person, every time. Nothing is paid on a timer, on a supplier's say so, or because the evidence looks fine to a model.</div>
+  </section>
+</div>
+</div>
+
+<!-- ===================================================== 2. THE PORTAL -->
+<div class="surface" id="s-portal" hidden>
+<header class="phead"><div class="pwrap">
+  <div class="pbrand">Yaadly<small>Supplier portal · app.yaadly.co.uk/portal/supplier</small></div>
+  <nav class="pnav"><button class="on" data-p="orders">Orders</button><button data-p="statement">Statement</button><button data-p="messages">Messages</button></nav>
+  <div class="pwho"><b>Portmore Builders Depot</b>Braeton, St Catherine · signed in</div>
+</div></header>
+<main class="pmain"><div class="pwrap">
+  <div id="p-orders">
+    <div class="pgrid">
+      <div>
+        <div class="ph1">Orders from Yaadly</div>
+        <p class="plead">Each order is one Yaadly job and one stage. You confirm it, hand the goods to the named collector who gives you the code, and attach your invoice number. Yaadly pays by bank transfer once the goods are evidenced on site.</p>
+        <div class="card" style="margin-top:16px" id="p-list"></div>
+      </div>
+      <aside>
+        <div class="card"><div class="eyebrow gold">Needs you first</div><div id="p-focus" style="margin-top:8px"></div></div>
+        <div class="card"><div class="tiles" id="p-tiles"></div></div>
+        <div class="card"><div class="eyebrow">Your account</div><div class="note">Terms: bank transfer within 7 days of the goods being evidenced on site, agreed in writing before the first order. Your bank details are taken by phone and confirmed back to you, never typed here or sent on WhatsApp.</div></div>
+      </aside>
+    </div>
+  </div>
+  <div id="p-statement" hidden>
+    <div class="ph1">Statement</div>
+    <p class="plead">Your invoices against Yaadly's orders, and what has been paid. Yaadly's release reference sits beside your invoice number on every line.</p>
+    <div class="card" style="margin-top:16px"><table class="stmt" style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="text-align:left;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:6px 8px">Date</th><th style="text-align:left;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:6px 8px">Entry</th><th style="text-align:left;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:6px 8px">Job · release</th><th style="text-align:left;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:6px 8px">Your invoice</th><th class="num" style="text-align:right;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:6px 8px">Invoiced</th><th class="num" style="text-align:right;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:6px 8px">Paid</th><th style="text-align:left;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:6px 8px">Recorded by</th></tr></thead><tbody id="p-stmt"></tbody></table><div class="tiles" style="margin-top:14px" id="p-stmt-tiles"></div></div>
+  </div>
+  <div id="p-messages" hidden>
+    <div class="ph1">Messages</div>
+    <p class="plead">The same message lane the client and worker portals use: a thread per job, answered by Yaadly from the desk's Conversations view. Price and availability questions arrive here before an order exists.</p>
+    <div id="p-threads" style="margin-top:16px"></div>
+  </div>
+  <p class="foot">Prototype only. In the real build this page sits behind the same server-side door as the client and worker portals, and row level security returns only this supplier's releases, with no client column on them.</p>
+</div></main>
+</div>
+
+<!-- ======================================================= 3. THE PLAN -->
+<div class="surface" id="s-plan" hidden>
+<div class="plan">
+  <div class="ph1">What this adds to what Yaadly already has</div>
+  <p style="margin-top:8px">The method statement. Nothing below is built yet. The point of this page is to agree the shape before a line of it is.</p>
+
+  <h2>What already exists and is reused as is</h2>
+  <ul>
+    <li><b>The nominated materials store</b> on the job (<code>jobs.materials_store</code>, <code>nominate_materials_store()</code>). Still the first gate. No store, no release, either lane.</li>
+    <li><b>The release</b> (<code>materials_releases</code>, <code>release_materials_tranche()</code>): refuses more than the quote and more than the client has paid. A supplier order is this row, made out to a supplier.</li>
+    <li><b>Sent and receipt</b> (<code>mark_materials_sent</code>, <code>record_materials_receipt()</code>): sent becomes the payment to the supplier; <code>receipt_ref</code> holds the supplier's invoice number.</li>
+    <li><b>Materials evidence</b> (evidence kind <code>materials</code>, filed by the tradesperson from the job room): this is the match. No new "delivery confirmed" concept.</li>
+    <li><b>The portal door</b> (<code>web/app/portal/(gated)</code>) and the way the worker portal reads only its own rows through RLS, never through a filter in the page.</li>
+    <li><b>Conversations</b> on the desk and <code>yaad-desk-reply</code> for answering. Supplier messages are threads, not a new enquiries table.</li>
+    <li><b>Pay workers</b> and <code>mark_worker_paid()</code>: call-back first, then pay from the bank app, then record it. Same screen, one more payee type.</li>
+  </ul>
+
+  <h2>What is added, in order of size</h2>
+  <ul>
+    <li><b>One table:</b> <code>suppliers</code> (name, parish, contact, account reference, the signed-in user, created by). RLS: a supplier reads their own row; admins read all.</li>
+    <li><b>Columns on <code>materials_releases</code>:</b> <code>payee</code> ('worker' or 'supplier', default 'worker' so every existing row is unchanged), <code>supplier_id</code>, <code>collection_code</code>, <code>confirmed_at</code>, <code>ready_at</code>, <code>collected_at</code>, and a <code>lines</code> JSON for the order lines. RLS: a supplier reads releases where <code>supplier_id</code> is theirs, through a view that carries job id, title, parish and stage and no client column.</li>
+    <li><b>One value on <code>jobs.materials_by</code>:</b> 'yaadly', meaning Yaadly buys from a supplier. Set on the job by the desk, like the store.</li>
+    <li><b>One value on <code>invoices.payable_to</code>:</b> 'supplier', and <code>mark_supplier_paid()</code> shaped exactly like <code>mark_worker_paid()</code>.</li>
+    <li><b>Three supplier functions</b>, each touching only a release whose <code>supplier_id</code> is the caller's: confirm, mark ready, mark collected (takes the code, refuses a wrong one). None of them touches money or evidence.</li>
+    <li><b>Desk:</b> the Materials view reads <code>payee</code> and shows the lane; a Suppliers view in People; Pay workers lists supplier invoices too.</li>
+    <li><b>App:</b> <code>/portal/supplier</code>, one page plus a job room, in the worker portal's components.</li>
+    <li><b>Site terms:</b> already say Yaadly buys from the merchant (7 October). Nothing to change there; this is what makes the sentence true.</li>
+  </ul>
+
+  <h2>Decided by the founder, 15 October 2026</h2>
+  <ul>
+    <li><b>Supplier payment terms.</b> Bank transfer within 7 days of the site evidence, the same as the tradesperson. No supplier credit terms in the pilot.</li>
+    <li><b>Delivery address.</b> Collection by the tradesperson is the default. Delivery is the exception for heavy loads, and on those the address goes on the delivery note only, never on the portal.</li>
+    <li><b>Default lane.</b> Supplier lane for new jobs; worker buys is the exception, chosen job by job on the desk.</li>
+    <li><b>Shortfalls, price rises, returns.</b> A held release and a conversation, nothing docked automatically. A rise after confirmation is the supplier's to carry. Returns are a credit note against the same release. In the supplier agreement, not in code, until a real case has happened.</li>
+    <li><b>Family and friends.</b> Guardrail 4 applies. A supplier is supply.</li>
+  </ul>
+  <p>Recorded in the ideas ledger the same day.</p>
+
+  <h2>What does not change</h2>
+  <p>Release, match and pay are each a named person's click. The supplier never sees a client's name or contact. The tradesperson never handles materials money. Materials are passed to the client at the supplier's price with no fee on either side. The engine stays stateless and pricing stays a lookup; nothing here goes near either.</p>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// --------------------------------------------------------------- invented data
+// J$ throughout. Four jobs. Two on the lane that is live today (worker buys),
+// two on the supplier lane this prototype proposes. Same per-job figures the
+// desk already shows: quoted, paid by client, released, left.
+const JOBS = [
+  {id:'JOB-0217', title:'Bathroom retile and new shower tray', parish:'Portmore', client:'client card, YD-2026-0412', worker:'Devon C.', store:'lockable', storeWhere:'back of the carport, key with the aunt', quoted:118500, paidFor:118500, by:'yaadly', stages:3},
+  {id:'JOB-0221', title:'Roof repair, zinc and timber', parish:'Kingston 8', client:'client bank transfer, YD-2026-0419 parts 1 and 2', worker:'Kemar B.', store:'indoors', storeWhere:'front room', quoted:264000, paidFor:264000, by:'yaadly', stages:2},
+  {id:'JOB-0224', title:'Boundary wall render and paint', parish:'Portmore', client:'client card, YD-2026-0427', worker:'Shanice R.', store:'none_available', storeWhere:'', quoted:86000, paidFor:86000, by:'worker', stages:2},
+  {id:'JOB-0230', title:'Replace cracked septic outlet pipe', parish:'Kingston 10', client:'', worker:'Devon C.', store:'indoors', storeWhere:'utility room', quoted:41200, paidFor:0, by:'yaadly', stages:1},
+];
+const SUP = {id:'SUP-0001', name:'Portmore Builders Depot', parish:'Braeton, St Catherine'};
+
+// materials_releases rows. Supplier lane steps, in order:
+//   released (desk, named human) -> confirmed (supplier) -> ready (supplier)
+//   -> collected (supplier, code checked) -> evidenced (tradesperson files
+//   materials evidence in the nominated store; desk reads it) -> sent (desk,
+//   named human, bank transfer) with receipt_ref = supplier invoice number.
+// Worker lane rows carry only released / sent / receipt, exactly as live.
+let REL = [
+  {id:'rel-a1', job:'JOB-0217', stage:1, payee:'supplier', amount:84900, code:'YC-4821', released_at:'01 Oct', released_by:'desk', confirmed_at:'01 Oct', ready_at:'02 Oct', collected_at:'02 Oct', evidenced_at:'02 Oct 19:48', sent_at:'07 Oct', sent_ref:'WISE-88213', receipt_ref:'PBD-11822',
+   lines:[['Ceramic floor tile 300x300, box of 11',12,4650],['Tile adhesive 20kg',6,3200],['Grout, grey, 5kg',3,1850],['Shower tray 900x900 acrylic',1,28500]]},
+  {id:'rel-a2', job:'JOB-0217', stage:2, payee:'supplier', amount:33600, code:'YC-5107', released_at:'10 Oct', released_by:'desk', confirmed_at:'11 Oct', ready_at:'12 Oct', collected_at:'13 Oct', evidenced_at:'', sent_at:'', sent_ref:'', receipt_ref:'PBD-11867',
+   lines:[['Wall tile 250x400, box of 8',10,5100],['Tile adhesive 20kg',4,3200],['Silicone sealant, white',4,1350],['Mixer tap, chrome',1,14800]]},
+  {id:'rel-b1', job:'JOB-0221', stage:1, payee:'supplier', amount:132000, code:'YC-5190', released_at:'12 Oct', released_by:'desk', confirmed_at:'12 Oct', ready_at:'', collected_at:'', evidenced_at:'', sent_at:'', sent_ref:'', receipt_ref:'',
+   lines:[['Zinc sheet 26g, 12ft',22,4100],['Treated lumber 2x4x16',18,2950],['Roofing screws, box 500',3,6400],['Ridge cap 10ft',6,3300]]},
+  {id:'rel-c1', job:'JOB-0224', stage:1, payee:'worker', amount:44000, released_at:'09 Oct', released_by:'desk', sent_at:'09 Oct', sent_ref:'WISE-88301', receipt_ref:'HWH-2231'},
+  {id:'rel-c2', job:'JOB-0224', stage:2, payee:'worker', amount:42000, released_at:'14 Oct', released_by:'desk', sent_at:'', sent_ref:'', receipt_ref:''},
+];
+let THREADS = [
+  {job:'JOB-0230', about:'Price and availability before an order', msgs:[['yaadly','Before anything is ordered for JOB-0230, Kingston 10: price and stock today on 4in PVC sewer pipe 10ft, 6 lengths; 4in 45 degree bends, 4; solvent cement 500ml, 1. Ready for collection Friday?','14 Oct 12:20']]},
+  {job:'JOB-0217', about:'Stage 2 order', msgs:[['supplier','YPO for stage 2 collected 13 Oct by Devon, code checked. Invoice PBD-11867 attached. When does it pay?','13 Oct 11:02'],['yaadly','Once Devon has filed the materials evidence in the carport store and a person here has matched it. Then it goes on the Pay run, bank transfer, inside 7 days. You will see it move on your statement.','13 Oct 11:30']]},
+];
+
+const $=s=>document.querySelector(s);
+const J=n=>'J$'+Math.round(n).toLocaleString('en-JM');
+const total=r=>r.lines?r.lines.reduce((s,l)=>s+l[1]*l[2],0):r.amount;
+const stamp=()=>{const d=new Date();return d.getDate().toString().padStart(2,'0')+' Oct '+d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');};
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),3000);}
+const STORE={lockable:'lockable store',indoors:'indoors',none_available:'nowhere securable: drops sized to each stage'};
+
+document.querySelectorAll('.switch button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.switch button').forEach(x=>x.classList.toggle('on',x===b));['desk','portal','plan'].forEach(s=>$('#s-'+s).hidden=s!==b.dataset.s);window.scrollTo({top:0});});
+document.querySelectorAll('.pnav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.pnav button').forEach(x=>x.classList.toggle('on',x===b));['orders','statement','messages'].forEach(s=>$('#p-'+s).hidden=s!==b.dataset.p);});
+
+// supplier lane step helper
+const SSTEPS=[['released_at','Released to supplier','h'],['confirmed_at','Supplier confirmed',''],['ready_at','Ready to collect',''],['collected_at','Collected, code checked',''],['evidenced_at','Evidenced on site','h'],['sent_at','Paid to supplier','h']];
+function stageOf(r){let i=0;for(;i<SSTEPS.length;i++){if(!r[SSTEPS[i][0]])break;}return i;}
+function stepsHtml(r){const n=stageOf(r);return '<div class="steps">'+SSTEPS.map(([k,t,h],i)=>`<span class="stp ${h} ${r[k]?'done':(i===n?'now':'')}">${t}${r[k]?' · '+r[k]:''}</span>`).join('')+'</div>';}
+function supChip(r){
+  const n=stageOf(r);
+  if(n>=6) return `<span class="jichip paid"><span class="dot"></span>Paid, invoice ${r.receipt_ref}</span>`;
+  if(n===5) return `<span class="jichip ready"><span class="dot"></span>Evidenced on site, pay the supplier</span>`;
+  if(n===4) return `<span class="jichip raised"><span class="dot"></span>Collected, waiting on materials evidence from ${JOBS.find(j=>j.id===r.job).worker.split(' ')[0]}</span>`;
+  if(n===3) return `<span class="jichip raised"><span class="dot"></span>Ready at the depot, ${JOBS.find(j=>j.id===r.job).worker.split(' ')[0]} told to collect</span>`;
+  if(n===2) return `<span class="jichip raised"><span class="dot"></span>Supplier confirmed, preparing</span>`;
+  return `<span class="jichip"><span class="dot"></span>Released, waiting on supplier to confirm</span>`;
+}
+
+// --------------------------------------------------------------- 1. the desk
+function renderDesk(){
+  const rows=JOBS.map(job=>{
+    const done=REL.filter(r=>r.job===job.id);
+    const soFar=done.reduce((s,r)=>s+r.amount,0);
+    const left=Math.max(job.quoted-soFar,0);
+    const canGo=Math.max(Math.min(job.quoted,job.paidFor)-soFar,0);
+    const storeOk=!!job.store; const full=left<=0;
+    const sup=job.by==='yaadly';
+    const status = full
+      ? (done.every(r=>r.sent_at&&r.receipt_ref)?`<span class="jichip paid"><span class="dot"></span>Fully released and receipted</span>`:`<span class="jichip ready"><span class="dot"></span>Released, ${done.filter(r=>!r.sent_at).length} not yet ${sup?'paid to the supplier':'sent to the worker'}</span>`)
+      : (!storeOk||canGo<=0)
+        ? `<span class="jichip"><span class="dot"></span>${[canGo<=0&&job.paidFor<=0?'Waiting on the client: the bill is not paid yet':'',!storeOk?'Waiting on the client: where materials are kept':'',canGo<=0&&job.paidFor>0?'Client has paid for what is released so far; next part not yet paid':''].filter(Boolean).join(' · ')}</span>`
+        : `<span class="jichip ready"><span class="dot"></span>Ready to ${sup?'order from the supplier':'release'}</span>`;
+    const history=done.map(r=>{
+      const head=`${J(r.amount)} released · stage ${r.stage} · ${r.released_at}`;
+      if(r.payee==='worker'){
+        const pay=r.sent_at?`sent by bank transfer, ref ${r.sent_ref}, ${r.sent_at}`:`<b>not yet sent.</b> Call-back first (Pay workers), then pay it from Wise, then <input placeholder="transfer ref, optional" style="width:150px"> <button class="btn" data-act="sent" data-rel="${r.id}">Mark as sent</button>`;
+        const rec=!r.sent_at?'':r.receipt_ref?` · receipt ${r.receipt_ref}`:` · <b>receipt to come</b> <input placeholder="receipt ref" style="width:110px" data-rref="${r.id}"> <button class="btn g" data-act="receipt" data-rel="${r.id}">Record receipt</button>`;
+        return `${head} <span class="lane">worker buys</span><br>&nbsp;&nbsp;${pay}${rec}`;
+      }
+      const n=stageOf(r);
+      const act = n===5
+        ? `<br>&nbsp;&nbsp;Invoice ${r.receipt_ref||'<b>not attached by supplier yet</b>'} · call-back first (Pay workers and suppliers), pay from Wise, then <input placeholder="transfer ref, optional" style="width:150px" data-sref="${r.id}"> <button class="btn" data-act="sent" data-rel="${r.id}">Mark as paid to supplier</button>`
+        : n===4 ? `<br>&nbsp;&nbsp;Waiting on the tradesperson's materials evidence in the nominated store. <button class="btn g" data-act="evidence" data-rel="${r.id}" title="Prototype only: in the real build this is filed by the tradesperson from the job room">Simulate evidence filed</button>`
+        : n>=6 ? `<br>&nbsp;&nbsp;paid by bank transfer, ref ${r.sent_ref}, ${r.sent_at} · supplier invoice ${r.receipt_ref}` : '';
+      return `${head} <span class="lane sup">${SUP.name} · code ${r.code}</span>${stepsHtml(r)}${act}`;
+    }).join('<br>');
+    const form=full?'':`<div class="row" style="margin-top:8px">
+      <div><label>Amount J$</label><input type="number" value="${canGo||left}" style="width:110px" data-amt="${job.id}"></div>
+      <div><label>Stage</label><input type="number" placeholder="opt." style="width:60px" data-stg="${job.id}"></div>
+      ${sup?`<div><label>Supplier</label><select style="width:190px"><option>${SUP.name}</option></select></div>`:`<div><label>Receipt ref, if you have one</label><input placeholder="usually comes later" style="width:140px"></div>`}
+      <div><label>Note</label><input placeholder="optional" style="width:140px"></div></div>`;
+    const blocked=!storeOk?'The database will refuse this until the client has said where materials are kept.':canGo<=0?'The database will refuse this until the bill carrying the materials is marked paid.':'';
+    const action=full?'':`<button class="btn" data-act="release" data-job="${job.id}" ${blocked?`disabled title="${blocked}"`:''}>${sup?'Order from supplier':'Release materials money'}</button>`;
+    return `<tr>
+      <td><div class="jistagename">${job.id} <span class="lane ${sup?'sup':''}">${sup?'Yaadly buys from supplier':'worker buys'}</span></div><div class="jistagepct">${job.title}</div><div class="jicond" style="margin-top:6px">${history}</div></td>
+      <td><div class="jicond">${job.worker} · ${job.parish}<br>Store: ${STORE[job.store]||'not nominated'}${job.storeWhere?', '+job.storeWhere:''}<br>Paid by: ${job.client||'<b>nothing paid yet</b>'}</div>${form}</td>
+      <td class="num"><span class="jiamt">${J(job.quoted)}</span><div class="jistagepct">${J(Math.min(job.paidFor,job.quoted))} paid by client · ${J(soFar)} released · ${J(left)} left</div></td>
+      <td>${status}</td><td>${action}</td></tr>`;
+  });
+  $('#mrBody').innerHTML=`<table class="jitable"><thead><tr><th>Job</th><th>Who &amp; release</th><th class="num">Materials line</th><th>Status</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table>
+  <div class="alert"><b>The job on the worker lane (JOB-0224) is exactly what the desk does today.</b> Nothing about it changes. The two supplier-lane jobs show the same figures and the same first button; what differs is who the release is made out to and the three supplier steps that run between release and payment.</div>`;
+  $('#mrBody').querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>deskAct(b));
+}
+function deskAct(b){
+  const act=b.dataset.act;
+  if(act==='release'){const job=JOBS.find(j=>j.id===b.dataset.job);const amt=Number($(`[data-amt="${job.id}"]`).value||0);const stg=Number($(`[data-stg="${job.id}"]`).value||0)||(REL.filter(r=>r.job===job.id).length+1);
+    const soFar=REL.filter(r=>r.job===job.id).reduce((s,r)=>s+r.amount,0);
+    if(!(amt>0)){toast('Enter the amount being released.');return;}
+    if(soFar+amt>Math.min(job.quoted,job.paidFor)){toast('Refused: that is more than the client has paid for. The database says no, so the button does too.');return;}
+    const sup=job.by==='yaadly';
+    REL.push({id:'rel-'+Date.now(),job:job.id,stage:stg,payee:sup?'supplier':'worker',amount:amt,code:'YC-'+(5200+REL.length),released_at:stamp(),released_by:'desk',confirmed_at:'',ready_at:'',collected_at:'',evidenced_at:'',sent_at:'',sent_ref:'',receipt_ref:'',lines:sup?[['Order lines typed at release, from the accepted quote',1,amt]]:undefined});
+    toast(sup?`Released to ${SUP.name}, stamped against you. They see it in their portal now and are asked to confirm. No money has moved.`:'Released, stamped against you. Now pay it from Wise and press Mark as sent.');}
+  else if(act==='sent'){const r=REL.find(x=>x.id===b.dataset.rel);r.sent_at=stamp();r.sent_ref=(($(`[data-sref="${r.id}"]`)||{}).value||'').trim()||'WISE-'+(88400+REL.indexOf(r));toast(r.payee==='supplier'?`Recorded as paid to ${SUP.name}. They see it on their statement. ${r.worker?'':''}`:'Recorded as sent. The worker gets a WhatsApp.');}
+  else if(act==='receipt'){const r=REL.find(x=>x.id===b.dataset.rel);const v=(($(`[data-rref="${r.id}"]`)||{}).value||'').trim();if(!v){toast('Type the receipt ref first.');return;}r.receipt_ref=v;toast('Receipt recorded against the release.');}
+  else if(act==='evidence'){const r=REL.find(x=>x.id===b.dataset.rel);r.evidenced_at=stamp();toast('Materials evidence filed in the nominated store (simulated). The release is now ready for a named person to pay.');}
+  renderAll();
+}
+
+// ------------------------------------------------------------- 2. the portal
+let openRel=null;
+function renderPortal(){
+  const mine=REL.filter(r=>r.payee==='supplier').sort((a,b)=>stageOf(a)-stageOf(b));
+  const label=r=>{const n=stageOf(r);return n>=6?'Paid':n===5?'Evidenced on site, payment next':n===4?'Collected, waiting on site evidence':n===3?'Ready, collector told':n===2?'Confirmed, make it ready':'Confirm price and stock';};
+  const tone=r=>{const n=stageOf(r);return n>=6?'green':n<=1||n===2?'gold':'';};
+  $('#p-list').innerHTML=mine.map(r=>{const j=JOBS.find(x=>x.id===r.job);return `<div class="jobrow" data-open="${r.id}"><div><div class="eyebrow ${stageOf(r)<=2?'gold':''}">${label(r)}</div><div class="jt">${j.title}</div><div class="js"><span class="mono" style="color:var(--tealb)">${j.id}</span> · stage ${r.stage} of ${j.stages} · ${j.parish} · collector ${j.worker.split(' ')[0]}</div></div><div class="amt"><b>${J(r.amount)}</b><span>${r.receipt_ref?'your invoice '+r.receipt_ref:'no invoice attached'}</span></div></div>${openRel===r.id?roomHtml(r,j):''}`;}).join('')||'<div class="note">No orders yet.</div>';
+  $('#p-list').querAll=null;
+  $('#p-list').querySelectorAll('[data-open]').forEach(d=>d.onclick=()=>{openRel=openRel===d.dataset.open?null:d.dataset.open;renderPortal();});
+  $('#p-list').querySelectorAll('[data-pact]').forEach(b=>b.onclick=e=>{e.stopPropagation();portalAct(b);});
+  const focus=mine.find(r=>stageOf(r)<=2);
+  $('#p-focus').innerHTML=focus?`<div class="jt" style="font-weight:600">${JOBS.find(j=>j.id===focus.job).title}</div><div class="js" style="color:var(--mute);font-size:12.5px">${label(focus)} · ${J(focus.amount)}</div><button class="btn primary" style="margin-top:10px" data-focus="${focus.id}">Open it</button>`:'<div class="note">Nothing waiting on you.</div>';
+  const fb=$('#p-focus [data-focus]');if(fb)fb.onclick=()=>{openRel=fb.dataset.focus;renderPortal();document.querySelector(`[data-open="${openRel}"]`).scrollIntoView({behavior:'smooth',block:'center'});};
+  const owed=mine.filter(r=>r.collected_at&&!r.sent_at).reduce((s,r)=>s+r.amount,0), paid=mine.filter(r=>r.sent_at).reduce((s,r)=>s+r.amount,0);
+  $('#p-tiles').innerHTML=`<div class="tile gold"><div class="n">${mine.filter(r=>stageOf(r)<=2).length}</div><div class="l">waiting on you</div></div><div class="tile"><div class="n">${mine.filter(r=>stageOf(r)===3||stageOf(r)===4).length}</div><div class="l">ready or collected</div></div><div class="tile"><div class="n" style="font-size:18px;padding-top:4px">${J(owed)}</div><div class="l">owed to you</div></div><div class="tile green"><div class="n" style="font-size:18px;padding-top:4px">${J(paid)}</div><div class="l">paid to you</div></div>`;
+  // statement
+  const rows=[];let inv=0,pd=0;
+  mine.forEach(r=>{if(r.receipt_ref&&r.collected_at){inv+=r.amount;rows.push([r.collected_at,'Your invoice against the release',r.job+' · stage '+r.stage,r.receipt_ref,r.amount,0,'Depot office']);}if(r.sent_at){pd+=r.amount;rows.push([r.sent_at,'Paid to you by bank transfer, ref '+r.sent_ref,r.job+' · stage '+r.stage,r.receipt_ref,0,r.amount,'Yaadly']);}});
+  $('#p-stmt').innerHTML=rows.map(x=>`<tr><td style="padding:7px 8px;border-bottom:1px solid var(--line)" class="mono">${x[0]}</td><td style="padding:7px 8px;border-bottom:1px solid var(--line)">${x[1]}</td><td style="padding:7px 8px;border-bottom:1px solid var(--line)" class="mono">${x[2]}</td><td style="padding:7px 8px;border-bottom:1px solid var(--line)" class="mono">${x[3]}</td><td style="padding:7px 8px;border-bottom:1px solid var(--line);text-align:right" class="mono">${x[4]?J(x[4]):''}</td><td style="padding:7px 8px;border-bottom:1px solid var(--line);text-align:right" class="mono">${x[5]?J(x[5]):''}</td><td style="padding:7px 8px;border-bottom:1px solid var(--line)" class="who">${x[6]}</td></tr>`).join('')||'<tr><td colspan="7" class="note" style="padding:12px">No entries yet.</td></tr>';
+  $('#p-stmt-tiles').innerHTML=`<div class="tile"><div class="n" style="font-size:18px;padding-top:4px">${J(inv)}</div><div class="l">invoiced to Yaadly</div></div><div class="tile green"><div class="n" style="font-size:18px;padding-top:4px">${J(pd)}</div><div class="l">paid, balance ${J(inv-pd)}</div></div>`;
+  // messages
+  $('#p-threads').innerHTML=THREADS.map((t,i)=>{const j=JOBS.find(x=>x.id===t.job);return `<div class="card"><div class="eyebrow">${t.job} · ${j.parish}</div><div class="jt" style="font-weight:600;margin-top:2px">${j.title}</div><div class="js" style="color:var(--mute);font-size:12.5px">${t.about}</div><div class="msgs">${t.msgs.map(m=>`<div class="msg ${m[0]==='supplier'?'me':''}">${m[1]}<span class="m">${m[0]==='supplier'?'Depot office':'Yaadly'} · ${m[2]}</span></div>`).join('')}</div><div class="reply"><input placeholder="Reply to Yaadly" data-ti="${i}"><button class="btn primary" data-tr="${i}">Send</button></div></div>`;}).join('');
+  $('#p-threads').querySelectorAll('[data-tr]').forEach(b=>b.onclick=()=>{const i=b.dataset.tr;const inp=$(`[data-ti="${i}"]`);const v=inp.value.trim();if(!v)return;THREADS[i].msgs.push(['supplier',v,stamp()]);renderPortal();toast('Sent. It lands in Conversations on the desk; a person replies from there. A quote in a message places no order.');});
+}
+function roomHtml(r,j){
+  const n=stageOf(r);
+  const next = n<=1?`<div class="next"><div class="eyebrow gold">Needs you first</div>Confirm the price and stock on these lines. A confirmed order is what the client is told they are getting, at your price with nothing added.<div class="row" style="margin-top:10px"><button class="btn primary" data-pact="confirm" data-rel="${r.id}">Confirm price and stock</button><button class="btn" data-pact="ask" data-rel="${r.id}">Something has changed</button></div></div>`
+    : n===2?`<div class="next"><div class="eyebrow gold">Needs you first</div>Mark it ready when the goods are set aside. ${j.worker.split(' ')[0]} is then told to come with the code.<div class="row" style="margin-top:10px"><button class="btn primary" data-pact="ready" data-rel="${r.id}">Mark ready for collection</button></div></div>`
+    : n===3?`<div class="next"><div class="eyebrow gold">At collection</div>Release the goods only to ${j.worker.split(' ')[0]}, and only against the code they give you. No code, no goods.<div class="row" style="margin-top:10px"><div><label>Code given by the collector</label><input placeholder="YC-...." data-code="${r.id}" style="width:120px"></div><button class="btn primary" data-pact="collected" data-rel="${r.id}">Release goods</button></div></div>`
+    : n===4?`<div class="next quiet"><div class="eyebrow">Collected</div>Yaadly is waiting for ${j.worker.split(' ')[0]} to file the site evidence. Attach your invoice number now so it is on the statement when payment is recorded.<div class="row" style="margin-top:10px"><div><label>Your invoice number</label><input value="${r.receipt_ref}" placeholder="e.g. PBD-11899" data-inv="${r.id}" style="width:150px"></div><button class="btn primary" data-pact="invoice" data-rel="${r.id}">Attach</button></div></div>`
+    : n===5?`<div class="next quiet"><div class="eyebrow">Evidenced on site</div>The goods have been evidenced in the client's store. Payment is the next step and it is Yaadly's, by bank transfer${r.receipt_ref?', against invoice '+r.receipt_ref:'. <b>Attach your invoice number</b> or payment waits'}.</div>`
+    : `<div class="next quiet"><div class="eyebrow">Paid</div>Bank transfer ${r.sent_at}, ref ${r.sent_ref}, against your invoice ${r.receipt_ref}.</div>`;
+  return `<div class="room" onclick="event.stopPropagation()">
+    ${stepsHtml(r)}
+    <table><thead><tr><th>Line</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Total</th></tr></thead><tbody>${(r.lines||[]).map(l=>`<tr><td>${l[0]}</td><td class="num">${l[1]}</td><td class="num">${J(l[2])}</td><td class="num">${J(l[1]*l[2])}</td></tr>`).join('')}<tr><td colspan="3" style="text-align:right;color:var(--mute)">Order total, your price, no mark-up to the client</td><td class="num"><b>${J(total(r))}</b></td></tr></tbody></table>
+    <dl class="kv"><dt>Collector</dt><dd>${j.worker.split(' ')[0]}, Yaadly tradesperson. First name only.</dd><dt>Collection code</dt><dd>Held by the collector, given to you at the counter. Not shown here.</dd><dt>Goods go to</dt><dd>The client's nominated store, ${STORE[j.store]}${j.storeWhere?', '+j.storeWhere:''}. The collector films them there; that is what Yaadly matches.</dd><dt>Released by</dt><dd>Yaadly, ${r.released_at}. A named person on the desk; the name is held on Yaadly's record.</dd></dl>
+    ${next}</div>`;
+}
+function portalAct(b){
+  const r=REL.find(x=>x.id===b.dataset.rel);const act=b.dataset.pact;
+  if(act==='confirm'){r.confirmed_at=stamp();toast('Confirmed. The desk sees it, and the client is told these are the goods at this price.');}
+  else if(act==='ready'){r.ready_at=stamp();toast('Marked ready. The collector is told to come with the code.');}
+  else if(act==='collected'){const v=(($(`[data-code="${r.id}"]`)||{}).value||'').trim().toUpperCase();if(v!==r.code){toast('That code does not match this order. Do not release the goods. (Prototype hint: the desk shows the code on the release.)');return;}r.collected_at=stamp();toast('Released to the collector. Yaadly now waits for the site evidence.');}
+  else if(act==='invoice'){const v=(($(`[data-inv="${r.id}"]`)||{}).value||'').trim();if(!v){toast('Type the invoice number first.');return;}r.receipt_ref=v;toast('Invoice '+v+' attached. It is on your statement and on the release at the desk.');}
+  else if(act==='ask'){THREADS.unshift({job:r.job,about:'Stage '+r.stage+' order, something has changed',msgs:[['supplier','About the stage '+r.stage+' order on '+r.job+': ','']]});document.querySelector('[data-p="messages"]').click();toast('A thread is opened on this job. Finish the message and send.');THREADS[0].msgs[0][2]=stamp();}
+  renderAll();
+}
+function renderAll(){renderDesk();renderPortal();}
+renderAll();
+</script>
+</body>
+</html>

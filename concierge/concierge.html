@@ -1425,10 +1425,26 @@ html[data-theme="light"] .theme-btn .knob{background:linear-gradient(135deg,#4B2
 </section>
 
 <section class="view" data-view="materials">
-  <h1 class="vh">Materials tranches</h1>
-  <p class="vsub">The materials line of an accepted quote, paid to the worker so they can buy the goods, once the client has paid for it, and never fee'd on either side. Releasing records the decision and moves no money: you then pay the worker from your business bank app and press Mark as sent, which is when the worker gets a WhatsApp. Yaadly stores no worker bank details. The receipt comes back afterwards and is recorded here against the release it accounts for. The database refuses a tranche until the client has said where materials are kept (Materials store, on the jobs view), and refuses any total above the quoted materials line. Every release is stamped against you.</p>
+  <h1 class="vh">Materials</h1>
+  <p class="vsub"><b>Two lanes since 15 October 2026, chosen per release in the Pay to box.</b> Supplier lane (the default for new jobs, founder decision): Yaadly orders from a hardware supplier on account; the supplier confirms, the tradesperson collects against a code, the tradesperson files the materials evidence in the nominated store, and only then does Mark as paid appear here. The supplier attaches their own invoice number from their portal. Worker lane: the materials line of an accepted quote, paid to the worker so they can buy the goods, once the client has paid for it, and never fee'd on either side. Releasing records the decision and moves no money: you then pay the worker from your business bank app and press Mark as sent, which is when the worker gets a WhatsApp. Yaadly stores no worker bank details. The receipt comes back afterwards and is recorded here against the release it accounts for. The database refuses a tranche until the client has said where materials are kept (Materials store, on the jobs view), and refuses any total above the quoted materials line. Every release is stamped against you.</p>
   <div id="mrMsg"></div>
   <div id="mrBody"><div class="empty"><b>Reading booked jobs&hellip;</b></div></div>
+</section>
+
+<!-- ============================================ SUPPLIERS -->
+<section class="view" data-view="suppliers">
+  <h1 class="vh">Suppliers</h1>
+  <p class="vsub">Hardware merchants Yaadly buys materials from on account (20261015120000). A supplier signs in to app.yaadly.co.uk/portal/supplier with the email recorded here and sees only the orders made out to them: job reference, parish, stage, the lines, the collector's first name. Never a client's name or contact. Orders are placed from the Materials view, one named person's click, under the same two gates as a worker tranche. Guardrail 4 applies: no family or friends in the supply chain, and a supplier is supply.</p>
+  <div id="spMsg"></div>
+  <div class="row" style="gap:8px;flex-wrap:wrap;margin:14px 0 6px">
+    <div><label>Business name</label><input type="text" id="spName" placeholder="e.g. a hardware depot" style="width:220px"></div>
+    <div><label>Parish</label><input type="text" id="spParish" placeholder="St Catherine" style="width:130px"></div>
+    <div><label>Contact name</label><input type="text" id="spContact" style="width:150px"></div>
+    <div><label>Contact email (their portal sign-in)</label><input type="email" id="spEmail" style="width:220px"></div>
+    <div><label>Phone</label><input type="text" id="spPhone" style="width:140px"></div>
+    <div><button class="btn" id="spAdd">Add supplier</button></div>
+  </div>
+  <div id="spBody"><div class="empty"><b>Reading suppliers&hellip;</b></div></div>
 </section>
 
 
@@ -2546,6 +2562,8 @@ const VIEWS = [
       {h:"Joined", f:r => mute_(day_(r.created_at))},
     ]},
 
+  { k:"suppliers", g:"People", label:"Suppliers", icon:"home", hand:true },
+
   { k:"reviews", g:"People", label:"Reviews", icon:"star",
     title:"Reviews", table:"reviews",
     sub:"Both directions, both tied to a completed job. You cannot delete one. You can hold one that breaks the rules and you must say why, and that note is kept.",
@@ -2691,7 +2709,7 @@ const VIEWS = [
 
   { k:"invoices", g:"Documents & money", label:"Invoices", icon:"bill", hand:true },
   { k:"workerpay", g:"Documents & money", label:"Pay workers", icon:"card", hand:true },
-  { k:"materials", g:"Documents & money", label:"Materials tranches", icon:"bill", hand:true },
+  { k:"materials", g:"Documents & money", label:"Materials", icon:"bill", hand:true },
   { k:"sketch",   g:"Documents & money", label:"Sketch packs", icon:"cam", hand:true },
 
   { k:"docs", g:"Documents & money", label:"Signatures", icon:"pen",
@@ -7252,7 +7270,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawe
 // does not re-read the database.
 const OVLANE = { you:true, wrk:false, cli:false, non:false, clr:false };
 
-const BESPOKE = { over: loadOverview, day: loadOverview, stats: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth, materials: loadMaterials, workerpay: loadWorkerPay };
+const BESPOKE = { over: loadOverview, day: loadOverview, stats: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth, materials: loadMaterials, workerpay: loadWorkerPay, suppliers: loadSuppliers };
 let currentView = "over";
 
 function go(v){
@@ -10534,6 +10552,42 @@ const jmdFmt = (n) => "J$" + Math.round(n).toLocaleString("en-JM");
 // keepMsg: true when a button on this view redraws it, so the confirmation
 // it just wrote survives the redraw. It used to be wiped straight away, so a
 // release or a receipt went through with nothing on screen to say so.
+// ------------------------------------------------- suppliers
+// 20261015120000. One row per hardware merchant. Adding one is add_supplier(),
+// admin only, which gives it the YSA-0000 account reference. The supplier's
+// portal binds itself to this row on their first sign-in with that email.
+async function loadSuppliers(keepMsg){
+  const host = $("spBody");
+  if (keepMsg !== true) say("spMsg", "", "");
+  const { data, error } = await sb.from("suppliers").select("*").order("created_at", { ascending: false });
+  if (error) { host.innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>Could not read suppliers</b><p>${esc(error.message)}</p></div></div>`; return; }
+  host.innerHTML = (data || []).length
+    ? `<table class="jitable"><thead><tr><th>Supplier</th><th>Contact</th><th>Account</th><th>Portal</th><th>Added</th></tr></thead><tbody>` +
+      data.map((r) => `<tr>
+        <td><div class="jistagename">${esc(r.name)}</div><div class="jistagepct">${esc(r.parish || "")}</div></td>
+        <td><div class="jicond">${esc(r.contact_name || "")}<br>${esc(r.contact_email)}<br>${esc(r.contact_phone || "")}</div></td>
+        <td><span class="mono">${esc(r.account_ref)}</span></td>
+        <td>${r.supplier_user ? chip_("ok","signed in") : chip_("mute","not yet signed in")}${r.is_active ? "" : " " + chip_("crit","inactive")}</td>
+        <td>${mute_(day_(r.created_at))}</td></tr>`).join("") + `</tbody></table>`
+    : `<div class="empty"><b>No suppliers yet</b>Add the first one above. They sign in at app.yaadly.co.uk/portal/supplier with the email you record.</div>`;
+  const add = $("spAdd");
+  add.onclick = async () => {
+    const v = (id) => ($(id).value || "").trim();
+    if (v("spName").length < 2 || !v("spEmail")) { say("spMsg", "err", "A business name and a contact email are the minimum."); return; }
+    add.disabled = true;
+    try {
+      const { data: row, error: e } = await sb.rpc("add_supplier", { p_name: v("spName"), p_parish: v("spParish"), p_contact_name: v("spContact"), p_contact_email: v("spEmail"), p_contact_phone: v("spPhone"), p_notes: "" });
+      if (e) throw e;
+      say("spMsg", "ok", `Added ${row.name}, account ${row.account_ref}. Tell them to sign in at app.yaadly.co.uk/portal/sign-in with ${row.contact_email}.`);
+      ["spName","spParish","spContact","spEmail","spPhone"].forEach((id) => { $(id).value = ""; });
+    } catch (e) {
+      say("spMsg", "err", /Only the desk/i.test(e.message) ? "This account is not on the Yaadly admin list." : e.message);
+    }
+    add.disabled = false;
+    await loadSuppliers(true);
+  };
+}
+
 async function loadMaterials(keepMsg){
   const host = $("mrBody");
   host.innerHTML = `<div class="empty"><b>Reading booked jobs with a materials line&hellip;</b></div>`;
@@ -10562,11 +10616,18 @@ async function loadMaterials(keepMsg){
   // Unpaid bills are read too, for the reason in the chip below: "paid" and
   // "on a bill at all" are different questions and only one of them is the
   // client's to answer. Void bills are left out of both, they were cancelled.
-  const [{ data: quotes }, { data: rels }, { data: invs }] = await Promise.all([
+  const [{ data: quotes }, { data: rels }, { data: invs }, { data: sups }] = await Promise.all([
     sb.from("job_quotes").select("job_id,worker_name,materials_jmd").eq("status", "accepted").in("job_id", jobIds),
-    sb.from("materials_releases").select("id,job_id,amount_jmd,released_at,receipt_ref,receipt_at,stage,sent_at,sent_by,sent_method,sent_ref").in("job_id", jobIds).not("released_at", "is", null).order("released_at", { ascending: true }),
+    sb.from("materials_releases").select("id,job_id,amount_jmd,released_at,receipt_ref,receipt_at,stage,sent_at,sent_by,sent_method,sent_ref,payee,supplier_id,collection_code,fulfilment,confirmed_at,ready_at,collected_at").in("job_id", jobIds).not("released_at", "is", null).order("released_at", { ascending: true }),
     sb.from("invoices").select("job_id,currency,status,sent_at,invoice_lines(description,line_total_pence)").in("job_id", jobIds).eq("payable_to", "yaadly").neq("status", "void"),
+    sb.from("suppliers").select("id,name,parish").eq("is_active", true).order("name"),
   ]);
+  const supById = new Map((sups || []).map((x) => [x.id, x]));
+  // Materials evidence on these jobs: the match between the goods and the
+  // site. Read, never acted on: it only decides whether Mark as paid shows
+  // on a supplier release. The gate itself stays a person's click.
+  const { data: matEv } = await sb.from("evidence").select("job_id,stage,created_at").in("job_id", jobIds).eq("kind", "materials");
+  const evidencedAfter = (r) => (matEv || []).some((e) => e.job_id === r.job_id && (r.stage == null || e.stage === r.stage) && e.created_at >= (r.collected_at || r.released_at));
   const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
   const relByJob = new Map();
   for (const r of rels || []) { const a = relByJob.get(r.job_id) || []; a.push(r); relByJob.set(r.job_id, a); }
@@ -10643,6 +10704,23 @@ async function loadMaterials(keepMsg){
           const ref = String(r.receipt_ref || "").trim();
           const rid = esc(String(r.id));
           const head = `${jmdFmt(r.amount_jmd)} released${r.stage != null ? " &middot; stage " + esc(String(r.stage)) : ""} &middot; ${esc(String(r.released_at || "").slice(0, 10))}`;
+          // Supplier lane (20261015120000): the supplier moves the goods in
+          // their portal; this row only reads their stamps. Mark as paid is
+          // offered once the materials evidence is on the job, and the
+          // supplier's invoice number is theirs to attach, not ours to type.
+          if (r.payee === "supplier") {
+            const sp = supById.get(r.supplier_id) || { name: "supplier" };
+            const d = (ts) => ts ? esc(String(ts).slice(0, 10)) : "";
+            const step = (lab, ts) => `<span class="jichip ${ts ? "raised" : "wait"}" style="margin-right:4px"><span class="dot"></span>${lab}${ts ? " " + d(ts) : ""}</span>`;
+            const ev = evidencedAfter(r);
+            const stepsHtml = step("confirmed", r.confirmed_at) + step(r.fulfilment === "delivery" ? "out for delivery" : "ready", r.ready_at) + step(r.fulfilment === "delivery" ? "delivered" : "collected, code checked", r.collected_at) + step("evidenced on site", ev ? true : null) + step("paid", r.sent_at);
+            const payHtml = r.sent_at
+              ? `paid by bank transfer${String(r.sent_ref || "").trim() ? ", ref " + esc(r.sent_ref) : ""}, ${d(r.sent_at)}, ${esc(r.sent_by || "")} &middot; supplier invoice ${esc(ref || "not attached")}`
+              : !r.collected_at ? `with the supplier, not yet ${r.fulfilment === "delivery" ? "delivered" : "collected"}`
+              : !ev ? `collected, <b>waiting on the tradesperson's materials evidence</b> in the nominated store before this can be paid`
+              : `<b>evidenced on site, not yet paid.</b> Supplier invoice ${ref ? esc(ref) : "<b>not attached yet</b>"}. Call-back first (Pay workers), pay it from Wise, then <input type="text" placeholder="transfer ref, optional" data-mr-sref="${rid}" style="width:150px"> <button class="btn" data-sent-rel="${rid}" data-sent-amt="${esc(String(r.amount_jmd))}" data-sent-sup="1">Mark as paid to supplier</button>`;
+            return `${head} &middot; ordered from <b>${esc(sp.name)}</b> &middot; collection code <span class="mono">${esc(r.collection_code || "")}</span> (give it to the tradesperson, never the supplier)<br>&nbsp;&nbsp;${stepsHtml}<br>&nbsp;&nbsp;${payHtml}`;
+          }
           // Released is a decision; sent is the money leaving. Yaadly holds no
           // worker bank details, so the transfer happens in the bank's own app
           // and this only records that it did (mark_materials_sent).
@@ -10660,6 +10738,7 @@ async function loadMaterials(keepMsg){
 
     const form = full ? "" : `
       <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+        <div><label>Pay to</label><select data-mr-payee="${id}" style="width:210px">${(sups || []).map((x) => `<option value="${esc(x.id)}">${esc(x.name)} (supplier)</option>`).join("")}<option value="worker">The worker buys</option></select></div>
         <div><label>Amount J$</label><input type="number" min="1" step="1" value="${canGo || left}" data-mr-amount="${id}" style="width:120px"></div>
         <div><label>Receipt ref, if you have one</label><input type="text" placeholder="usually comes later" data-mr-receipt="${id}" style="width:150px"></div>
         <div><label>Stage</label><input type="number" min="1" step="1" placeholder="opt." data-mr-stage="${id}" style="width:70px"></div>
@@ -10699,10 +10778,24 @@ async function loadMaterials(keepMsg){
       const receipt = ((g("receipt") || {}).value || "").trim();
       const stageV = ((g("stage") || {}).value || "").trim();
       const note = ((g("note") || {}).value || "").trim();
+      const payee = ((g("payee") || {}).value || "worker");
       if (!(amount > 0)) { say("mrMsg", "err", "Enter the amount being released."); return; }
       btn.disabled = true;
       say("mrMsg", "ok", `Releasing ${jmdFmt(amount)} on ${job}…`);
       try {
+        if (payee !== "worker") {
+          // Supplier lane: same gates, same admin check, run inside
+          // release_materials_to_supplier (20261015120000).
+          const { data: relId, error: spErr } = await sb.rpc("release_materials_to_supplier", {
+            p_job: job, p_amount_jmd: amount, p_supplier: payee,
+            p_stage: stageV ? Number(stageV) : null, p_lines: [], p_fulfilment: "collection", p_note: note,
+          });
+          if (spErr) throw spErr;
+          const sp = supById.get(payee) || { name: "the supplier" };
+          say("mrMsg", "ok", `Ordered ${jmdFmt(amount)} on ${job} from ${sp.name}. They see it in their portal now and are asked to confirm. The collection code is on the row: give it to the tradesperson. No money has moved.`);
+          await loadMaterials(true);
+          return;
+        }
         const { data, error } = await sb.rpc("release_materials_tranche", {
           p_job: job, p_amount_jmd: amount, p_receipt_ref: receipt,
           p_stage: stageV ? Number(stageV) : null, p_note: note,
@@ -10729,6 +10822,9 @@ async function loadMaterials(keepMsg){
       const rel = btn.dataset.sentRel;
       const ref = ((host.querySelector(`[data-mr-sref="${rel}"]`) || {}).value || "").trim();
       const amt = jmdFmt(Number(btn.dataset.sentAmt || 0));
+      if (btn.dataset.sentSup) {
+        if (!confirm(`Mark ${amt} as paid to the supplier by bank transfer${ref ? ", reference " + ref : ""}?\n\nStamped against you, once, never changed. No WhatsApp is sent: the supplier sees it on their statement. Only press it once the transfer has left Wise.`)) return;
+      } else
       if (!confirm(`Mark ${amt} as sent to the worker by bank transfer${ref ? ", reference " + ref : ""}?\n\nThis sends them a WhatsApp saying it has been sent, and it cannot be changed afterwards. Only press it once the transfer has gone from your bank.`)) return;
       btn.disabled = true;
       try {
