@@ -84,6 +84,11 @@ h1.display em {
 }
 .hero-sub { margin-top:24px; font-size:19px; line-height:1.62; color:var(--mute); max-width:56ch; }
 .hero-sub b { color:var(--ink); font-weight:600; }
+.hero-list { list-style:disc; padding-left:22px; display:flex; flex-direction:column; gap:6px; }
+.hero-list li::marker { font-size:1.4em; }
+.hero-list li:nth-child(1)::marker { color:var(--purple); }
+.hero-list li:nth-child(2)::marker { color:var(--gold); }
+.hero-list li:nth-child(3)::marker { color:#14B8A6; }
 .hero-ctas { display:flex; gap:14px; margin-top:32px; flex-wrap:wrap; }
 .btn {
   display:inline-flex; align-items:center; border-radius:100px;
@@ -296,12 +301,16 @@ footer { border-top:1px solid var(--line); padding:36px 0; margin-top:56px; }
 <header class="hero">
   <span class="eyebrow"><i class="dot"></i>Yaadly for business</span>
   <h1 class="display">Your company answers for property <em>it cannot stand in front of.</em></h1>
-  <p class="hero-sub">If your business carries property in Jamaica, somebody qualified has to check the work. <b>The person who assesses is never the person who did it</b>, and both are named on the report. You buy the service from Yaadly at one agreed price. Yaadly supplies the checklist, the visit and the report.</p>
+  <ul class="hero-sub hero-list">
+    <li>A qualified person checks the work on your Jamaican property.</li>
+    <li><b>The checker is never the person who did the work.</b> Both are named on the report.</li>
+    <li>One agreed price. We supply the checklist, the visit and the report.</li>
+  </ul>
   <div class="hero-ctas">
     <a class="btn btn-primary" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a consultation</a>
     <a class="btn btn-ghost" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20am%20enquiring%20on%20behalf%20of%20a%20company%20with%20property%20in%20Jamaica." target="_blank" rel="noopener">Message us on WhatsApp</a>
   </div>
-  <p class="hero-cred">BEng Aerospace Engineering · 7+ years UK construction and IoT project management · Yaadly Ltd, England and Wales, company 17358077 · On the ground in Kingston and Portmore first, other parishes considered on request</p>
+  <p class="hero-cred">BEng Aerospace · 7+ years UK construction project management · Yaadly Ltd, company 17358077 · Kingston and Portmore first</p>
 </header>
 
 <!-- WHO I WORK WITH -->
