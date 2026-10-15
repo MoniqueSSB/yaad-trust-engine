@@ -144,21 +144,34 @@ h1.hero-h em{font-style:italic;font-weight:300;background:linear-gradient(120deg
 .sec{padding:76px 0 0}
 .sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:24px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--line2)}
 .sec-head span{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
-.trades{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-top:24px}
+.trades{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:24px}
+.trade.more{grid-column:span 2}
+.trade.more .ph{aspect-ratio:8/3}
+.trade.more .ph img{object-position:center 45%!important}
+@media(max-width:700px){.trades{grid-template-columns:repeat(2,1fr);gap:10px}}
+/* 15 Oct 2026: tiles carry a real photo of the trade (Pexels, credits in
+   img/work/CREDITS.md). Camera photographs only, no AI images. */
 .trade{
-  display:flex;flex-direction:column;align-items:center;gap:12px;
-  padding:22px 12px;border:1px solid rgba(155,115,245,0.18);border-radius:16px;
+  display:flex;flex-direction:column;overflow:hidden;
+  border:1px solid rgba(155,115,245,0.18);border-radius:16px;background:var(--bg2);
   color:var(--ink);text-decoration:none;
   transition:border-color .2s,transform .2s var(--spring),background .2s;
 }
-.trade:hover{border-color:rgba(245,158,11,0.55);transform:translateY(-3px);background:rgba(245,158,11,0.05)}
+.trade:hover{border-color:rgba(245,158,11,0.55);transform:translateY(-3px)}
+.trade .ph{display:block;flex:1;min-height:150px;aspect-ratio:4/3;overflow:hidden;background:var(--bg3)}
+.trade .ph img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .5s var(--spring)}
+.trade:hover .ph img{transform:scale(1.05)}
+.trade .tb{display:flex;align-items:center;gap:10px;padding:13px 14px 15px}
 .trade.more{border-style:dashed;border-color:var(--line2)}
 .trade.more b{color:var(--mute)}
-.trade svg{width:34px;height:34px;fill:none;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
+.trade svg{width:22px;height:22px;flex-shrink:0;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .trade.i-gold svg{stroke:var(--goldb)}
 .trade.i-purple svg{stroke:var(--purpleb)}
 .trade.more svg{stroke:var(--dim)}
-.trade b{font:600 14.5px var(--body);text-align:center}
+.trade b{font:600 14.5px var(--body)}
+.ph-note{margin-top:12px;font-size:12px;color:var(--dim)}
+.ph-note a{color:inherit;text-decoration:underline}
+@media(prefers-reduced-motion:reduce){.trade,.trade .ph img{transition:none}.trade:hover .ph img{transform:none}}
 
 /* ── how it works ───────────────────────────────────────────────────────── */
 .stages{list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));margin-top:38px}
@@ -362,27 +375,28 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
   </div>
   <div class="trades rv d1">
     <a class="trade i-gold" href="https://app.yaadly.co.uk/jobs/new?trade=Roofing">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12 12 4l10 8"/><path d="M5 12h14"/><path d="M7 16h10"/><path d="M9 20h6"/></svg>
-      <b>Roof and zinc</b></a>
+      <span class="ph"><img src="/img/work/roof-crew-nairobi.jpg" alt="A roofing crew in hard hats and hi-vis working at roof level" width="900" height="600" loading="lazy" decoding="async" style="object-position:center 40%"></span>
+      <span class="tb"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12 12 4l10 8"/><path d="M5 12h14"/><path d="M7 16h10"/><path d="M9 20h6"/></svg><b>Roof and zinc</b></span></a>
     <a class="trade i-purple" href="https://app.yaadly.co.uk/jobs/new?trade=Plumbing">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v6a4 4 0 0 0 4 4h4"/><path d="M16 11h4v4h-4z"/><path d="M18 15v4"/><path d="M2 5h4"/></svg>
-      <b>Plumbing</b></a>
+      <span class="ph"><img src="/img/work/plumber-fitting-pvc.jpg" alt="A plumber in blue coveralls fitting a PVC pipe overhead" width="900" height="563" loading="lazy" decoding="async" style="object-position:center 40%"></span>
+      <span class="tb"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v6a4 4 0 0 0 4 4h4"/><path d="M16 11h4v4h-4z"/><path d="M18 15v4"/><path d="M2 5h4"/></svg><b>Plumbing</b></span></a>
     <a class="trade i-gold" href="https://app.yaadly.co.uk/jobs/new?trade=Electrical">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 6 13h5l-1 8 7-10h-5z"/></svg>
-      <b>Electrical</b></a>
+      <span class="ph"><img src="/img/work/electricians-wiring.jpg" alt="Two electricians in hard hats and hi-vis vests wiring a wall point" width="505" height="900" loading="lazy" decoding="async" style="object-position:center 30%"></span>
+      <span class="tb"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 6 13h5l-1 8 7-10h-5z"/></svg><b>Electrical</b></span></a>
     <a class="trade i-purple" href="https://app.yaadly.co.uk/jobs/new?trade=Painting%20%26%20Decorating">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h13v6H4z"/><path d="M17 7h3v4h-6v3"/><path d="M12 14h4v6h-4z"/></svg>
-      <b>Painting</b></a>
+      <span class="ph"><img src="/img/work/painter-roller.jpg" alt="A painter in paint-splattered work clothes holding a roller" width="600" height="900" loading="lazy" decoding="async" style="object-position:center 30%"></span>
+      <span class="tb"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h13v6H4z"/><path d="M17 7h3v4h-6v3"/><path d="M12 14h4v6h-4z"/></svg><b>Painting</b></span></a>
     <a class="trade i-gold" href="https://app.yaadly.co.uk/jobs/new?trade=Drainage%20%26%20Septic">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M8 9h8"/><path d="M7 13h10"/><path d="M9 17h6"/></svg>
-      <b>Septic and drainage</b></a>
+      <span class="ph"><img src="/img/work/drainage-trench-crew.jpg" alt="Two groundworkers in hard hats and hi-vis working in a drainage trench" width="600" height="900" loading="lazy" decoding="async" style="object-position:center 55%"></span>
+      <span class="tb"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M8 9h8"/><path d="M7 13h10"/><path d="M9 17h6"/></svg><b>Septic and drainage</b></span></a>
     <a class="trade i-purple" href="https://app.yaadly.co.uk/jobs/new?trade=Grille%20%26%20Gate%20Welding">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3z"/><path d="M9 5v14"/><path d="M15 5v14"/><path d="M3 12h18"/></svg>
-      <b>Grille and gate</b></a>
+      <span class="ph"><img src="/img/work/welder-coveralls.jpg" alt="A welder in coveralls, respirator and leather gloves welding steel" width="720" height="900" loading="lazy" decoding="async" style="object-position:center 40%"></span>
+      <span class="tb"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3z"/><path d="M9 5v14"/><path d="M15 5v14"/><path d="M3 12h18"/></svg><b>Grille and gate</b></span></a>
     <a class="trade more" href="https://app.yaadly.co.uk/jobs/new">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-      <b>Something else</b></a>
+      <span class="ph"><img src="/img/work/mason-hivis-wall.jpg" alt="A mason in a hard hat and hi-vis vest building a block wall" width="600" height="900" loading="lazy" decoding="async" style="object-position:center 25%"></span>
+      <span class="tb"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg><b>Something else</b></span></a>
   </div>
+  <p class="ph-note">Photos show the kind of work we cover. They are not Yaadly jobs. Photos from Wikimedia Commons, <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>, resized: plumbing by <a href="https://commons.wikimedia.org/wiki/File:Cameroon_male_plumbier_at_work_05.jpg" target="_blank" rel="noopener">Gatien Titcho Seumo</a>, electrical by <a href="https://commons.wikimedia.org/wiki/File:Electrical_safety.jpg" target="_blank" rel="noopener">Okema Benard</a>.</p>
 </div></section>
 
 <!-- HOW IT WORKS -->
