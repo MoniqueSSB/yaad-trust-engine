@@ -297,6 +297,8 @@ footer {
 .btn-gold { display:flex; align-items:center; justify-content:center; min-height:46px; border-radius:100px; background:var(--gold); color:var(--bg); font-weight:700; font-size:15px; }
 .btn-gold:hover { color:var(--bg); background:var(--goldb); }
 .mw-card { flex:2 1 340px; min-width:0; background:var(--card); border:1px solid var(--line); border-radius:20px; padding:24px; display:flex; flex-direction:column; gap:10px; }
+.mw-card .mw-ph { margin:-24px -24px 6px; aspect-ratio:16/9; overflow:hidden; border-radius:20px 20px 0 0; background:var(--bg3); }
+.mw-card .mw-ph img { display:block; width:100%; height:100%; object-fit:cover; object-position:center; }
 .mw-card .top { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
 .mw-card h3 { font-family:var(--disp); font-weight:400; font-size:23px; }
 .mw-card .tag { font:600 13px var(--mono); color:var(--purpleb); }
@@ -483,6 +485,7 @@ footer {
       </article>
 
       <article class="mw-card rv">
+        <div class="mw-ph"><img src="/img/work/plastering-scaffold.jpg" alt="A plasterer rendering a wall from scaffolding" width="900" height="506" loading="lazy" decoding="async"></div>
         <div class="top"><h3>Managed Work</h3><span class="tag">Quoted after scope</span></div>
         <ul class="dots">
           <li>We write the scope first.</li>
