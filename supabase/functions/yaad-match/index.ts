@@ -23,6 +23,8 @@ const RESEND_KEY   = Deno.env.get("RESEND_API_KEY") ?? "";       // optional
 // still shows as verified there but its DKIM and SPF records are gone from
 // DNS, so anything from it fails authentication and lands in spam silently.
 const FROM_EMAIL   = Deno.env.get("YAAD_FROM_EMAIL") ?? "jobs@in.yaadly.co.uk";
+// Where a worker writes to stop job alert emails. A monitored inbox, not the sending domain.
+const UNSUB_EMAIL  = Deno.env.get("YAAD_UNSUB_EMAIL") ?? "monique@yaadly.co.uk";
 const SITE         = Deno.env.get("YAAD_SITE") ?? "https://yaadly.co.uk";
 
 const cors = {
@@ -159,7 +161,17 @@ to quote for one, or for a lead you did not win.
 Open the board: ${link}
 
 You are getting this because ${w.match_reason} matched your published profile.
+To stop these emails, reply with the word STOP, or email ${UNSUB_EMAIL}
+with the subject "Stop job alerts". We switch them off within two working days.
 `,
+            // Added 16 Oct 2026: a recurring marketing-style email needs a way
+            // out, and the one-click header lets mail apps show an
+            // "Unsubscribe" button. The request lands with a person, who
+            // unpublishes the alert preference by hand. Nothing automatic
+            // here changes a worker's profile.
+            headers: {
+              "List-Unsubscribe": `<mailto:${UNSUB_EMAIL}?subject=Stop%20job%20alerts%20${encodeURIComponent(w.worker_email)}>`,
+            },
           }),
         });
         results.push({ worker_email: w.worker_email, channel: "email", status: r.ok ? "sent" : "failed", detail: r.ok ? undefined : `http ${r.status}` });

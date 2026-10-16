@@ -6685,3 +6685,10 @@ Migration `20261015120000_the_supplier_lane_for_materials.sql`. Yaadly buys mate
 6. **Mark as paid to supplier** appears only once materials evidence for that job and stage is on the job after collection. If the goods are on site and the button is not there, the tradesperson has not filed the evidence: chase them, not the supplier.
 7. **A supplier cannot see an order:** `select id, supplier_user, contact_email from suppliers;` and compare `supplier_user` with their `auth.users` id. Null means they have not signed in with that exact email yet.
 8. **Supplier wants to correct an invoice number:** it is write-once (`supplier_attach_invoice`). Note the correction on the release with `record_materials_receipt(release, ref, note)` from the desk; do not edit the column by hand.
+
+## 69. A worker asks to stop job alert emails (16 Oct 2026)
+
+1. Job alert emails from `yaad-match` now end with a stop line and carry a `List-Unsubscribe` header. Both send the request to `YAAD_UNSUB_EMAIL` (default `monique@yaadly.co.uk`). Set that secret to change the inbox.
+2. The request reaches a person. Nothing switches off automatically. Unpublish the worker's alert preference by hand within two working days, because the email promises that.
+3. A worker on WhatsApp alerts says STOP there instead. That lane already handles it (`yaad-inbound/job-alerts.ts`).
+4. The change only reaches workers once `yaad-match` is deployed from main: `supabase functions deploy yaad-match --project-ref leffyisvfvjwzilydlwf`. Read `supabase functions list` first and keep its current `verify_jwt` setting.

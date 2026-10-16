@@ -299,6 +299,7 @@ footer {
 .mw-card { flex:2 1 340px; min-width:0; background:var(--card); border:1px solid var(--line); border-radius:20px; padding:24px; display:flex; flex-direction:column; gap:10px; }
 .mw-card .mw-ph { margin:-24px -24px 6px; aspect-ratio:16/9; overflow:hidden; border-radius:20px 20px 0 0; background:var(--bg3); }
 .mw-card .mw-ph img { display:block; width:100%; height:100%; object-fit:cover; object-position:center; }
+.mw-card .ph-note { margin:0 0 10px; font-size:12px; color:var(--dim); }
 .mw-card .top { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
 .mw-card h3 { font-family:var(--disp); font-weight:400; font-size:23px; }
 .mw-card .tag { font:600 13px var(--mono); color:var(--purpleb); }
@@ -394,6 +395,7 @@ footer {
 <script src="theme.js?v=3"></script>
 </head>
 <body>
+<a class="skip" href="#content">Skip to content</a>
 
 <nav class="site-nav"><div class="nav-in">
   <a class="brand" href="/"><img class="mark" src="/logo-v1.png" alt="" width="30" height="30"><b>Yaadly<span>Hub</span></b></a>
@@ -423,7 +425,7 @@ footer {
 
 
 <!-- HERO -->
-<header class="hero left">
+<header class="hero left" id="content">
   <span class="hero-badge"><i class="dot"></i>Managed services · Kingston and Portmore</span>
   <h1 class="display">Your property in Jamaica, <em>checked and managed in writing.</em></h1>
   <ul class="ticks">
@@ -486,7 +488,8 @@ footer {
       </article>
 
       <article class="mw-card rv">
-        <div class="mw-ph"><img src="/img/work/plastering-scaffold.jpg" alt="A plasterer rendering a wall from scaffolding" width="900" height="506" loading="lazy" decoding="async"></div>
+        <div class="mw-ph"><img src="/img/work/plastering-scaffold.jpg" alt="A plasterer rendering a wall from scaffolding. Stock photo, illustrative, not a Yaadly job" width="900" height="506" loading="lazy" decoding="async"></div>
+        <p class="ph-note">Stock photo, illustrative. Not a Yaadly job.</p>
         <div class="top"><h3>Managed Work</h3><span class="tag">Quoted after scope</span></div>
         <ul class="dots">
           <li>We write the scope first.</li>
