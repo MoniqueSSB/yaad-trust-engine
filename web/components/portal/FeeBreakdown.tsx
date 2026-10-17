@@ -1,4 +1,5 @@
 import { jmd } from "@/lib/money";
+import { WORKER_FEE_PCT, WORKER_FEE_RATE } from "@/lib/jobs/addon";
 
 /**
  * The settled fee panel, from the preview's `feeClient()` and `feeWorker()`.
@@ -61,7 +62,7 @@ export function FeeBreakdown({
     );
   }
 
-  const fee = Math.round(labour * 0.05);
+  const fee = Math.round(labour * WORKER_FEE_RATE);
   return (
     <section className="mt-4 rounded-2xl border border-line bg-panel p-5">
       <h2 className="mb-3 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
@@ -70,7 +71,7 @@ export function FeeBreakdown({
       <dl className="grid grid-cols-[1fr_auto] gap-y-2 text-[14px] tabular-nums">
         <dt className="text-mute">Your quoted labour price</dt>
         <dd className="text-right text-mute">{jmd(labour)}</dd>
-        <dt className="text-mute">Yaadly&rsquo;s margin, 5%</dt>
+        <dt className="text-mute">Yaadly&rsquo;s margin, {WORKER_FEE_PCT}</dt>
         <dd className="text-right text-mute">{jmd(fee)}</dd>
         <dt className="text-mute">
           Materials{materialsAtCost ? ", at cost" : ""}
@@ -83,7 +84,7 @@ export function FeeBreakdown({
         </dd>
       </dl>
       <p className="mt-3 text-[12.5px] leading-relaxed text-dim">
-        Yaadly engages you at your quoted price less 5%, agreed before you
+        Yaadly engages you at your quoted price less {WORKER_FEE_PCT}, agreed before you
         accept and never changed afterwards. Materials are paid at cost with
         nothing deducted. Nothing to join, nothing per quote, nothing per lead.
       </p>

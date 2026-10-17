@@ -16,6 +16,8 @@
 import { CLIENT_FEE_RATE } from "./client-bill";
 
 export const WORKER_FEE_RATE = 0.07;
+/** The same rate as page text, "7%", so a label can never disagree with the sum beside it. */
+export const WORKER_FEE_PCT = `${Math.round(WORKER_FEE_RATE * 100)}%`;
 
 export type AddonStatus = "with_worker" | "with_client" | "agreed" | "declined" | "withdrawn" | "signed_off" | "cancelled";
 export type AddonTerms = "in_full" | "half_now_half_on_signoff";

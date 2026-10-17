@@ -11,6 +11,8 @@
  * details.
  */
 
+import { WORKER_FEE_PCT } from "@/lib/jobs/addon";
+
 export type TrailBill = { id: string; label: string; total: number | null; paid: boolean; paidAt: string | null };
 export type TrailWorkerPay = { id: string; addonId?: string | null; what: string; labour: number | null; paid: boolean; paidAt: string | null };
 /** due: money sent, no receipt yet. filed: the worker has uploaded one.
@@ -103,7 +105,7 @@ export function MoneyTrail({
             />
           )}
           {side === "worker" && (
-            <p className="py-2 text-[11.5px] text-dim">Labour is shown before Yaadly&rsquo;s 5%. Your pay invoices below show what reaches you.</p>
+            <p className="py-2 text-[11.5px] text-dim">Labour is shown before Yaadly&rsquo;s {WORKER_FEE_PCT}. Your pay invoices below show what reaches you.</p>
           )}
         </div>
       </div>
