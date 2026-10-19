@@ -1107,6 +1107,20 @@ html[data-theme="light"] .ovside,
 html[data-theme="light"] .sc,
 html[data-theme="light"] .jcard,
 html[data-theme="light"] .ans{background:#FFFFFF}
+/* The side panel, the pinned first column of a table on a phone, and the
+   empty photo tile were fixed dark colours, so they stayed dark with the
+   switch on light and the words on them all but disappeared. */
+html[data-theme="light"] .drw,
+html[data-theme="light"] .drw .dhd,
+html[data-theme="light"] .drw .dacts{background:#FFFFFF}
+@media(max-width:820px){
+  html[data-theme="light"] .tw th:first-child,
+  html[data-theme="light"] .tw td:first-child{background:#FFFFFF}
+  html[data-theme="light"] tbody tr:hover td:first-child{background:#F3F0FC}
+}
+html[data-theme="light"] .thumbs>i{background:linear-gradient(135deg,#F3F0FC,#E7E1F8)}
+html[data-theme="light"] .thumbs>a.thumb img,
+html[data-theme="light"] .thumbs>a.thumb video,
 html[data-theme="light"] .evpmedia img,
 html[data-theme="light"] .evpmedia video{background:#EFEBFA}
 html[data-theme="light"] .pthumb .x{background:rgba(21,20,46,.75)}
