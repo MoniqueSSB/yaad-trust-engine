@@ -6,6 +6,12 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-10-20 · Early-start tick box on one line, consent wording v3
+
+**Decided by Monique, 20 Oct 2026.** The tick box on the booking form now reads "Book now and start straight away. Cancel within 14 days for a refund, less any work already done." The note under it reads "Leave it unticked and we start after 14 days, with nothing to pay before then." The old note ("Not ticked? We wait 14 days, then you pay and we visit...") made people read the box twice. The substance is unchanged: ticking is the client's express request to start inside the 14 day cancellation period, and "less any work already done" stays because it is what lets Yaadly keep payment for a visit already made if the client cancels afterwards. Whether that clause is strictly required for UK, US and Canada clients is an adviser question, not settled here. `START_NOW_VERSION` moved to `start-now-v3` in the same commit as the form copy and `START_NOW_WORDING`, so every booking still records the exact sentence that client saw; v2 answers stay readable as v2. What happens after the click is unchanged: a held booking, a receipt by email and WhatsApp with the portal link, and the card button only for a client who ticked. The on-screen confirmation after booking was cut to two points in the same change: what we have (reference, and that the receipt is coming by email, WhatsApp or both, whichever were given; it used to name only one even when both were sent), and what happens to their money. The seven day card authorisation detail stays in the small print beside the form rather than in the confirmation.
+
+---
+
 ## 2026-10-09 · Services page rebuilt: two services, dropdowns for the detail, consent wording v2
 
 **Decided by Monique, 9 Oct 2026, later the same day as the entry below, on a design canvas.** The Before You Pay Check comes off `docs/services.html`, which leaves Visual Check (the hero card, with a one visit / monthly switch) and Managed Work. Its `service_catalogue` row, its `deposit` key in `yaad-book-service`'s `BOOKABLE` map and its Stripe link are untouched: the page simply stops offering it, so restoring it is a page change only. **Still offering it, and not changed here:** `docs/faq.html`, `docs/index.html`, `docs/terms.html` and the WhatsApp assistant (`yaad-inbound/faq.ts`, and its price list). Those need their own change before the page and the rest of the site agree.
