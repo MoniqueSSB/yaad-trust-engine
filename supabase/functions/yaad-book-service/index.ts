@@ -106,6 +106,37 @@ Deno.serve(async (req: Request) => {
   const startNowVersion = startNow ? s(body.startNowVersion, 40) : "";
   const startNowWording = startNow ? s(body.startNowWording, 600) : "";
 
+  // The client's PREFERRED visit date, picked on the page (20 Oct 2026,
+  // founder decision). It goes into the notes as a preference only, never
+  // into due_at: due_at is a promised date and is printed to the client as
+  // one, and only a named person can promise a date. Optional, so a page
+  // cached from before the date step still books. The page offers tomorrow
+  // onwards with the early-start request, and the day after the 14 days
+  // without it; the checks here allow one day either way for time zones
+  // (UK, Jamaica and North America straddle midnight UTC differently).
+  const preferredDate = s(body.preferredDate, 10);
+  let preferredLine = "";
+  if (preferredDate) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(preferredDate);
+    const when = m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : NaN;
+    const now = new Date();
+    const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const days = (when - todayUtc) / 86400_000;
+    if (!m || Number.isNaN(when) || new Date(when).getUTCDate() !== +m[3]) {
+      return json({ error: "That visit date did not come through properly. Pick it again." }, 400);
+    }
+    if (days < (startNow ? 0 : 14)) {
+      return json({ error: startNow
+        ? "Pick a visit date from tomorrow onwards."
+        : "Without the early start, the visit has to be after your 14 days. Pick a later date." }, 400);
+    }
+    if (days > 121) {
+      return json({ error: "Pick a visit date within the next four months." }, 400);
+    }
+    const pretty = new Date(when).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+    preferredLine = `Preferred visit date: ${pretty} (${preferredDate}). The client's choice, NOT confirmed: confirm it with them in writing.`;
+  }
+
   const catalogueId = BOOKABLE[serviceKey];
   if (!catalogueId) {
     return json({ error: "Pick one of the services on this page." }, 400);
@@ -160,6 +191,7 @@ Deno.serve(async (req: Request) => {
 
   const notes = [
     `Booked on the web${label ? `: ${label}` : ""}.`,
+    preferredLine,
     message ? `Client wrote: ${message}` : "",
     startNow
       ? `EXPRESS REQUEST TO START INSIDE THE 14 DAYS, given at booking (${startNowVersion || "version not sent"}). Client ticked: "${startNowWording}"`
