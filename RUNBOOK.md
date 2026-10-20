@@ -6685,3 +6685,23 @@ Migration `20261015120000_the_supplier_lane_for_materials.sql`. Yaadly buys mate
 6. **Mark as paid to supplier** appears only once materials evidence for that job and stage is on the job after collection. If the goods are on site and the button is not there, the tradesperson has not filed the evidence: chase them, not the supplier.
 7. **A supplier cannot see an order:** `select id, supplier_user, contact_email from suppliers;` and compare `supplier_user` with their `auth.users` id. Null means they have not signed in with that exact email yet.
 8. **Supplier wants to correct an invoice number:** it is write-once (`supplier_attach_invoice`). Note the correction on the release with `record_materials_receipt(release, ref, note)` from the desk; do not edit the column by hand.
+
+## 69. Access levels: giving someone a level, or taking it away (20 Oct 2026)
+
+Migration `20261020120000_the_access_register.sql`. The register records who holds which level. As of this file it gives nobody any new button; later files do that one level at a time.
+
+1. **Applied 20 Oct 2026**, recorded in schema_migrations, guard test nine PASS. To re-check, run `supabase/tests/access_register_guards.sql` with execute_sql: nine checks, all PASS, the summary comes back as the error text and nothing persists.
+2. **The eight levels.** Super Admin is the `admins` table, added by hand only. Project Manager, Member, Checker and Viewer are rows in `staff_access`. Client, Worker and Material Supplier are worked out from jobs, worker profiles and suppliers, and are never granted.
+3. **Give someone a level** (signed in as Super Admin): `select public.grant_access('name@example.com', 'project_manager', 'why');`. Levels: `project_manager`, `member`, `checker`, `viewer`. Granting a new level replaces the old one; the old row keeps its history.
+4. **Take it away:** `select public.revoke_access('name@example.com');` returns 1 if they held a level, 0 if not.
+5. **"is a worker. A checker must be independent"**: that person has a worker profile or is the worker on a job. That is the rule, not a fault. Pick a different checker.
+6. **What does someone hold?** `select public.access_levels_for('name@example.com');` (service role or SQL editor). The person themselves sees theirs with `my_access_levels()`.
+7. **PM release limit** is `app_settings.pm_release_limit_pence`, 50000 (GBP 500). Changing it is a money decision: ledger entry first.
+
+## 70. The daily check-in keeps coming for a job that should be finished (20 Oct 2026)
+
+1. **Who gets it:** every job at `in_progress` or `evidence` with a worker on it, once a day, except test jobs (`is_test` true). A job stays on the list until it moves past `evidence`, so an unfinished job keeps getting it. That is by design.
+2. **Find the job:** `select id, status, is_test, updated_at from jobs where status in ('in_progress','evidence') and worker_email is not null;`
+3. **A test job:** set `is_test` to true on it and the ping stops the next day. Needs `yaad-daily-checkin` deployed from main on or after 20 Oct 2026.
+4. **A real job that is done:** close it in the desk. Approving a job is a human decision; nothing closes it for you.
+5. **How many times it went:** `select sent_on from daily_checkin_log where job_id = '<id>' order by sent_on desc;`
