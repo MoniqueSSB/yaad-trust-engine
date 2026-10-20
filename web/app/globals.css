@@ -145,6 +145,44 @@ html[data-theme="light"] {
   --field: #FFFFFF; --bar: rgba(247,246,252,0.94);
 }
 
+/* ── Portal surfaces ─────────────────────────────────────────────────────
+   The signed-in portal's own surfaces and text, from the Yaadly Portal
+   design system (20 Oct 2026, founder: portal only for now). Warm paper in
+   light, deep slate in dark: no pure white or near-black ground, so no
+   glare in a long session. Purple, gold and the status colours are not
+   touched here; only grounds, borders and the three text tiers.
+
+   Switched on by the portal-skin class on the frame in app/portal/layout.tsx,
+   read through :has() so the variables still land on <html> and body picks
+   them up. Every other page on this app keeps the values above and so still
+   matches docs/theme.css. Screen only, and never on the PDF copy, so the
+   print and pdf-render blocks below still turn a report white.
+
+   Text tiers, measured. Dark on #1b1f24: ink 12.8:1, mute 7.6:1, dim 5.7:1.
+   Light on #f5f2ec: ink 14.1:1, mute 10.7:1, dim 7.9:1, kept as dark as the
+   old light tiers because "the words need to stand out and be dark".
+   Control borders (line2) hold 3:1 on the page in both. */
+@media screen {
+  html:not(.pdf-render):has(.portal-skin) {
+    --color-bg: #1B1F24; --color-panel: #232830; --color-panel2: #2B313A;
+    --color-line: #343B45; --color-line2: #6B7480;
+    --color-ink: #E6E2DA; --color-mute: #B3B0A8; --color-dim: #9A978F;
+    --card-top-90: rgba(35,40,48,0.9); --card-top-80: rgba(35,40,48,0.8); --card-top-75: rgba(35,40,48,0.75);
+    --card-bot-75: rgba(31,36,43,0.75); --card-bot-60: rgba(31,36,43,0.6);
+    --well-60: rgba(27,31,36,0.6); --well-50: rgba(27,31,36,0.5);
+    --field: rgba(27,31,36,0.7); --bar: rgba(27,31,36,0.94);
+  }
+  html[data-theme="light"]:not(.pdf-render):has(.portal-skin) {
+    --color-bg: #F5F2EC; --color-panel: #FBF9F5; --color-panel2: #EEEAE2;
+    --color-line: #E2DCD1; --color-line2: #8F877A;
+    --color-ink: #1F2328; --color-mute: #33373D; --color-dim: #464B52;
+    --card-top-90: #FBF9F5; --card-top-80: #FBF9F5; --card-top-75: #FBF9F5;
+    --card-bot-75: #F8F5F0; --card-bot-60: #F8F5F0;
+    --well-60: #FBF9F5; --well-50: #FBF9F5;
+    --field: #FDFCF9; --bar: rgba(245,242,236,0.94);
+  }
+}
+
 /* ── The light and dark switch in the header ─────────────────────────────
    Same rules as docs/theme.css so the two headers match. A knob slides
    between a sun and a moon; on (aria-checked) means dark. */

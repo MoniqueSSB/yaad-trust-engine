@@ -6,6 +6,12 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-10-20 · Portal gets its own low-strain surfaces, public pages keep the site's
+
+**Decided by Monique, 20 Oct 2026: portal only for now.** The signed-in portal moves to the Yaadly Portal design system's grounds and text: warm paper (#f5f2ec) in light, deep slate (#1b1f24) in dark, warm near-black and near-white text, and borders on controls that hold 3:1. The near-black #07071A and the lavender light page stay everywhere else on app.yaadly.co.uk (the job form, /apply, /trades), so those still match the marketing site and `docs/theme.css`. This is the first of three pieces; colour-coded job tabs and the Money charts follow as their own changes.
+
+**How it is scoped.** A `portal-skin` class on the frame in `app/portal/layout.tsx`, and two rules in `globals.css` that read it through `html:has(.portal-skin)`, so the variables still land on `<html>` and `body` repaints with them. A class on the wrapper alone would leave the body and anything portalled outside it on the old colours. The rules sit inside `@media screen` and exclude `html.pdf-render`, so printing and the downloaded Completion Report stay white paper. Only grounds, borders and the three text tiers change: purple, gold and the status colours are untouched in this piece. Light text stays as dark as before (ink 14.1:1, mute 10.7:1, dim 7.9:1) because the founder asked for dark words that do not merge into the page.
+
 ## 2026-10-09 · Services page rebuilt: two services, dropdowns for the detail, consent wording v2
 
 **Decided by Monique, 9 Oct 2026, later the same day as the entry below, on a design canvas.** The Before You Pay Check comes off `docs/services.html`, which leaves Visual Check (the hero card, with a one visit / monthly switch) and Managed Work. Its `service_catalogue` row, its `deposit` key in `yaad-book-service`'s `BOOKABLE` map and its Stripe link are untouched: the page simply stops offering it, so restoring it is a page change only. **Still offering it, and not changed here:** `docs/faq.html`, `docs/index.html`, `docs/terms.html` and the WhatsApp assistant (`yaad-inbound/faq.ts`, and its price list). Those need their own change before the page and the rest of the site agree.
