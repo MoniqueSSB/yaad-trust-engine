@@ -3,6 +3,7 @@ import { amount, gbp } from "@/lib/money";
 import { whenDate } from "@/lib/date";
 import { PayByCardButton } from "./PayByCardButton";
 import { invoiceLabel } from "@/lib/portal/invoice-label";
+import { WORKER_FEE_RATE, workerFeePct } from "@/lib/jobs/worker-fee";
 
 /**
  * What this job costs, what has been invoiced, and the rules that govern
@@ -47,8 +48,12 @@ export type ExtraWorkLine = {
   scope: string;
   /** the amount agreed for the work */
   work: number;
-  /** client: Yaadly's 15% on top. worker: Yaadly's 5%, taken off. */
+  /** client: Yaadly's 15% on top. worker: Yaadly's 7%, or 5% on work
+      agreed before 4 Oct 2026, taken off. */
   fee: number;
+  /** Worker side: the rate this add-on was agreed at (workerFeeRate() on its
+      agreed_at), so the label names the figure that was taken off. */
+  feeRate?: number;
   /** client: what they pay for it. worker: what they are paid for it. */
   total: number;
   status: string;
@@ -113,7 +118,13 @@ export function MoneyPanel({
   cardReturning = false,
   bankDetails = "",
   extraWork = null,
+  workerFeeRate = WORKER_FEE_RATE,
 }: {
+  /** Worker side: the rate on this job's accepted quote, workerFeeRate() on
+   *  the quote's created_at, the same rule raise_job_worker_payable() uses.
+   *  7% from 4 Oct 2026, 5% on a quote given before it. Display only: the
+   *  figure in `fee` must be worked out at this same rate by the caller. */
+  workerFeeRate?: number;
   /** Agreed extra work (add-ons agreed or approved), one row each, shown as
    *  its own section UNDER the main work. NOT included in allIn or takeHome,
    *  which are the main work only. Founder, 28 Sep 2026: "What this job
@@ -155,6 +166,7 @@ export function MoneyPanel({
   const counts = (x: ExtraWorkLine) => x.counted ?? (x.status === "agreed" || x.status === "signed_off");
   const extraTotal = (extraWork ?? []).filter(counts).reduce((t, x) => t + x.total, 0);
   const mainTotal = side === "client" ? allIn : takeHome;
+  const workerPct = workerFeePct(workerFeeRate);
 
   return (
     <>
@@ -176,7 +188,7 @@ export function MoneyPanel({
             <p className="mx-auto max-w-[46ch] text-[12.5px] leading-relaxed text-dim">
               {side === "client"
                 ? "When quotes arrive you will see each worker's labour price, Yaadly's 15% fee calculated on it, and the full all-in total, before you commit to anything."
-                : "When a client accepts your quote, your labour price and what you take home after Yaadly's 5% appear here."}
+                : "When a client accepts your quote, your labour price and what you take home after Yaadly's " + workerPct + " appear here."}
             </p>
           </div>
         ) : (
@@ -204,7 +216,7 @@ export function MoneyPanel({
                 {side === "client" ? (
                   <Line label="Yaadly Guarantee & Support, 15% of the labour" value={money(fee)} />
                 ) : (
-                  <Line label="Yaadly's 5%, taken off" value={fee == null ? null : "−" + (money(fee) ?? "")} />
+                  <Line label={"Yaadly's " + workerPct + ", taken off"} value={fee == null ? null : "−" + (money(fee) ?? "")} />
                 )}
                 {showCheck && check && (
                   <Line
@@ -246,7 +258,7 @@ export function MoneyPanel({
                       <div className="mt-2 grid gap-1 text-[12.5px]">
                         <div className="flex justify-between gap-3"><span className="text-dim">The work</span><span className="font-mono-app">{money(x.work)}</span></div>
                         <div className="flex justify-between gap-3">
-                          <span className="text-dim">{side === "client" ? "Yaadly Guarantee & Support, 15%" : "Yaadly's 5%, taken off"}</span>
+                          <span className="text-dim">{side === "client" ? "Yaadly Guarantee & Support, 15%" : "Yaadly's " + workerFeePct(x.feeRate ?? workerFeeRate) + ", taken off"}</span>
                           <span className="font-mono-app">{side === "client" ? "" : "−"}{money(x.fee)}</span>
                         </div>
                         <div className="flex justify-between gap-3 border-t border-line pt-1 font-semibold">

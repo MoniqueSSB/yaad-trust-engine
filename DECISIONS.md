@@ -6,6 +6,10 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-10-20 · The worker's money panel shows the rate the job was agreed at
+
+**Display only, following the founder's 4 Oct 2026 decision.** The worker side is 7% on work agreed from 4 October 2026 and 5% on work agreed before it. Postgres decides this in `worker_fee_rate()`, from `app_settings.worker_fee_7pc_from`, and raises every worker payable with it. The job room's money panel still said "Yaadly's 5%" on every job and worked the amount out at a flat 7%, so an old job showed the wrong figure and a new one the wrong label. `worker_fee_rate()` is not callable by a signed-in worker, so `web/lib/jobs/worker-fee.ts` mirrors it: the switch moment is copied in as a constant (the live value, 2026-10-04 00:00 UTC, read on 20 Oct 2026), a quote is dated by its `created_at` and an add-on by `agreed_at`, else `created_at`, exactly as the payable functions do. The migration says that setting is never moved; if it ever is, the constant moves in the same change. `web/tests/worker-fee.test.mjs` pins both rates. Nothing here raises, moves or changes money: the pay invoice is still Postgres's arithmetic, approved by a named person.
+
 ## 2026-10-20 · Job room becomes a one-view dashboard; every tab opens as a side panel
 
 **Decided by Monique, 20 Oct 2026**, after reviewing a clickable mock-up: the job room opens on one view of coloured boxes, a figure or a small chart in each and few words, with a tap opening the detail. Ten tabs, ten colours. The portal's light page goes whiter (#fcfbf8). She chose to ship without a signed-in check of a real job, so the first live look is hers.
