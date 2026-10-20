@@ -6697,3 +6697,11 @@ Migration `20261020120000_the_access_register.sql`. The register records who hol
 5. **"is a worker. A checker must be independent"**: that person has a worker profile or is the worker on a job. That is the rule, not a fault. Pick a different checker.
 6. **What does someone hold?** `select public.access_levels_for('name@example.com');` (service role or SQL editor). The person themselves sees theirs with `my_access_levels()`.
 7. **PM release limit** is `app_settings.pm_release_limit_pence`, 50000 (GBP 500). Changing it is a money decision: ledger entry first.
+
+## 70. The daily check-in keeps coming for a job that should be finished (20 Oct 2026)
+
+1. **Who gets it:** every job at `in_progress` or `evidence` with a worker on it, once a day, except test jobs (`is_test` true). A job stays on the list until it moves past `evidence`, so an unfinished job keeps getting it. That is by design.
+2. **Find the job:** `select id, status, is_test, updated_at from jobs where status in ('in_progress','evidence') and worker_email is not null;`
+3. **A test job:** set `is_test` to true on it and the ping stops the next day. Needs `yaad-daily-checkin` deployed from main on or after 20 Oct 2026.
+4. **A real job that is done:** close it in the desk. Approving a job is a human decision; nothing closes it for you.
+5. **How many times it went:** `select sent_on from daily_checkin_log where job_id = '<id>' order by sent_on desc;`
