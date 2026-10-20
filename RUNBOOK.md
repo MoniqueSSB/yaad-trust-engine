@@ -6705,9 +6705,20 @@ Migration `20261020120000_the_access_register.sql`. The register records who hol
 3. **A test job:** set `is_test` to true on it and the ping stops the next day. Needs `yaad-daily-checkin` deployed from main on or after 20 Oct 2026.
 4. **A real job that is done:** close it in the desk. Approving a job is a human decision; nothing closes it for you.
 5. **How many times it went:** `select sent_on from daily_checkin_log where job_id = '<id>' order by sent_on desc;`
+
+## 71. Attaching a check report to the job it was booked on (20 Oct 2026)
+
+A Visual Check or Technical Sign-off the client booked from their job room (Independent checks view) is written on Reports like any other, but must carry the job's id or the job room has nothing to show under the booking.
+
+1. **Reports, then "Draft a report from your notes".** Pick Visual Check or Technical Sign-off. A list called "Job, if the client booked this check on a job" appears under the service.
+2. **Pick the job.** The list holds only jobs with that check booked (`v_job_checks`), with job number, title and client; jobs that already have a report sit at the bottom. Picking one fills the client name and property if they are empty. Nothing is picked for you on purpose: the job decides which client reads the report.
+3. **Draft, finish and issue as usual.** The draft is saved with `reports.job_id` set. The client of that job sees it under the booking only once it is issued (RLS "client reads their issued report"); a draft is never shown.
+4. **A check bought on its own** stays on "None, bought on its own" and is saved with no job, as before.
+5. **Drafted it without the job?** The desk has no button to add it afterwards. While it is still a draft, set it in the SQL editor by the report's id (a draft has no number yet): `update public.reports set job_id = 'J-xxxx' where id = '<report id>' and status = 'draft';`, after checking the job's `check_level` matches the report's kind. Once a report is issued, `report_guard_issue()` refuses an update from the SQL editor, which is the guard working: draft it again with the job picked.
+6. **"Could not read the jobs"** under the list means `v_job_checks` refused the read; check you are signed in as an admin. The rest of the drafter still works and saves with no job.
 7. **PM release limit** is `app_settings.pm_release_limit_jmd`, 100000 (J$100,000, roughly GBP 500; every worker and materials payment is in J$). It was `pm_release_limit_pence` for an hour on 20 Oct and was replaced by 20261020140000. Changing it is a money decision: ledger entry first.
 
-## 71. A Project Manager on the desk (20 Oct 2026)
+## 72. A Project Manager on the desk (20 Oct 2026)
 
 Migration `20261020140000_a_project_manager_reads_the_job_desk.sql`, applied 20 Oct 2026, guard test `supabase/tests/pm_desk_read_guards.sql` nine PASS.
 
