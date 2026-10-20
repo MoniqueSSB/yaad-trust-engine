@@ -76,8 +76,10 @@ begin
     perform set_config('request.jwt.claims', json_build_object('email', v_admin)::text, true);
     res := res || ('8. the Super Admin holds super_admin: ' || case when public.has_access('super_admin') then 'PASS' else 'FAIL' end);
 
-    -- 9. the PM release limit is recorded at GBP 500
-    res := res || ('9. PM release limit is 50000 pence: ' || case when (select value from public.app_settings where key = 'pm_release_limit_pence') = '50000' then 'PASS' else 'FAIL' end);
+    -- 9. the PM release limit is recorded at J$100,000. It was GBP 500 in
+    -- 20261020120000 and moved to J$ on the founder's instruction the same
+    -- day (20261020140000), because every worker and materials payment is J$.
+    res := res || ('9. PM release limit is J$100,000: ' || case when (select value from public.app_settings where key = 'pm_release_limit_jmd') = '100000' then 'PASS' else 'FAIL' end);
 
     raise exception 'rollback';
   exception when others then
