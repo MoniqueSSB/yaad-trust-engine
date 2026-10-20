@@ -1915,6 +1915,11 @@ const VIEWS = [
             <option value="pm_stage">Full PM, stage completion record</option>
           </select>
           <p class="mute" id="rptKindWhat" style="margin-top:6px"></p>
+          <div id="rptJobBox" style="display:none">
+            <label class="fl" style="margin-top:10px" for="rptJob">Job, if the client booked this check on a job</label>
+            <select id="rptJob" class="inp"><option value="">None, bought on its own</option></select>
+            <p class="mute" id="rptJobWhat" style="margin-top:6px"></p>
+          </div>
           <label class="fl" style="margin-top:10px">Client name</label>
           <input id="rptClient" class="inp" placeholder="As it should read on the report">
           <label class="fl" style="margin-top:10px">Property</label>
@@ -6977,6 +6982,7 @@ function wireReportDrafter(){
         visited_on: composed.visited_on,
         who: composed.who,
         source_text: RPT_SOURCE || null,
+        job_id: rptJobPicked(),
       });
       const bits = [`Drafted ${j.findings} finding${j.findings === 1 ? "" : "s"}, all unrated, no verdict.`];
       if (j.scrubbed && j.scrubbed.length) {
@@ -6997,6 +7003,9 @@ function wireReportDrafter(){
       delete RPT_TYPED[$("rptKind").value];
       rptFormDraw();
       RPT_SOURCE = "";
+      RPT_JOBS = null;
+      if ($("rptJob")) $("rptJob").value = "";
+      rptJobDraw();
       if ($("rptFiles")) $("rptFiles").value = "";
       await loadTableView("reports");
     } catch (e) {
@@ -11514,6 +11523,68 @@ const RPT_FORMS = {
 // and back does not lose a half written visit.
 const RPT_TYPED = {};
 
+// The job a check report belongs to, 20 October 2026. A Visual Check or a
+// Technical Sign-off the client booked from their job room (jobs.check_level)
+// is written here like any other, and until now landed with job_id null, so
+// the job room had nothing to show under the booking. yaad-report already
+// takes job_id; this is the desk sending it. A pick list of jobs with that
+// check booked, read from v_job_checks, never a typed id. Nothing is picked
+// for you: the job decides which client reads the report once it is issued,
+// so a wrong guess here would show it to the wrong person.
+const RPT_JOB_LEVEL = { visual_check: "visual", technical_signoff: "technical" };
+let RPT_JOBS = null;
+
+async function rptJobDraw(){
+  const box = $("rptJobBox"), sel = $("rptJob"); if (!box || !sel) return;
+  const level = RPT_JOB_LEVEL[$("rptKind").value];
+  if (!level) { box.style.display = "none"; sel.value = ""; return; }
+  box.style.display = "";
+  const was = sel.value;
+  if (!RPT_JOBS) {
+    $("rptJobWhat").textContent = "Reading the jobs with a check booked.";
+    const { data, error } = await sb.from("v_job_checks")
+      .select("id,title,parish,client_name,check_level,check_chosen_at,report_number,report_status")
+      .order("check_chosen_at", { ascending:false }).limit(200);
+    if (error) { $("rptJobWhat").innerHTML = '<span style="color:var(--coral)">Could not read the jobs: ' + esc(error.message) + "</span>"; return; }
+    RPT_JOBS = data || [];
+  }
+  if (RPT_JOB_LEVEL[$("rptKind").value] !== level) return;
+  const mine = RPT_JOBS.filter(j => j.check_level === level)
+    .sort((a, b) => (a.report_number ? 1 : 0) - (b.report_number ? 1 : 0));
+  sel.innerHTML = `<option value="">None, bought on its own</option>` + mine.map(j =>
+    `<option value="${esc(j.id)}">${esc(j.id)}, ${esc(j.title || "untitled")}, ${esc(j.client_name || "client not named")}${j.report_number ? ` (has ${esc(j.report_number)}, ${esc(j.report_status || "")})` : ""}</option>`).join("");
+  sel.value = mine.some(j => j.id === was) ? was : "";
+  if (!sel.dataset.wired) {
+    sel.dataset.wired = "1";
+    sel.addEventListener("change", () => {
+      const j = (RPT_JOBS || []).find(x => x.id === sel.value);
+      if (j) {
+        const c = $("rptClient"), p = $("rptProperty");
+        if (c && !c.value.trim() && j.client_name) c.value = j.client_name;
+        if (p && !p.value.trim() && j.parish) p.value = j.parish;
+      }
+      rptJobSays();
+    });
+  }
+  rptJobSays();
+}
+
+function rptJobSays(){
+  const sel = $("rptJob"), out = $("rptJobWhat"); if (!sel || !out) return;
+  const j = (RPT_JOBS || []).find(x => x.id === sel.value);
+  const n = (RPT_JOBS || []).filter(x => x.check_level === RPT_JOB_LEVEL[$("rptKind").value]).length;
+  out.innerHTML = j
+    ? `Saved on <b>${esc(j.id)}</b>. Once you issue it, it shows under the booking in that job's room, to ${esc(j.client_name || "that job's client")} and nobody else. A draft is never shown.`
+    : n
+      ? `Pick the job if this visit was the check the client booked from their job, so the findings show under the booking. Leave it on None for a check bought on its own. ${n} job${n === 1 ? "" : "s"} with this check booked; any that already have a report are at the bottom.`
+      : "No job has this check booked, so the report is saved on its own.";
+}
+
+function rptJobPicked(){
+  const sel = $("rptJob");
+  return sel && RPT_JOB_LEVEL[$("rptKind").value] && sel.value ? sel.value : null;
+}
+
 function rptFormKeep(){
   const kind = $("rptFields")?.dataset.kind; if (!kind) return;
   const keep = RPT_TYPED[kind] = RPT_TYPED[kind] || {};
@@ -11540,6 +11611,7 @@ function rptFormDraw(){
   h += form.fields.map(f => input(f.id, f.label, f.hint, f.short, f.rows)).join("");
   box.dataset.kind = kind;
   box.innerHTML = h;
+  rptJobDraw();
   $("rptKindWhat").textContent = form.what;
   $("rptFilesLbl").textContent = form.files;
 }
