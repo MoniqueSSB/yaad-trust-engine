@@ -159,7 +159,8 @@ html[data-theme="light"] {
    print and pdf-render blocks below still turn a report white.
 
    Text tiers, measured. Dark on #1b1f24: ink 12.8:1, mute 7.6:1, dim 5.7:1.
-   Light on #f5f2ec: ink 14.1:1, mute 10.7:1, dim 7.9:1, kept as dark as the
+   Light on #fcfbf8 (whiter from 20 Oct 2026, founder: "make background more
+   white"): ink 15.3:1, mute 11.6:1, dim 8.5:1, kept as dark as the
    old light tiers because "the words need to stand out and be dark".
    Control borders (line2) hold 3:1 on the page in both. */
 @media screen {
@@ -173,7 +174,7 @@ html[data-theme="light"] {
     --field: rgba(27,31,36,0.7); --bar: rgba(27,31,36,0.94);
   }
   html[data-theme="light"]:not(.pdf-render):has(.portal-skin) {
-    --color-bg: #F5F2EC; --color-panel: #FBF9F5; --color-panel2: #EEEAE2;
+    --color-bg: #FCFBF8; --color-panel: #FFFEFB; --color-panel2: #F1EEE8;
     --color-line: #E2DCD1; --color-line2: #8F877A;
     --color-ink: #1F2328; --color-mute: #33373D; --color-dim: #464B52;
     --card-top-90: #FBF9F5; --card-top-80: #FBF9F5; --card-top-75: #FBF9F5;
@@ -198,6 +199,11 @@ html[data-theme="light"] {
     --tab-terracotta: #D29579; --tab-terracotta-soft: #3A2C26; --tab-terracotta-ink: #EBBDA8;
     --tab-slate: #8EAACB; --tab-slate-soft: #26303C; --tab-slate-ink: #B7CBE2;
     --tab-lagoon: #7DB6B5; --tab-lagoon-soft: #233435; --tab-lagoon-ink: #ACD5D3;
+    --tab-plum: #B39AC6; --tab-plum-soft: #322A39; --tab-plum-ink: #D6C4E2;
+    --tab-stone: #A8A196; --tab-stone-soft: #2E2C29; --tab-stone-ink: #CFC9BE;
+    --tab-clay: #C9997A; --tab-clay-soft: #382C24; --tab-clay-ink: #E3C3AB;
+    --tab-rose: #D28FA3; --tab-rose-soft: #3A262D; --tab-rose-ink: #EBBCCB;
+    --tab-dusk: #9EA2D0; --tab-dusk-soft: #2A2C3D; --tab-dusk-ink: #C7CAE8;
   }
   html[data-theme="light"]:not(.pdf-render):has(.portal-skin) {
     --tab-sage: #5F8463; --tab-sage-soft: #E2EADF; --tab-sage-ink: #3A5A3F;
@@ -205,6 +211,11 @@ html[data-theme="light"] {
     --tab-terracotta: #A8664C; --tab-terracotta-soft: #F2E2D9; --tab-terracotta-ink: #7F4330;
     --tab-slate: #55728F; --tab-slate-soft: #DFE6EE; --tab-slate-ink: #34506C;
     --tab-lagoon: #4A8384; --tab-lagoon-soft: #DBEAE8; --tab-lagoon-ink: #2D5B5C;
+    --tab-plum: #80659A; --tab-plum-soft: #EBE3F0; --tab-plum-ink: #5A4170;
+    --tab-stone: #7A7468; --tab-stone-soft: #EBE7E0; --tab-stone-ink: #4F4A41;
+    --tab-clay: #9A6B4B; --tab-clay-soft: #EFE2D6; --tab-clay-ink: #6B452C;
+    --tab-rose: #A35D72; --tab-rose-soft: #F2E0E5; --tab-rose-ink: #7A3B4F;
+    --tab-dusk: #6B6F9E; --tab-dusk-soft: #E4E5F0; --tab-dusk-ink: #464A78;
   }
 }
 .hue-sage { --hue: var(--tab-sage, var(--color-purple)); --hue-soft: var(--tab-sage-soft, var(--color-soft)); --hue-ink: var(--tab-sage-ink, var(--color-ink)); }
@@ -212,21 +223,87 @@ html[data-theme="light"] {
 .hue-terracotta { --hue: var(--tab-terracotta, var(--color-purple)); --hue-soft: var(--tab-terracotta-soft, var(--color-soft)); --hue-ink: var(--tab-terracotta-ink, var(--color-ink)); }
 .hue-slate { --hue: var(--tab-slate, var(--color-purple)); --hue-soft: var(--tab-slate-soft, var(--color-soft)); --hue-ink: var(--tab-slate-ink, var(--color-ink)); }
 .hue-lagoon { --hue: var(--tab-lagoon, var(--color-purple)); --hue-soft: var(--tab-lagoon-soft, var(--color-soft)); --hue-ink: var(--tab-lagoon-ink, var(--color-ink)); }
+.hue-plum { --hue: var(--tab-plum, var(--color-purple)); --hue-soft: var(--tab-plum-soft, var(--color-soft)); --hue-ink: var(--tab-plum-ink, var(--color-ink)); }
+.hue-stone { --hue: var(--tab-stone, var(--color-purple)); --hue-soft: var(--tab-stone-soft, var(--color-soft)); --hue-ink: var(--tab-stone-ink, var(--color-ink)); }
+.hue-clay { --hue: var(--tab-clay, var(--color-purple)); --hue-soft: var(--tab-clay-soft, var(--color-soft)); --hue-ink: var(--tab-clay-ink, var(--color-ink)); }
+.hue-rose { --hue: var(--tab-rose, var(--color-purple)); --hue-soft: var(--tab-rose-soft, var(--color-soft)); --hue-ink: var(--tab-rose-ink, var(--color-ink)); }
+.hue-dusk { --hue: var(--tab-dusk, var(--color-purple)); --hue-soft: var(--tab-dusk-soft, var(--color-soft)); --hue-ink: var(--tab-dusk-ink, var(--color-ink)); }
 
-.jtabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 3px solid var(--hue); }
+/* Every tab is filled in its own soft colour, so ten sections read as ten
+   colours at a glance (founder, 20 Oct 2026: "the tabs need to be different
+   colours"). The section that is open gets an outline in its mark. */
+.jtabs { display: flex; flex-wrap: wrap; gap: 8px; }
 .jtab {
-  display: inline-flex; align-items: center; gap: 8px; margin-bottom: -3px;
-  padding: 10px 14px 9px; border-radius: 12px 12px 0 0; border-bottom: 3px solid transparent;
-  font-size: 13px; font-weight: 500; color: var(--color-dim);
-  transition: background .15s, color .15s;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 15px; border-radius: 12px; border: 2px solid transparent;
+  font-size: 15px; font-weight: 600; background: var(--hue-soft); color: var(--hue-ink);
+  transition: border-color .15s;
 }
 .jtab::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--hue); flex: none; }
-.jtab:hover { background: var(--color-panel2); color: var(--color-ink); }
-.jtab[aria-current="page"] { background: var(--hue-soft); color: var(--hue-ink); font-weight: 700; border-bottom-color: var(--hue); }
+.jtab:hover { border-color: var(--hue); }
+.jtab[aria-current="page"] { border-color: var(--hue); font-weight: 700; }
 .jtab:focus-visible { outline: 2px solid var(--color-purple); outline-offset: 2px; }
-.jtab-count { border-radius: 100px; padding: 1px 6px; font-size: 10.5px; font-weight: 700; background: var(--color-panel2); color: var(--color-dim); }
-/* The ink, not the mark: page colour on the mark misses 4.5:1 in light. */
-.jtab[aria-current="page"] .jtab-count { background: var(--hue-ink); color: var(--color-bg); }
+.jtab-count { border-radius: 100px; padding: 1px 8px; font-size: 13px; font-weight: 700; background: var(--color-bg); color: var(--hue-ink); }
+
+/* ── Job room dashboard ──────────────────────────────────────────────────
+   The job room's front page (founder, 20 Oct 2026): one view of coloured
+   boxes, a figure or a chart in each, few words; tap a box for the detail.
+   Each box is a link to the tab it summarises, so the detail is the same
+   tab content as before, nothing removed. A mosaic of mixed widths that
+   keeps several columns until phone width. */
+.jd { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-flow: dense; gap: 18px; margin-top: 22px; }
+.jd-box {
+  position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  padding: 20px 22px; border-radius: 18px; border: 2px solid transparent;
+  background: var(--hue-soft); color: var(--color-ink); transition: border-color .15s;
+}
+.jd-box:hover { border-color: var(--hue); }
+.jd-box:focus-visible { outline: 2px solid var(--color-purple); outline-offset: 2px; }
+.jd-tag { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; color: var(--hue-ink); }
+.jd-tag::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--hue); flex: none; }
+.jd-n { margin-left: auto; min-width: 28px; padding: 0 9px; border-radius: 100px; background: var(--color-bg); color: var(--hue-ink); font-size: 15px; font-weight: 700; line-height: 28px; text-align: center; }
+.jd-top { display: flex; align-items: center; gap: 8px; }
+.jd-big { font-size: 38px; line-height: 42px; font-weight: 500; letter-spacing: -.015em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.jd-mid { font-size: 26px; line-height: 32px; font-weight: 500; }
+.jd-sub { font-size: 15px; line-height: 22px; color: var(--color-mute); }
+.jd-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.jd-row > div { min-width: 0; }
+.jd-chart { display: block; width: 100%; height: auto; }
+.jd-chart text { font-size: 14px; fill: var(--color-dim); }
+.jd-chart .ink { fill: var(--color-ink); font-weight: 600; }
+.jd-act { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 14px 18px; border-color: var(--hue); }
+.jd-act b { display: block; font-size: 22px; line-height: 28px; }
+.jd-go { margin-left: auto; display: inline-flex; align-items: center; height: 46px; padding: 0 20px; border-radius: 10px; background: var(--color-purple); color: #fff; font-size: 16px; font-weight: 600; }
+html[data-theme="light"] .jd-go { color: #fff; }
+html:not([data-theme="light"]) .jd-go { color: var(--color-onbrand); }
+.w3 { grid-column: span 3; } .w4 { grid-column: span 4; } .w5 { grid-column: span 5; }
+.w6 { grid-column: span 6; } .w7 { grid-column: span 7; } .w8 { grid-column: span 8; } .w12 { grid-column: span 12; }
+.t2 { grid-row: span 2; }
+@media (max-width: 1080px) {
+  .jd { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .w3, .w4, .w5 { grid-column: span 3; } .w6, .w7, .w8, .w12 { grid-column: span 6; }
+}
+@media (max-width: 640px) {
+  .jd { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .w3 { grid-column: span 1; } .w4, .w5, .w6, .w7, .w8, .w12 { grid-column: span 2; } .t2 { grid-row: auto; }
+  .jd-box { padding: 16px; } .jd-big { font-size: 28px; line-height: 32px; } .jd-act b { font-size: 19px; line-height: 24px; }
+  .jd-row { flex-direction: column; align-items: flex-start; }
+}
+
+/* The detail: a tab opened from a box, a tab link, or any old ?tab= link in
+   a message, slides over the dashboard from the right. Same tab content as
+   before; Close returns to the dashboard. */
+.jpanel-back { position: fixed; inset: 0; z-index: 60; background: rgba(20, 18, 14, .38); }
+.jpanel {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 61; width: min(720px, 100%);
+  overflow-y: auto; overscroll-behavior: contain; padding: 22px 24px 56px;
+  background: var(--color-bg); border-left: 3px solid var(--hue); box-shadow: -8px 0 24px rgba(0, 0, 0, .18);
+}
+.jpanel-head { position: sticky; top: -22px; z-index: 2; display: flex; align-items: center; gap: 12px; margin: -22px -24px 8px; padding: 18px 24px 14px; background: var(--color-bg); border-bottom: 1px solid var(--color-line); }
+.jpanel-head h2 { margin: 0; font-family: var(--font-display); font-size: 26px; line-height: 32px; font-weight: 500; color: var(--color-ink); }
+.jpanel-close { margin-left: auto; display: inline-flex; align-items: center; height: 42px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--color-line2); font-size: 15px; font-weight: 600; color: var(--color-ink); }
+.jpanel-close:hover { border-color: var(--hue); }
+@media (max-width: 640px) { .jpanel { padding: 18px 16px 48px; border-left: 0; } .jpanel-head { margin: -18px -16px 8px; padding: 14px 16px 12px; } }
 
 /* ── The light and dark switch in the header ─────────────────────────────
    Same rules as docs/theme.css so the two headers match. A knob slides

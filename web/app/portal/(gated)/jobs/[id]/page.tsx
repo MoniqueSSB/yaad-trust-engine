@@ -25,8 +25,11 @@ import { jobGates } from "@/lib/portal/gates";
 import { materialsReceipt } from "@/lib/portal/materials-receipt";
 import { DocStrip, type Doc } from "@/components/portal/DocStrip";
 import { TabBar, TABS, type TabKey } from "@/components/portal/TabBar";
+import { JobDashboard, type DashboardData } from "@/components/portal/JobDashboard";
+import { JobPanel } from "@/components/portal/JobPanel";
 import { AddOnPanel, AddonApprove, type AddonInvoice, type AddonPhoto, type AddonRow } from "@/components/portal/AddOnPanel";
-import { addonClientBill, addonStateLine, addonWorkerPay, waitingOn, WORKER_FEE_RATE } from "@/lib/jobs/addon";
+import { addonClientBill, addonStateLine, addonWorkerPay, waitingOn } from "@/lib/jobs/addon";
+import { workerFeeRate } from "@/lib/jobs/worker-fee";
 import { MoneyTrail, type TrailWorkerPay } from "@/components/portal/MoneyTrail";
 import { JobAddress } from "@/components/portal/JobAddress";
 import { JobWhatsApp } from "@/components/portal/JobWhatsApp";
@@ -42,7 +45,7 @@ import { JobSummaryCard } from "@/components/portal/JobSummaryCard";
 import { ConfirmAction } from "@/components/portal/ConfirmAction";
 import { AskForChange } from "@/components/portal/AskForChange";
 import { ApproveButton } from "@/components/portal/ApproveButton";
-import { JobCheckPanel, type CheckInvoice, type CheckPrice } from "@/components/portal/JobCheckPanel";
+import { JobCheckPanel, type CheckInvoice, type CheckPrice, type CheckReport } from "@/components/portal/JobCheckPanel";
 import { JobFiles, type JobFile } from "@/components/portal/JobFiles";
 import {
   CHECK_CATALOGUE_ID,
@@ -129,6 +132,8 @@ type Quote = {
   recommended_at: string | null;
   recommended_by: string | null;
   recommended_reason: string | null;
+  /** When the quote was given: picks the worker's rate (worker_fee_rate()). */
+  created_at?: string | null;
 };
 
 type Pack = {
@@ -309,7 +314,7 @@ export default async function JobRoom({
       supabase
         .from("job_quotes")
         .select(
-          "id,worker_name,worker_email,labour_jmd,materials_jmd,materials_at_cost,earliest_start,days_estimate,note,status,scope_summary,included_note,excluded_note,timeline_note,payment_stage_note,recommended_at,recommended_by,recommended_reason,billing_mode",
+          "id,worker_name,worker_email,labour_jmd,materials_jmd,materials_at_cost,earliest_start,days_estimate,note,status,scope_summary,included_note,excluded_note,timeline_note,payment_stage_note,recommended_at,recommended_by,recommended_reason,billing_mode,created_at",
         )
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
@@ -375,7 +380,7 @@ export default async function JobRoom({
   const [{ data: addonRows }, { data: addonInvRows }, { data: addonEvRows }] = await Promise.all([
     supabase
       .from("job_addons")
-      .select("id,rev,scope,amount_jmd,terms,status,last_edit_side,history,closed_reason,signed_off_at,created_at")
+      .select("id,rev,scope,amount_jmd,terms,status,last_edit_side,history,closed_reason,signed_off_at,created_at,agreed_at")
       .eq("job_id", id)
       .order("created_at", { ascending: true }),
     supabase
@@ -608,7 +613,9 @@ export default async function JobRoom({
 
   const labour = won?.labour_jmd ?? null;
   const allIn = labour == null ? null : Math.round(labour * 1.15) + (won?.materials_jmd ?? 0);
-  const takeHome = labour == null ? null : Math.round(labour * (1 - WORKER_FEE_RATE)) + (won?.materials_jmd ?? 0);
+  /* 7% on a quote given from 4 Oct 2026, 5% before, as raise_job_worker_payable() decides. */
+  const workerRate = workerFeeRate(won?.created_at);
+  const takeHome = labour == null ? null : labour - Math.round(labour * workerRate) + (won?.materials_jmd ?? 0);
 
   const jobBase = "/portal/jobs/" + encodeURIComponent(job.id);
 
@@ -649,7 +656,7 @@ export default async function JobRoom({
      cannot have found it. RLS shows a client their invoice once it is sent,
      and nothing while it is a draft, same as every other invoice. */
   const checkLevel = isCheckLevel(job.check_level) ? job.check_level : null;
-  const [{ data: checkRows }, { data: checkInvoiceRow }] = await Promise.all([
+  const [{ data: checkRows }, { data: checkInvoiceRow }, { data: checkReportRows }] = await Promise.all([
     /* Also read while the client is still choosing a quote (29 Sep 2026):
        the Visual Check is offered on the quote itself, and its price is the
        catalogue's there too. */
@@ -666,7 +673,23 @@ export default async function JobRoom({
           .eq("id", job.check_invoice_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    /* What the checker recorded (founder, 20 Oct 2026: a check booked on a
+       job had nowhere to show its findings). The issued report for this job's
+       check kind, with its findings. RLS ("client reads their issued report")
+       returns it to the job's client only, and only once a person has issued
+       it, so a draft or a worker session reads nothing. */
+    checkLevel
+      ? supabase
+          .from("reports")
+          .select("id,number,visited_on,verdict,verdict_line,issued_at,report_findings(ord,heading,body)")
+          .eq("job_id", job.id)
+          .eq("kind", checkLevel === "visual" ? "visual_check" : "technical_signoff")
+          .eq("status", "issued")
+          .order("issued_at", { ascending: false })
+          .limit(1)
+      : Promise.resolve({ data: null }),
   ]);
+  const checkReport = ((checkReportRows ?? []) as CheckReport[])[0] ?? null;
   const checkPrices = {
     visual: ((checkRows ?? []) as CheckPrice[]).find((r) => r.id === CHECK_CATALOGUE_ID.visual) ?? null,
     technical: ((checkRows ?? []) as CheckPrice[]).find((r) => r.id === CHECK_CATALOGUE_ID.technical) ?? null,
@@ -819,7 +842,7 @@ export default async function JobRoom({
   /* The worker's side is 7% (4 Oct 2026, was 5% from 9 Sep), the same figure takeHome uses.
      The worker's money panel was handed feeJmd, the client's 15%, and so
      showed "Yaadly fee, deducted" at three times what is deducted. */
-  const workerFeeJmd = labour == null ? null : Math.round(labour * WORKER_FEE_RATE);
+  const workerFeeJmd = labour == null ? null : Math.round(labour * workerRate);
   const matReleases = (materialsRows ?? []) as {
     amount_jmd: number; released_at: string | null; stage: number | null; receipt_ref: string; sent_at: string | null;
   }[];
@@ -1396,6 +1419,76 @@ export default async function JobRoom({
     who === "you" ? "You" : who === "them" ? otherSideLabel : "Yaadly";
   const lastUpdated = whenDateTime(job.updated_at);
 
+  /* The dashboard's figures (founder, 20 Oct 2026). Read off rows this page
+     has already loaded; nothing new is queried and nothing is decided here.
+     Bills are counted, not summed, so two currencies are never added; the
+     stage chart only draws when every stage bill shares one currency. */
+  const parentIds = new Set(invoices.map((i) => i.part_of).filter(Boolean));
+  const liveBills = invoices.filter((i) => (i.status === "sent" || i.status === "paid") && !parentIds.has(i.id));
+  const stageBills = liveBills.filter((i) => i.stage != null && i.total_pence != null).sort((a, b) => (a.stage ?? 0) - (b.stage ?? 0));
+  const oneCurrency = new Set(stageBills.map((i) => (i.currency ?? "GBP").toUpperCase())).size === 1;
+  const compact = (v: number, cur: string | null) => {
+    const c = (cur ?? "GBP").toUpperCase();
+    if (c === "JMD") return v >= 1000 ? "J$" + Math.round(v / 1000) + "k" : "J$" + v;
+    return amount(v, c);
+  };
+  const evDays = new Map<string, number>();
+  for (const e of ev) {
+    if (!e.created_at) continue;
+    const k = new Date(new Date(e.created_at).getTime() - 5 * 3600_000).toISOString().slice(0, 10);
+    evDays.set(k, (evDays.get(k) ?? 0) + 1);
+  }
+  const evLatest = ev.reduce<string | null>((m, e) => (e.created_at && (!m || e.created_at > m) ? e.created_at : m), null);
+  const mineWaiting = outstanding.filter((o) => o.who === "you");
+  const dashboard: DashboardData = {
+    base: jobBase,
+    role: isClient ? "client" : "worker",
+    waiting: { count: mineWaiting.length, title: mineWaiting[0]?.title ?? null },
+    check: checkLevel
+      ? {
+          label: CHECK_LABEL[checkLevel],
+          detail: checkReport
+            ? "What was recorded is in"
+            : job.check_assigned_to
+              ? "Visit arranged"
+              : "Yaadly is arranging the visit",
+          recorded: !!checkReport,
+        }
+      : null,
+    total: isClient ? jmdOrNull(clientAllIn) : jmdOrNull(takeHome),
+    totalLabel: isClient ? "Job total" : "You take home",
+    bills: {
+      paid: liveBills.filter((i) => i.status === "paid").length,
+      all: liveBills.length,
+      label: isClient ? "Bills paid" : "Paid to you",
+    },
+    unpaid: isClient ? unpaidClientInvoices : 0,
+    stage: { now: jobStage, of: evidenceStageCount },
+    evidence: {
+      total: ev.length,
+      byDay: [...evDays.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([k, n]) => ({
+        day: new Date(k + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+        n,
+      })),
+      latest: whenDateTime(evLatest),
+    },
+    messages: { count: chat.length, last: chat.length ? chat[chat.length - 1].body : null },
+    quotes: qs.length,
+    materials: { store: job.materials_store ?? null },
+    extra: { waiting: tabCounts.extra, total: addons.length },
+    docs: docsReady,
+    details: { trade: job.trade ?? null, parish: job.parish ?? null },
+    help: { open: helpOpen > 0 },
+    stageBars: oneCurrency
+      ? stageBills.map((i) => ({
+          stage: i.stage as number,
+          label: compact(i.total_pence as number, i.currency),
+          value: i.total_pence as number,
+          paid: i.status === "paid",
+        }))
+      : [],
+  };
+
   return (
     <>
       <Link
@@ -1446,6 +1539,11 @@ export default async function JobRoom({
           job
         </span>
       </div>
+
+      {/* The tab strip and the dashboard lead the room (founder, 20 Oct 2026).
+          A tab or a box opens that section's detail over the dashboard. */}
+      <TabBar base={jobBase} active={tab} counts={tabCounts} />
+      <JobDashboard d={dashboard} />
 
       {/*
         "Waiting on your portal setup" names a state and leaves the reader to
@@ -1545,7 +1643,7 @@ export default async function JobRoom({
 
       <div className="mt-2 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0">
-      <TabBar base={jobBase} active={tab} counts={tabCounts} />
+      <JobPanel open={tab !== "overview"} tab={tab} base={jobBase}>
 
       {tab === "scope" && (
         <>
@@ -1914,6 +2012,7 @@ export default async function JobRoom({
           chosenAt={job.check_chosen_at ?? null}
           assignedTo={job.check_assigned_to ?? null}
           invoice={checkInvoice}
+          report={checkReport}
           prices={checkPrices}
           jmdPerGbp={jmdPerGbp}
         />
@@ -2043,6 +2142,7 @@ export default async function JobRoom({
           workerName={won?.worker_name ?? job.worker_name ?? "the tradesperson"}
         />
         <MoneyPanel
+          workerFeeRate={workerRate}
           cardPayments={role === "client" ? cardPayments : {}}
           cardReturning={role === "client" && cardParam === "paid"}
           bankDetails={role === "client" ? bankDetails : ""}
@@ -2071,7 +2171,8 @@ export default async function JobRoom({
             })
             .map((a) => {
             const c = addonClientBill(a.amount_jmd, a.terms);
-            const pay = addonWorkerPay(a.amount_jmd);
+            const agreedAt = (a as AddonRow & { agreed_at?: string | null }).agreed_at ?? a.created_at;
+            const pay = addonWorkerPay(a.amount_jmd, agreedAt);
             const counted = a.status === "agreed" || a.status === "signed_off";
             const bill = addonBill[a.id] ?? "none";
             const workerPay = workerPays.find((p) => p.addonId === a.id);
@@ -2085,7 +2186,7 @@ export default async function JobRoom({
             const cancelledWords = a.status === "cancelled" ? " Cancelled after it was paid for: Yaadly settles this with you." : "";
             const line = role === "client"
               ? { id: a.id, scope: a.scope, work: c.amount, fee: c.fee, total: c.total, status: a.status }
-              : { id: a.id, scope: a.scope, work: a.amount_jmd, fee: a.amount_jmd - pay, total: pay, status: a.status };
+              : { id: a.id, scope: a.scope, work: a.amount_jmd, fee: a.amount_jmd - pay, feeRate: workerFeeRate(agreedAt), total: pay, status: a.status };
             return {
               ...line,
               counted,
@@ -2460,6 +2561,7 @@ export default async function JobRoom({
           </div>
         </>
       )}
+      </JobPanel>
         </div>
 
         <JobRail
