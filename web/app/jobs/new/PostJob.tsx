@@ -919,6 +919,12 @@ export function PostJob({ initialTrade, initialParish, initialDesc, requestedWor
                   once your portal is set up. You can remove it from the job at
                   any time.
                 </p>
+                <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
+                  Yaadly Ltd uses these details to run this job and to reach you
+                  about it, nothing else. How we look after them, who we share
+                  them with and how to ask for a copy or a deletion:{" "}
+                  <a className="underline" href="https://yaadly.co.uk/privacy.html" target="_blank" rel="noreferrer">privacy policy</a>.
+                </p>
               </div>
             </div>
           )}

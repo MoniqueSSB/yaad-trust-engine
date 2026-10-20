@@ -192,6 +192,15 @@ html:not([data-theme="light"]) .calc td input{background:rgba(155,115,245,0.06)}
 }
 .site-nav .theme-btn:hover{border-color:var(--purple)}
 .site-nav .theme-btn:focus-visible{outline:2px solid var(--purple); outline-offset:2px}
+
+/* Keyboard focus, site wide. Every link, button and field shows the same
+   ring when reached by keyboard, and nothing when reached by mouse.
+   Added 16 Oct 2026 after the twenty point check: some fields had
+   outline:none and relied on a border colour change nobody could see. */
+:focus-visible{outline:2px solid var(--purple, #9B73F5); outline-offset:2px}
+.skip{position:fixed; left:max(16px, env(safe-area-inset-left, 0px)); top:-60px; z-index:100; padding:10px 14px; border-radius:10px;
+  background:var(--purple, #9B73F5); color:#0E0D22; font:700 14px system-ui,sans-serif; text-decoration:none}
+.skip:focus{top:calc(12px + env(safe-area-inset-top, 0px))}
 .site-nav .theme-btn svg{
   position:relative; z-index:1;
   width:15px; height:15px; fill:none; stroke:currentColor;

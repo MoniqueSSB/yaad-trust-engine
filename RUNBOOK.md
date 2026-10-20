@@ -6716,3 +6716,10 @@ A Visual Check or Technical Sign-off the client booked from their job room (Inde
 4. **A check bought on its own** stays on "None, bought on its own" and is saved with no job, as before.
 5. **Drafted it without the job?** The desk has no button to add it afterwards. While it is still a draft, set it in the SQL editor by the report's id (a draft has no number yet): `update public.reports set job_id = 'J-xxxx' where id = '<report id>' and status = 'draft';`, after checking the job's `check_level` matches the report's kind. Once a report is issued, `report_guard_issue()` refuses an update from the SQL editor, which is the guard working: draft it again with the job picked.
 6. **"Could not read the jobs"** under the list means `v_job_checks` refused the read; check you are signed in as an admin. The rest of the drafter still works and saves with no job.
+
+## 72. A worker asks to stop job alert emails (16 Oct 2026)
+
+1. Job alert emails from `yaad-match` now end with a stop line and carry a `List-Unsubscribe` header. Both send the request to `YAAD_UNSUB_EMAIL` (default `monique@yaadly.co.uk`). Set that secret to change the inbox.
+2. The request reaches a person. Nothing switches off automatically. Unpublish the worker's alert preference by hand within two working days, because the email promises that.
+3. A worker on WhatsApp alerts says STOP there instead. That lane already handles it (`yaad-inbound/job-alerts.ts`).
+4. The change only reaches workers once `yaad-match` is deployed from main: `supabase functions deploy yaad-match --project-ref leffyisvfvjwzilydlwf`. Read `supabase functions list` first and keep its current `verify_jwt` setting.
