@@ -575,6 +575,7 @@ footer {
       </div>
 
       <div class="panel book-form">
+        <div id="bk-fields">
         <div class="fgroup"><label for="bk-svc">Which service</label>
           <select id="bk-svc">
             <option value="visual">Visual Check, one visit</option>
@@ -603,6 +604,12 @@ footer {
         <div class="bk-consent-note">Leave it unticked and we start after 14 days, with nothing to pay before then. <a href="/cancellation" target="_blank" rel="noopener">What this means</a>.</div>
         <button class="btn btn-primary" id="bk-send" style="width:100%;justify-content:center" onclick="sendBooking()">Book it, nothing charged yet</button>
         <div id="bk-status" style="margin-top:10px;font-size:13.5px;line-height:1.6"></div>
+        </div>
+        <!-- STEP 2. Once a booking goes through, the form is swapped for this
+             box: what we have, what happens to the money, and (only for a
+             client who ticked the early start) the Pay button. Paying is
+             still the client's own click; nothing redirects them to Stripe. -->
+        <div id="bk-next" hidden aria-live="polite"></div>
       </div>
     </div>
 
@@ -829,12 +836,12 @@ async function sendBooking(){
     j = await r.json().catch(()=>null);
     if(!r.ok) throw new Error((j && j.error) || ("HTTP " + r.status));
   }catch(err){
-    btn.disabled = false; btn.textContent = "Book it, nothing charged yet";
+    btn.disabled = false; btn.textContent = bookLabel();
     const mine = (j && j.error) ? esc(j.error) : "That did not go through. Nothing is lost on your side.";
     say("bad", "<b>" + mine + "</b>" + fallback);
     return;
   }
-  btn.disabled = false; btn.textContent = "Book it, nothing charged yet";
+  btn.disabled = false; btn.textContent = bookLabel();
   /* Both are sent when both were given (yaad-notify-client), so say both. */
   const channel = j.phoneGiven && j.emailGiven ? "email and WhatsApp" : (j.phoneGiven ? "WhatsApp" : "email");
   /* No express request to start early means the work waits out the 14 days,
@@ -861,8 +868,32 @@ async function sendBooking(){
       + '<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg></a>'
       + '<div style="margin-top:8px;font-size:12.5px;color:var(--mute)">Card handled by Stripe, shown as Yaadly Founder on your statement. Prefer an invoice or bank transfer? Reply to your receipt. <a href="/cancellation">Cancelling</a>.</div>'
     : "";
-  say("ok", "Thank you, " + esc(b.name) + '.<ul style="margin:8px 0 0 18px;padding:0"><li style="margin-bottom:6px">' + point1 + "</li><li>" + point2 + "</li></ul>" + payBtn);
+  const kick = payUrl ? "Step 2 of 2 · Pay" : "Booked";
+  const next = $id("bk-next");
+  next.innerHTML = '<div class="kick">' + kick + '</div>'
+    + '<h3 class="heading" style="font-size:24px;margin:6px 0 4px">Thank you, ' + esc(b.name) + '.</h3>'
+    + '<ul style="margin:10px 0 0 18px;padding:0;font-size:14.5px;line-height:1.6"><li style="margin-bottom:8px">' + point1 + "</li><li>" + point2 + "</li></ul>"
+    + payBtn
+    + '<button type="button" class="btn" style="margin-top:14px;background:none;border:0;padding:0;color:var(--mute);font-size:13px;text-decoration:underline;cursor:pointer" onclick="bookAnother()">Book another visit</button>';
+  $id("bk-fields").hidden = true;
+  next.hidden = false;
+  status.innerHTML = "";
+  /* Clear of the sticky header, so "Step 2 of 2" is the first thing seen. */
+  window.scrollTo({ top: next.closest(".book-form").getBoundingClientRect().top + window.scrollY - 100, behavior: "smooth" });
   ["bk-name","bk-email","bk-phone","bk-parish","bk-msg"].forEach(i=>$id(i).value="");
+}
+
+/* The button says where it leads: a ticked box goes on to the pay step,
+   an unticked one ends at the booking. Nothing is charged either way. */
+function bookLabel(){ return $id("bk-start-now").checked ? "Book, then pay (nothing charged yet)" : "Book it, nothing charged yet"; }
+$id("bk-start-now").addEventListener("change", () => { $id("bk-send").textContent = bookLabel(); });
+
+/* Back from step 2 to an empty form. */
+function bookAnother(){
+  $id("bk-next").hidden = true;
+  $id("bk-fields").hidden = false;
+  $id("bk-start-now").checked = false;
+  $id("bk-send").textContent = bookLabel();
 }
 
 async function sendEnquiry(){
