@@ -6690,7 +6690,7 @@ Migration `20261015120000_the_supplier_lane_for_materials.sql`. Yaadly buys mate
 
 Migration `20261020120000_the_access_register.sql`. The register records who holds which level. As of this file it gives nobody any new button; later files do that one level at a time.
 
-1. **Apply the migration** (not applied as of 20 Oct 2026). Then run `supabase/tests/access_register_guards.sql` with execute_sql: nine checks, all PASS, the summary comes back as the error text and nothing persists.
+1. **Applied 20 Oct 2026**, recorded in schema_migrations, guard test nine PASS. To re-check, run `supabase/tests/access_register_guards.sql` with execute_sql: nine checks, all PASS, the summary comes back as the error text and nothing persists.
 2. **The eight levels.** Super Admin is the `admins` table, added by hand only. Project Manager, Member, Checker and Viewer are rows in `staff_access`. Client, Worker and Material Supplier are worked out from jobs, worker profiles and suppliers, and are never granted.
 3. **Give someone a level** (signed in as Super Admin): `select public.grant_access('name@example.com', 'project_manager', 'why');`. Levels: `project_manager`, `member`, `checker`, `viewer`. Granting a new level replaces the old one; the old row keeps its history.
 4. **Take it away:** `select public.revoke_access('name@example.com');` returns 1 if they held a level, 0 if not.
