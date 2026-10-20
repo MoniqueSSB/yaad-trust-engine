@@ -27,7 +27,10 @@ export default async function PortalShell({
   const user = await getUser();
 
   return (
-    <div className="min-h-screen">
+    /* portal-skin switches on the portal's own low-strain surfaces and text
+       (globals.css, "Portal surfaces"). Public pages on this app keep the
+       marketing site's colours. Founder, 20 Oct 2026: portal only for now. */
+    <div className="portal-skin min-h-screen">
       <SiteNav
         email={user?.email}
         signOut={user ? signOut : undefined}

@@ -145,6 +145,89 @@ html[data-theme="light"] {
   --field: #FFFFFF; --bar: rgba(247,246,252,0.94);
 }
 
+/* ── Portal surfaces ─────────────────────────────────────────────────────
+   The signed-in portal's own surfaces and text, from the Yaadly Portal
+   design system (20 Oct 2026, founder: portal only for now). Warm paper in
+   light, deep slate in dark: no pure white or near-black ground, so no
+   glare in a long session. Purple, gold and the status colours are not
+   touched here; only grounds, borders and the three text tiers.
+
+   Switched on by the portal-skin class on the frame in app/portal/layout.tsx,
+   read through :has() so the variables still land on <html> and body picks
+   them up. Every other page on this app keeps the values above and so still
+   matches docs/theme.css. Screen only, and never on the PDF copy, so the
+   print and pdf-render blocks below still turn a report white.
+
+   Text tiers, measured. Dark on #1b1f24: ink 12.8:1, mute 7.6:1, dim 5.7:1.
+   Light on #f5f2ec: ink 14.1:1, mute 10.7:1, dim 7.9:1, kept as dark as the
+   old light tiers because "the words need to stand out and be dark".
+   Control borders (line2) hold 3:1 on the page in both. */
+@media screen {
+  html:not(.pdf-render):has(.portal-skin) {
+    --color-bg: #1B1F24; --color-panel: #232830; --color-panel2: #2B313A;
+    --color-line: #343B45; --color-line2: #6B7480;
+    --color-ink: #E6E2DA; --color-mute: #B3B0A8; --color-dim: #9A978F;
+    --card-top-90: rgba(35,40,48,0.9); --card-top-80: rgba(35,40,48,0.8); --card-top-75: rgba(35,40,48,0.75);
+    --card-bot-75: rgba(31,36,43,0.75); --card-bot-60: rgba(31,36,43,0.6);
+    --well-60: rgba(27,31,36,0.6); --well-50: rgba(27,31,36,0.5);
+    --field: rgba(27,31,36,0.7); --bar: rgba(27,31,36,0.94);
+  }
+  html[data-theme="light"]:not(.pdf-render):has(.portal-skin) {
+    --color-bg: #F5F2EC; --color-panel: #FBF9F5; --color-panel2: #EEEAE2;
+    --color-line: #E2DCD1; --color-line2: #8F877A;
+    --color-ink: #1F2328; --color-mute: #33373D; --color-dim: #464B52;
+    --card-top-90: #FBF9F5; --card-top-80: #FBF9F5; --card-top-75: #FBF9F5;
+    --card-bot-75: #F8F5F0; --card-bot-60: #F8F5F0;
+    --well-60: #FBF9F5; --well-50: #FBF9F5;
+    --field: #FDFCF9; --bar: rgba(245,242,236,0.94);
+  }
+}
+
+/* ── Portal tab colours ──────────────────────────────────────────────────
+   The job room's tabs, one muted colour per kind of question (founder,
+   20 Oct 2026): sage the job itself, ochre the proof, terracotta waiting on
+   you, slate the money, lagoon talking. Values from the Yaadly Portal design
+   system's tab-* tokens. Each set is a mark (dot and bar, 3:1 on the page),
+   a soft fill for the current tab, and an ink that reads 4.5:1 on that fill.
+   Declared only with portal-skin, like the surfaces above; the jtab rules
+   below fall back to the old purple if they are ever read without it. */
+@media screen {
+  html:not(.pdf-render):has(.portal-skin) {
+    --tab-sage: #8FB592; --tab-sage-soft: #28332B; --tab-sage-ink: #B8D2B9;
+    --tab-ochre: #CDAD68; --tab-ochre-soft: #353024; --tab-ochre-ink: #E5D09C;
+    --tab-terracotta: #D29579; --tab-terracotta-soft: #3A2C26; --tab-terracotta-ink: #EBBDA8;
+    --tab-slate: #8EAACB; --tab-slate-soft: #26303C; --tab-slate-ink: #B7CBE2;
+    --tab-lagoon: #7DB6B5; --tab-lagoon-soft: #233435; --tab-lagoon-ink: #ACD5D3;
+  }
+  html[data-theme="light"]:not(.pdf-render):has(.portal-skin) {
+    --tab-sage: #5F8463; --tab-sage-soft: #E2EADF; --tab-sage-ink: #3A5A3F;
+    --tab-ochre: #8F7234; --tab-ochre-soft: #EFE7D2; --tab-ochre-ink: #64501D;
+    --tab-terracotta: #A8664C; --tab-terracotta-soft: #F2E2D9; --tab-terracotta-ink: #7F4330;
+    --tab-slate: #55728F; --tab-slate-soft: #DFE6EE; --tab-slate-ink: #34506C;
+    --tab-lagoon: #4A8384; --tab-lagoon-soft: #DBEAE8; --tab-lagoon-ink: #2D5B5C;
+  }
+}
+.hue-sage { --hue: var(--tab-sage, var(--color-purple)); --hue-soft: var(--tab-sage-soft, var(--color-soft)); --hue-ink: var(--tab-sage-ink, var(--color-ink)); }
+.hue-ochre { --hue: var(--tab-ochre, var(--color-purple)); --hue-soft: var(--tab-ochre-soft, var(--color-soft)); --hue-ink: var(--tab-ochre-ink, var(--color-ink)); }
+.hue-terracotta { --hue: var(--tab-terracotta, var(--color-purple)); --hue-soft: var(--tab-terracotta-soft, var(--color-soft)); --hue-ink: var(--tab-terracotta-ink, var(--color-ink)); }
+.hue-slate { --hue: var(--tab-slate, var(--color-purple)); --hue-soft: var(--tab-slate-soft, var(--color-soft)); --hue-ink: var(--tab-slate-ink, var(--color-ink)); }
+.hue-lagoon { --hue: var(--tab-lagoon, var(--color-purple)); --hue-soft: var(--tab-lagoon-soft, var(--color-soft)); --hue-ink: var(--tab-lagoon-ink, var(--color-ink)); }
+
+.jtabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 3px solid var(--hue); }
+.jtab {
+  display: inline-flex; align-items: center; gap: 8px; margin-bottom: -3px;
+  padding: 10px 14px 9px; border-radius: 12px 12px 0 0; border-bottom: 3px solid transparent;
+  font-size: 13px; font-weight: 500; color: var(--color-dim);
+  transition: background .15s, color .15s;
+}
+.jtab::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--hue); flex: none; }
+.jtab:hover { background: var(--color-panel2); color: var(--color-ink); }
+.jtab[aria-current="page"] { background: var(--hue-soft); color: var(--hue-ink); font-weight: 700; border-bottom-color: var(--hue); }
+.jtab:focus-visible { outline: 2px solid var(--color-purple); outline-offset: 2px; }
+.jtab-count { border-radius: 100px; padding: 1px 6px; font-size: 10.5px; font-weight: 700; background: var(--color-panel2); color: var(--color-dim); }
+/* The ink, not the mark: page colour on the mark misses 4.5:1 in light. */
+.jtab[aria-current="page"] .jtab-count { background: var(--hue-ink); color: var(--color-bg); }
+
 /* ── The light and dark switch in the header ─────────────────────────────
    Same rules as docs/theme.css so the two headers match. A knob slides
    between a sun and a moon; on (aria-checked) means dark. */

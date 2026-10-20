@@ -1107,6 +1107,20 @@ html[data-theme="light"] .ovside,
 html[data-theme="light"] .sc,
 html[data-theme="light"] .jcard,
 html[data-theme="light"] .ans{background:#FFFFFF}
+/* The side panel, the pinned first column of a table on a phone, and the
+   empty photo tile were fixed dark colours, so they stayed dark with the
+   switch on light and the words on them all but disappeared. */
+html[data-theme="light"] .drw,
+html[data-theme="light"] .drw .dhd,
+html[data-theme="light"] .drw .dacts{background:#FFFFFF}
+@media(max-width:820px){
+  html[data-theme="light"] .tw th:first-child,
+  html[data-theme="light"] .tw td:first-child{background:#FFFFFF}
+  html[data-theme="light"] tbody tr:hover td:first-child{background:#F3F0FC}
+}
+html[data-theme="light"] .thumbs>i{background:linear-gradient(135deg,#F3F0FC,#E7E1F8)}
+html[data-theme="light"] .thumbs>a.thumb img,
+html[data-theme="light"] .thumbs>a.thumb video,
 html[data-theme="light"] .evpmedia img,
 html[data-theme="light"] .evpmedia video{background:#EFEBFA}
 html[data-theme="light"] .pthumb .x{background:rgba(21,20,46,.75)}
@@ -8249,8 +8263,16 @@ async function loadOverview(){
   const enqBreached = CLOCK.filter(r => r.kind === "enquiry" && r.breached).length;
   const enqOldest = CLOCK.filter(r => r.kind === "enquiry")
     .reduce((a, r) => Math.max(a, Number(r.hours_waiting) || 0), 0);
-  const slaRows = await sb.from("sla_first_reply").select("met,hours,awaiting_human_since,from_addr,job_id");
-  const sla = slaRows.data || [];
+  // sla_first_reply is every conversation, tests included. The Answer button
+  // opens v_waiting_on_you, which drops JOB-TEST jobs and anything marked
+  // "that was me testing". Reading the raw view here left a 19 day alert on
+  // the Overview for a test thread the queue no longer showed, so the alert
+  // pointed at an empty screen. Same exclusions as the queue, so the two agree.
+  const slaRows = await sb.from("sla_first_reply").select("met,hours,awaiting_human_since,from_addr,job_id,channel");
+  const testThreads = await sb.from("intake_threads").select("channel,from_addr").eq("is_test", true).limit(1000);
+  const testKeys = new Set((testThreads.data || []).map(r => r.channel + "|" + r.from_addr));
+  const sla = (slaRows.data || []).filter(r =>
+    !String(r.job_id || "").startsWith("JOB-TEST") && !testKeys.has(r.channel + "|" + r.from_addr));
   const answered = sla.filter(r => r.met !== null);
   const slaMet = answered.filter(r => r.met === true).length;
   const slaPct = answered.length ? Math.round((slaMet / answered.length) * 100) : null;
