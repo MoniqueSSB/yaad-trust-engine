@@ -2860,7 +2860,7 @@ select id, status, payable_to, total_pence from invoices where job_id = '<job id
 
 ## Booking directly on the web
 
-**`yaad-book-service` (verify_jwt off, like `yaad-enquiry`) is the public booking door on yaadly.co.uk/services.** It creates a `held` services row priced from `service_catalogue`, records the exact label the visitor clicked in `notes`, and the insert itself fires the `service_booked` WhatsApp/email receipt. Nothing is charged and nothing moves until "Confirm the work" in the desk, so a flood of bookings costs attention, never delivery. Throttles: 3 per caller per day, 20 per day overall (`booking_attempts`, hashed keys, swept after two days). **Watch for:** the marketing page shows founding rates (£149 deposit check) while the catalogue holds full prices (£249), so the booking row carries the catalogue price and the clicked label side by side; reconcile at confirm before raising the invoice. Technical Sign-off has no catalogue row and deliberately falls back to WhatsApp on the page.
+**`yaad-book-service` (verify_jwt off, like `yaad-enquiry`) is the public booking door on yaadly.co.uk/services.** It creates a `held` services row priced from `service_catalogue`, records the exact label the visitor clicked in `notes`, and the insert itself fires the `service_booked` WhatsApp/email receipt. Nothing is charged and nothing moves until "Confirm the work" in the desk, so a flood of bookings costs attention, never delivery. Throttles: 3 per caller per day, 20 per day overall (`booking_attempts`, hashed keys, swept after two days). **Watch for:** the marketing page shows founding rates (£149 deposit check) while the catalogue holds full prices (£249), so the booking row carries the catalogue price and the clicked label side by side; reconcile at confirm before raising the invoice. Technical Sign-off has no catalogue row and deliberately falls back to WhatsApp on the page. **Preferred visit date (20 Oct 2026):** the form now asks for a visit date after the details, and the function writes it into `notes` as "Requested visit date: ... NOT confirmed". It never sets `due_at`, because `due_at` is printed to the client as a promised date. **The page promises availability is confirmed within 24 hours of booking**, and no Pay button is shown at booking: check availability, then "Confirm the work" in the desk, which sends the confirmation and the invoice. The function rejects a date before tomorrow with the early-start tick, before day 14 without it, or more than four months out. **Deploy `yaad-book-service` before the page change goes live**: an older function just ignores the date, so bookings still go through but the date is lost.
 
 ## Somebody asked to speak to a person on WhatsApp, or you need to reply as Yaadly
 
@@ -3566,7 +3566,7 @@ const PAYMENT_LINKS = {
 };
 ```
 
-Paste a URL against a service and a pay button appears on that service's booking confirmation. Leave one empty and that confirmation reads as it did before, with no button, so there is never a dead button or a half wired payment. **The keys are the service values the form posts, which are the same strings `yaad-book-service`'s own `BOOKABLE` allowlist uses.** They are not the catalogue ids, and they used to be a third set again on the Property Care tiers, which is how the tier bug above happened. If you add a service, add it in both places with the same string.
+Paste a URL against a service and a pay button appears on that service's booking confirmation. **Since 20 Oct 2026 (second change that day):** the pay button shows only to a client who ticked the early start and picked a visit within seven days. **If no checker can be confirmed within 24 hours, cancel that client's card authorisation in Stripe** (Payments, find the uncaptured payment, Cancel), because the page promises nothing is taken. Leave one empty and that confirmation reads as it did before, with no button, so there is never a dead button or a half wired payment. **The keys are the service values the form posts, which are the same strings `yaad-book-service`'s own `BOOKABLE` allowlist uses.** They are not the catalogue ids, and they used to be a third set again on the Property Care tiers, which is how the tier bug above happened. If you add a service, add it in both places with the same string.
 
 Add a new subscription link to `SUBSCRIPTION_SERVICES` in the same file, directly below, or its confirmation will tell the client their card is only authorised when it is being charged.
 
@@ -6685,3 +6685,41 @@ Migration `20261015120000_the_supplier_lane_for_materials.sql`. Yaadly buys mate
 6. **Mark as paid to supplier** appears only once materials evidence for that job and stage is on the job after collection. If the goods are on site and the button is not there, the tradesperson has not filed the evidence: chase them, not the supplier.
 7. **A supplier cannot see an order:** `select id, supplier_user, contact_email from suppliers;` and compare `supplier_user` with their `auth.users` id. Null means they have not signed in with that exact email yet.
 8. **Supplier wants to correct an invoice number:** it is write-once (`supplier_attach_invoice`). Note the correction on the release with `record_materials_receipt(release, ref, note)` from the desk; do not edit the column by hand.
+
+## 69. Access levels: giving someone a level, or taking it away (20 Oct 2026)
+
+Migration `20261020120000_the_access_register.sql`. The register records who holds which level. As of this file it gives nobody any new button; later files do that one level at a time.
+
+1. **Applied 20 Oct 2026**, recorded in schema_migrations, guard test nine PASS. To re-check, run `supabase/tests/access_register_guards.sql` with execute_sql: nine checks, all PASS, the summary comes back as the error text and nothing persists.
+2. **The eight levels.** Super Admin is the `admins` table, added by hand only. Project Manager, Member, Checker and Viewer are rows in `staff_access`. Client, Worker and Material Supplier are worked out from jobs, worker profiles and suppliers, and are never granted.
+3. **Give someone a level** (signed in as Super Admin): `select public.grant_access('name@example.com', 'project_manager', 'why');`. Levels: `project_manager`, `member`, `checker`, `viewer`. Granting a new level replaces the old one; the old row keeps its history.
+4. **Take it away:** `select public.revoke_access('name@example.com');` returns 1 if they held a level, 0 if not.
+5. **"is a worker. A checker must be independent"**: that person has a worker profile or is the worker on a job. That is the rule, not a fault. Pick a different checker.
+6. **What does someone hold?** `select public.access_levels_for('name@example.com');` (service role or SQL editor). The person themselves sees theirs with `my_access_levels()`.
+7. **PM release limit** is `app_settings.pm_release_limit_pence`, 50000 (GBP 500). Changing it is a money decision: ledger entry first.
+
+## 70. The daily check-in keeps coming for a job that should be finished (20 Oct 2026)
+
+1. **Who gets it:** every job at `in_progress` or `evidence` with a worker on it, once a day, except test jobs (`is_test` true). A job stays on the list until it moves past `evidence`, so an unfinished job keeps getting it. That is by design.
+2. **Find the job:** `select id, status, is_test, updated_at from jobs where status in ('in_progress','evidence') and worker_email is not null;`
+3. **A test job:** set `is_test` to true on it and the ping stops the next day. Needs `yaad-daily-checkin` deployed from main on or after 20 Oct 2026.
+4. **A real job that is done:** close it in the desk. Approving a job is a human decision; nothing closes it for you.
+5. **How many times it went:** `select sent_on from daily_checkin_log where job_id = '<id>' order by sent_on desc;`
+
+## 71. Attaching a check report to the job it was booked on (20 Oct 2026)
+
+A Visual Check or Technical Sign-off the client booked from their job room (Independent checks view) is written on Reports like any other, but must carry the job's id or the job room has nothing to show under the booking.
+
+1. **Reports, then "Draft a report from your notes".** Pick Visual Check or Technical Sign-off. A list called "Job, if the client booked this check on a job" appears under the service.
+2. **Pick the job.** The list holds only jobs with that check booked (`v_job_checks`), with job number, title and client; jobs that already have a report sit at the bottom. Picking one fills the client name and property if they are empty. Nothing is picked for you on purpose: the job decides which client reads the report.
+3. **Draft, finish and issue as usual.** The draft is saved with `reports.job_id` set. The client of that job sees it under the booking only once it is issued (RLS "client reads their issued report"); a draft is never shown.
+4. **A check bought on its own** stays on "None, bought on its own" and is saved with no job, as before.
+5. **Drafted it without the job?** The desk has no button to add it afterwards. While it is still a draft, set it in the SQL editor by the report's id (a draft has no number yet): `update public.reports set job_id = 'J-xxxx' where id = '<report id>' and status = 'draft';`, after checking the job's `check_level` matches the report's kind. Once a report is issued, `report_guard_issue()` refuses an update from the SQL editor, which is the guard working: draft it again with the job picked.
+6. **"Could not read the jobs"** under the list means `v_job_checks` refused the read; check you are signed in as an admin. The rest of the drafter still works and saves with no job.
+
+## 72. A worker asks to stop job alert emails (16 Oct 2026)
+
+1. Job alert emails from `yaad-match` now end with a stop line and carry a `List-Unsubscribe` header. Both send the request to `YAAD_UNSUB_EMAIL` (default `monique@yaadly.co.uk`). Set that secret to change the inbox.
+2. The request reaches a person. Nothing switches off automatically. Unpublish the worker's alert preference by hand within two working days, because the email promises that.
+3. A worker on WhatsApp alerts says STOP there instead. That lane already handles it (`yaad-inbound/job-alerts.ts`).
+4. The change only reaches workers once `yaad-match` is deployed from main: `supabase functions deploy yaad-match --project-ref leffyisvfvjwzilydlwf`. Read `supabase functions list` first and keep its current `verify_jwt` setting.

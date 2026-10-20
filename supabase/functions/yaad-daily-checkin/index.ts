@@ -3,6 +3,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { recordAccepted, type SendMeta, withMessagingService, withStatusCallback } from "./twilio-status.ts";
 import { checkInApplies } from "./arrival-rule.ts";
+import { jobLabel } from "./job-label.ts";
 
 // The daily worker prompt. Founder's own instruction, 1 Sep 2026: "when a
 // job is live and has been accepted by a worker, there should be a ping
@@ -183,9 +184,9 @@ Deno.serve(async (req: Request) => {
     }
     if (!/^HX[0-9a-f]{32}$/i.test(dailyStepsSid)) dailyStepsSid = "";
     const stepsMessage = (j: { id: string; title: string | null }): { sid: string; vars: Record<string, string> } | null => dailyStepsSid
-      ? { sid: dailyStepsSid, vars: { "1": `${j.title ?? "your job"} (${j.id})` } }
+      ? { sid: dailyStepsSid, vars: { "1": jobLabel(j) } }
       : workerUpdateSid
-        ? { sid: workerUpdateSid, vars: { "1": `${j.title ?? "your job"} (${j.id})`, "2": ON_SITE_STEPS, "3": `https://app.yaadly.co.uk/portal/jobs/${encodeURIComponent(j.id)}` } }
+        ? { sid: workerUpdateSid, vars: { "1": jobLabel(j), "2": ON_SITE_STEPS, "3": `https://app.yaadly.co.uk/portal/jobs/${encodeURIComponent(j.id)}` } }
         : null;
     root.setAttributes({ "yaadly.daily_checkin.button": Boolean(onSiteSid) });
 
@@ -211,7 +212,11 @@ Deno.serve(async (req: Request) => {
       .from("jobs")
       .select("id, title, worker_email")
       .in("status", ["in_progress", "evidence"])
-      .not("worker_email", "is", null);
+      .not("worker_email", "is", null)
+      // A test job is never pinged (20 Oct 2026). One left at "evidence" on
+      // 29 Sep sent the founder this ask every day for three weeks. NULL is
+      // read as a real job, so nothing real can drop off by accident.
+      .not("is_test", "is", true);
     if (liveErr) { root.recordError(liveErr.message); return json({ error: liveErr.message }, 500); }
 
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Jamaica" }); // YYYY-MM-DD, Jamaica-local
@@ -238,7 +243,7 @@ Deno.serve(async (req: Request) => {
       // location. With neither approved, nothing goes to this job today.
       if (!checkInApplies(accessById.get(j.id))) {
         atHome++;
-        const steps: { sid: string; vars: Record<string, string> } | null = stepsMessage(j) ?? (CONTENT_SID ? { sid: CONTENT_SID, vars: { "1": j.title ?? j.id } } : null);
+        const steps: { sid: string; vars: Record<string, string> } | null = stepsMessage(j) ?? (CONTENT_SID ? { sid: CONTENT_SID, vars: { "1": jobLabel(j, false) } } : null);
         if (!steps) { skippedAtHome++; continue; }
         const r = await sendTwilioTemplate(String(profile.phone), steps.vars, trace, { kind: "daily update ask", job_id: j.id }, steps.sid);
         await admin.from("daily_checkin_log").insert({ job_id: j.id, sent_on: today });
@@ -247,8 +252,8 @@ Deno.serve(async (req: Request) => {
       }
 
       const vars: Record<string, string> = onSiteSid
-        ? { "1": `${j.title ?? "your job"} (${j.id})`, "2": j.id }
-        : { "1": j.title ?? j.id };
+        ? { "1": jobLabel(j), "2": j.id }
+        : { "1": jobLabel(j, false) };
       const result = await sendTwilioTemplate(String(profile.phone), vars, trace, { kind: "daily check-in", job_id: j.id }, useSid);
       // The second message, 30 Sep 2026: the 1.2.3 of what to send today,
       // through the approved worker update template, only after the

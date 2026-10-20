@@ -14,10 +14,9 @@
  * the page and the invoice disagree.
  */
 import { CLIENT_FEE_RATE } from "./client-bill";
+import { WORKER_FEE_RATE, workerFeeRate } from "./worker-fee";
 
-export const WORKER_FEE_RATE = 0.07;
-/** The same rate as page text, "7%", so a label can never disagree with the sum beside it. */
-export const WORKER_FEE_PCT = `${Math.round(WORKER_FEE_RATE * 100)}%`;
+export { WORKER_FEE_RATE };
 
 export type AddonStatus = "with_worker" | "with_client" | "agreed" | "declined" | "withdrawn" | "signed_off" | "cancelled";
 export type AddonTerms = "in_full" | "half_now_half_on_signoff";
@@ -41,10 +40,12 @@ export function addonClientBill(amountJmd: number, terms: AddonTerms) {
   };
 }
 
-/** What the worker is paid for it: the agreed amount less 7%. */
-export function addonWorkerPay(amountJmd: number) {
+/** What the worker is paid for it: the agreed amount less 7%, or 5% when it
+ *  was agreed before 4 Oct 2026. Pass the add-on's agreed_at (else its
+ *  created_at), as _sign_off_addon() does; no date means today's rate. */
+export function addonWorkerPay(amountJmd: number, agreedAt?: string | null) {
   const amount = Math.round(Number(amountJmd) || 0);
-  return amount - Math.round(amount * WORKER_FEE_RATE);
+  return amount - Math.round(amount * workerFeeRate(agreedAt));
 }
 
 /** Whose move it is, or null once it is settled. */

@@ -17,9 +17,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { jmd } from "@/lib/money";
 import {
-  TERMS_LABEL, WORKER_FEE_PCT, addonClientBill, addonStateLine, addonWorkerPay, waitingOn,
+  TERMS_LABEL, addonClientBill, addonStateLine, addonWorkerPay, waitingOn,
   type AddonStatus, type AddonTerms, type Side,
 } from "@/lib/jobs/addon";
+import { WORKER_FEE_RATE, workerFeePct } from "@/lib/jobs/worker-fee";
 import { directUpload } from "@/lib/portal/direct-upload";
 import { agreeAddon, approveAddon, declineAddon, editAddon, proposeAddon, uploadAddonEvidence } from "@/app/portal/addon-actions";
 
@@ -110,7 +111,7 @@ function AddonForm({
         <p className="mt-2 max-w-[60ch] text-[12.5px] leading-snug text-mute">
           {me === "client"
             ? <>You would pay <b className="text-ink">{jmd(bill.total)}</b>: {jmd(n)} for the work and {jmd(bill.fee)} Guarantee &amp; Support (15%) on top.</>
-            : <>You would be paid <b className="text-ink">{jmd(addonWorkerPay(n))}</b>: {jmd(n)} less Yaadly&apos;s {WORKER_FEE_PCT}.</>}
+            : <>You would be paid <b className="text-ink">{jmd(addonWorkerPay(n))}</b>: {jmd(n)} less Yaadly&apos;s {workerFeePct(WORKER_FEE_RATE)}.</>}
         </p>
       )}
       <p className="mt-2 max-w-[60ch] text-[11.5px] leading-snug text-dim">
@@ -227,7 +228,7 @@ function AddonCard({
         {me === "client" ? (
           <><dt className="text-dim">You pay, with 15% on top</dt><dd className="font-bold text-ink">{jmd(bill.total)}</dd></>
         ) : (
-          <><dt className="text-dim">You are paid, less {WORKER_FEE_PCT}</dt><dd className="font-bold text-ink">{jmd(addonWorkerPay(a.amount_jmd))}</dd></>
+          <><dt className="text-dim">You are paid, less {workerFeePct(WORKER_FEE_RATE)}</dt><dd className="font-bold text-ink">{jmd(addonWorkerPay(a.amount_jmd))}</dd></>
         )}
         <dt className="text-dim">How it is paid</dt><dd className="text-ink">{TERMS_LABEL[a.terms]}</dd>
       </dl>
@@ -404,7 +405,7 @@ export function AddOnPanel({
       )}
       {agreedTotal > 0 && (
         <p className="mt-2 text-[12.5px] text-mute">
-          Agreed add-ons so far: <b className="text-ink">{jmd(agreedTotal)}</b> {me === "client" ? "including Yaadly's 15%" : `to you, after Yaadly's ${WORKER_FEE_PCT}`}, on top of the main job.
+          Agreed add-ons so far: <b className="text-ink">{jmd(agreedTotal)}</b> {me === "client" ? "including Yaadly's 15%" : `to you, after Yaadly's ${workerFeePct(WORKER_FEE_RATE)}`}, on top of the main job.
         </p>
       )}
 

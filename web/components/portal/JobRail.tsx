@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { TabKey } from "@/components/portal/TabBar";
-import { WORKER_FEE_PCT } from "@/lib/jobs/addon";
+import { WORKER_FEE_RATE, workerFeePct } from "@/lib/jobs/worker-fee";
 
 const JOB_LINKS: { tab: TabKey; label: string; hint: string }[] = [
   { tab: "evidence", label: "Progress evidence", hint: "Photos and videos for each stage" },
@@ -114,7 +114,7 @@ export function JobRail({
               </div>
             )}
             <div className="flex justify-between text-[12px]">
-              <span className="text-mute">{side === "client" ? "Yaadly fee, 15%" : `Yaadly fee, ${WORKER_FEE_PCT}, deducted`}</span>
+              <span className="text-mute">{side === "client" ? "Yaadly fee, 15%" : `Yaadly fee, ${workerFeePct(WORKER_FEE_RATE)}, deducted`}</span>
               <span className="font-mono-app text-[11.5px] text-ink">{money(fee)}</span>
             </div>
             {side === "client" && check && (
@@ -130,7 +130,7 @@ export function JobRail({
                   <span className="font-mono-app text-[11.5px] text-ink">{money(main)}</span>
                 </div>
                 <div className="flex justify-between text-[12px]">
-                  <span className="text-mute">{side === "client" ? "Additional work, with 15%" : `Additional work, less ${WORKER_FEE_PCT}`}</span>
+                  <span className="text-mute">{side === "client" ? "Additional work, with 15%" : `Additional work, less ${workerFeePct(WORKER_FEE_RATE)}`}</span>
                   <span className="font-mono-app text-[11.5px] text-ink">{money(extra)}</span>
                 </div>
               </>
