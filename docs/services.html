@@ -346,6 +346,9 @@ footer {
 .small-print { margin-top:18px; font-size:13px; color:var(--dim); line-height:1.6; }
 .book-form { flex:1 1 440px; min-width:0; margin-top:0; }
 .bk-consent .pts { display:flex; flex-direction:column; gap:4px; }
+/* The browser draws the date picker itself; tell it which theme it is on. */
+html:not([data-theme="light"]) #bk-date { color-scheme:dark; }
+html[data-theme="light"] #bk-date { color-scheme:light; }
 .limits { display:flex; flex-wrap:wrap; gap:28px; margin-top:16px; border:1px solid var(--line); border-radius:20px; padding:28px; background:rgba(155,115,245,0.04); }
 .limits > div { flex:1 1 360px; min-width:0; }
 .limits h2 { font-family:var(--disp); font-weight:400; font-size:24px; }
@@ -567,7 +570,7 @@ footer {
         <h2 class="heading">Nothing is charged <em>now.</em></h2>
         <p class="lead">You pay only for work that is done and accepted.</p>
         <ol class="steps">
-          <li><span class="num">1</span><div><b>Book</b><small>Send the form. Your card button appears straight away.</small></div></li>
+          <li><span class="num">1</span><div><b>Book</b><small>Your details and a date. We confirm availability within 24 hours.</small></div></li>
           <li><span class="num">2</span><div><b>Authorise</b><small>Your card is checked. Nothing is taken.</small></div></li>
           <li class="gold"><span class="num">3</span><div><b>Pay on acceptance</b><small>Charged once the work is done and you accept it.</small></div></li>
         </ol>
@@ -575,6 +578,7 @@ footer {
       </div>
 
       <div class="panel book-form">
+        <div id="bk-fields">
         <div class="fgroup"><label for="bk-svc">Which service</label>
           <select id="bk-svc">
             <option value="visual">Visual Check, one visit</option>
@@ -598,11 +602,31 @@ footer {
              bump START_NOW_VERSION, in one commit. -->
         <label class="bk-consent" for="bk-start-now">
           <input type="checkbox" id="bk-start-now">
-          <span class="pts"><b>Start my visit now.</b>If I cancel within 14 days, I get a refund, less any work already done.</span>
+          <span class="pts"><b>Start my visit straight away.</b>Cancel within 14 days for a refund, less any work already done.</span>
         </label>
-        <div class="bk-consent-note">Not ticked? We wait 14 days, then you pay and we visit. Cancel before then and you pay nothing. <a href="/cancellation" target="_blank" rel="noopener">What this means</a>.</div>
-        <button class="btn btn-primary" id="bk-send" style="width:100%;justify-content:center" onclick="sendBooking()">Book it, nothing charged yet</button>
+        <div class="bk-consent-note">Leave it unticked and we start after 14 days, with nothing to pay before then. <a href="/cancellation" target="_blank" rel="noopener">What this means</a>.</div>
+        <button class="btn btn-primary" id="bk-send" style="width:100%;justify-content:center" onclick="goToDate()">Choose your date</button>
         <div id="bk-status" style="margin-top:10px;font-size:13.5px;line-height:1.6"></div>
+        </div>
+        <!-- THE DATE STEP. The client picks a visit date and sends it; it is
+             recorded on the booking as requested, and a named person checks
+             availability and confirms within 24 hours.
+             The earliest date follows the tick: tomorrow if they asked to
+             start inside the 14 days, the day after the 14 days otherwise. -->
+        <div id="bk-date-step" hidden>
+          <div class="kick" id="bk-date-kick">Step 2 · Choose a date</div>
+          <h3 class="heading" style="font-size:24px;margin:6px 0 10px">When would you like the visit?</h3>
+          <div class="fgroup"><label for="bk-date">Visit date</label><input type="date" id="bk-date"></div>
+          <p id="bk-date-note" style="font-size:13.5px;line-height:1.6;color:var(--mute);margin:6px 0 14px"></p>
+          <button class="btn btn-primary" id="bk-date-send" style="width:100%;justify-content:center" onclick="sendBooking()">Book now</button>
+          <div id="bk-date-status" style="margin-top:10px;font-size:13.5px;line-height:1.6"></div>
+          <button type="button" class="btn" style="margin-top:12px;background:none;border:0;padding:0;color:var(--mute);font-size:13px;text-decoration:underline;cursor:pointer" onclick="backToDetails()">Back to your details</button>
+        </div>
+        <!-- THE DONE BOX. Once a booking goes through, the date step is
+             swapped for this: what we have, and that Yaadly holds it and
+             confirms availability within 24 hours. No Pay button: how to pay
+             comes with the confirmation (founder decision, 20 Oct 2026). -->
+        <div id="bk-next" hidden aria-live="polite"></div>
       </div>
     </div>
 
@@ -728,6 +752,10 @@ const BOOKING_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-
    reach them. A card CTA pointing straight at Stripe would skip all of it.
    Confirmed again by the founder on 5 Sep 2026 when the card path was made
    visible: more prominent, still after the record, never instead of it. */
+/* Not shown on the booking confirmation since 20 Oct 2026: a booking is
+   held, confirmed within 24 hours, and the confirmation says how to pay.
+   Kept here because the links are live in Stripe and still the reference
+   for which link belongs to which service. */
 const PAYMENT_LINKS = {
   /* THE FOUNDER'S OWN Stripe account (acct_1UIPus2B5v0diTai), live mode,
      created 23 Sep 2026, the day the site started saying she sells these
@@ -768,9 +796,10 @@ const SUBSCRIPTION_SERVICES = new Set(["retainer"]);
    worth what the sentence that earned it said, so rewording the tickbox
    without bumping this silently reinterprets everybody's existing answer.
    Change the copy in the form and this string together, in one commit. */
-const START_NOW_VERSION = "start-now-v2";
-/* v2, 9 Oct 2026: same substance in plainer words, founder instruction. */
-const START_NOW_WORDING = "Start my visit now. If I cancel within 14 days, I get a refund, less any work already done.";
+const START_NOW_VERSION = "start-now-v3";
+/* v2, 9 Oct 2026: same substance in plainer words, founder instruction.
+   v3, 20 Oct 2026: one line, same substance, founder instruction. */
+const START_NOW_WORDING = "Start my visit straight away. Cancel within 14 days for a refund, less any work already done.";
 
 /* One visit / monthly switch on the Visual Check card. Without script the
    one visit price shows and the monthly terms are still in their dropdown. */
@@ -797,27 +826,81 @@ document.querySelectorAll("[data-book]").forEach(el => {
   });
 });
 
+/* The three stages of the booking panel: details, date, done. One is shown
+   at a time, and the page scrolls so its heading clears the sticky header. */
+function showStage(id){
+  ["bk-fields","bk-date-step","bk-next"].forEach(k => { $id(k).hidden = k !== id; });
+  const panel = $id(id).closest(".book-form");
+  window.scrollTo({ top: panel.getBoundingClientRect().top + window.scrollY - 100, behavior: "smooth" });
+}
+
+/* Dates as the browser's own calendar day, YYYY-MM-DD, never via UTC:
+   toISOString() would shift a late evening in Kingston to tomorrow. */
+const DAY = 86400_000;
+const isoDay = d => d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+const fromIso = v => { const [y,m,d] = v.split("-").map(Number); return new Date(y, m-1, d); };
+const niceDay = v => fromIso(v).toLocaleDateString("en-GB", { weekday:"short", day:"numeric", month:"short", year:"numeric" });
+const todayStart = () => { const t = new Date(); t.setHours(0,0,0,0); return t; };
+
+/* The earliest date follows the tick. Ticked: tomorrow. Unticked: the day
+   after the 14 days run out, because nothing may start before then. The
+   latest is 120 days out, matching yaad-book-service. */
+function dateBounds(startNow){
+  const t = todayStart();
+  return { min: isoDay(new Date(t.getTime() + (startNow ? 1 : 15) * DAY)),
+           max: isoDay(new Date(t.getTime() + 120 * DAY)) };
+}
+
+function goToDate(){
+  const g = i => ($id(i).value||"").trim();
+  const status = $id("bk-status");
+  if(!g("bk-name") || (!g("bk-email") && !g("bk-phone"))){
+    status.innerHTML = '<div style="color:#F87171"><b>Nearly.</b> We need your name and an email or WhatsApp number, so the reservation has somebody to belong to.</div>';
+    return;
+  }
+  status.innerHTML = "";
+  const startNow = $id("bk-start-now").checked;
+  const { min, max } = dateBounds(startNow);
+  const input = $id("bk-date");
+  input.min = min; input.max = max;
+  if (!input.value || input.value < min || input.value > max) input.value = "";
+  $id("bk-date-kick").textContent = "Step 2 of 2 · Choose a date";
+  $id("bk-date-note").innerHTML = (startNow
+      ? "The earliest is tomorrow."
+      : "The earliest is <b>" + niceDay(min) + "</b>, once your 14 days have run.")
+    + " Send it to us and we check availability and confirm within 24 hours.";
+  $id("bk-date-send").textContent = "Book now";
+  $id("bk-date-status").innerHTML = "";
+  showStage("bk-date-step");
+}
+
+function backToDetails(){ showStage("bk-fields"); }
+
 async function sendBooking(){
   const g = i => ($id(i).value||"").trim();
-  const status = $id("bk-status"), btn = $id("bk-send");
-  /* block, not inline: the confirmation now carries a full width pay button */
-  const say = (tone, html) => { status.innerHTML = '<span style="display:block;color:'+(tone==="bad"?"#F87171":"#C4AAFF")+'">'+html+'</span>'; };
-  const fallback = ' Book it on <a href="https://wa.me/447878877567" target="_blank" rel="noopener">WhatsApp</a> instead, or email <a href="mailto:'+SVC_EMAIL+'">'+esc(SVC_EMAIL)+'</a>.';
+  const status = $id("bk-date-status"), btn = $id("bk-date-send");
+  const say = (tone, html) => { status.innerHTML = '<div style="color:'+(tone==="bad"?"#F87171":"#C4AAFF")+'">'+html+'</div>'; };
+  const fallback = ' Reserve it on <a href="https://wa.me/447878877567" target="_blank" rel="noopener">WhatsApp</a> instead, or email <a href="mailto:'+SVC_EMAIL+'">'+esc(SVC_EMAIL)+'</a>.';
   const sel = $id("bk-svc");
   const service = sel.value;
   const label = sel.dataset.label || sel.options[sel.selectedIndex].text;
   const startNow = $id("bk-start-now").checked;
+  const preferredDate = g("bk-date");
+  const { min, max } = dateBounds(startNow);
+  if(!preferredDate){ say("bad", "<b>Pick a date</b> for the visit."); return; }
+  if(preferredDate < min || preferredDate > max){
+    say("bad", "<b>Pick a date between " + niceDay(min) + " and " + niceDay(max) + ".</b>");
+    return;
+  }
   const b = { service, label,
               name: g("bk-name"), email: g("bk-email"), phone: g("bk-phone"),
               parish: g("bk-parish"), message: g("bk-msg"),
+              preferredDate,
               startNow,
               startNowVersion: startNow ? START_NOW_VERSION : "",
               startNowWording: startNow ? START_NOW_WORDING : "" };
-  if(!b.name || (!b.email && !b.phone)){
-    say("bad", "<b>Nearly.</b> We need your name and an email or WhatsApp number, so the booking has somebody to belong to.");
-    return;
-  }
-  btn.disabled = true; btn.textContent = "Booking…";
+  const idle = btn.textContent;
+  btn.disabled = true; btn.textContent = "One moment…";
   let j = null;
   try{
     const r = await fetch(BOOKING_URL, {
@@ -828,33 +911,40 @@ async function sendBooking(){
     j = await r.json().catch(()=>null);
     if(!r.ok) throw new Error((j && j.error) || ("HTTP " + r.status));
   }catch(err){
-    btn.disabled = false; btn.textContent = "Book it, nothing charged yet";
+    btn.disabled = false; btn.textContent = idle;
     const mine = (j && j.error) ? esc(j.error) : "That did not go through. Nothing is lost on your side.";
     say("bad", "<b>" + mine + "</b>" + fallback);
     return;
   }
-  btn.disabled = false; btn.textContent = "Book it, nothing charged yet";
-  const channel = j.phoneGiven ? "WhatsApp" : "email";
-  /* No express request to start early means the work waits out the 14 days,
-     and a card authorisation only lasts seven. Offering the button anyway
-     would take a hold that is guaranteed to expire before the job can begin,
-     so the card path is offered only to a client who actually asked. */
-  const payUrl = startNow ? (PAYMENT_LINKS[b.service] || "") : "";
-  const subs = SUBSCRIPTION_SERVICES.has(b.service);
-  const terms = subs
-    ? ' This one is a monthly subscription, so the first month is charged when you pay and it bills again each month until you stop it. Thirty days notice to stop, and you have 14 days to <a href="/cancellation">cancel</a>.'
-    : ' Your card is authorised, not charged. It is only taken once the work is done and you have accepted it. The authorisation lasts seven days; if your visit falls later it lapses without taking anything and we send a fresh link. You have 14 days to <a href="/cancellation">cancel</a>.';
-  const tail = payUrl
-    ? ' Nothing has been charged.' + terms
-      + '<a class="btn btn-primary" style="margin-top:14px;width:100%;justify-content:center" href="'
-      + payUrl + '" target="_blank" rel="noopener">Pay for ' + esc(b.label)
-      + '<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg></a>'
-      + '<div style="margin-top:8px;font-size:12.5px;color:var(--mute)">Card handled by Stripe, and it shows as Yaadly Founder on your statement. The founder never sees or stores your card number. Prefer an invoice or a bank transfer? Reply to your receipt and say so.</div>'
-    : (startNow
-        ? ' Nothing is charged: the founder confirms the scope and the exact price with you in writing first, and the invoice follows only after that.'
-        : ' <b>You have not asked us to start inside your 14 days</b>, so nothing begins until they have run out, and there is nothing to pay before then. The founder will confirm the scope and the exact price with you in writing in the meantime. If you change your mind and want it started sooner, say so in your reply and we will take that as the request.');
-  say("ok", "<b>Held for you, "+esc(b.name)+".</b> Your reference is <b>"+esc(j.ref)+"</b> and a receipt is on its way by "+channel+", with the code that opens your client portal." + tail);
-  ["bk-name","bk-email","bk-phone","bk-parish","bk-msg"].forEach(i=>$id(i).value="");
+  btn.disabled = false; btn.textContent = idle;
+  /* Both are sent when both were given (yaad-notify-client), so say both. */
+  const channel = j.phoneGiven && j.emailGiven ? "email and WhatsApp" : (j.phoneGiven ? "WhatsApp" : "email");
+  /* Held, never paid, at this point (founder decision, 20 Oct 2026): Yaadly
+     checks availability, confirms within 24 hours, and the confirmation is
+     what tells the client how to pay. So there is no Pay button here. */
+  const point1 = "<b>Your request is in</b> for <b>" + esc(niceDay(preferredDate)) + "</b>. Reference <b>" + esc(j.ref) + "</b>. Your receipt and the link to your client portal are on their way by " + channel + ".";
+  const point2 = startNow
+    ? "<b>We hold it and confirm within 24 hours.</b> We check availability and send your confirmation, with how to pay. Nothing is charged until then. Cancel within 14 days for a refund, less any work already done."
+    : "<b>We hold it and confirm within 24 hours.</b> We check availability and send your confirmation. Nothing starts and nothing is paid until your 14 days have run, and you can cancel before then and pay nothing.";
+  const next = $id("bk-next");
+  next.innerHTML = '<div class="kick">Held for you</div>'
+    + '<h3 class="heading" style="font-size:24px;margin:6px 0 4px">Thank you, ' + esc(b.name) + '.</h3>'
+    + '<ul style="margin:10px 0 0 18px;padding:0;font-size:14.5px;line-height:1.6"><li style="margin-bottom:8px">' + point1 + "</li><li>" + point2 + "</li></ul>"
+    + '<button type="button" class="btn" style="margin-top:14px;background:none;border:0;padding:0;color:var(--mute);font-size:13px;text-decoration:underline;cursor:pointer" onclick="bookAnother()">Book another visit</button>';
+  showStage("bk-next");
+  ["bk-name","bk-email","bk-phone","bk-parish","bk-msg","bk-date"].forEach(i=>$id(i).value="");
+}
+
+/* One label either way since 20 Oct 2026: every booking goes on to the date
+   step, and nothing is paid at booking. */
+function bookLabel(){ return "Choose your date"; }
+$id("bk-start-now").addEventListener("change", () => { $id("bk-send").textContent = bookLabel(); });
+
+/* From the done box back to an empty form. */
+function bookAnother(){
+  $id("bk-start-now").checked = false;
+  $id("bk-send").textContent = bookLabel();
+  showStage("bk-fields");
 }
 
 async function sendEnquiry(){
