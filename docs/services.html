@@ -599,10 +599,10 @@ footer {
              bump START_NOW_VERSION, in one commit. -->
         <label class="bk-consent" for="bk-start-now">
           <input type="checkbox" id="bk-start-now">
-          <span class="pts"><b>Book now and start straight away.</b>Cancel within 14 days for a refund, less any work already done.</span>
+          <span class="pts"><b>Start my visit straight away.</b>Cancel within 14 days for a refund, less any work already done.</span>
         </label>
         <div class="bk-consent-note">Leave it unticked and we start after 14 days, with nothing to pay before then. <a href="/cancellation" target="_blank" rel="noopener">What this means</a>.</div>
-        <button class="btn btn-primary" id="bk-send" style="width:100%;justify-content:center" onclick="sendBooking()">Book it, nothing charged yet</button>
+        <button class="btn btn-primary" id="bk-send" style="width:100%;justify-content:center" onclick="sendBooking()">Reserve now</button>
         <div id="bk-status" style="margin-top:10px;font-size:13.5px;line-height:1.6"></div>
         </div>
         <!-- STEP 2. Once a booking goes through, the form is swapped for this
@@ -778,7 +778,7 @@ const SUBSCRIPTION_SERVICES = new Set(["retainer"]);
 const START_NOW_VERSION = "start-now-v3";
 /* v2, 9 Oct 2026: same substance in plainer words, founder instruction.
    v3, 20 Oct 2026: one line, same substance, founder instruction. */
-const START_NOW_WORDING = "Book now and start straight away. Cancel within 14 days for a refund, less any work already done.";
+const START_NOW_WORDING = "Start my visit straight away. Cancel within 14 days for a refund, less any work already done.";
 
 /* One visit / monthly switch on the Visual Check card. Without script the
    one visit price shows and the monthly terms are still in their dropdown. */
@@ -825,7 +825,7 @@ async function sendBooking(){
     say("bad", "<b>Nearly.</b> We need your name and an email or WhatsApp number, so the booking has somebody to belong to.");
     return;
   }
-  btn.disabled = true; btn.textContent = "Booking…";
+  btn.disabled = true; btn.textContent = "One moment…";
   let j = null;
   try{
     const r = await fetch(BOOKING_URL, {
@@ -854,7 +854,7 @@ async function sendBooking(){
      happens to their money. The seven day authorisation detail lives in the
      small print beside the form ("Visit more than seven days away? We send
      a fresh link closer to the day."), not here. */
-  const point1 = "<b>Your booking is in.</b> Reference <b>" + esc(j.ref) + "</b>. Your receipt and the link to your client portal are on their way by " + channel + ".";
+  const point1 = "<b>Your visit is reserved.</b> Reference <b>" + esc(j.ref) + "</b>. Your receipt and the link to your client portal are on their way by " + channel + ".";
   const point2 = payUrl
     ? (subs
         ? '<b>Paying.</b> This is a monthly plan: the first month is charged when you pay, then it bills each month until you stop it (30 days notice). Cancel within 14 days for a refund, less any work already done.'
@@ -868,13 +868,13 @@ async function sendBooking(){
       + '<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg></a>'
       + '<div style="margin-top:8px;font-size:12.5px;color:var(--mute)">Card handled by Stripe, shown as Yaadly Founder on your statement. Prefer an invoice or bank transfer? Reply to your receipt. <a href="/cancellation">Cancelling</a>.</div>'
     : "";
-  const kick = payUrl ? "Step 2 of 2 · Pay" : "Booked";
+  const kick = payUrl ? "Step 2 of 2 · Pay" : "Reserved";
   const next = $id("bk-next");
   next.innerHTML = '<div class="kick">' + kick + '</div>'
     + '<h3 class="heading" style="font-size:24px;margin:6px 0 4px">Thank you, ' + esc(b.name) + '.</h3>'
     + '<ul style="margin:10px 0 0 18px;padding:0;font-size:14.5px;line-height:1.6"><li style="margin-bottom:8px">' + point1 + "</li><li>" + point2 + "</li></ul>"
     + payBtn
-    + '<button type="button" class="btn" style="margin-top:14px;background:none;border:0;padding:0;color:var(--mute);font-size:13px;text-decoration:underline;cursor:pointer" onclick="bookAnother()">Book another visit</button>';
+    + '<button type="button" class="btn" style="margin-top:14px;background:none;border:0;padding:0;color:var(--mute);font-size:13px;text-decoration:underline;cursor:pointer" onclick="bookAnother()">Reserve another visit</button>';
   $id("bk-fields").hidden = true;
   next.hidden = false;
   status.innerHTML = "";
@@ -885,7 +885,7 @@ async function sendBooking(){
 
 /* The button says where it leads: a ticked box goes on to the pay step,
    an unticked one ends at the booking. Nothing is charged either way. */
-function bookLabel(){ return $id("bk-start-now").checked ? "Book, then pay (nothing charged yet)" : "Book it, nothing charged yet"; }
+function bookLabel(){ return $id("bk-start-now").checked ? "Pay now" : "Reserve now"; }
 $id("bk-start-now").addEventListener("change", () => { $id("bk-send").textContent = bookLabel(); });
 
 /* Back from step 2 to an empty form. */
