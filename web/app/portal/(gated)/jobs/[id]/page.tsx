@@ -42,7 +42,7 @@ import { JobSummaryCard } from "@/components/portal/JobSummaryCard";
 import { ConfirmAction } from "@/components/portal/ConfirmAction";
 import { AskForChange } from "@/components/portal/AskForChange";
 import { ApproveButton } from "@/components/portal/ApproveButton";
-import { JobCheckPanel, type CheckInvoice, type CheckPrice } from "@/components/portal/JobCheckPanel";
+import { JobCheckPanel, type CheckInvoice, type CheckPrice, type CheckReport } from "@/components/portal/JobCheckPanel";
 import { JobFiles, type JobFile } from "@/components/portal/JobFiles";
 import {
   CHECK_CATALOGUE_ID,
@@ -649,7 +649,7 @@ export default async function JobRoom({
      cannot have found it. RLS shows a client their invoice once it is sent,
      and nothing while it is a draft, same as every other invoice. */
   const checkLevel = isCheckLevel(job.check_level) ? job.check_level : null;
-  const [{ data: checkRows }, { data: checkInvoiceRow }] = await Promise.all([
+  const [{ data: checkRows }, { data: checkInvoiceRow }, { data: checkReportRows }] = await Promise.all([
     /* Also read while the client is still choosing a quote (29 Sep 2026):
        the Visual Check is offered on the quote itself, and its price is the
        catalogue's there too. */
@@ -666,7 +666,23 @@ export default async function JobRoom({
           .eq("id", job.check_invoice_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    /* What the checker recorded (founder, 20 Oct 2026: a check booked on a
+       job had nowhere to show its findings). The issued report for this job's
+       check kind, with its findings. RLS ("client reads their issued report")
+       returns it to the job's client only, and only once a person has issued
+       it, so a draft or a worker session reads nothing. */
+    checkLevel
+      ? supabase
+          .from("reports")
+          .select("id,number,visited_on,verdict,verdict_line,issued_at,report_findings(ord,heading,body)")
+          .eq("job_id", job.id)
+          .eq("kind", checkLevel === "visual" ? "visual_check" : "technical_signoff")
+          .eq("status", "issued")
+          .order("issued_at", { ascending: false })
+          .limit(1)
+      : Promise.resolve({ data: null }),
   ]);
+  const checkReport = ((checkReportRows ?? []) as CheckReport[])[0] ?? null;
   const checkPrices = {
     visual: ((checkRows ?? []) as CheckPrice[]).find((r) => r.id === CHECK_CATALOGUE_ID.visual) ?? null,
     technical: ((checkRows ?? []) as CheckPrice[]).find((r) => r.id === CHECK_CATALOGUE_ID.technical) ?? null,
@@ -1914,6 +1930,7 @@ export default async function JobRoom({
           chosenAt={job.check_chosen_at ?? null}
           assignedTo={job.check_assigned_to ?? null}
           invoice={checkInvoice}
+          report={checkReport}
           prices={checkPrices}
           jmdPerGbp={jmdPerGbp}
         />
