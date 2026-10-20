@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { TabKey } from "@/components/portal/TabBar";
+import { WORKER_FEE_RATE, workerFeePct } from "@/lib/jobs/worker-fee";
 
 const JOB_LINKS: { tab: TabKey; label: string; hint: string }[] = [
   { tab: "evidence", label: "Progress evidence", hint: "Photos and videos for each stage" },
@@ -51,7 +52,7 @@ export function JobRail({
   labour: number | null;
   allIn: number | null;
   takeHome: number | null;
-  /** This side's fee: the client's 15% or the worker's 5%, never the other one. */
+  /** This side's fee: the client's 15% or the worker's 7% (5% before 4 Oct 2026), never the other one. */
   fee: number | null;
   /** Materials at cost, already inside allIn and takeHome. Never fee'd on either side. */
   materials?: number | null;
@@ -64,7 +65,7 @@ export function JobRail({
   /** The tab the page is showing, so its row is marked rather than linked. */
   active: TabKey;
   /** Agreed additional work, priced for this side (client: with 15% on top;
-   *  worker: less 5%). Not inside allIn or takeHome. Added to the headline
+   *  worker: less 7%). Not inside allIn or takeHome. Added to the headline
    *  and shown as its own line, so the rail and "What this job costs" end on
    *  the same figure for both sides (28 Sep 2026). */
   extra?: number;
@@ -113,7 +114,7 @@ export function JobRail({
               </div>
             )}
             <div className="flex justify-between text-[12px]">
-              <span className="text-mute">{side === "client" ? "Yaadly fee, 15%" : "Yaadly fee, 5%, deducted"}</span>
+              <span className="text-mute">{side === "client" ? "Yaadly fee, 15%" : `Yaadly fee, ${workerFeePct(WORKER_FEE_RATE)}, deducted`}</span>
               <span className="font-mono-app text-[11.5px] text-ink">{money(fee)}</span>
             </div>
             {side === "client" && check && (
@@ -129,7 +130,7 @@ export function JobRail({
                   <span className="font-mono-app text-[11.5px] text-ink">{money(main)}</span>
                 </div>
                 <div className="flex justify-between text-[12px]">
-                  <span className="text-mute">{side === "client" ? "Additional work, with 15%" : "Additional work, less 5%"}</span>
+                  <span className="text-mute">{side === "client" ? "Additional work, with 15%" : `Additional work, less ${workerFeePct(WORKER_FEE_RATE)}`}</span>
                   <span className="font-mono-app text-[11.5px] text-ink">{money(extra)}</span>
                 </div>
               </>

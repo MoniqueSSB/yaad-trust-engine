@@ -2341,7 +2341,7 @@ const VIEWS = [
 
   { k:"quotes", g:"Run the day", label:"Quotes", icon:"money",
     title:"Quotes", table:"job_quotes",
-    sub:"Submitted quotes waiting to reach a client. Client sees labour plus 15%, materials at cost. Worker keeps labour minus 5%, materials at cost. Materials are never fee'd on either side.",
+    sub:"Submitted quotes waiting to reach a client. Client sees labour plus 15%, materials at cost. Worker keeps labour minus 7%, materials at cost. Materials are never fee'd on either side.",
     select:"*",
     order:"created_at", search:["job_id","worker_name","worker_email"],
     empty:["No quotes in","Workers quote from the board. Nothing has been submitted yet."],
@@ -6088,7 +6088,7 @@ function addonStory_(r){
   return `<div class="dlvstory">` + rail
     + `<div class="dlvgrid">`
     + `<div><span class="dk">Job</span><div>${id_(r.job_id)} ${sub_("version " + r.rev + (wait ? ", " + wait.toLowerCase() : ""))}</div></div>`
-    + `<div><span class="dk">Money</span><div>Client pays <b>${esc(jmdFmt(r.amount_jmd + fee))}</b> ${sub_(jmdFmt(r.amount_jmd) + " + 15%")}<br>Worker is paid <b>${esc(jmdFmt(pay))}</b> ${sub_("less 5%")}</div></div>`
+    + `<div><span class="dk">Money</span><div>Client pays <b>${esc(jmdFmt(r.amount_jmd + fee))}</b> ${sub_(jmdFmt(r.amount_jmd) + " + 15%")}<br>Worker is paid <b>${esc(jmdFmt(pay))}</b> ${sub_("less 7%")}</div></div>`
     + `</div>`
     + `<div class="dlvbox"><span class="dk">The extra work</span><p style="white-space:pre-wrap">${esc(r.scope)}</p><p class="mute">${r.terms === "in_full" ? "Paid in full before the work starts." : "Half before the work starts, half once it is signed off."}</p></div>`
     + `<div class="dlvbox"><span class="dk">Invoices</span><div data-addon-inv>${mute_("Reading…")}</div></div>`
@@ -10038,7 +10038,7 @@ function invFeeTab(t, on){
 function invFeeHint(which = "agency"){
   if (which === "worker") return "Yaadly's 7% worker fee. It is kept out of what the tradesperson is paid, so it is never a payment going out and never an invoice of its own: the worker's pay invoice is their quoted labour less 7%. "
     + "Worked out from each accepted quote at today's rate, not read from an invoice. The pay itself is on Worker pay.";
-  return "Everything on this tab is money to Yaadly from clients. The 15% is taken when the client pays the invoice that carries it, which starts the job. Services are the whole price. Yaadly's 5% from tradespeople is on Worker fees.";
+  return "Everything on this tab is money to Yaadly from clients. The 15% is taken when the client pays the invoice that carries it, which starts the job. Services are the whole price. Yaadly's 7% from tradespeople is on Worker fees.";
 }
 
 function invFeeRows(q, which = "agency"){
