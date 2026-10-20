@@ -46,6 +46,18 @@ export type CheckInvoice = {
   currency: string | null;
 };
 
+/** The issued report for the check, as the page reads it. Visual Check
+ *  findings are a record, never rated, so no severity is read or shown. */
+export type CheckReport = {
+  id: string;
+  number: string | null;
+  visited_on: string | null;
+  verdict: string | null;
+  verdict_line: string | null;
+  issued_at: string | null;
+  report_findings: { ord: number; heading: string; body: string }[] | null;
+};
+
 /** Full price struck through beside the founding rate, the way every pilot
  *  price is shown: a visible discount, never a low list price. */
 function PriceTag({ p }: { p: CheckPrice | null }) {
@@ -81,6 +93,7 @@ export function JobCheckPanel({
   chosenAt,
   assignedTo,
   invoice,
+  report,
   prices,
   jmdPerGbp,
 }: {
@@ -92,6 +105,8 @@ export function JobCheckPanel({
   chosenAt: string | null;
   assignedTo: string | null;
   invoice: CheckInvoice | null;
+  /** The issued report, once there is one. Null for a worker: RLS returns it to the client only. */
+  report?: CheckReport | null;
   prices: Record<CheckLevel, CheckPrice | null>;
   /** The rate the page converts the check at, named on screen beside the figure. */
   jmdPerGbp: number;
@@ -234,6 +249,39 @@ export function JobCheckPanel({
             <p className="mt-2 text-[11.5px] text-dim">To change or cancel this, message us on WhatsApp.</p>
           )}
         </div>
+      )}
+
+      {state === "chosen" && level && report && (
+        <div id="check-findings" className="mt-3 scroll-mt-6 rounded-xl border border-line2 bg-panel px-3.5 py-3">
+          <p className="text-[13px] font-semibold text-ink">
+            What was recorded
+            {report.visited_on
+              ? ", visit on " + new Date(report.visited_on).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+              : ""}
+          </p>
+          {(report.verdict_line || report.verdict) && (
+            <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink">{report.verdict_line || report.verdict}</p>
+          )}
+          {(report.report_findings ?? []).length > 0 && (
+            <ol className="mt-2.5 grid gap-2">
+              {[...(report.report_findings ?? [])]
+                .sort((a, b) => a.ord - b.ord)
+                .map((f) => (
+                  <li key={f.ord} className="text-[13px] leading-relaxed">
+                    <b className="text-ink">{f.heading}</b>
+                    <span className="block text-mute">{f.body}</span>
+                  </li>
+                ))}
+            </ol>
+          )}
+          <p className="mt-2.5 text-[11.5px] text-dim">
+            {report.number ? "Report " + report.number + ". " : ""}
+            {level === "visual" ? "A record of what was seen. It does not rate or advise." : ""}
+          </p>
+        </div>
+      )}
+      {state === "chosen" && level && !report && role === "client" && assignedTo && (
+        <p className="mt-2 text-[12px] text-dim">What was recorded appears here once the visit is written up.</p>
       )}
     </section>
   );

@@ -6,6 +6,14 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-10-20 · Job room becomes a one-view dashboard; every tab opens as a side panel
+
+**Decided by Monique, 20 Oct 2026**, after reviewing a clickable mock-up: the job room opens on one view of coloured boxes, a figure or a small chart in each and few words, with a tap opening the detail. Ten tabs, ten colours. The portal's light page goes whiter (#fcfbf8). She chose to ship without a signed-in check of a real job, so the first live look is hers.
+
+**Nothing on any tab was removed.** The boxes (`components/portal/JobDashboard.tsx`) only summarise, from rows the page already loaded: no new query, and nothing is decided there. Each box links to `?tab=<key>`, the address every tab always had, and any tab other than the front page now renders inside `components/portal/JobPanel.tsx`, a panel over the dashboard with a Close link. So the old tab content, its forms and every existing `?tab=` link in WhatsApp messages, emails and the desk land where they did, now in a panel. The front page (no tab, or `?tab=overview`) shows the dashboard and, below it, the old Overview content. Bills in the boxes are counted, not summed; the stage chart draws only when every stage bill shares one currency, so two currencies are never added.
+
+**Visual Check findings** show under the booking on Approvals once a person issues the report; RLS already returns it to the job's client only. The desk's report form does not yet attach a report to a job, which is its own change.
+
 ## 2026-10-20 · Buy at booking: card authorised until the checker is confirmed
 
 **Decided by Monique, 20 Oct 2026, after PR 407 went live.** A client who ticks the early start and picks a visit within seven days now gets the Pay button straight after booking ("Step 3 · Pay"). Their card is authorised, not charged. Yaadly confirms a checker within 24 hours; if it cannot, the authorisation is cancelled and nothing is taken. The card is charged only once the visit is done and accepted, which matches the live payment terms. Her words were "we will hold the payment till checker is confirmed"; the page says "authorised, not charged" instead, because guardrail 1 bans saying money is held for anybody, and it is in fact the client's own card that is checked. Visits more than seven days out get the pay link with the confirmation, because a card authorisation lapses after seven days. Unticked bookings have no card step, since nothing may start for 14 days. **The cancel-if-no-checker promise is manual**: somebody has to cancel the authorisation in Stripe when no checker can be found.

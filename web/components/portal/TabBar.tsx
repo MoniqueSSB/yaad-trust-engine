@@ -50,23 +50,26 @@ export const TABS: { key: TabKey; label: string }[] = [
   { key: "help", label: "Help" },
 ];
 
-/* Each tab's colour, by the question it answers (founder, 20 Oct 2026):
-   sage is the job itself, ochre the proof, terracotta what is waiting on
-   you, slate the money, lagoon talking to people. The colours are the
-   tab-* variables in globals.css, "Portal tab colours". */
-export type TabHue = "sage" | "ochre" | "terracotta" | "slate" | "lagoon";
+/* Each tab has its own colour (founder, 20 Oct 2026: "the tabs need to be
+   different colours"). Terracotta stays what is waiting on you, slate the
+   money and ochre the proof, so a colour still means the same thing on the
+   tab, its dashboard box and its panel. The colours are the tab-* variables
+   in globals.css, "Portal tab colours". */
+export type TabHue =
+  | "sage" | "stone" | "plum" | "ochre" | "clay"
+  | "lagoon" | "terracotta" | "slate" | "rose" | "dusk";
 
 export const TAB_HUE: Record<TabKey, TabHue> = {
   overview: "sage",
-  details: "sage",
-  scope: "sage",
-  extra: "sage",
+  details: "stone",
+  scope: "plum",
   evidence: "ochre",
-  materials: "ochre",
+  materials: "clay",
+  messages: "lagoon",
   approvals: "terracotta",
   money: "slate",
-  messages: "lagoon",
-  help: "lagoon",
+  extra: "rose",
+  help: "dusk",
 };
 
 export function TabBar({
