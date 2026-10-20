@@ -45,6 +45,20 @@ export default function RootLayout({
       </head>
       <body className={`${fraunces.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}>
         {children}
+        {/* Company details and the legal pages, on every app screen. The
+            marketing site has carried these in its footer since launch; the
+            app had none of them until 16 Oct 2026 (the twenty point check).
+            Kept small so it never competes with a job screen. */}
+        <footer className="mx-auto mt-10 max-w-[1080px] px-5 pb-8 text-[12px] leading-relaxed text-dim">
+          <p>
+            Yaadly is a trading name of Yaadly Ltd, registered in England and Wales,
+            company no. 17358077. Registered office: 55 Remington Road, London N15 6SS.{" "}
+            <a className="underline" href="https://yaadly.co.uk/privacy.html">Privacy</a>{" · "}
+            <a className="underline" href="https://yaadly.co.uk/terms.html">Terms</a>{" · "}
+            <a className="underline" href="https://yaadly.co.uk/cancellation.html">Cancellation and refunds</a>{" · "}
+            <a className="underline" href="https://yaadly.co.uk/contact.html">Contact</a>
+          </p>
+        </footer>
         {/* The Ask Yaadly chat, the same file the marketing site serves, so
             there is one widget and one place to change it. It talks to
             yaad-inbound on the "web" channel; app.yaadly.co.uk is on that

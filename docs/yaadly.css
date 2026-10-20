@@ -271,7 +271,8 @@ h3.hx{font-size:clamp(21px,3vw,28px)}
 .fgroup{margin-bottom:14px}
 .fl{display:block;font:700 11px var(--body);letter-spacing:1.4px;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
 .f{width:100%;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;color:var(--ink);font:15px var(--body);padding:12px 13px}
-.f:focus{outline:none;border-color:var(--tealb)}
+.f:focus{border-color:var(--tealb)}
+.f:focus-visible{outline:2px solid var(--tealb);outline-offset:2px}
 textarea.f{min-height:110px;resize:vertical}
 .chan{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
 @media(max-width:640px){.chan{grid-template-columns:1fr}}

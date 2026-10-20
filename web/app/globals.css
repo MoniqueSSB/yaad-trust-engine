@@ -318,6 +318,9 @@ html:not([data-theme="light"]) .jd-go { color: var(--color-onbrand); }
 }
 .theme-btn:hover{border-color:var(--color-purple)}
 .theme-btn:focus-visible{outline:2px solid var(--color-purple); outline-offset:2px}
+:focus-visible{outline:2px solid var(--color-purple); outline-offset:2px}
+.skip{position:fixed;left:max(16px,env(safe-area-inset-left,0px));top:-60px;z-index:100;padding:10px 14px;border-radius:10px;background:var(--color-purple);color:#0E0D22;font-weight:700;text-decoration:none}
+.skip:focus{top:calc(12px + env(safe-area-inset-top,0px))}
 .theme-btn svg{
   position:relative; z-index:1; width:15px; height:15px;
   fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;
@@ -396,7 +399,8 @@ html[data-theme="light"] .theme-btn .knob{background:linear-gradient(135deg,#4B2
 .jquick2 button.clear{color:var(--mute);background:transparent;border-color:var(--line)}
 .jin{width:100%;padding:14px 16px;border-radius:12px;background:var(--field);border:1px solid var(--line2);color:var(--ink);font:inherit;font-size:16px;line-height:1.55}
 .jin::placeholder{color:var(--dim)}
-.jin:focus{outline:none;border-color:rgba(155,115,245,.6)}
+.jin:focus{border-color:rgba(155,115,245,.6)}
+.jin:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
 .jhead-p1{display:flex;flex-direction:column}
 .jreview{border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,var(--card-top-90),var(--card-bot-75));overflow:hidden}
 .jreview-row{display:flex;gap:14px;padding:14px 17px;border-bottom:1px solid var(--line)}
@@ -465,7 +469,8 @@ html[data-theme="light"] .theme-btn .knob{background:linear-gradient(135deg,#4B2
 .fgroup{margin-bottom:16px}
 .fl{display:block;font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
 .jf{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:11px;padding:11px 12px;color:var(--ink);font:inherit;font-size:14px}
-.jf:focus{outline:none;border-color:var(--teal)}
+.jf:focus{border-color:var(--teal)}
+.jf:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
 .pcrule{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:14px}
 @media(max-width:760px){.pcrule{grid-template-columns:1fr}}
 .pcbox{border:1px solid var(--line);border-radius:12px;padding:13px;background:var(--panel)}
