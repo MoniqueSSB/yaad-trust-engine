@@ -106,8 +106,9 @@ Deno.serve(async (req: Request) => {
   const startNowVersion = startNow ? s(body.startNowVersion, 40) : "";
   const startNowWording = startNow ? s(body.startNowWording, 600) : "";
 
-  // The client's PREFERRED visit date, picked on the page (20 Oct 2026,
-  // founder decision). It goes into the notes as a preference only, never
+  // The visit date the client REQUESTED on the page (20 Oct 2026, founder
+  // decision). The page promises availability is confirmed within 24
+  // hours. It goes into the notes as a request only, never
   // into due_at: due_at is a promised date and is printed to the client as
   // one, and only a named person can promise a date. Optional, so a page
   // cached from before the date step still books. The page offers tomorrow
@@ -134,7 +135,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Pick a visit date within the next four months." }, 400);
     }
     const pretty = new Date(when).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-    preferredLine = `Preferred visit date: ${pretty} (${preferredDate}). The client's choice, NOT confirmed: confirm it with them in writing.`;
+    preferredLine = `Requested visit date: ${pretty} (${preferredDate}). NOT confirmed. The page promised availability is checked and confirmed within 24 hours of booking.`;
   }
 
   const catalogueId = BOOKABLE[serviceKey];
