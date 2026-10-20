@@ -50,6 +50,25 @@ export const TABS: { key: TabKey; label: string }[] = [
   { key: "help", label: "Help" },
 ];
 
+/* Each tab's colour, by the question it answers (founder, 20 Oct 2026):
+   sage is the job itself, ochre the proof, terracotta what is waiting on
+   you, slate the money, lagoon talking to people. The colours are the
+   tab-* variables in globals.css, "Portal tab colours". */
+export type TabHue = "sage" | "ochre" | "terracotta" | "slate" | "lagoon";
+
+export const TAB_HUE: Record<TabKey, TabHue> = {
+  overview: "sage",
+  details: "sage",
+  scope: "sage",
+  extra: "sage",
+  evidence: "ochre",
+  materials: "ochre",
+  approvals: "terracotta",
+  money: "slate",
+  messages: "lagoon",
+  help: "lagoon",
+};
+
 export function TabBar({
   base,
   active,
@@ -61,9 +80,11 @@ export function TabBar({
   counts?: Partial<Record<TabKey, number>>;
 }) {
   return (
+    /* The rule under the row takes the current tab's colour, so the tab and
+       the section below it read as one piece. */
     <nav
       aria-label="Job sections"
-      className="mt-6 flex flex-wrap gap-1.5 border-b border-line pb-px"
+      className={"jtabs mt-6 hue-" + TAB_HUE[active]}
     >
       {TABS.map((t) => {
         const on = t.key === active;
@@ -73,23 +94,14 @@ export function TabBar({
             key={t.key}
             href={base + (t.key === "overview" ? "" : "?tab=" + t.key)}
             aria-current={on ? "page" : undefined}
-            /* The section you are on reads as a filled, outlined tab in ink;
-               the rest are plain and lighter. Founder, 14 Sep 2026: with every
-               tab bold and only a thin underline on the current one, "it is
-               not clear what section I am on". */
-            className={
-              "-mb-px rounded-t-xl border px-3.5 py-2.5 text-[13px] transition " +
-              (on
-                ? "border-teal border-b-bg bg-soft font-bold text-ink"
-                : "border-transparent font-medium text-dim hover:bg-panel2 hover:text-tealb")
-            }
+            /* Every tab carries a dot in its colour; the section you are on is
+               filled in that colour, bold, with a bar along its foot. Founder,
+               14 Sep 2026: with every tab bold and only a thin underline on
+               the current one, "it is not clear what section I am on". */
+            className={"jtab hue-" + TAB_HUE[t.key]}
           >
             {t.label}
-            {n != null && n > 0 && (
-              <span className="ml-1.5 rounded-full bg-panel2 px-1.5 py-0.5 text-[10.5px] font-bold text-dim">
-                {n}
-              </span>
-            )}
+            {n != null && n > 0 && <span className="jtab-count">{n}</span>}
           </Link>
         );
       })}

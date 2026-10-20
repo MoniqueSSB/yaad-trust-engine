@@ -6,6 +6,12 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-10-20 · Job room tabs colour-coded by the question they answer
+
+**Decided by Monique, 20 Oct 2026, piece 2 of the Yaadly Portal design system.** The job room has ten tabs and the design system allows five or six colours, so tabs that answer the same kind of question share one: sage for the job itself (Overview, Job details, Scope and quote, Extra work), ochre for the proof (Progress evidence, Materials), terracotta for what is waiting on you (Approvals), slate blue for the money (Money), lagoon for talking (Messages, Help). The mapping lives in `TAB_HUE` in `web/components/portal/TabBar.tsx`, next to the tab list it colours, so a new tab cannot be added without choosing its colour.
+
+**What shows.** Every tab carries a 10px dot in its colour. The current tab is filled with that colour's soft tint, set bold in its ink, with a 3px bar along its foot, and the rule under the whole row turns the same colour, so the tab and its section read as one piece. That keeps the 14 Sep 2026 rule that the current section must be obvious. The colours are declared only with `portal-skin` (screen only, never the PDF copy), beside the piece 1 surfaces; the tab rules fall back to the old purple if read without them. The count badge on the current tab uses the colour's ink rather than its mark, because page colour on the mark misses 4.5:1 in light. With ten tabs the row wraps to two lines at laptop width, so a current tab on the first line sits a line above the coloured rule; accepted rather than hiding tabs behind a scrolling strip.
+
 ## 2026-10-20 · Portal gets its own low-strain surfaces, public pages keep the site's
 
 **Decided by Monique, 20 Oct 2026: portal only for now.** The signed-in portal moves to the Yaadly Portal design system's grounds and text: warm paper (#f5f2ec) in light, deep slate (#1b1f24) in dark, warm near-black and near-white text, and borders on controls that hold 3:1. The near-black #07071A and the lavender light page stay everywhere else on app.yaadly.co.uk (the job form, /apply, /trades), so those still match the marketing site and `docs/theme.css`. This is the first of three pieces; colour-coded job tabs and the Money charts follow as their own changes.
