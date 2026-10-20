@@ -6723,3 +6723,14 @@ A Visual Check or Technical Sign-off the client booked from their job room (Inde
 2. The request reaches a person. Nothing switches off automatically. Unpublish the worker's alert preference by hand within two working days, because the email promises that.
 3. A worker on WhatsApp alerts says STOP there instead. That lane already handles it (`yaad-inbound/job-alerts.ts`).
 4. The change only reaches workers once `yaad-match` is deployed from main: `supabase functions deploy yaad-match --project-ref leffyisvfvjwzilydlwf`. Read `supabase functions list` first and keep its current `verify_jwt` setting.
+7. **PM release limit** is `app_settings.pm_release_limit_jmd`, 100000 (J$100,000, roughly GBP 500; every worker and materials payment is in J$). It was `pm_release_limit_pence` for an hour on 20 Oct and was replaced by 20261020140000. Changing it is a money decision: ledger entry first.
+
+## 73. A Project Manager on the desk (20 Oct 2026)
+
+Migration `20261020140000_a_project_manager_reads_the_job_desk.sql`, applied 20 Oct 2026, guard test `supabase/tests/pm_desk_read_guards.sql` nine PASS.
+
+1. **Give someone the PM level:** `select public.grant_access('pm@example.com', 'project_manager', 'why');` signed in as Super Admin (runbook 69).
+2. **Add their email to Cloudflare Access** for `concierge.yaadly.co.uk`, or the page is never served to them. That is the Super Admin's click in the Cloudflare dashboard. Check afterwards that a stranger still gets 302: `curl -s -o /dev/null -w "%{http_code}\n" https://concierge.yaadly.co.uk/`.
+3. **What a PM reads:** jobs and everything on a job, invoices, materials, workers, clients, suppliers, conversations. **Never:** vetting documents, applications, signatures, the vetting bucket, secret settings, the sales inbox, anybody else on the access register.
+4. **What a PM can do:** nothing yet. Every desk button is a function checking `is_admin()`, so a PM's click is refused by the database. Approvals and money up to J$100,000 arrive in their own changes.
+5. **"that address has no desk access"** at the desk gate: `select public.access_levels_for('their@email');` should include `project_manager`. If it does and the gate still says no, they signed in with a different address.

@@ -7558,6 +7558,32 @@ const initials = (s) => String(s || "").replace(/@.*/,"").split(/[.\s_-]+/).filt
    person and would defeat the point of writing it down. */
 let SESSION_EMAIL = "";
 
+/* super_admin or project_manager, from desk_role() at boot. A Project Manager
+   sees the views that run jobs and nothing else: no applications or
+   signatures (identity), no sales inbox, no settings or money totals.
+   Founder, 20 October 2026. Read only for now: every button still calls a
+   function that checks is_admin(), so the database refuses a PM's click
+   until the approval and money changes land. */
+let DESK_ROLE = "";
+const PM_VIEWS = new Set([
+  "jobs","evid","stalled","quotes","shortlist",
+  "reports","completion","jobfiles","checks",
+  "kick","addons","qpd","invoices","workerpay","materials",
+  "workers","clients","suppliers",
+  "svc","photos",
+  "threads","delivery","waiting",
+]);
+function pmTrimViews(){
+  for (let i = VIEWS.length - 1; i >= 0; i--) if (!PM_VIEWS.has(VIEWS[i].k)) VIEWS.splice(i, 1);
+  for (const k of Object.keys(VIEW)) if (!PM_VIEWS.has(k)) delete VIEW[k];
+  // The rail orders groups by first appearance, and with Overview gone the
+  // first view left is Reports, which put Documents & money above Run the
+  // day. Jobs is where a PM starts, so Run the day goes back on top.
+  const first = VIEWS.filter(v => v.g === "Run the day");
+  const rest  = VIEWS.filter(v => v.g !== "Run the day");
+  VIEWS.splice(0, VIEWS.length, ...first, ...rest);
+}
+
 async function boot(){
   if (!startClient()) return;
   const { data } = await sb.auth.getSession();
@@ -7565,14 +7591,18 @@ async function boot(){
   const who = data.session.user.email;
   SESSION_EMAIL = who || "";
 
-  // is_admin() is the same predicate row level security uses, so this asks the
-  // database the question rather than trusting the page. RLS still refuses the
-  // rows on its own if this were ever bypassed.
-  const { data: admin, error: adminErr } = await sb.rpc("is_admin");
-  if (adminErr || !admin) {
+  // desk_role() answers super_admin, project_manager or nothing
+  // (20261020140000). It uses the same predicates row level security uses, so
+  // this asks the database the question rather than trusting the page. RLS
+  // still refuses the rows on its own if this were ever bypassed: hiding a
+  // view from a Project Manager below is tidiness, the policies are the lock.
+  const { data: role, error: roleErr } = await sb.rpc("desk_role");
+  if (roleErr || !role) {
     show("gate",true); show("desk",false);
-    return say("authMsg","err","Signed in as " + who + ", but that address is not on the Yaadly admin list, so this is closed to it. Sign out and use your admin address.");
+    return say("authMsg","err","Signed in as " + who + ", but that address has no desk access, so this is closed to it. Sign out and use the address the Super Admin gave access to.");
   }
+  DESK_ROLE = role;
+  if (DESK_ROLE === "project_manager") pmTrimViews();
 
   try {
     const { catalogue } = await fn({ action: "catalogue" });
@@ -7589,13 +7619,14 @@ async function boot(){
   const setErr = await loadSettings();
   await loadSignatures();
 
-  $("who").innerHTML = `<span class="av">${esc(initials(who))}</span><span class="em" title="${esc(who)}">${esc(who)}</span><button class="btn g" id="signOut">Sign out</button>`;
+  const roleTag = DESK_ROLE === "project_manager" ? `<span class="chip warn" style="grid-column:1/-1;justify-self:start" title="Project Manager: reads jobs, cannot approve or pay yet">Project Manager, read only</span>` : "";
+  $("who").innerHTML = `${roleTag}<span class="av">${esc(initials(who))}</span><span class="em" title="${esc(who)}">${esc(who)}</span><button class="btn g" id="signOut">Sign out</button>`;
   $("signOut").addEventListener("click", signOut);
   show("gate",false); show("desk",true);
   paintKill();
   buildRail(); buildSections();
   if (setErr) console.warn("app_settings:", setErr);
-  go("over");
+  go(DESK_ROLE === "project_manager" ? "jobs" : "over");
 }
 
 // ---------------------------------------------------------------- page strips
