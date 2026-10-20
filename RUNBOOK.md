@@ -6698,7 +6698,15 @@ Migration `20261020120000_the_access_register.sql`. The register records who hol
 6. **What does someone hold?** `select public.access_levels_for('name@example.com');` (service role or SQL editor). The person themselves sees theirs with `my_access_levels()`.
 7. **PM release limit** is `app_settings.pm_release_limit_pence`, 50000 (GBP 500). Changing it is a money decision: ledger entry first.
 
-## 70. A worker asks to stop job alert emails (16 Oct 2026)
+## 70. The daily check-in keeps coming for a job that should be finished (20 Oct 2026)
+
+1. **Who gets it:** every job at `in_progress` or `evidence` with a worker on it, once a day, except test jobs (`is_test` true). A job stays on the list until it moves past `evidence`, so an unfinished job keeps getting it. That is by design.
+2. **Find the job:** `select id, status, is_test, updated_at from jobs where status in ('in_progress','evidence') and worker_email is not null;`
+3. **A test job:** set `is_test` to true on it and the ping stops the next day. Needs `yaad-daily-checkin` deployed from main on or after 20 Oct 2026.
+4. **A real job that is done:** close it in the desk. Approving a job is a human decision; nothing closes it for you.
+5. **How many times it went:** `select sent_on from daily_checkin_log where job_id = '<id>' order by sent_on desc;`
+
+## 71. A worker asks to stop job alert emails (16 Oct 2026)
 
 1. Job alert emails from `yaad-match` now end with a stop line and carry a `List-Unsubscribe` header. Both send the request to `YAAD_UNSUB_EMAIL` (default `monique@yaadly.co.uk`). Set that secret to change the inbox.
 2. The request reaches a person. Nothing switches off automatically. Unpublish the worker's alert preference by hand within two working days, because the email promises that.
