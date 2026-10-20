@@ -26,7 +26,8 @@ import { materialsReceipt } from "@/lib/portal/materials-receipt";
 import { DocStrip, type Doc } from "@/components/portal/DocStrip";
 import { TabBar, TABS, type TabKey } from "@/components/portal/TabBar";
 import { AddOnPanel, AddonApprove, type AddonInvoice, type AddonPhoto, type AddonRow } from "@/components/portal/AddOnPanel";
-import { addonClientBill, addonStateLine, addonWorkerPay, waitingOn, WORKER_FEE_RATE } from "@/lib/jobs/addon";
+import { addonClientBill, addonStateLine, addonWorkerPay, waitingOn } from "@/lib/jobs/addon";
+import { workerFeeRate } from "@/lib/jobs/worker-fee";
 import { MoneyTrail, type TrailWorkerPay } from "@/components/portal/MoneyTrail";
 import { JobAddress } from "@/components/portal/JobAddress";
 import { JobWhatsApp } from "@/components/portal/JobWhatsApp";
@@ -129,6 +130,8 @@ type Quote = {
   recommended_at: string | null;
   recommended_by: string | null;
   recommended_reason: string | null;
+  /** When the quote was given: picks the worker's rate (worker_fee_rate()). */
+  created_at?: string | null;
 };
 
 type Pack = {
@@ -309,7 +312,7 @@ export default async function JobRoom({
       supabase
         .from("job_quotes")
         .select(
-          "id,worker_name,worker_email,labour_jmd,materials_jmd,materials_at_cost,earliest_start,days_estimate,note,status,scope_summary,included_note,excluded_note,timeline_note,payment_stage_note,recommended_at,recommended_by,recommended_reason,billing_mode",
+          "id,worker_name,worker_email,labour_jmd,materials_jmd,materials_at_cost,earliest_start,days_estimate,note,status,scope_summary,included_note,excluded_note,timeline_note,payment_stage_note,recommended_at,recommended_by,recommended_reason,billing_mode,created_at",
         )
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
@@ -375,7 +378,7 @@ export default async function JobRoom({
   const [{ data: addonRows }, { data: addonInvRows }, { data: addonEvRows }] = await Promise.all([
     supabase
       .from("job_addons")
-      .select("id,rev,scope,amount_jmd,terms,status,last_edit_side,history,closed_reason,signed_off_at,created_at")
+      .select("id,rev,scope,amount_jmd,terms,status,last_edit_side,history,closed_reason,signed_off_at,created_at,agreed_at")
       .eq("job_id", id)
       .order("created_at", { ascending: true }),
     supabase
@@ -608,7 +611,9 @@ export default async function JobRoom({
 
   const labour = won?.labour_jmd ?? null;
   const allIn = labour == null ? null : Math.round(labour * 1.15) + (won?.materials_jmd ?? 0);
-  const takeHome = labour == null ? null : Math.round(labour * (1 - WORKER_FEE_RATE)) + (won?.materials_jmd ?? 0);
+  /* 7% on a quote given from 4 Oct 2026, 5% before, as raise_job_worker_payable() decides. */
+  const workerRate = workerFeeRate(won?.created_at);
+  const takeHome = labour == null ? null : labour - Math.round(labour * workerRate) + (won?.materials_jmd ?? 0);
 
   const jobBase = "/portal/jobs/" + encodeURIComponent(job.id);
 
@@ -819,7 +824,7 @@ export default async function JobRoom({
   /* The worker's side is 7% (4 Oct 2026, was 5% from 9 Sep), the same figure takeHome uses.
      The worker's money panel was handed feeJmd, the client's 15%, and so
      showed "Yaadly fee, deducted" at three times what is deducted. */
-  const workerFeeJmd = labour == null ? null : Math.round(labour * WORKER_FEE_RATE);
+  const workerFeeJmd = labour == null ? null : Math.round(labour * workerRate);
   const matReleases = (materialsRows ?? []) as {
     amount_jmd: number; released_at: string | null; stage: number | null; receipt_ref: string; sent_at: string | null;
   }[];
@@ -2043,6 +2048,7 @@ export default async function JobRoom({
           workerName={won?.worker_name ?? job.worker_name ?? "the tradesperson"}
         />
         <MoneyPanel
+          workerFeeRate={workerRate}
           cardPayments={role === "client" ? cardPayments : {}}
           cardReturning={role === "client" && cardParam === "paid"}
           bankDetails={role === "client" ? bankDetails : ""}
@@ -2071,7 +2077,8 @@ export default async function JobRoom({
             })
             .map((a) => {
             const c = addonClientBill(a.amount_jmd, a.terms);
-            const pay = addonWorkerPay(a.amount_jmd);
+            const agreedAt = (a as AddonRow & { agreed_at?: string | null }).agreed_at ?? a.created_at;
+            const pay = addonWorkerPay(a.amount_jmd, agreedAt);
             const counted = a.status === "agreed" || a.status === "signed_off";
             const bill = addonBill[a.id] ?? "none";
             const workerPay = workerPays.find((p) => p.addonId === a.id);
@@ -2085,7 +2092,7 @@ export default async function JobRoom({
             const cancelledWords = a.status === "cancelled" ? " Cancelled after it was paid for: Yaadly settles this with you." : "";
             const line = role === "client"
               ? { id: a.id, scope: a.scope, work: c.amount, fee: c.fee, total: c.total, status: a.status }
-              : { id: a.id, scope: a.scope, work: a.amount_jmd, fee: a.amount_jmd - pay, total: pay, status: a.status };
+              : { id: a.id, scope: a.scope, work: a.amount_jmd, fee: a.amount_jmd - pay, feeRate: workerFeeRate(agreedAt), total: pay, status: a.status };
             return {
               ...line,
               counted,
