@@ -6,6 +6,10 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-10-20 · Buy at booking: card authorised until the checker is confirmed
+
+**Decided by Monique, 20 Oct 2026, after PR 407 went live.** A client who ticks the early start and picks a visit within seven days now gets the Pay button straight after booking ("Step 3 · Pay"). Their card is authorised, not charged. Yaadly confirms a checker within 24 hours; if it cannot, the authorisation is cancelled and nothing is taken. The card is charged only once the visit is done and accepted, which matches the live payment terms. Her words were "we will hold the payment till checker is confirmed"; the page says "authorised, not charged" instead, because guardrail 1 bans saying money is held for anybody, and it is in fact the client's own card that is checked. Visits more than seven days out get the pay link with the confirmation, because a card authorisation lapses after seven days. Unticked bookings have no card step, since nothing may start for 14 days. **The cancel-if-no-checker promise is manual**: somebody has to cancel the authorisation in Stripe when no checker can be found.
+
 ## 2026-10-20 · Job room tabs colour-coded by the question they answer
 
 **Decided by Monique, 20 Oct 2026, piece 2 of the Yaadly Portal design system.** The job room has ten tabs and the design system allows five or six colours, so tabs that answer the same kind of question share one: sage for the job itself (Overview, Job details, Scope and quote, Extra work), ochre for the proof (Progress evidence, Materials), terracotta for what is waiting on you (Approvals), slate blue for the money (Money), lagoon for talking (Messages, Help). The mapping lives in `TAB_HUE` in `web/components/portal/TabBar.tsx`, next to the tab list it colours, so a new tab cannot be added without choosing its colour.
