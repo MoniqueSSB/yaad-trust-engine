@@ -6758,7 +6758,7 @@ Found 25 October 2026: every worker application since 5 September had failed at 
 5. **"Sent, but it could not be written to the ledger"** means the message went and the migration in step 3 is not applied, or the session is not an admin. Note the send on the application by hand so the record is complete, then apply the migration.
 6. **Reading the record back**: `select at, actor, summary, refs from agent_actions where action = 'desk_message' and refs->>'to' = 'applicant' order by at desc;`. The row has no `job_id`; the application id and reference are in `refs`.
 
-## 74. Does the code write to a column production does not have? (25 Oct 2026)
+## 76. Does the code write to a column production does not have? (25 Oct 2026)
 
 1. **Why.** Section 73 is a function deployed from a branch whose migration never reached production: seven weeks of failed applications, invisible, because `scripts/check-deploy-drift.sh` compares function names and the typecheck cannot see the database. `scripts/check-schema-drift.mjs` closes that gap. It reads the live columns, functions and buckets (plain selects, never DDL), reads every Edge Function, the app and the desk for `.from("table")` writes, selects and filters, `.rpc("name")` and `storage.from("bucket")`, and prints everything the code names that production lacks.
 2. **Run it before deploying a function, the app or the desk**, from a linked checkout: `node scripts/check-schema-drift.mjs`. It also runs at the end of `scripts/check-deploy-drift.sh`. Exit 0 and "Clean" means every name in the code is live, apart from the known gaps it lists. Exit 1 lists the unknown ones with file and line. If a listed item is a column the thing you are deploying writes, apply the migration first or do not deploy.

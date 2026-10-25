@@ -362,7 +362,7 @@ jobs:
       # application failed at Send for seven weeks. The function was in step
       # with main the whole time, so the deploy drift check said nothing, and
       # the Edge Function typecheck above cannot see the database. See
-      # RUNBOOK 73 and 74.
+      # RUNBOOK 73 and 76.
       #
       # CI holds no database credential and should not. So this compares the
       # code against scripts/schema-snapshot.json, which the live run writes
