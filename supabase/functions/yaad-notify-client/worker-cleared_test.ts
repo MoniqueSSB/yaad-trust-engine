@@ -1,5 +1,5 @@
-import { assert } from "jsr:@std/assert@1";
-import { applyLink, checkReminderText, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
+import { assert, assertEquals } from "jsr:@std/assert@1";
+import { APPLY_LINK_SUBJECT, applyLink, applyLinkText, checkReminderText, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
 
 Deno.test("the cleared message fits one phone screen, names the board and the pay, and promises nothing", () => {
   const t = workerClearedText("Marcus Brown", "marcus@example.com", "https://app.yaadly.co.uk");
@@ -68,3 +68,42 @@ Deno.test("the send reminder goes once, carries no token, and promises nothing",
   assert(mig.includes("'kind', 'worker_send_reminder'"));
 });
 
+Deno.test("the apply link carries phase=1 only for a started application, and the check reminder's link is unchanged", () => {
+  const plain = applyLink("https://app.yaadly.co.uk", "11111111-2222-3333-4444-555555555555", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "APP-48A107");
+  assert(!plain.includes("phase="), "no phase unless asked");
+  assertEquals(plain, applyLink("https://app.yaadly.co.uk", "11111111-2222-3333-4444-555555555555", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "APP-48A107", 2), "phase 2 is the default and adds nothing");
+  const first = applyLink("https://app.yaadly.co.uk", "11111111-2222-3333-4444-555555555555", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "APP-48A107", 1);
+  const u = new URL(first);
+  assertEquals(u.pathname, "/apply");
+  assertEquals(u.searchParams.get("phase"), "1");
+  assertEquals(u.searchParams.get("ref"), "APP-48A107");
+  assert(u.searchParams.get("app") && u.searchParams.get("token"), "the claim must travel");
+});
+
+Deno.test("the apply link message names the reference, carries the link, warns it is theirs, and says nothing about the decision", () => {
+  const link = "https://app.yaadly.co.uk/apply?app=x&token=y&ref=APP-48A107";
+  for (const phase of [1, 2] as const) {
+    const t = applyLinkText("Monique Sewell-Bennett", "APP-48A107", link, phase);
+    assert(t.startsWith("Hi Monique, it is Yaadly."));
+    assert(t.includes("APP-48A107") && t.includes(link), "reference and link");
+    assert(/yours alone/.test(t) && /did not ask for this/.test(t), "the two warnings");
+    assert(!/[\u2013\u2014]/.test(t) && !/[\u2013\u2014]/.test(APPLY_LINK_SUBJECT), "no dashes in worker copy");
+    assert(!/cleared|approved|declined|waiting|decision|guarantee|escrow|100%/i.test(t), t);
+    assert(t.split("\n").length <= 9, "one phone screen");
+  }
+  assert(applyLinkText("", "APP-48A107", link, 1).startsWith("Hi, it is Yaadly."));
+  assert(/your application APP-48A107/.test(applyLinkText("A", "APP-48A107", link, 1)), "a started application is carried on, not checked");
+  assert(/your check for APP-48A107/.test(applyLinkText("A", "APP-48A107", link, 2)), "a received application reopens at the check");
+});
+
+Deno.test("worker_apply_link is a kind, is answered before any job is loaded, and sends only to the row's own contacts", async () => {
+  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  assert(/"worker_apply_link"/.test(src.slice(src.indexOf("const KINDS"), src.indexOf("type Kind"))), "not in KINDS");
+  const at = src.indexOf('kind === "worker_apply_link"');
+  const jobLoad = src.indexOf('.select("id, title, parish, stage, status, portal_code, client_email, client_phone, worker_email")');
+  assert(at > 0 && at < jobLoad, "worker_apply_link must be answered before the job is loaded, it has none");
+  const branch = src.slice(at, src.indexOf("// A service kind reads services", at));
+  assert(branch.includes('app.status !== "started" && app.status !== "received"'), "only an open application");
+  assert(!/b\.phone|b\.email|meta\.phone|meta\.email/.test(branch), "the address must come off the row, never the request");
+  assert(branch.includes("sendToWorker(") && branch.includes("sendPlainEmail("), "the shared ladder, not a new one");
+});
