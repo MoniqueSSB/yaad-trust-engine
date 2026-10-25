@@ -342,6 +342,38 @@ jobs:
       - name: Check the four copies agree
         run: node scripts/check-taxonomy.mjs
 
+  schema:
+    name: Code names nothing production lacks
+    runs-on: ubuntu-latest
+    # NON-BLOCKING for now, on purpose. The extractor is new and a job that
+    # cries wolf gets switched off. Flip continue-on-error to false once it has
+    # run clean on a few merged PRs. The comparison is against the committed
+    # snapshot, so it still means something when it goes red.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # Added 25 October 2026. yaad-vetting-upload wrote showcase_consent to
+      # public.applications from 5 September, the day it was deployed from a
+      # branch whose migration never reached production. Every worker
+      # application failed at Send for seven weeks. The function was in step
+      # with main the whole time, so the deploy drift check said nothing, and
+      # the Edge Function typecheck above cannot see the database. See
+      # RUNBOOK 73 and 74.
+      #
+      # CI holds no database credential and should not. So this compares the
+      # code against scripts/schema-snapshot.json, which the live run writes
+      # (scripts/check-schema-drift.mjs from a linked checkout). A stale
+      # snapshot errs towards a false alarm, never a silent pass: a column
+      # added since the snapshot shows as missing until somebody refreshes
+      # and commits the file. Known gaps, with a reason and a date, live in
+      # scripts/schema-drift-known.json.
+      - name: Compare the code against the schema snapshot
+        run: node scripts/check-schema-drift.mjs --snapshot
+
   secrets:
     name: No secrets committed
     runs-on: ubuntu-latest

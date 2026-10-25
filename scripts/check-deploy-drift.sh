@@ -128,8 +128,21 @@ echo "   preserved on every redeploy, or it silently gains a token check."
 read_list open | sed 's/^/  /'
 echo
 
+# Schema, added 25 Oct 2026. Everything above compares function NAMES. It said
+# "no drift" for the seven weeks yaad-vetting-upload was writing a column
+# production did not have (RUNBOOK 73). The schema check reads the live
+# columns, functions and buckets and lists anything the code names that is
+# not there. Read only, like the rest of this script.
+echo "== Schema: what the code names, versus what production has =="
+schema_rc=0
+node "$here/scripts/check-schema-drift.mjs" 2>&1 | grep -v "new version of Supabase CLI\|recommend updating" | sed 's/^/  /' || schema_rc=$?
+echo
+
 if [ "$drift" -eq 1 ]; then
   echo "Drift found. Nothing has been changed: read the notes above and decide."
 else
-  echo "No drift. Deployed and this branch agree."
+  echo "No drift in function names. Deployed and this branch agree on which functions exist."
+fi
+if [ "$schema_rc" -ne 0 ]; then
+  echo "The schema check found something unknown: see the section above."
 fi
