@@ -6779,3 +6779,15 @@ Found 25 October 2026: every worker application since 5 September had failed at 
    `supabase functions deploy yaad-apply-link --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` (the applicant has no session; this is the eighteenth on the CLAUDE.md §12 list) and
    `supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` (it already runs without platform auth; the new kind is in it). Then the app: `cd web && npm run deploy` from a checkout with `web/.env.local`. Read `supabase functions list` first and keep what is there.
 7. **Probe after deploying.** `curl -s -o /dev/null -w "%{http_code}\n" -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-apply-link -H "Content-Type: application/json" -H "apikey: sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz" -d '{"reference":"APP-ZZZZZZ"}'` returns 200 three times and 429 on the fourth within the hour; a body of `{"reference":"nonsense"}` returns 400. None of those sends anything.
+
+---
+
+## 78. "Not sent. Twilio refused it: 400 (code 21211), The 'To' number +07776171858 is not a valid phone number."
+
+The number on the row was typed the national way (a UK 07, or a Jamaican 876 without its 1) and saved as typed. Since 25 October 2026 every sender runs the stored number through `supabase/functions/_shared/e164.ts` before the send, which adds the country code, so this message should not come back for a UK or Jamaican number. If it does:
+
+1. **Read the number on the row.** A seven digit local number, or anything that is not a UK or Jamaican shape, is left as typed on purpose, because guessing a country sends the message to a stranger. Correct the row by hand to the full international form, with the country code and no leading 0, and send again.
+2. **A function was deployed without the helper.** `grep -L e164Digits supabase/functions/yaad-*/index.ts` lists functions that do not use it. The ten that send to a stored number are desk-message, desk-reply, notify-client, portal-code, job-health, daily-checkin, inbound, match, enquiry, and vetting-upload (which fixes the number at save time). Redeploy from disk after `supabase/functions/sync-shared.sh`, keeping each function's live `verify_jwt` setting.
+3. **Rows saved before 25 October 2026** were corrected by hand that day with: `update applications set phone = '+44' || substr(regexp_replace(phone, '\D', '', 'g'), 2) where regexp_replace(phone, '\D', '', 'g') ~ '^07\d{9}$';` and the same shape for `^(876|658)\d{7}$` with `'+1' ||`. Run the `select` form first and read what it will touch.
+
+Nothing is sent by any of this. The desk's "Not sent" is honest: send again once the number is right.

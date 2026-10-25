@@ -51,6 +51,7 @@
  */
 
 import { httpAttrs, SpanKind, Trace } from "./otel.ts";
+import { e164Digits } from "./e164.ts";
 import { recordAccepted, type SendMeta } from "./twilio-status.ts";
 
 const CORS = {
@@ -103,7 +104,7 @@ async function sendWhatsApp(to: string, body: string, trace: Trace, meta: SendMe
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
   if (!sid || !tok) return { sent: false, reason: "TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set." };
   if (!from) return { sent: false, reason: "TWILIO_WHATSAPP_FROM not set." };
-  const digits = to.replace(/\D/g, "");
+  const digits = e164Digits(to);
   if (digits.length < 7) return { sent: false, reason: "The number on this job is not usable." };
 
   return await trace.span("twilio.send.whatsapp", SpanKind.CLIENT, {

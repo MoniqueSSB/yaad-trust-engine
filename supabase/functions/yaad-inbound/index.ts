@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { e164Digits } from "./e164.ts";
 import { answerText, chatWithFailover, pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
 import { checkTwilioSignature } from "./twilio-signature.ts";
@@ -756,7 +757,7 @@ async function sendWhatsAppTo(to: string, body: string, trace: Trace, meta: Send
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
-  const digits = to.replace(/\D/g, "");
+  const digits = e164Digits(to);
   if (!sid || !tok || !from || digits.length < 7) return false;
   return await trace.span("twilio.send.whatsapp", SpanKind.CLIENT, {
     "server.address": "api.twilio.com", "messaging.system": "twilio",
@@ -827,7 +828,7 @@ async function sendPhaseMenu(to: string, lead: string, contentSid: string, messa
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
-  const digits = to.replace(/\D/g, "");
+  const digits = e164Digits(to);
   if (!contentSid || !sid || !tok || !from || digits.length < 7) return false;
   // "A Messaging Service is a prerequisite for using Content Templates",
   // Twilio's own words, and the reason this send was refused with 20422
@@ -905,7 +906,7 @@ async function sendReadBackButtons(
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
-  const digits = to.replace(/\D/g, "");
+  const digits = e164Digits(to);
   if (!contentSid || !messagingServiceSid || !sid || !tok || !from || digits.length < 7) return false;
   if (guardrails.scan(screen).length) return false;
   return await trace.span("twilio.send.whatsapp", SpanKind.CLIENT, {

@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { e164Digits } from "./e164.ts";
 import { recordAccepted, recordNotSent, type SendMeta, withMessagingService, withStatusCallback } from "./twilio-status.ts";
 import { approvedTemplateSid, lastInboundInWindow } from "./wa-window.ts";
 
@@ -67,7 +68,7 @@ async function sendTwilioWhatsApp(
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
   if (!sid || !tok || !from) return { sent: false, reason: "Twilio not configured" };
-  const digits = to.replace(/\D/g, "");
+  const digits = e164Digits(to);
   if (digits.length < 7) return { sent: false, reason: "number not usable" };
   return await trace.span("twilio.send.whatsapp", SpanKind.CLIENT, {
     "server.address": "api.twilio.com", "messaging.system": "twilio",

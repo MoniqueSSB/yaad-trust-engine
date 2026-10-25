@@ -48,6 +48,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { type AttrValue, httpAttrs, SpanKind, Trace } from "./otel.ts";
+import { e164Digits } from "./e164.ts";
 import { pickTextProvider, providerAttrs, chatWithFailover } from "./textmodel.ts";
 import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, type VisionProvider, visionAttrs } from "./visionmodel.ts";
 import * as guardrails from "./guardrails.ts";
@@ -127,7 +128,7 @@ async function sendTwilio(
     : (Deno.env.get("TWILIO_SMS_FROM") ?? "");
   if (!sid || !tok) return { sent: false, reason: "TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set" };
   if (!from) return { sent: false, reason: `TWILIO_${channel === "whatsapp" ? "WHATSAPP" : "SMS"}_FROM not set` };
-  const digits = to.replace(/\D/g, "");
+  const digits = e164Digits(to);
   if (digits.length < 7) return { sent: false, reason: "number not usable" };
   const dest = channel === "whatsapp" ? `whatsapp:+${digits}` : `+${digits}`;
   return await trace.span(`twilio.send.${channel}`, SpanKind.CLIENT, {
@@ -183,7 +184,7 @@ async function sendMetaWhatsApp(to: string, body: string, trace: Trace) {
       const r = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ messaging_product: "whatsapp", to: to.replace(/\D/g, ""), type: "text", text: { body } }),
+        body: JSON.stringify({ messaging_product: "whatsapp", to: e164Digits(to), type: "text", text: { body } }),
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });

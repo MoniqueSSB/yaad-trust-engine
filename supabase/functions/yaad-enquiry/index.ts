@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { e164Digits } from "./e164.ts";
 import { recordAccepted, type SendMeta, withMessagingService, withStatusCallback } from "./twilio-status.ts";
 
 // The contact form at the bottom of yaadly.co.uk posts here.
@@ -223,7 +224,7 @@ Deno.serve(async (req: Request) => {
   //               they open the 24 hour window themselves and a person can
   //               answer freely from then on, with no template and no cost.
   //               That is the route that works today.
-  const phone = !email ? contact.replace(/\D/g, "") : "";
+  const phone = !email ? e164Digits(contact) : "";
   const canTemplate = Boolean(WA_RECEIPT_SID && TWILIO_SID && TWILIO_TOKEN && TWILIO_FROM && phone.length >= 7);
   const receipt = email
     ? (willEmail ? "sent" : "throttled")

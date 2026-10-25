@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { e164 } from "./e164.ts";
 
 // Vetting document upload, for the join-as-a-pro flow.
 //
@@ -150,7 +151,7 @@ Deno.serve(async (req: Request) => {
         // parishes is the real answer, and it is the one matching will use.
         parish:   s(b.parish),
         parishes: s(b.parishes).slice(0, 400),
-        phone:  s(b.phone),
+        phone:  e164(s(b.phone)),
         email:  s(b.email).toLowerCase(),
         years:  s(b.years),
         work:   s(b.work).slice(0, 2000),
@@ -366,7 +367,7 @@ Deno.serve(async (req: Request) => {
 
       const core = {
         status: "received",
-        phone:    s(b.phone)  || undefined,
+        phone:    e164(s(b.phone)) || undefined,
         email:    s(b.email).toLowerCase() || undefined,
         parish:   s(b.parish) || undefined,
         parishes: s(b.parishes).slice(0, 400) || undefined,
