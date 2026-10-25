@@ -37,6 +37,9 @@ export type Worker = {
   name: string | null; trade: string | null; parish: string | null; lane: string | null;
   jobs_completed: number | null; slug: string | null; about: string | null; years: number | null;
   vetting_state: string | null;
+  // Since 25 Oct 2026 a profile goes live at the profile stage, before the ID
+  // check. True once a person has passed their ID stage: they can quote.
+  id_checked: boolean | null;
 };
 
 /**
@@ -51,23 +54,23 @@ export type Worker = {
  */
 export const WORKER_VIEW = "public_worker_profiles";
 export const SELECT_WORKER =
-  "name,trade,parish,lane,jobs_completed,slug,about,years,vetting_state";
+  "name,trade,parish,lane,jobs_completed,slug,about,years,vetting_state,id_checked";
 
 export function WorkerDirectory({ workers }: { workers: Worker[] }) {
   if (workers.length === 0) {
     return (
       <p className="mt-5 rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
-        The worker network is being built parish by parish, and nobody is
-        listed before both checks are complete: an identity check run by an
-        independent verification provider, and a Jamaican TRN checked against
-        the name on that ID. Profiles appear here as workers pass.
+        The worker network is being built parish by parish. A person at Yaadly
+        approves every profile before it appears here, and nobody can quote or
+        be booked until their identity has been checked by an independent
+        verification provider.
       </p>
     );
   }
   return (
     <>
       <p className="mt-4 font-mono-app text-[11px] font-medium uppercase tracking-[0.06em] text-dim">
-        Every profile: identity checked with an independent provider, TRN checked against the ID
+        Every profile approved by a person. Nobody quotes or is booked before their ID is checked
       </p>
       {/* auto-fit rather than a fixed 2/3 column count, changed 6 Sep 2026
           with the job board redesign. This component renders in two very
@@ -131,11 +134,16 @@ export function WorkerDirectory({ workers }: { workers: Worker[] }) {
               )}
 
               <div className="flex flex-wrap gap-1.5">
-                {/* "ID verified" is literal, not marketing: the publish gate
-                    (enforce_profile_publish_checks) refuses to make a profile
-                    active unless Persona reads back approved or completed, so
-                    every row this view can return has actually cleared it. */}
-                <span className="rounded-full border border-line bg-panel2 px-2.5 py-1 text-[10.5px] font-semibold text-mute">ID verified</span>
+                {/* Read off the row, never assumed. Since 25 Oct 2026 a profile
+                    goes live at the profile stage, before the ID check, so
+                    "ID checked" is shown only where a person has passed the
+                    ID stage, which the gate refuses without an approved
+                    Persona check (enforce_profile_publish_checks). */}
+                {w.id_checked ? (
+                  <span className="rounded-full border border-green/35 bg-green/[0.08] px-2.5 py-1 text-[10.5px] font-semibold text-green">ID checked</span>
+                ) : (
+                  <span className="rounded-full border border-line bg-panel2 px-2.5 py-1 text-[10.5px] font-semibold text-mute">ID not yet checked</span>
+                )}
                 <span className={"rounded-full px-2.5 py-1 text-[10.5px] font-semibold " + (w.lane === "cert" ? "border border-gold/35 bg-gold/[0.08] text-goldb" : "border border-purple/30 bg-purple/[0.08] text-purpleb")}>
                   {w.lane === "cert" ? "Certified professional" : "Evidence vetted"}
                 </span>

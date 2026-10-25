@@ -14,15 +14,17 @@
 
 export function workerClearedText(name: string, email: string, appUrl: string): string {
   const first = (name ?? "").trim().split(/\s+/)[0] ?? "";
-  // One phone screen, founder 30 Sep 2026.
+  // One phone screen, founder 30 Sep 2026. Since 25 Oct 2026 this is the ID
+  // stage pass, fired when id_checked_at is first set: the profile was
+  // already live, and what is new is that they can quote.
   return [
-    `You are cleared${first ? `, ${first}` : ""}. Welcome to Yaadly.`,
+    `Your ID stage is passed${first ? `, ${first}` : ""}. You can quote for jobs now.`,
     ``,
     `Jobs are on the board: ${appUrl}/portal/sign-in`,
     `Log in with ${email || "your email"}. We send you a code.`,
     ``,
     `Pay: bank transfer within 7 days of sign off. Never cash.`,
-    ``,
+    `We ask for your TRN just before your first payment.`,
     // An invitation, never an alert: new jobs only come on WhatsApp to
     // somebody who asked (the ALERTS lane records their consent). Founder,
     // 30 Sep 2026, "fix these also": published workers were never told the
@@ -31,7 +33,7 @@ export function workerClearedText(name: string, email: string, appUrl: string): 
   ].join("\n");
 }
 
-export const WORKER_CLEARED_SUBJECT = "You are cleared. Welcome to Yaadly.";
+export const WORKER_CLEARED_SUBJECT = "Your ID stage is passed. You can quote on Yaadly.";
 
 /** The reminder to finish the check, 30 Sep 2026. Founder, on "nothing
  *  automatic reminds them": "yes fix this". Sent by remind_unfinished_
@@ -106,6 +108,40 @@ export function applyLink(appUrl: string, applicationId: string, uploadToken: st
   return u.toString();
 }
 
+/** Which sitting a "Continue on another device" link reopens, or null when
+ *  there is nothing for the applicant to come back to. The one place this is
+ *  decided: yaad-apply-link hands every real reference here and this rules.
+ *
+ *  `started` is Phase 1 never sent. `received` is sent and waiting on the
+ *  check. Until 25 Oct 2026 that was the whole list, and it stranded APP-DFDA56:
+ *  passed at the desk before the ID check was ever started, with no TRN and no
+ *  signature, so the publish gate (20260830c) could never let the profile out,
+ *  the portal would not open an account without one, and the link refused
+ *  because the row no longer read received. Founder: "yes do it".
+ *
+ *  So `passed` and `gap` also get the check back, but only while the
+ *  applicant still owes a piece of the ID stage themselves: the ID check not
+ *  approved, or the Guidelines not signed. (The TRN was in this list until
+ *  later the same night, when it moved to just before the first payment.)
+ *  Blocked and test rows never get a link. Sending the check sets the row back to
+ *  received (yaad-vetting-upload, submit), so it comes back to the desk to be
+ *  decided again with the ID in front of a person. Nothing here passes,
+ *  publishes or decides anything. */
+export function applyLinkPhase(app: {
+  status?: unknown; persona_status?: unknown; trn_status?: unknown; signed_at?: unknown;
+}): 1 | 2 | null {
+  const status = String(app.status ?? "");
+  if (status === "started") return 1;
+  if (status === "received") return 2;
+  if (status !== "passed" && status !== "gap") return null;
+  const idDone = ["approved", "completed"].includes(String(app.persona_status ?? ""));
+  const signed = Boolean(app.signed_at);
+  // 25 Oct 2026, later: the TRN left the ID stage and is asked just before
+  // the first payment, on the worker's portal, so it no longer keeps the
+  // link open.
+  return idDone && signed ? null : 2;
+}
+
 /** The message that carries the link when the applicant asked for it from
  *  the box on /apply (yaad-apply-link, 25 Oct 2026). It says what the link
  *  is, which application it opens, and that it is theirs alone. It says
@@ -138,24 +174,23 @@ export function jobDelayedWorkerText(jobId: string, title: string): string {
   return `${jobId}${title ? ` (${title})` : ""}: the client has been told the job is running late. Is anything holding you up? Reply here and a person will help.`;
 }
 
-/** What a worker is told the moment a person at the desk passes them,
- *  25 Oct 2026. Until then Pass sent nothing: the desk recorded the decision
- *  and the worker heard nothing until the profile was published, which can be
- *  days later and waits on an ID check and a TRN they may not know are
- *  outstanding. Founder: "when i press pass does an email go to them". No.
- *  Now it does, by WhatsApp or text and by email. It promises no work, no
- *  dates, and does not say the profile is live, because it is not yet. */
-export function workerPassedText(name: string): string {
+/** What a worker is told the moment a person at the desk passes their
+ *  profile stage. First written 25 Oct 2026 for Pass, which then went live
+ *  nowhere; rewritten the same night for the two stages (founder: "profile
+ *  stage then id stage"). Pass now puts the profile live on the job board,
+ *  so this says so, and says what the ID stage is and where it starts. It
+ *  promises no work and no dates. The TRN is not in it: that is asked just
+ *  before the first payment. */
+export function workerPassedText(name: string, link: string): string {
   const first = (name ?? "").trim().split(/\s+/)[0] ?? "";
   return [
-    `Good news${first ? `, ${first}` : ""}. It is Yaadly.`,
+    `Your Yaadly profile is live${first ? `, ${first}` : ""}. You are on the job board now.`,
     ``,
-    `A person has checked your application and you are through.`,
-    `Your profile is being set up now. You will hear on this number when it is live and you can quote.`,
+    `To quote for jobs, finish your ID stage: your email, your ID check, the Guidelines, and referees or a short skills video. Start here:`,
+    link,
     ``,
-    `If anything is still needed from you, Monique will message you here to say what.`,
-    `Questions? Reply here.`,
+    `The link is yours alone. Questions? Reply here.`,
   ].join("\n");
 }
 
-export const WORKER_PASSED_SUBJECT = "You are through. Yaadly is setting up your profile.";
+export const WORKER_PASSED_SUBJECT = "Your Yaadly profile is live";

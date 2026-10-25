@@ -66,7 +66,7 @@ import { screenOwnWords } from "./own-words.ts";
 import { captionsLine, namedNextStep, noCaptionPrompt, plainDraft, reportSentReceipt, unearnedClaims, usableCaptions } from "./report-draft.ts";
 import { acceptedForClient, acceptedForWorker, offerForClient, PLATFORM_LABEL as WALK_PLATFORM } from "./walkthrough-offer.ts";
 import { chaseClient, DISPUTE_HOURS, problemForWorker, replyForClient, type SteppedInWhy, steppedInForClient, steppedInForWorker } from "./dispute-lane.ts";
-import { APPLY_LINK_SUBJECT, applyLink, applyLinkText, CHECK_REMINDER_SUBJECT, checkReminderText, jobDelayedWorkerText, SEND_REMINDER_SUBJECT, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText, WORKER_PASSED_SUBJECT, workerPassedText } from "./worker-cleared.ts";
+import { APPLY_LINK_SUBJECT, applyLink, applyLinkPhase, applyLinkText, CHECK_REMINDER_SUBJECT, checkReminderText, jobDelayedWorkerText, SEND_REMINDER_SUBJECT, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText, WORKER_PASSED_SUBJECT, workerPassedText } from "./worker-cleared.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -1012,8 +1012,9 @@ Deno.serve(async (req: Request) => {
     // the body can name a person but cannot put words in the message.
     if (kind === "worker_cleared") {
       const { data: w } = await admin.from("worker_profiles")
-        .select("worker_email, phone, name, active").ilike("worker_email", workerEmailIn).maybeSingle();
-      if (!w || w.active !== true) {
+        .select("worker_email, phone, name, active, id_checked_at").ilike("worker_email", workerEmailIn).maybeSingle();
+      // Since 25 Oct 2026 this is the ID stage pass: live AND ID checked.
+      if (!w || w.active !== true || !w.id_checked_at) {
         root.setAttributes({ "yaadly.notify.outcome": "worker_not_cleared" });
         return json({ ok: true, kind, told: false, reason: "That worker is not published." });
       }
@@ -1108,22 +1109,34 @@ Deno.serve(async (req: Request) => {
     // (Phase 1 was never sent); a received one opens at the check.
     if (kind === "worker_apply_link") {
       const { data: app } = await admin.from("applications")
-        .select("id, app_id, name, phone, email, upload_token, status").eq("id", applicationIdIn).maybeSingle();
-      if (!app || (app.status !== "started" && app.status !== "received")) {
+        .select("id, app_id, name, phone, email, upload_token, status, persona_status, trn_status, signed_at").eq("id", applicationIdIn).maybeSingle();
+      // applyLinkPhase (worker-cleared.ts) is the one rule for who gets a link:
+      // started and received, and a passed or gap row that still owes its own
+      // ID check, TRN or signature. Everything else is not open.
+      const phase = app ? applyLinkPhase(app) : null;
+      if (!app || phase === null) {
         root.setAttributes({ "yaadly.notify.outcome": "application_not_open" });
         return json({ ok: true, kind, told: false, reason: "That application is not open." });
       }
-      const phase: 1 | 2 = app.status === "started" ? 1 : 2;
       const link = applyLink(APP_URL, String(app.id), String(app.upload_token), String(app.app_id), phase);
       const text = applyLinkText(String(app.name ?? ""), String(app.app_id), link, phase);
       const phone = String(app.phone ?? "").trim();
-      // Free text inside the 24 hour window, a text message outside it. No
-      // approved template says "here is your link", and none is borrowed:
-      // the check reminder template says the check is waiting, which is not
-      // what somebody who just asked for a link needs to hear, and would be
-      // untrue of a started application.
+      // Free text inside the 24 hour window. Outside it, a link that reopens
+      // the check (phase 2) goes as the approved check reminder template,
+      // because what that template says is true of exactly those rows: the
+      // application is incomplete, the ID, TRN and Guidelines are what is
+      // left, here is the link. 25 Oct 2026: until then nothing was borrowed,
+      // text messages are not switched on, and APP-DFDA56 (no email) got
+      // nothing at all. A started application (phase 1) never gets it: it
+      // has not reached the check, so the template would be untrue.
+      const reminderSid = phase === 2
+        ? await approvedTemplateSid(admin, "TWILIO_CONTENT_SID_WORKER_CHECK_REMINDER", "twilio_content_sid_worker_check_reminder")
+        : "";
+      const linkFirst = String(app.name ?? "").trim().split(/\s+/)[0] ?? "";
       const wa = phone
-        ? await sendToWorker(admin, phone, text, trace, { kind: "apply link" })
+        ? await sendToWorker(admin, phone, text, trace, { kind: "apply link" }, reminderSid
+          ? { sid: reminderSid, vars: { "1": templateVar(linkFirst || "there", 60), "2": link } }
+          : undefined)
         : { sent: false, reason: "no phone on the application", outsideWindow: false };
       const emailed = app.email ? await sendPlainEmail(String(app.email), APPLY_LINK_SUBJECT, text, trace) : false;
       root.setAttributes({ "yaadly.notify.outcome": "apply_link", "yaadly.notify.wa_sent": wa.sent, "yaadly.notify.emailed": emailed });
@@ -1137,15 +1150,27 @@ Deno.serve(async (req: Request) => {
     // secret alone cannot put words in a worker's phone.
     if (kind === "worker_passed") {
       const { data: app } = await admin.from("applications")
-        .select("id, app_id, name, phone, email, status").eq("id", applicationIdIn).maybeSingle();
+        .select("id, app_id, name, phone, email, status, upload_token").eq("id", applicationIdIn).maybeSingle();
       if (!app || app.status !== "passed") {
         root.setAttributes({ "yaadly.notify.outcome": "application_not_passed" });
         return json({ ok: true, kind, told: false, reason: "That application is not passed." });
       }
-      const text = workerPassedText(String(app.name ?? ""));
+      // The profile stage pass (25 Oct 2026). The link opens their ID stage
+      // (the second sitting) and goes only to the contacts on the row.
+      const link = applyLink(APP_URL, String(app.id), String(app.upload_token), String(app.app_id));
+      const text = workerPassedText(String(app.name ?? ""), link);
       const phone = String(app.phone ?? "").trim();
+      // Outside the 24 hour window, the approved check reminder template, for
+      // the same reason as worker_apply_link: what it says (incomplete, the
+      // ID and Guidelines left, here is the link) is true of somebody whose
+      // ID stage has not started. Text messages are not switched on, so
+      // without it a worker with no email would hear nothing.
+      const passedSid = await approvedTemplateSid(admin, "TWILIO_CONTENT_SID_WORKER_CHECK_REMINDER", "twilio_content_sid_worker_check_reminder");
+      const passedFirst = String(app.name ?? "").trim().split(/\s+/)[0] ?? "";
       const wa = phone
-        ? await sendToWorker(admin, phone, text, trace, { kind: "worker passed" })
+        ? await sendToWorker(admin, phone, text, trace, { kind: "worker passed" }, passedSid
+          ? { sid: passedSid, vars: { "1": templateVar(passedFirst || "there", 60), "2": link } }
+          : undefined)
         : { sent: false, reason: "no phone on the application", outsideWindow: false };
       const emailed = app.email ? await sendPlainEmail(String(app.email), WORKER_PASSED_SUBJECT, text, trace) : false;
       root.setAttributes({ "yaadly.notify.outcome": "worker_passed", "yaadly.notify.wa_sent": wa.sent, "yaadly.notify.emailed": emailed });

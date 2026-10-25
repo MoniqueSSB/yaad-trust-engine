@@ -26,9 +26,8 @@ export const SAME_ANSWER = "If that reference is ours, your link is on its way t
 export const PER_REFERENCE_PER_HOUR = 3;
 export const PER_CALLER_PER_HOUR = 3;
 
-/** Which statuses still have a page to come back to. `started` is Phase 1
- *  never sent; `received` is sent and waiting on the check. Anything else
- *  (decided, published, withdrawn) has nothing to open and gets no link. */
-export function isOpenApplication(status: unknown): boolean {
-  return status === "started" || status === "received";
-}
+/* Which applications are still open to a link is decided in one place,
+ * applyLinkPhase in yaad-notify-client/worker-cleared.ts, because that is the
+ * function that sends it. This one used to keep its own copy of the rule
+ * (started or received), and a passed applicant who still owed the ID check
+ * was refused by both. 25 Oct 2026. */

@@ -114,7 +114,7 @@ export default async function WorkerProfile({
 
   const { data: wp } = await supabase
     .from("public_worker_profiles")
-    .select("name,trade,parish,lane,jobs_completed,about,years,areas,slug,vetting_state")
+    .select("name,trade,parish,lane,jobs_completed,about,years,areas,slug,vetting_state,id_checked")
     .eq("slug", slug)
     .maybeSingle();
   if (!wp) notFound();
@@ -216,10 +216,19 @@ export default async function WorkerProfile({
                   lost the one label saying they still cannot take a large or
                   in-home job. It is who they are, not a stand-in for the score. */}
               <div className="mt-3.5 flex flex-wrap gap-1.5">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-green/35 bg-green/[0.08] px-3 py-1.5 text-[11.5px] font-semibold text-green">
-                  <svg viewBox="0 0 24 24" className="size-3 fill-none stroke-green stroke-[2.5]" strokeLinecap="round" strokeLinejoin="round"><path d="m5 13 4 4L19 7" /></svg>
-                  Identity verified
-                </span>
+                {/* Since 25 Oct 2026 a profile is live before the ID check, so
+                    this reads the row (id_checked, the ID stage) and never
+                    claims a check that has not been passed. */}
+                {wp.id_checked ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-green/35 bg-green/[0.08] px-3 py-1.5 text-[11.5px] font-semibold text-green">
+                    <svg viewBox="0 0 24 24" className="size-3 fill-none stroke-green stroke-[2.5]" strokeLinecap="round" strokeLinejoin="round"><path d="m5 13 4 4L19 7" /></svg>
+                    Identity verified
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center rounded-full border border-line bg-panel2 px-3 py-1.5 text-[11.5px] font-semibold text-mute">
+                    ID not yet checked · cannot quote or be booked yet
+                  </span>
+                )}
                 <span className="inline-flex items-center rounded-full border border-gold/35 bg-gold/[0.08] px-3 py-1.5 text-[11.5px] font-semibold text-goldb">
                   {wp.lane === "cert" ? "Certified professional" : "Evidence vetted"}
                 </span>
