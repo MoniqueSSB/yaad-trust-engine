@@ -119,6 +119,11 @@
   text-decoration:none; transition:filter .15s, transform .15s;
 }
 .site-nav .navcta:hover{filter:brightness(1.08); transform:translateY(-1px)}
+/* The second door, top right, 25 Oct 2026 (founder: "in the top right there
+   should be join as a worker"). Outlined so the filled Post a job still reads
+   as the main one, and the same shape so they sit as a pair. */
+.site-nav .navcta.join{background:transparent; color:var(--purpleb); border-color:var(--purpleb)}
+.site-nav .navcta.join:hover{background:rgba(155,115,245,.1)}
 
 /* Narrow screens. The old pages hid the menu entirely below their own
    breakpoint, which left a phone with a logo and nothing to navigate by. The
