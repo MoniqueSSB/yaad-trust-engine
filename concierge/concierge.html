@@ -6299,7 +6299,7 @@ async function openQuotePackDocument(r){
   if (!w) throw new Error("The browser blocked the new tab. Allow pop-ups for the desk and try again.");
   w.document.write("<p style='font:15px sans-serif;padding:24px'>Building the document.</p>");
   let job = null;
-  if (r.job_id) ({ data: job } = await sb.from("jobs").select("id,title,parish,trades").eq("id", r.job_id).maybeSingle());
+  if (r.job_id) ({ data: job } = await sb.from("jobs").select("id,title,parish,trade").eq("id", r.job_id).maybeSingle());
   w.document.open(); w.document.write(quotePackDocumentHtml(r, job)); w.document.close();
   w.document.title = "Quote pack, " + (r.job_id || r.id);
 }
@@ -6356,7 +6356,7 @@ footer{margin-top:22px;padding-top:9px;border-top:1pt solid var(--line);font-siz
 <div><span class="stamp${approved ? " ok" : ""}">${approved ? "Approved " + esc(dateOf(r.approved_at)) : "Draft, not yet approved"}</span></div>
 <dl class="meta">
   <div><dt>Location</dt><dd>${esc((job && job.parish) || "Not given")}</dd></div>
-  <div><dt>Trade</dt><dd>${esc((job && job.trades) || "Not given")}</dd></div>
+  <div><dt>Trade</dt><dd>${esc((job && job.trade) || "Not given")}</dd></div>
   <div><dt>Drafted</dt><dd>${esc(dateOf(r.created_at))}</dd></div>
 </dl>
 <h2>Scope</h2>${paras(d.scope_summary) || "<p>Not written.</p>"}

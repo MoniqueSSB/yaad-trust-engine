@@ -28,10 +28,5 @@
     "ref": "function:worker_decline_job_request",
     "since": "2026-10-25",
     "why": "From 20260905a. The decline button on web/app/jobs calls it; the call fails quietly until the migration is applied."
-  },
-  {
-    "ref": "column:jobs.trades",
-    "since": "2026-10-25",
-    "why": "A DESK BUG, not a missing migration. jobs has never had a trades column (it is trade). openQuotePackDocument() in concierge.html selects it, so the quote pack document tab fails in production. Fix the select and the template line that reads job.trades, then remove this entry."
   }
 ]
