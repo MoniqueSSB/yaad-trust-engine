@@ -65,7 +65,7 @@ import { screenOwnWords } from "./own-words.ts";
 import { captionsLine, namedNextStep, noCaptionPrompt, plainDraft, reportSentReceipt, unearnedClaims, usableCaptions } from "./report-draft.ts";
 import { acceptedForClient, acceptedForWorker, offerForClient, PLATFORM_LABEL as WALK_PLATFORM } from "./walkthrough-offer.ts";
 import { chaseClient, DISPUTE_HOURS, problemForWorker, replyForClient, type SteppedInWhy, steppedInForClient, steppedInForWorker } from "./dispute-lane.ts";
-import { applyLink, CHECK_REMINDER_SUBJECT, checkReminderText, jobDelayedWorkerText, SEND_REMINDER_SUBJECT, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
+import { APPLY_LINK_SUBJECT, applyLink, applyLinkText, CHECK_REMINDER_SUBJECT, checkReminderText, jobDelayedWorkerText, SEND_REMINDER_SUBJECT, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -80,7 +80,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "stage_signed_off_worker", "stage_paid_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "worker_send_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied", "dispute_stepped_in", "dispute_stepped_in_worker", "dispute_chase_client", "job_live", "stage_paid"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "stage_signed_off_worker", "stage_paid_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "worker_apply_link", "worker_send_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied", "dispute_stepped_in", "dispute_stepped_in_worker", "dispute_chase_client", "job_live", "stage_paid"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -986,9 +986,9 @@ Deno.serve(async (req: Request) => {
     const quoteId = typeof meta.quoteId === "string" && meta.quoteId.trim() ? meta.quoteId.trim() : "";
     // worker_cleared is about a person, not a job: it carries workerEmail.
     const workerEmailIn = String(b.workerEmail ?? "").trim().toLowerCase();
-    // worker_check_reminder is about an application: it carries applicationId.
+    // worker_check_reminder and worker_apply_link are about an application: they carry applicationId.
     const applicationIdIn = String(b.applicationId ?? "").trim();
-    const isWorkerOnly = kind === "worker_cleared" || kind === "worker_check_reminder" || kind === "worker_send_reminder";
+    const isWorkerOnly = kind === "worker_cleared" || kind === "worker_check_reminder" || kind === "worker_apply_link" || kind === "worker_send_reminder";
     const workerOnlyKey = kind === "worker_cleared" ? workerEmailIn : applicationIdIn;
     if (!secret || !KINDS.includes(kind) || (isWorkerOnly ? !workerOnlyKey : isService ? !serviceId : !jobId)) {
       return json({ error: "secret, a valid kind, and jobId (or serviceId for a service kind, workerEmail for worker_cleared) are required." }, 400);
@@ -1094,6 +1094,38 @@ Deno.serve(async (req: Request) => {
         } catch (_) { emailed = false; }
       }
       root.setAttributes({ "yaadly.notify.outcome": "check_reminder", "yaadly.notify.wa_sent": wa.sent, "yaadly.notify.emailed": emailed });
+      return json({ ok: true, kind, told: wa.sent || emailed, whatsapp: wa.sent, via: "via" in wa ? wa.via ?? "" : "", reason: wa.sent ? "" : wa.reason ?? "", emailed });
+    }
+
+    // The applicant asked for their own link, from the box on /apply
+    // (yaad-apply-link, 25 Oct 2026). Answered here, before any job is
+    // loaded. The caller has already throttled and already told the browser
+    // the same sentence whatever happens here. This reads the row and sends
+    // the link to the phone and the email ON THE ROW, never to anything the
+    // request carries, so a leaked secret could make us text an applicant
+    // their own link and nothing else. A started application gets phase=1
+    // (Phase 1 was never sent); a received one opens at the check.
+    if (kind === "worker_apply_link") {
+      const { data: app } = await admin.from("applications")
+        .select("id, app_id, name, phone, email, upload_token, status").eq("id", applicationIdIn).maybeSingle();
+      if (!app || (app.status !== "started" && app.status !== "received")) {
+        root.setAttributes({ "yaadly.notify.outcome": "application_not_open" });
+        return json({ ok: true, kind, told: false, reason: "That application is not open." });
+      }
+      const phase: 1 | 2 = app.status === "started" ? 1 : 2;
+      const link = applyLink(APP_URL, String(app.id), String(app.upload_token), String(app.app_id), phase);
+      const text = applyLinkText(String(app.name ?? ""), String(app.app_id), link, phase);
+      const phone = String(app.phone ?? "").trim();
+      // Free text inside the 24 hour window, a text message outside it. No
+      // approved template says "here is your link", and none is borrowed:
+      // the check reminder template says the check is waiting, which is not
+      // what somebody who just asked for a link needs to hear, and would be
+      // untrue of a started application.
+      const wa = phone
+        ? await sendToWorker(admin, phone, text, trace, { kind: "apply link" })
+        : { sent: false, reason: "no phone on the application", outsideWindow: false };
+      const emailed = app.email ? await sendPlainEmail(String(app.email), APPLY_LINK_SUBJECT, text, trace) : false;
+      root.setAttributes({ "yaadly.notify.outcome": "apply_link", "yaadly.notify.wa_sent": wa.sent, "yaadly.notify.emailed": emailed });
       return json({ ok: true, kind, told: wa.sent || emailed, whatsapp: wa.sent, via: "via" in wa ? wa.via ?? "" : "", reason: wa.sent ? "" : wa.reason ?? "", emailed });
     }
 
