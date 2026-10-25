@@ -1107,6 +1107,20 @@ html[data-theme="light"] .ovside,
 html[data-theme="light"] .sc,
 html[data-theme="light"] .jcard,
 html[data-theme="light"] .ans{background:#FFFFFF}
+/* The side panel, the pinned first column of a table on a phone, and the
+   empty photo tile were fixed dark colours, so they stayed dark with the
+   switch on light and the words on them all but disappeared. */
+html[data-theme="light"] .drw,
+html[data-theme="light"] .drw .dhd,
+html[data-theme="light"] .drw .dacts{background:#FFFFFF}
+@media(max-width:820px){
+  html[data-theme="light"] .tw th:first-child,
+  html[data-theme="light"] .tw td:first-child{background:#FFFFFF}
+  html[data-theme="light"] tbody tr:hover td:first-child{background:#F3F0FC}
+}
+html[data-theme="light"] .thumbs>i{background:linear-gradient(135deg,#F3F0FC,#E7E1F8)}
+html[data-theme="light"] .thumbs>a.thumb img,
+html[data-theme="light"] .thumbs>a.thumb video,
 html[data-theme="light"] .evpmedia img,
 html[data-theme="light"] .evpmedia video{background:#EFEBFA}
 html[data-theme="light"] .pthumb .x{background:rgba(21,20,46,.75)}
@@ -1425,10 +1439,26 @@ html[data-theme="light"] .theme-btn .knob{background:linear-gradient(135deg,#4B2
 </section>
 
 <section class="view" data-view="materials">
-  <h1 class="vh">Materials tranches</h1>
-  <p class="vsub">The materials line of an accepted quote, paid to the worker so they can buy the goods, once the client has paid for it, and never fee'd on either side. Releasing records the decision and moves no money: you then pay the worker from your business bank app and press Mark as sent, which is when the worker gets a WhatsApp. Yaadly stores no worker bank details. The receipt comes back afterwards and is recorded here against the release it accounts for. The database refuses a tranche until the client has said where materials are kept (Materials store, on the jobs view), and refuses any total above the quoted materials line. Every release is stamped against you.</p>
+  <h1 class="vh">Materials</h1>
+  <p class="vsub"><b>Two lanes since 15 October 2026, chosen per release in the Pay to box.</b> Supplier lane (the default for new jobs, founder decision): Yaadly orders from a hardware supplier on account; the supplier confirms, the tradesperson collects against a code, the tradesperson files the materials evidence in the nominated store, and only then does Mark as paid appear here. The supplier attaches their own invoice number from their portal. Worker lane: the materials line of an accepted quote, paid to the worker so they can buy the goods, once the client has paid for it, and never fee'd on either side. Releasing records the decision and moves no money: you then pay the worker from your business bank app and press Mark as sent, which is when the worker gets a WhatsApp. Yaadly stores no worker bank details. The receipt comes back afterwards and is recorded here against the release it accounts for. The database refuses a tranche until the client has said where materials are kept (Materials store, on the jobs view), and refuses any total above the quoted materials line. Every release is stamped against you.</p>
   <div id="mrMsg"></div>
   <div id="mrBody"><div class="empty"><b>Reading booked jobs&hellip;</b></div></div>
+</section>
+
+<!-- ============================================ SUPPLIERS -->
+<section class="view" data-view="suppliers">
+  <h1 class="vh">Suppliers</h1>
+  <p class="vsub">Hardware merchants Yaadly buys materials from on account (20261015120000). A supplier signs in to app.yaadly.co.uk/portal/supplier with the email recorded here and sees only the orders made out to them: job reference, parish, stage, the lines, the collector's first name. Never a client's name or contact. Orders are placed from the Materials view, one named person's click, under the same two gates as a worker tranche. Guardrail 4 applies: no family or friends in the supply chain, and a supplier is supply.</p>
+  <div id="spMsg"></div>
+  <div class="row" style="gap:8px;flex-wrap:wrap;margin:14px 0 6px">
+    <div><label>Business name</label><input type="text" id="spName" placeholder="e.g. a hardware depot" style="width:220px"></div>
+    <div><label>Parish</label><input type="text" id="spParish" placeholder="St Catherine" style="width:130px"></div>
+    <div><label>Contact name</label><input type="text" id="spContact" style="width:150px"></div>
+    <div><label>Contact email (their portal sign-in)</label><input type="email" id="spEmail" style="width:220px"></div>
+    <div><label>Phone</label><input type="text" id="spPhone" style="width:140px"></div>
+    <div><button class="btn" id="spAdd">Add supplier</button></div>
+  </div>
+  <div id="spBody"><div class="empty"><b>Reading suppliers&hellip;</b></div></div>
 </section>
 
 
@@ -1885,6 +1915,11 @@ const VIEWS = [
             <option value="pm_stage">Full PM, stage completion record</option>
           </select>
           <p class="mute" id="rptKindWhat" style="margin-top:6px"></p>
+          <div id="rptJobBox" style="display:none">
+            <label class="fl" style="margin-top:10px" for="rptJob">Job, if the client booked this check on a job</label>
+            <select id="rptJob" class="inp"><option value="">None, bought on its own</option></select>
+            <p class="mute" id="rptJobWhat" style="margin-top:6px"></p>
+          </div>
           <label class="fl" style="margin-top:10px">Client name</label>
           <input id="rptClient" class="inp" placeholder="As it should read on the report">
           <label class="fl" style="margin-top:10px">Property</label>
@@ -2306,7 +2341,7 @@ const VIEWS = [
 
   { k:"quotes", g:"Run the day", label:"Quotes", icon:"money",
     title:"Quotes", table:"job_quotes",
-    sub:"Submitted quotes waiting to reach a client. Client sees labour plus 15%, materials at cost. Worker keeps labour minus 5%, materials at cost. Materials are never fee'd on either side.",
+    sub:"Submitted quotes waiting to reach a client. Client sees labour plus 15%, materials at cost. Worker keeps labour minus 7%, materials at cost. Materials are never fee'd on either side.",
     select:"*",
     order:"created_at", search:["job_id","worker_name","worker_email"],
     empty:["No quotes in","Workers quote from the board. Nothing has been submitted yet."],
@@ -2392,7 +2427,8 @@ const VIEWS = [
 
   { k:"apps", g:"People", label:"Applications", icon:"people",
     title:"Applications", table:"applications",
-    detailTop: r => applicantCard(r), titleOf: r => r.name || r.email || "Application",
+    detailTop: r => applicantCard(r) + applicantMessageCard(r), afterOpen: wireApplicantMessage,
+    titleOf: r => r.name || r.email || "Application",
     sub:"Vetting is by hand and stays that way. The agent reads documents and flags what is missing or does not line up. It never approves anybody: PASS, GAP and BLOCK are your words, not its.",
     select:"*",
     order:"created_at", search:["app_id","name","email","trade","parish"],
@@ -2546,6 +2582,8 @@ const VIEWS = [
       {h:"Joined", f:r => mute_(day_(r.created_at))},
     ]},
 
+  { k:"suppliers", g:"People", label:"Suppliers", icon:"home", hand:true },
+
   { k:"reviews", g:"People", label:"Reviews", icon:"star",
     title:"Reviews", table:"reviews",
     sub:"Both directions, both tied to a completed job. You cannot delete one. You can hold one that breaks the rules and you must say why, and that note is kept.",
@@ -2691,7 +2729,7 @@ const VIEWS = [
 
   { k:"invoices", g:"Documents & money", label:"Invoices", icon:"bill", hand:true },
   { k:"workerpay", g:"Documents & money", label:"Pay workers", icon:"card", hand:true },
-  { k:"materials", g:"Documents & money", label:"Materials tranches", icon:"bill", hand:true },
+  { k:"materials", g:"Documents & money", label:"Materials", icon:"bill", hand:true },
   { k:"sketch",   g:"Documents & money", label:"Sketch packs", icon:"cam", hand:true },
 
   { k:"docs", g:"Documents & money", label:"Signatures", icon:"pen",
@@ -4225,19 +4263,33 @@ function jobContacts(r){
   return c;
 }
 
-function jobMessageCard(r){
-  const cs = jobContacts(r);
-  if (!cs.length) return `<div class="card jpmsg"><div class="chd"><h3>Message about this job</h3></div><p class="hint" style="margin:0">Neither the client nor a tradesperson has a number or an address on this job, so there is nobody to message from here.</p></div>`;
-  const opts = cs.map(c => `<option value="${c.to}">${esc(c.who)} (${c.to === "client" ? "client" : "tradesperson"})</option>`).join("");
-  return `<div class="card jpmsg" data-job="${esc(r.id)}">
-      <div class="chd"><h3>Message about this job</h3><span class="sp">your words, sent as typed</span></div>
+// One card, two owners. A job page and an application drawer both message a
+// person this way, so the markup and the wiring live once, in messageCard()
+// and wireMessageCard(). The spec says who can be reached and what the
+// function is told; nothing else differs. Added 25 October 2026, when the
+// applicant card was built and would otherwise have been a second copy.
+//
+//   key          what the card is about, for the data attribute
+//   title        the card heading
+//   contacts     [{ to, who, kind, phone, email }], to is what the function
+//                receives: client, worker or applicant
+//   subject      the default email subject
+//   placeholder  the example text in the box
+//   payload(c, ch, subject, text)  the JSON body yaad-desk-message gets
+//   recordedOn   "this job" or "this application", for the own-app note
+function messageCard(spec){
+  const cs = spec.contacts;
+  if (!cs.length) return `<div class="card jpmsg"><div class="chd"><h3>${esc(spec.title)}</h3></div><p class="hint" style="margin:0">${esc(spec.nobody)}</p></div>`;
+  const opts = cs.map(c => `<option value="${c.to}">${esc(c.who)} (${esc(c.kind)})</option>`).join("");
+  return `<div class="card jpmsg" data-msg="${esc(spec.key)}">
+      <div class="chd"><h3>${esc(spec.title)}</h3><span class="sp">your words, sent as typed</span></div>
       <div class="row" style="margin-bottom:8px">
         <div><label>To</label><select class="jm-to">${opts}</select></div>
         <div><label>How</label><select class="jm-ch"></select></div>
       </div>
-      <div class="row jm-subj-row hidden" style="margin-bottom:8px"><div style="flex:1"><label>Subject</label><input class="jm-subj" maxlength="120" value="${esc("About your job " + r.id)}"></div></div>
+      <div class="row jm-subj-row hidden" style="margin-bottom:8px"><div style="flex:1"><label>Subject</label><input class="jm-subj" maxlength="120" value="${esc(spec.subject)}"></div></div>
       <label>Message</label>
-      <textarea class="jm-text" rows="4" maxlength="1500" placeholder="The roofer is on site from 8 tomorrow. Please leave the side gate unlocked."></textarea>
+      <textarea class="jm-text" rows="4" maxlength="1500" placeholder="${esc(spec.placeholder)}"></textarea>
       <div class="brow" style="margin-top:10px">
         <button class="btn jm-send">Send from Yaadly</button>
         <button class="btn g jm-own">Open in my own app</button>
@@ -4247,10 +4299,10 @@ function jobMessageCard(r){
     </div>`;
 }
 
-function wireJobMessage(r, el){
-  const card = el.querySelector(".jpmsg[data-job]");
+function wireMessageCard(spec, el){
+  const card = el.querySelector(`.jpmsg[data-msg="${CSS.escape(spec.key)}"]`);
   if (!card) return;
-  const cs = jobContacts(r);
+  const cs = spec.contacts;
   const $$ = (s) => card.querySelector(s);
   const who = () => cs.find(c => c.to === $$(".jm-to").value) || cs[0];
   const fillChannels = () => {
@@ -4277,7 +4329,7 @@ function wireJobMessage(r, el){
     if (!text) { $$(".jm-out").innerHTML = '<div class="msg warn">Write the message first.</div>'; return; }
     if (ch === "email") window.open(`mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent($$(".jm-subj").value || "")}&body=${encodeURIComponent(text + "\n\nMonique\nYaadly")}`, "_blank", "noopener");
     else window.open(`https://wa.me/${digits_(c.phone)}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
-    $$(".jm-out").innerHTML = '<div class="msg ok">Opened in your own app. Nothing is sent until you press send there, and it is not recorded on this job.</div>';
+    $$(".jm-out").innerHTML = `<div class="msg ok">Opened in your own app. Nothing is sent until you press send there, and it is not recorded on ${esc(spec.recordedOn)}.</div>`;
   });
 
   $$(".jm-send").addEventListener("click", async () => {
@@ -4291,7 +4343,7 @@ function wireJobMessage(r, el){
       const res = await fetch(MSG_FN, {
         method: "POST",
         headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
-        body: JSON.stringify({ job_id: r.id, to: c.to, channel: ch, subject: $$(".jm-subj").value || "", text }),
+        body: JSON.stringify(spec.payload(c, ch, $$(".jm-subj").value || "", text)),
       });
       const j = await res.json().catch(() => ({ error: "The function returned something unreadable." }));
       if (!res.ok) throw new Error(j.error || ("http " + res.status));
@@ -4302,6 +4354,46 @@ function wireJobMessage(r, el){
     } finally { b.disabled = false; }
   });
 }
+
+function jobMessageSpec(r){
+  return {
+    key: "job:" + r.id, title: "Message about this job",
+    nobody: "Neither the client nor a tradesperson has a number or an address on this job, so there is nobody to message from here.",
+    contacts: jobContacts(r).map(c => ({ ...c, kind: c.to === "client" ? "client" : "tradesperson" })),
+    subject: "About your job " + r.id,
+    placeholder: "The roofer is on site from 8 tomorrow. Please leave the side gate unlocked.",
+    payload: (c, ch, subject, text) => ({ job_id: r.id, to: c.to, channel: ch, subject, text }),
+    recordedOn: "this job",
+  };
+}
+function jobMessageCard(r){ return messageCard(jobMessageSpec(r)); }
+function wireJobMessage(r, el){ wireMessageCard(jobMessageSpec(r), el); }
+
+// ---- Message an applicant who has no job yet.
+//
+// Asked for on 25 October 2026, the day it was found that every application
+// since 5 September had failed at Send and two real applicants had sat at
+// "started" for weeks with no way to reach them from here. The "Reach them"
+// card above it only opens her own apps; this one can also send from Yaadly
+// and write the send to the ledger under her name, the same path a job uses.
+// The function reads the number and address off the application row itself,
+// under her token (applications are admin only), never off this page.
+function applicantMessageSpec(r){
+  const contacts = [];
+  if (hasPhone_(r.phone || "") || isEmail_(r.email || "")) contacts.push({ to:"applicant", who:r.name || "the applicant", kind:"applicant", phone:r.phone || "", email:r.email || "" });
+  return {
+    key: "app:" + r.id, title: "Message this applicant",
+    nobody: "This application has neither a number nor an email address, so there is nobody to message from here.",
+    contacts,
+    subject: "Your Yaadly application" + (r.app_id ? " " + r.app_id : ""),
+    placeholder: "Hello, this is Yaadly about your application. We have it and are reviewing it. Nothing more is needed from you right now.",
+    payload: (c, ch, subject, text) => ({ application_id: r.id, to: "applicant", channel: ch, subject, text }),
+    recordedOn: "this application",
+  };
+}
+function applicantMessageCard(r){ return messageCard(applicantMessageSpec(r)); }
+function wireApplicantMessage(r, el){ wireMessageCard(applicantMessageSpec(r), el); }
+
 
 // One bar per currency, split by where the money is, counts beside it. Each
 // part's v is a { currency: amount } total from sumByCur. A job bill is in
@@ -5393,9 +5485,36 @@ async function preApps(rows){
 
 const VERDICT = { pass:["ok","&#10003;","Pass"], flag:["gap","!","Gap"], unclear:["gap","?","Unclear"], block:["block","&times;","Block"], fail:["block","&times;","Fail"] };
 
+// Opened and never sent (25 Oct 2026). Every worker who tapped Send between
+// 5 September and 25 October was refused by a missing column and this page
+// never showed them, because everything here starts at "received". Two days
+// is the line: a first sitting takes ten minutes, so somebody still at
+// started after two days has walked away or been turned away. The contact
+// buttons are the same Reach them card every application carries.
+function stuckAppsCard(rows){
+  const line = Date.now() - 48 * 3600 * 1000;
+  const stuck = (rows || []).filter(r => String(r.status || "") === "started" && new Date(r.created_at || 0).getTime() < line);
+  if (!stuck.length) return "";
+  const items = stuck.map(r => {
+    const docs = (VDOC[r.id] || []).length;
+    const reach = hasPhone_(r.phone || "") ? "WhatsApp" : isEmail_(r.email || "") ? "email" : "no way back";
+    return `<div class="vitem ${reach === "no way back" ? "block" : "gap"}"><span class="vi">${docs}</span>`
+      + `<div><h6>${esc(r.name || r.app_id || "no name")}</h6><p>${esc(r.trade || "trade not said")} &middot; ${esc(r.parish || "parish not said")} &middot; opened ${esc(ago_(r.created_at))} ago &middot; ${docs} document${docs === 1 ? "" : "s"} on file`
+      + (r.send_reminded_at ? ` &middot; reminded ${esc(ago_(r.send_reminded_at))} ago` : ` &middot; not reminded yet`) + `</p></div>`
+      + `<span class="vs">${esc(reach)}</span></div>`;
+  }).join("");
+  return `<div class="card">
+      <div class="chd"><h3>Started, never sent</h3><span class="chip warn dot">${stuck.length}</span>
+      <span class="sp">opened more than two days ago and never reached Send</span></div>
+      <div class="vrec">${items}</div>
+      <p class="conseq">Each of these people got as far as the form, and some uploaded documents. A reminder goes to them once, two days on, by text message and email; after that it is your call. Open the row below and use Reach them. If it was you testing, mark it so and it drops off.</p>
+    </div>`;
+}
+
 function panelApps(rows){
-  const waiting = (rows || []).filter(r => ["submitted","reviewing"].includes(String(r.status || "")));
-  if (!waiting.length) return "";
+  const waiting = (rows || []).filter(r => ["received","submitted","reviewing"].includes(String(r.status || "")));
+  const stuckCard = stuckAppsCard(rows);
+  if (!waiting.length) return stuckCard;
   const a = waiting[0];
   const v = VET[a.id];
   const docs = VDOC[a.id] || [];
@@ -5424,7 +5543,7 @@ function panelApps(rows){
     + `<span class="sp">${esc(a.trade || "trade not said")} &middot; ${esc(a.parish || "parish not said")} &middot; applied ${esc(ago_(a.created_at))} ago</span></div>`
     + body
     + `<p class="conseq"><b>The agent flags, a person decides.</b> ${v ? esc(v.model || "The model") + " read " + docs.length + " document" + (docs.length === 1 ? "" : "s") + " and raised " + flags + "." : "Nothing has read these documents."} It never approves anybody. Open the row below to record Pass, Gap or Block, and each one says what it does before it does it.</p>`
-    + `</div>`;
+    + `</div>` + stuckCard;
 }
 
 // ---- Quotes: where a quote sits against the others on the same job.
@@ -6051,7 +6170,7 @@ function addonStory_(r){
   return `<div class="dlvstory">` + rail
     + `<div class="dlvgrid">`
     + `<div><span class="dk">Job</span><div>${id_(r.job_id)} ${sub_("version " + r.rev + (wait ? ", " + wait.toLowerCase() : ""))}</div></div>`
-    + `<div><span class="dk">Money</span><div>Client pays <b>${esc(jmdFmt(r.amount_jmd + fee))}</b> ${sub_(jmdFmt(r.amount_jmd) + " + 15%")}<br>Worker is paid <b>${esc(jmdFmt(pay))}</b> ${sub_("less 5%")}</div></div>`
+    + `<div><span class="dk">Money</span><div>Client pays <b>${esc(jmdFmt(r.amount_jmd + fee))}</b> ${sub_(jmdFmt(r.amount_jmd) + " + 15%")}<br>Worker is paid <b>${esc(jmdFmt(pay))}</b> ${sub_("less 7%")}</div></div>`
     + `</div>`
     + `<div class="dlvbox"><span class="dk">The extra work</span><p style="white-space:pre-wrap">${esc(r.scope)}</p><p class="mute">${r.terms === "in_full" ? "Paid in full before the work starts." : "Half before the work starts, half once it is signed off."}</p></div>`
     + `<div class="dlvbox"><span class="dk">Invoices</span><div data-addon-inv>${mute_("Reading…")}</div></div>`
@@ -6262,7 +6381,7 @@ async function openQuotePackDocument(r){
   if (!w) throw new Error("The browser blocked the new tab. Allow pop-ups for the desk and try again.");
   w.document.write("<p style='font:15px sans-serif;padding:24px'>Building the document.</p>");
   let job = null;
-  if (r.job_id) ({ data: job } = await sb.from("jobs").select("id,title,parish,trades").eq("id", r.job_id).maybeSingle());
+  if (r.job_id) ({ data: job } = await sb.from("jobs").select("id,title,parish,trade").eq("id", r.job_id).maybeSingle());
   w.document.open(); w.document.write(quotePackDocumentHtml(r, job)); w.document.close();
   w.document.title = "Quote pack, " + (r.job_id || r.id);
 }
@@ -6319,7 +6438,7 @@ footer{margin-top:22px;padding-top:9px;border-top:1pt solid var(--line);font-siz
 <div><span class="stamp${approved ? " ok" : ""}">${approved ? "Approved " + esc(dateOf(r.approved_at)) : "Draft, not yet approved"}</span></div>
 <dl class="meta">
   <div><dt>Location</dt><dd>${esc((job && job.parish) || "Not given")}</dd></div>
-  <div><dt>Trade</dt><dd>${esc((job && job.trades) || "Not given")}</dd></div>
+  <div><dt>Trade</dt><dd>${esc((job && job.trade) || "Not given")}</dd></div>
   <div><dt>Drafted</dt><dd>${esc(dateOf(r.created_at))}</dd></div>
 </dl>
 <h2>Scope</h2>${paras(d.scope_summary) || "<p>Not written.</p>"}
@@ -6945,6 +7064,7 @@ function wireReportDrafter(){
         visited_on: composed.visited_on,
         who: composed.who,
         source_text: RPT_SOURCE || null,
+        job_id: rptJobPicked(),
       });
       const bits = [`Drafted ${j.findings} finding${j.findings === 1 ? "" : "s"}, all unrated, no verdict.`];
       if (j.scrubbed && j.scrubbed.length) {
@@ -6965,6 +7085,9 @@ function wireReportDrafter(){
       delete RPT_TYPED[$("rptKind").value];
       rptFormDraw();
       RPT_SOURCE = "";
+      RPT_JOBS = null;
+      if ($("rptJob")) $("rptJob").value = "";
+      rptJobDraw();
       if ($("rptFiles")) $("rptFiles").value = "";
       await loadTableView("reports");
     } catch (e) {
@@ -7087,7 +7210,7 @@ function openDetail(k, i){
     </div>`;
   document.body.appendChild(el);
   // A view with live controls on its page wires them here, once the markup
-  // exists. Only the job page has any today: its message card.
+  // exists: the job page and the application drawer each have a message card.
   if (v.afterOpen) v.afterOpen(row, el);
 
   el.addEventListener("click", (e) => { if (e.target === el) closeDrawer(); });
@@ -7252,7 +7375,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawe
 // does not re-read the database.
 const OVLANE = { you:true, wrk:false, cli:false, non:false, clr:false };
 
-const BESPOKE = { over: loadOverview, day: loadOverview, stats: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth, materials: loadMaterials, workerpay: loadWorkerPay };
+const BESPOKE = { over: loadOverview, day: loadOverview, stats: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth, materials: loadMaterials, workerpay: loadWorkerPay, suppliers: loadSuppliers };
 let currentView = "over";
 
 function go(v){
@@ -8064,7 +8187,7 @@ async function loadOverview(){
   VISITS = vis.data || [];
   renderCal();
 
-  const [intakeNew, appsWaiting, evidOwn, quotesOut, callsNew, disputesOpen,
+  const [intakeNew, appsWaiting, appsStuck, evidOwn, quotesOut, callsNew, disputesOpen,
          pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsignedOwn,
          enqNew, asksNew] = await Promise.all([
     // Was countOf("intakes", ...) until 19 September 2026, which is to say it
@@ -8074,7 +8197,13 @@ async function loadOverview(){
     // thing the Intake view now shows: somebody on WhatsApp or the website
     // chat who has been waiting on a human, her own tests excluded.
     countOf("intake_threads", q => q.not("awaiting_human_since", "is", null).not("is_test", "is", true)),
-    countOf("applications",q => q.in("status", ["submitted","reviewing"])),
+    // "received" is what yaad-vetting-upload writes at Send. This counted
+    // "submitted" and "reviewing" until 25 Oct 2026, words no function has
+    // written since the join flow was rebuilt, so the tile said "None
+    // waiting" whatever came in. Kept in the list in case an old row holds one.
+    countOf("applications",q => q.in("status", ["received","submitted","reviewing"])),
+    // Opened, maybe documents uploaded, never sent, two days on (25 Oct 2026).
+    countOf("applications",q => q.eq("status", "started").lt("created_at", new Date(Date.now() - 48 * 3600 * 1000).toISOString())),
     evidenceOwnership(),
     countOf("job_quotes",  q => q.eq("status", "sent")),
     countOf("calls",       q => q.eq("status", "requested")),
@@ -8231,8 +8360,16 @@ async function loadOverview(){
   const enqBreached = CLOCK.filter(r => r.kind === "enquiry" && r.breached).length;
   const enqOldest = CLOCK.filter(r => r.kind === "enquiry")
     .reduce((a, r) => Math.max(a, Number(r.hours_waiting) || 0), 0);
-  const slaRows = await sb.from("sla_first_reply").select("met,hours,awaiting_human_since,from_addr,job_id");
-  const sla = slaRows.data || [];
+  // sla_first_reply is every conversation, tests included. The Answer button
+  // opens v_waiting_on_you, which drops JOB-TEST jobs and anything marked
+  // "that was me testing". Reading the raw view here left a 19 day alert on
+  // the Overview for a test thread the queue no longer showed, so the alert
+  // pointed at an empty screen. Same exclusions as the queue, so the two agree.
+  const slaRows = await sb.from("sla_first_reply").select("met,hours,awaiting_human_since,from_addr,job_id,channel");
+  const testThreads = await sb.from("intake_threads").select("channel,from_addr").eq("is_test", true).limit(1000);
+  const testKeys = new Set((testThreads.data || []).map(r => r.channel + "|" + r.from_addr));
+  const sla = (slaRows.data || []).filter(r =>
+    !String(r.job_id || "").startsWith("JOB-TEST") && !testKeys.has(r.channel + "|" + r.from_addr));
   const answered = sla.filter(r => r.met !== null);
   const slaMet = answered.filter(r => r.met === true).length;
   const slaPct = answered.length ? Math.round((slaMet / answered.length) * 100) : null;
@@ -8324,7 +8461,7 @@ async function loadOverview(){
     tile(disputesOpen ? "crit" : "ok", "Disputes open", String(disputesOpen), disputesOpen ? "Nothing moves while one is" : "Nothing in dispute", "jobs"),
     tile("", "Evidence with clients", String(evidWaiting), evidWaiting ? "The client reviews it; you step in on an issue" : "Nothing waiting on a client", "evid"),
     tile(intakeNew ? "warn" : "ok", "Waiting on a reply", String(intakeNew), intakeNew ? "Somebody wrote and nobody answered" : "Nobody is waiting", "intake"),
-    tile(appsWaiting ? "warn" : "ok", "Applications", String(appsWaiting), appsWaiting ? "Vetting not finished" : "None waiting", "apps"),
+    tile(appsWaiting || appsStuck ? "warn" : "ok", "Applications", String(appsWaiting), appsStuck ? appsStuck + " started, never sent" : appsWaiting ? "Vetting not finished" : "None waiting", "apps"),
     tile(quotesOut ? "warn" : "ok", "Quotes to pass on", String(quotesOut), quotesOut ? "Sitting with you" : "None held", "quotes"),
     tile(callsNew ? "warn" : "ok", "Calls requested", String(callsNew), callsNew ? "Somebody wants to talk" : "None asked", "calls"),
     tile(enqNew ? "warn" : "ok", "Enquiries to answer", String(enqNew), enqNew ? "Somebody asked a question" : "All replied to", "enq"),
@@ -8941,7 +9078,7 @@ async function loadHealth(){
   const [staleW, staleC, unvetted, blob, noTrade, orphanQuotes, unsigned, evidNoPrint] = await Promise.all([
     wgV ? countOf("doc_signatures", q => q.eq("doc_type","worker_guidelines").neq("doc_version", wgV)) : Promise.resolve(0),
     cgV ? countOf("doc_signatures", q => q.eq("doc_type","client_guidelines").neq("doc_version", cgV)) : Promise.resolve(0),
-    countOf("applications", q => q.in("status", ["submitted","reviewing"])),
+    countOf("applications", q => q.in("status", ["received","submitted","reviewing"])),
     countOf("app_state", null),
     countOf("jobs", q => q.is("trade", null)),
     countOf("job_quotes", q => q.is("worker_user", null)),
@@ -9989,7 +10126,7 @@ function invFeeTab(t, on){
 function invFeeHint(which = "agency"){
   if (which === "worker") return "Yaadly's 7% worker fee. It is kept out of what the tradesperson is paid, so it is never a payment going out and never an invoice of its own: the worker's pay invoice is their quoted labour less 7%. "
     + "Worked out from each accepted quote at today's rate, not read from an invoice. The pay itself is on Worker pay.";
-  return "Everything on this tab is money to Yaadly from clients. The 15% is taken when the client pays the invoice that carries it, which starts the job. Services are the whole price. Yaadly's 5% from tradespeople is on Worker fees.";
+  return "Everything on this tab is money to Yaadly from clients. The 15% is taken when the client pays the invoice that carries it, which starts the job. Services are the whole price. Yaadly's 7% from tradespeople is on Worker fees.";
 }
 
 function invFeeRows(q, which = "agency"){
@@ -10534,6 +10671,42 @@ const jmdFmt = (n) => "J$" + Math.round(n).toLocaleString("en-JM");
 // keepMsg: true when a button on this view redraws it, so the confirmation
 // it just wrote survives the redraw. It used to be wiped straight away, so a
 // release or a receipt went through with nothing on screen to say so.
+// ------------------------------------------------- suppliers
+// 20261015120000. One row per hardware merchant. Adding one is add_supplier(),
+// admin only, which gives it the YSA-0000 account reference. The supplier's
+// portal binds itself to this row on their first sign-in with that email.
+async function loadSuppliers(keepMsg){
+  const host = $("spBody");
+  if (keepMsg !== true) say("spMsg", "", "");
+  const { data, error } = await sb.from("suppliers").select("*").order("created_at", { ascending: false });
+  if (error) { host.innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>Could not read suppliers</b><p>${esc(error.message)}</p></div></div>`; return; }
+  host.innerHTML = (data || []).length
+    ? `<table class="jitable"><thead><tr><th>Supplier</th><th>Contact</th><th>Account</th><th>Portal</th><th>Added</th></tr></thead><tbody>` +
+      data.map((r) => `<tr>
+        <td><div class="jistagename">${esc(r.name)}</div><div class="jistagepct">${esc(r.parish || "")}</div></td>
+        <td><div class="jicond">${esc(r.contact_name || "")}<br>${esc(r.contact_email)}<br>${esc(r.contact_phone || "")}</div></td>
+        <td><span class="mono">${esc(r.account_ref)}</span></td>
+        <td>${r.supplier_user ? chip_("ok","signed in") : chip_("mute","not yet signed in")}${r.is_active ? "" : " " + chip_("crit","inactive")}</td>
+        <td>${mute_(day_(r.created_at))}</td></tr>`).join("") + `</tbody></table>`
+    : `<div class="empty"><b>No suppliers yet</b>Add the first one above. They sign in at app.yaadly.co.uk/portal/supplier with the email you record.</div>`;
+  const add = $("spAdd");
+  add.onclick = async () => {
+    const v = (id) => ($(id).value || "").trim();
+    if (v("spName").length < 2 || !v("spEmail")) { say("spMsg", "err", "A business name and a contact email are the minimum."); return; }
+    add.disabled = true;
+    try {
+      const { data: row, error: e } = await sb.rpc("add_supplier", { p_name: v("spName"), p_parish: v("spParish"), p_contact_name: v("spContact"), p_contact_email: v("spEmail"), p_contact_phone: v("spPhone"), p_notes: "" });
+      if (e) throw e;
+      say("spMsg", "ok", `Added ${row.name}, account ${row.account_ref}. Tell them to sign in at app.yaadly.co.uk/portal/sign-in with ${row.contact_email}.`);
+      ["spName","spParish","spContact","spEmail","spPhone"].forEach((id) => { $(id).value = ""; });
+    } catch (e) {
+      say("spMsg", "err", /Only the desk/i.test(e.message) ? "This account is not on the Yaadly admin list." : e.message);
+    }
+    add.disabled = false;
+    await loadSuppliers(true);
+  };
+}
+
 async function loadMaterials(keepMsg){
   const host = $("mrBody");
   host.innerHTML = `<div class="empty"><b>Reading booked jobs with a materials line&hellip;</b></div>`;
@@ -10562,11 +10735,18 @@ async function loadMaterials(keepMsg){
   // Unpaid bills are read too, for the reason in the chip below: "paid" and
   // "on a bill at all" are different questions and only one of them is the
   // client's to answer. Void bills are left out of both, they were cancelled.
-  const [{ data: quotes }, { data: rels }, { data: invs }] = await Promise.all([
+  const [{ data: quotes }, { data: rels }, { data: invs }, { data: sups }] = await Promise.all([
     sb.from("job_quotes").select("job_id,worker_name,materials_jmd").eq("status", "accepted").in("job_id", jobIds),
-    sb.from("materials_releases").select("id,job_id,amount_jmd,released_at,receipt_ref,receipt_at,stage,sent_at,sent_by,sent_method,sent_ref").in("job_id", jobIds).not("released_at", "is", null).order("released_at", { ascending: true }),
+    sb.from("materials_releases").select("id,job_id,amount_jmd,released_at,receipt_ref,receipt_at,stage,sent_at,sent_by,sent_method,sent_ref,payee,supplier_id,collection_code,fulfilment,confirmed_at,ready_at,collected_at").in("job_id", jobIds).not("released_at", "is", null).order("released_at", { ascending: true }),
     sb.from("invoices").select("job_id,currency,status,sent_at,invoice_lines(description,line_total_pence)").in("job_id", jobIds).eq("payable_to", "yaadly").neq("status", "void"),
+    sb.from("suppliers").select("id,name,parish").eq("is_active", true).order("name"),
   ]);
+  const supById = new Map((sups || []).map((x) => [x.id, x]));
+  // Materials evidence on these jobs: the match between the goods and the
+  // site. Read, never acted on: it only decides whether Mark as paid shows
+  // on a supplier release. The gate itself stays a person's click.
+  const { data: matEv } = await sb.from("evidence").select("job_id,stage,created_at").in("job_id", jobIds).eq("kind", "materials");
+  const evidencedAfter = (r) => (matEv || []).some((e) => e.job_id === r.job_id && (r.stage == null || e.stage === r.stage) && e.created_at >= (r.collected_at || r.released_at));
   const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
   const relByJob = new Map();
   for (const r of rels || []) { const a = relByJob.get(r.job_id) || []; a.push(r); relByJob.set(r.job_id, a); }
@@ -10643,6 +10823,23 @@ async function loadMaterials(keepMsg){
           const ref = String(r.receipt_ref || "").trim();
           const rid = esc(String(r.id));
           const head = `${jmdFmt(r.amount_jmd)} released${r.stage != null ? " &middot; stage " + esc(String(r.stage)) : ""} &middot; ${esc(String(r.released_at || "").slice(0, 10))}`;
+          // Supplier lane (20261015120000): the supplier moves the goods in
+          // their portal; this row only reads their stamps. Mark as paid is
+          // offered once the materials evidence is on the job, and the
+          // supplier's invoice number is theirs to attach, not ours to type.
+          if (r.payee === "supplier") {
+            const sp = supById.get(r.supplier_id) || { name: "supplier" };
+            const d = (ts) => ts ? esc(String(ts).slice(0, 10)) : "";
+            const step = (lab, ts) => `<span class="jichip ${ts ? "raised" : "wait"}" style="margin-right:4px"><span class="dot"></span>${lab}${ts ? " " + d(ts) : ""}</span>`;
+            const ev = evidencedAfter(r);
+            const stepsHtml = step("confirmed", r.confirmed_at) + step(r.fulfilment === "delivery" ? "out for delivery" : "ready", r.ready_at) + step(r.fulfilment === "delivery" ? "delivered" : "collected, code checked", r.collected_at) + step("evidenced on site", ev ? true : null) + step("paid", r.sent_at);
+            const payHtml = r.sent_at
+              ? `paid by bank transfer${String(r.sent_ref || "").trim() ? ", ref " + esc(r.sent_ref) : ""}, ${d(r.sent_at)}, ${esc(r.sent_by || "")} &middot; supplier invoice ${esc(ref || "not attached")}`
+              : !r.collected_at ? `with the supplier, not yet ${r.fulfilment === "delivery" ? "delivered" : "collected"}`
+              : !ev ? `collected, <b>waiting on the tradesperson's materials evidence</b> in the nominated store before this can be paid`
+              : `<b>evidenced on site, not yet paid.</b> Supplier invoice ${ref ? esc(ref) : "<b>not attached yet</b>"}. Call-back first (Pay workers), pay it from Wise, then <input type="text" placeholder="transfer ref, optional" data-mr-sref="${rid}" style="width:150px"> <button class="btn" data-sent-rel="${rid}" data-sent-amt="${esc(String(r.amount_jmd))}" data-sent-sup="1">Mark as paid to supplier</button>`;
+            return `${head} &middot; ordered from <b>${esc(sp.name)}</b> &middot; collection code <span class="mono">${esc(r.collection_code || "")}</span> (give it to the tradesperson, never the supplier)<br>&nbsp;&nbsp;${stepsHtml}<br>&nbsp;&nbsp;${payHtml}`;
+          }
           // Released is a decision; sent is the money leaving. Yaadly holds no
           // worker bank details, so the transfer happens in the bank's own app
           // and this only records that it did (mark_materials_sent).
@@ -10660,6 +10857,7 @@ async function loadMaterials(keepMsg){
 
     const form = full ? "" : `
       <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+        <div><label>Pay to</label><select data-mr-payee="${id}" style="width:210px">${(sups || []).map((x) => `<option value="${esc(x.id)}">${esc(x.name)} (supplier)</option>`).join("")}<option value="worker">The worker buys</option></select></div>
         <div><label>Amount J$</label><input type="number" min="1" step="1" value="${canGo || left}" data-mr-amount="${id}" style="width:120px"></div>
         <div><label>Receipt ref, if you have one</label><input type="text" placeholder="usually comes later" data-mr-receipt="${id}" style="width:150px"></div>
         <div><label>Stage</label><input type="number" min="1" step="1" placeholder="opt." data-mr-stage="${id}" style="width:70px"></div>
@@ -10699,10 +10897,24 @@ async function loadMaterials(keepMsg){
       const receipt = ((g("receipt") || {}).value || "").trim();
       const stageV = ((g("stage") || {}).value || "").trim();
       const note = ((g("note") || {}).value || "").trim();
+      const payee = ((g("payee") || {}).value || "worker");
       if (!(amount > 0)) { say("mrMsg", "err", "Enter the amount being released."); return; }
       btn.disabled = true;
       say("mrMsg", "ok", `Releasing ${jmdFmt(amount)} on ${job}…`);
       try {
+        if (payee !== "worker") {
+          // Supplier lane: same gates, same admin check, run inside
+          // release_materials_to_supplier (20261015120000).
+          const { data: relId, error: spErr } = await sb.rpc("release_materials_to_supplier", {
+            p_job: job, p_amount_jmd: amount, p_supplier: payee,
+            p_stage: stageV ? Number(stageV) : null, p_lines: [], p_fulfilment: "collection", p_note: note,
+          });
+          if (spErr) throw spErr;
+          const sp = supById.get(payee) || { name: "the supplier" };
+          say("mrMsg", "ok", `Ordered ${jmdFmt(amount)} on ${job} from ${sp.name}. They see it in their portal now and are asked to confirm. The collection code is on the row: give it to the tradesperson. No money has moved.`);
+          await loadMaterials(true);
+          return;
+        }
         const { data, error } = await sb.rpc("release_materials_tranche", {
           p_job: job, p_amount_jmd: amount, p_receipt_ref: receipt,
           p_stage: stageV ? Number(stageV) : null, p_note: note,
@@ -10729,6 +10941,9 @@ async function loadMaterials(keepMsg){
       const rel = btn.dataset.sentRel;
       const ref = ((host.querySelector(`[data-mr-sref="${rel}"]`) || {}).value || "").trim();
       const amt = jmdFmt(Number(btn.dataset.sentAmt || 0));
+      if (btn.dataset.sentSup) {
+        if (!confirm(`Mark ${amt} as paid to the supplier by bank transfer${ref ? ", reference " + ref : ""}?\n\nStamped against you, once, never changed. No WhatsApp is sent: the supplier sees it on their statement. Only press it once the transfer has left Wise.`)) return;
+      } else
       if (!confirm(`Mark ${amt} as sent to the worker by bank transfer${ref ? ", reference " + ref : ""}?\n\nThis sends them a WhatsApp saying it has been sent, and it cannot be changed afterwards. Only press it once the transfer has gone from your bank.`)) return;
       btn.disabled = true;
       try {
@@ -11396,6 +11611,68 @@ const RPT_FORMS = {
 // and back does not lose a half written visit.
 const RPT_TYPED = {};
 
+// The job a check report belongs to, 20 October 2026. A Visual Check or a
+// Technical Sign-off the client booked from their job room (jobs.check_level)
+// is written here like any other, and until now landed with job_id null, so
+// the job room had nothing to show under the booking. yaad-report already
+// takes job_id; this is the desk sending it. A pick list of jobs with that
+// check booked, read from v_job_checks, never a typed id. Nothing is picked
+// for you: the job decides which client reads the report once it is issued,
+// so a wrong guess here would show it to the wrong person.
+const RPT_JOB_LEVEL = { visual_check: "visual", technical_signoff: "technical" };
+let RPT_JOBS = null;
+
+async function rptJobDraw(){
+  const box = $("rptJobBox"), sel = $("rptJob"); if (!box || !sel) return;
+  const level = RPT_JOB_LEVEL[$("rptKind").value];
+  if (!level) { box.style.display = "none"; sel.value = ""; return; }
+  box.style.display = "";
+  const was = sel.value;
+  if (!RPT_JOBS) {
+    $("rptJobWhat").textContent = "Reading the jobs with a check booked.";
+    const { data, error } = await sb.from("v_job_checks")
+      .select("id,title,parish,client_name,check_level,check_chosen_at,report_number,report_status")
+      .order("check_chosen_at", { ascending:false }).limit(200);
+    if (error) { $("rptJobWhat").innerHTML = '<span style="color:var(--coral)">Could not read the jobs: ' + esc(error.message) + "</span>"; return; }
+    RPT_JOBS = data || [];
+  }
+  if (RPT_JOB_LEVEL[$("rptKind").value] !== level) return;
+  const mine = RPT_JOBS.filter(j => j.check_level === level)
+    .sort((a, b) => (a.report_number ? 1 : 0) - (b.report_number ? 1 : 0));
+  sel.innerHTML = `<option value="">None, bought on its own</option>` + mine.map(j =>
+    `<option value="${esc(j.id)}">${esc(j.id)}, ${esc(j.title || "untitled")}, ${esc(j.client_name || "client not named")}${j.report_number ? ` (has ${esc(j.report_number)}, ${esc(j.report_status || "")})` : ""}</option>`).join("");
+  sel.value = mine.some(j => j.id === was) ? was : "";
+  if (!sel.dataset.wired) {
+    sel.dataset.wired = "1";
+    sel.addEventListener("change", () => {
+      const j = (RPT_JOBS || []).find(x => x.id === sel.value);
+      if (j) {
+        const c = $("rptClient"), p = $("rptProperty");
+        if (c && !c.value.trim() && j.client_name) c.value = j.client_name;
+        if (p && !p.value.trim() && j.parish) p.value = j.parish;
+      }
+      rptJobSays();
+    });
+  }
+  rptJobSays();
+}
+
+function rptJobSays(){
+  const sel = $("rptJob"), out = $("rptJobWhat"); if (!sel || !out) return;
+  const j = (RPT_JOBS || []).find(x => x.id === sel.value);
+  const n = (RPT_JOBS || []).filter(x => x.check_level === RPT_JOB_LEVEL[$("rptKind").value]).length;
+  out.innerHTML = j
+    ? `Saved on <b>${esc(j.id)}</b>. Once you issue it, it shows under the booking in that job's room, to ${esc(j.client_name || "that job's client")} and nobody else. A draft is never shown.`
+    : n
+      ? `Pick the job if this visit was the check the client booked from their job, so the findings show under the booking. Leave it on None for a check bought on its own. ${n} job${n === 1 ? "" : "s"} with this check booked; any that already have a report are at the bottom.`
+      : "No job has this check booked, so the report is saved on its own.";
+}
+
+function rptJobPicked(){
+  const sel = $("rptJob");
+  return sel && RPT_JOB_LEVEL[$("rptKind").value] && sel.value ? sel.value : null;
+}
+
 function rptFormKeep(){
   const kind = $("rptFields")?.dataset.kind; if (!kind) return;
   const keep = RPT_TYPED[kind] = RPT_TYPED[kind] || {};
@@ -11422,6 +11699,7 @@ function rptFormDraw(){
   h += form.fields.map(f => input(f.id, f.label, f.hint, f.short, f.rows)).join("");
   box.dataset.kind = kind;
   box.innerHTML = h;
+  rptJobDraw();
   $("rptKindWhat").textContent = form.what;
   $("rptFilesLbl").textContent = form.files;
 }
