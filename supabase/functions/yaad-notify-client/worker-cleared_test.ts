@@ -141,3 +141,11 @@ Deno.test("the passed message says they are through, says what happens next, and
   assert(workerPassedText("").startsWith("Good news. It is Yaadly."));
   assert(WORKER_PASSED_SUBJECT.length < 60);
 });
+
+Deno.test("outside the window the link borrows the check reminder template only for the check, never for a started application", async () => {
+  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const at = src.indexOf('kind === "worker_apply_link"');
+  const branch = src.slice(at, src.indexOf("// An application opened and never sent", at));
+  assert(/const reminderSid = phase === 2\s*\?\s*await approvedTemplateSid\(admin, "TWILIO_CONTENT_SID_WORKER_CHECK_REMINDER"/.test(branch), "template only when phase is 2");
+  assert(branch.includes('"2": link'), "the template carries the same link the text does");
+});

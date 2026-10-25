@@ -1120,13 +1120,22 @@ Deno.serve(async (req: Request) => {
       const link = applyLink(APP_URL, String(app.id), String(app.upload_token), String(app.app_id), phase);
       const text = applyLinkText(String(app.name ?? ""), String(app.app_id), link, phase);
       const phone = String(app.phone ?? "").trim();
-      // Free text inside the 24 hour window, a text message outside it. No
-      // approved template says "here is your link", and none is borrowed:
-      // the check reminder template says the check is waiting, which is not
-      // what somebody who just asked for a link needs to hear, and would be
-      // untrue of a started application.
+      // Free text inside the 24 hour window. Outside it, a link that reopens
+      // the check (phase 2) goes as the approved check reminder template,
+      // because what that template says is true of exactly those rows: the
+      // application is incomplete, the ID, TRN and Guidelines are what is
+      // left, here is the link. 25 Oct 2026: until then nothing was borrowed,
+      // text messages are not switched on, and APP-DFDA56 (no email) got
+      // nothing at all. A started application (phase 1) never gets it: it
+      // has not reached the check, so the template would be untrue.
+      const reminderSid = phase === 2
+        ? await approvedTemplateSid(admin, "TWILIO_CONTENT_SID_WORKER_CHECK_REMINDER", "twilio_content_sid_worker_check_reminder")
+        : "";
+      const linkFirst = String(app.name ?? "").trim().split(/\s+/)[0] ?? "";
       const wa = phone
-        ? await sendToWorker(admin, phone, text, trace, { kind: "apply link" })
+        ? await sendToWorker(admin, phone, text, trace, { kind: "apply link" }, reminderSid
+          ? { sid: reminderSid, vars: { "1": templateVar(linkFirst || "there", 60), "2": link } }
+          : undefined)
         : { sent: false, reason: "no phone on the application", outsideWindow: false };
       const emailed = app.email ? await sendPlainEmail(String(app.email), APPLY_LINK_SUBJECT, text, trace) : false;
       root.setAttributes({ "yaadly.notify.outcome": "apply_link", "yaadly.notify.wa_sent": wa.sent, "yaadly.notify.emailed": emailed });
