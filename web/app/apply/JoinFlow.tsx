@@ -493,10 +493,23 @@ export function JoinFlow() {
       const linkApp = q.get("app") ?? "", linkTok = q.get("token") ?? "", linkRef = q.get("ref") ?? "";
       if (/^[0-9a-f-]{36}$/i.test(linkApp) && /^[0-9a-f-]{36}$/i.test(linkTok) && /^APP-[0-9A-Z]{6}$/.test(linkRef)) {
         const c: Claim = { applicationId: linkApp, uploadToken: linkTok, reference: linkRef };
-        claimRef.current = c; setClaim(c); setSentRef(linkRef); setContinuing(true); setStep(0);
+        // Which sitting the link opens (25 Oct 2026, "Continue on another
+        // device"). No phase, or any value but 1, is the second sitting: the
+        // application was sent and the check is what is left. phase=1 is an
+        // application that was started and never sent, so it reopens at
+        // "Your trades" with the claim attached, and Send lands on the row
+        // that already exists instead of opening a second one. The form
+        // fields are not in this browser's storage and are typed again;
+        // whatever was uploaded from the other device is still on the row.
+        const firstSitting = q.get("phase") === "1";
+        claimRef.current = c; setClaim(c); setStep(0);
+        if (firstSitting) { setSentRef(""); setContinuing(false); }
+        else { setSentRef(linkRef); setContinuing(true); }
         try {
           const cur = JSON.parse(localStorage.getItem(STORE) ?? "{}");
-          localStorage.setItem(STORE, JSON.stringify({ ...cur, claim: c, sentRef: linkRef, continuing: true, step: 0 }));
+          localStorage.setItem(STORE, JSON.stringify(firstSitting
+            ? { ...cur, claim: c, sentRef: "", continuing: false, step: 0 }
+            : { ...cur, claim: c, sentRef: linkRef, continuing: true, step: 0 }));
         } catch { /* private browsing, carry on */ }
         window.history.replaceState(null, "", "/apply");
         restored.current = true; return;
@@ -994,8 +1007,15 @@ export function JoinFlow() {
 
   if (sentRef && !continuing) {
     /* "Sent" first, in the founder's design (17 Sep 2026). The reference
-       stays right under it: it is the only thing that gets somebody back to
-       this application from another phone, so it is not optional furniture. */
+       stays right under it. Until 25 Oct 2026 this comment said the reference
+       was what got somebody back to this application from another phone, and
+       that was not true: nothing accepted it. The application lives in THIS
+       browser's storage, and the reference on its own opened nothing. It is
+       true now only because of the "Continue on another device" box further
+       down this screen and on the first screen of /apply, which takes the
+       reference and sends the real link (yaad-apply-link) to the phone or
+       email already on the application. The reference is still worth
+       keeping: it is the one thing that box needs. */
     const firstName = name.trim().split(/\s+/)[0];
     const tradesSent = [...trades, tradeOther.trim()].filter(Boolean);
     return (
@@ -1125,6 +1145,13 @@ export function JoinFlow() {
           </button>
         </div>
 
+        {/* On another phone or computer there is no "carry on" button, because
+            the application is saved in this browser and not in that one. This
+            is the way across: the reference, typed there, sends the link to
+            the contact already on the application. Shown here so the person
+            reading it knows the route exists before they need it. */}
+        <ContinueElsewhere reference={sentRef} />
+
         <p className="mt-4 text-[12.5px] leading-relaxed text-dim">
           {persona.state === "done" ? (
             <>Your ID and selfie are held by Persona, the identity service that
@@ -1235,6 +1262,12 @@ export function JoinFlow() {
           <span className="ml-auto font-mono text-[13px] font-semibold text-green" aria-hidden="true">&rarr;</span>
         </a>
       )}
+
+      {/* Already applied, on another phone or computer? The application is
+          saved in the browser that started it and nowhere else, so this is
+          the only way back in from here: the reference, and the link goes to
+          the contact already on the application (25 Oct 2026). */}
+      {!claim && at === 0 && !continuing && <ContinueElsewhere />}
 
       {/* ── WHO SHOULD APPLY ─────────────────────────────────────────────────
           Folded away behind one tap in the founder's design (17 Sep 2026), so
@@ -2247,6 +2280,79 @@ function ShowcaseConsent({
  * Clipboard access can be refused, so the fallback is to select the text and
  * say so rather than to claim a copy that did not happen.
  */
+/**
+ * Continue on another device (25 Oct 2026).
+ *
+ * The application is kept in the browser that started it, and the pair that
+ * opens it (the application id and its upload token) is the credential: the
+ * database minted it and only ever handed it to that browser. So from any
+ * other browser the reference on its own opened nothing, and the sent screen
+ * said otherwise. Monique hit it with her own test application.
+ *
+ * This box takes the reference and nothing else, and asks yaad-apply-link to
+ * send the real link to the phone number or email ALREADY on the application.
+ * Three things it deliberately does not do: it never shows the token, it
+ * never takes a new number or address to send to, and it never says whether
+ * the reference exists. The server answers with the same sentence either
+ * way, and this box prints that sentence. The only other answer is a 429
+ * after three tries in an hour, which counts tries and not rows.
+ */
+function ContinueElsewhere({ reference = "" }: { reference?: string }) {
+  const [ref, setRef] = useState(reference);
+  const [state, setState] = useState<"idle" | "busy" | "sent" | "slow" | "bad" | "failed">("idle");
+
+  async function send() {
+    const typed = ref.toUpperCase().replace(/[\s\u2010-\u2015]/g, "");
+    if (!/^(?:APP-?)?[0-9A-Z]{6}$/.test(typed)) { setState("bad"); return; }
+    setState("busy");
+    try {
+      const sb = createClient();
+      const { error } = await sb.functions.invoke("yaad-apply-link", { body: { reference: typed } });
+      if (error) {
+        const status = (error as { context?: Response }).context?.status ?? 0;
+        setState(status === 429 ? "slow" : "failed");
+        return;
+      }
+      setState("sent");
+    } catch {
+      setState("failed");
+    }
+  }
+
+  const said =
+    state === "sent" ? "If that reference is ours, your link is on its way to the phone number or email on the application. Open it on this device."
+    : state === "slow" ? "That is three tries in an hour for that reference. Check your messages, then try again later."
+    : state === "bad" ? "A reference is APP- followed by six letters or numbers. It is on the screen that said your application was sent."
+    : state === "failed" ? "That did not go. Try again in a moment."
+    : "";
+
+  return (
+    <div className="mt-5 rounded-2xl border border-line bg-panel p-5">
+      <b className="text-[15px] text-ink">Already applied? Continue on another device.</b>
+      <p className="mt-2 text-[13.5px] leading-relaxed text-mute">
+        Your application is saved in the browser you started it in. To carry
+        on here, type your reference and we send your link to the phone number
+        or email already on your application. Nothing is shown on this screen.
+      </p>
+      <form className="mt-3 flex flex-wrap items-center gap-2.5"
+        onSubmit={(e) => { e.preventDefault(); void send(); }}>
+        <label htmlFor="jf-cont-ref" className="sr-only">Your reference</label>
+        <input id="jf-cont-ref" className="jin max-w-[180px] font-mono uppercase" placeholder="APP-XXXXXX"
+          autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={12}
+          value={ref} onChange={(e) => { setRef(e.target.value); if (state !== "busy") setState("idle"); }} />
+        <button type="submit" className="upbtn" disabled={state === "busy" || state === "sent"}>
+          {state === "busy" ? "Sending…" : state === "sent" ? "Sent" : "Send me my link"}
+        </button>
+      </form>
+      {said && (
+        <p aria-live="polite" className={"mt-3 text-[12.5px] leading-relaxed " + (state === "sent" ? "text-mute" : "text-coral")}>
+          {said}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function CopyRef({ reference }: { reference: string }) {
   const [said, setSaid] = useState("");
   const box = useRef<HTMLSpanElement | null>(null);

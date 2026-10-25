@@ -62,13 +62,49 @@ export function checkReminderText(name: string, link: string, nth: number): stri
 
 export const CHECK_REMINDER_SUBJECT = "Your Yaadly check is waiting";
 
-export function applyLink(appUrl: string, applicationId: string, uploadToken: string, reference: string): string {
+/** The link that opens an application on the site, carrying the same claim
+ *  the site keeps in its own storage: the application id and its upload
+ *  token (JoinFlow.tsx reads them off the address bar and cleans it).
+ *
+ *  `phase`, added 25 Oct 2026 for "Continue on another device". Without it
+ *  the page opens the second sitting (the check), which is right for an
+ *  application that has been sent. An application still `started` has never
+ *  sent Phase 1, so its link carries phase=1 and the page reopens at "Your
+ *  trades" with the claim attached, and the Send button lands on the row that
+ *  already exists rather than opening a second one. The check reminder never
+ *  passes a phase: it is only ever sent to a received application. */
+export function applyLink(appUrl: string, applicationId: string, uploadToken: string, reference: string, phase?: 1 | 2): string {
   const u = new URL("/apply", appUrl);
   u.searchParams.set("app", applicationId);
   u.searchParams.set("token", uploadToken);
   u.searchParams.set("ref", reference);
+  if (phase === 1) u.searchParams.set("phase", "1");
   return u.toString();
 }
+
+/** The message that carries the link when the applicant asked for it from
+ *  the box on /apply (yaad-apply-link, 25 Oct 2026). It says what the link
+ *  is, which application it opens, and that it is theirs alone. It says
+ *  nothing about how the application is going, because this is sent to
+ *  whoever typed the reference's contact details in, and the only thing it
+ *  may reveal is what the applicant already has: a way back in. */
+export function applyLinkText(name: string, reference: string, link: string, phase: 1 | 2): string {
+  const first = (name ?? "").trim().split(/\s+/)[0] ?? "";
+  return [
+    `Hi${first ? ` ${first}` : ""}, it is Yaadly.`,
+    ``,
+    phase === 1
+      ? `Here is your link to carry on with your application ${reference}:`
+      : `Here is your link to carry on with your check for ${reference}:`,
+    link,
+    ``,
+    `It opens your application on whichever phone or computer you tap it on.`,
+    `It is yours alone. Do not forward it.`,
+    `If you did not ask for this, ignore it. Nothing changes.`,
+  ].join("\n");
+}
+
+export const APPLY_LINK_SUBJECT = "Your Yaadly application link";
 
 /** The worker's side of job_delayed, 30 Sep 2026. The client is told the job
  *  has gone quiet and that the worker has been checked in with; this is that
