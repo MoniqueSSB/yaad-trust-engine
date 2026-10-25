@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { WorkerSign } from "@/components/portal/CompletionReview";
+import { DocLogo } from "@/components/portal/DocLogo";
 import { fmtDay, fmtWhen, phaseCounts } from "@/lib/portal/completion-report";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +49,8 @@ export default async function WorkerReport({
   if (error || p.error || !p.job || !p.report) {
     return (
       <div className={shell}>
-        <h1 className="font-display text-[26px] uppercase">Completion Report</h1>
+        <DocLogo />
+        <h1 className="mt-5 font-display text-[26px] uppercase">Completion Report</h1>
         <p className="mt-3 text-[14px] text-mute">{p.error || "That link is not valid, or it is out of date. Open the latest link from your WhatsApp."}</p>
       </div>
     );
@@ -61,6 +63,10 @@ export default async function WorkerReport({
 
   return (
     <div className={shell + " grid gap-4"}>
+      {/* Every document carries the logo (founder, 28 Sep 2026). This page
+          had none until 25 Oct 2026: it has no header by design, so the
+          mark is set in by hand, the same way the signed-in copy does. */}
+      <DocLogo />
       <div>
         <p className={label}>Completion Report · {job.id}</p>
         <h1 className="mt-1 font-display text-[clamp(22px,3.5vw,30px)] uppercase leading-tight">{job.title}</h1>
