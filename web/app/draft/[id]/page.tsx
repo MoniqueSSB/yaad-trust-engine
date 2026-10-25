@@ -1,6 +1,7 @@
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { createClient } from "@/lib/supabase/server";
 import { DraftEditor } from "@/components/draft/DraftEditor";
+import { DocLogo } from "@/components/portal/DocLogo";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,8 @@ export default async function ReportDraft({
   if (error || p.error || !p.job || typeof p.draft !== "string") {
     return (
       <div className={shell}>
-        <h1 className="font-display text-[26px] uppercase">Your report to the client</h1>
+        <DocLogo />
+        <h1 className="mt-5 font-display text-[26px] uppercase">Your report to the client</h1>
         <p className="mt-3 text-[14px] text-mute">{p.error || "That link is not valid, or it is out of date. Open the latest link from your WhatsApp."}</p>
       </div>
     );
@@ -62,10 +64,14 @@ export default async function ReportDraft({
   return (
     <div className={shell + " grid gap-4"}>
       <div>
-        <div className="flex items-center justify-between gap-3">
-          <p className={label}>Report to the client · {p.job.id} · stage {p.stage}</p>
+        {/* The Yaadly mark, on every page since 25 Oct 2026. This page has
+            no header by design, so it sits where the header would, with the
+            light and dark switch beside it. */}
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <DocLogo />
           <ThemeToggle />
         </div>
+        <p className={label}>Report to the client · {p.job.id} · stage {p.stage}</p>
         <h1 className="mt-1 font-display text-[clamp(22px,3.5vw,30px)] uppercase leading-tight">{p.job.title}</h1>
       </div>
 

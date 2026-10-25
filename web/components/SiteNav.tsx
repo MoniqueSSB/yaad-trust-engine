@@ -86,9 +86,14 @@ export function SiteNav({
     <nav className="sticky top-0 z-50 border-b border-line bg-bg/85 backdrop-blur-[14px]">
       <div className="flex min-h-[58px] flex-nowrap items-center px-10 max-[1100px]:flex-wrap max-[1100px]:gap-y-2 max-[1100px]:px-[18px] max-[1100px]:py-2">
         <a href={SITE} className="mr-auto flex shrink-0 items-center gap-2 font-display text-[18px] font-medium">
-          <span className={`grid size-[30px] place-items-center rounded-[8px] text-[16px] font-bold text-white ${GRAD}`}>
-            Y
-          </span>
+          {/* The Yaadly roundel, the same mark docs/nav.css has carried since
+              25 Sep 2026. Until 25 Oct 2026 this was still the old gradient
+              tile with a Y in it, so the header changed its logo the moment
+              you crossed from yaadly.co.uk into the app. No tile and no
+              radius behind it: it is its own circle. Width and height on the
+              img so the row does not jump while the file loads. */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- a 30px static mark, same file DocLogo draws */}
+          <img src="/yaadly-logo.png" alt="" width={30} height={30} className="block size-[30px] shrink-0" />
           <b className="font-medium">
             Yaadly<span className="font-light text-mute">Hub</span>
           </b>
