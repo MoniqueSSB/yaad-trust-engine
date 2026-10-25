@@ -17,11 +17,19 @@
  * a named human speaking for herself. Do not add a model call here. A drafted
  * message belongs in the desk as text she edits, never in this path.
  *
- * THE ADDRESS COMES FROM THE JOB, NEVER FROM THE PAGE. The caller names a job
- * and a side, client or worker. This function reads that job under the
- * caller's own token and sends to the number or address on it. A page that
- * could supply its own address would be a way to send from the Yaadly number
- * to anybody at all.
+ * THE ADDRESS COMES FROM THE ROW, NEVER FROM THE PAGE. The caller names a job
+ * and a side, client or worker, or an application and the side applicant.
+ * This function reads that row under the caller's own token and sends to the
+ * number or address on it. A page that could supply its own address would be
+ * a way to send from the Yaadly number to anybody at all.
+ *
+ * THE SECOND KEY, 25 October 2026. Every worker application since 5 September
+ * had failed at Send, and two real applicants sat at status started for weeks
+ * with no way to reach them from the desk, because this function was keyed on
+ * a job and an applicant has no job. So it now also takes application_id with
+ * to = "applicant". Same token, same RLS (applications is admin only), same
+ * no-model rule, same ledger shape through record_desk_applicant_message()
+ * (migration 20261025120000). Nothing about the job path changed.
  *
  * AUTH. Platform verify_jwt stays ON for this function: deploy WITHOUT
  * --no-verify-jwt. Inside, is_admin() is checked through the caller's token,
@@ -169,6 +177,63 @@ async function sendEmail(to: string, subject: string, body: string, trace: Trace
   });
 }
 
+/* ── The applicant path ───────────────────────────────────────────────────
+ *
+ * Keyed on applications.id, which only an admin can read (RLS: "applications
+ * are admin only"), so a non-admin token gets no row and no send. The name,
+ * number and address come off that row. The page sends an id and words.
+ */
+type Reply = (b: unknown, status?: number) => Response;
+type Span = { setAttributes: (a: Record<string, string | number>) => void; recordError: (e: unknown) => void };
+
+async function sendToApplicant(
+  req: Request, trace: Trace, root: Span, json: Reply,
+  a: { applicationId: string; channel: string; text: string; subject: string },
+): Promise<Response> {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!a.applicationId) return json({ error: "Which application is this about?" }, 400);
+  if (!UUID.test(a.applicationId)) return json({ error: "That is not an application id." }, 400);
+
+  const ar = await db(req, `applications?id=eq.${encodeURIComponent(a.applicationId)}&select=id,app_id,name,phone,email`);
+  if (!ar.ok) return json({ error: `Could not read the application: rest ${ar.status}.` }, 502);
+  const app = ((await ar.json()) as Record<string, string | null>[])[0];
+  if (!app) return json({ error: "No application with that id." }, 404);
+
+  const who = app.name || "the applicant";
+  const ref = app.app_id || a.applicationId;
+  const addr = String((a.channel === "whatsapp" ? app.phone : app.email) ?? "").trim();
+  if (!addr) {
+    return json({ error: `There is no ${a.channel === "whatsapp" ? "number" : "email address"} for ${who} on this application.` }, 400);
+  }
+  const subject = (a.subject.trim() || `Your Yaadly application ${ref}`).slice(0, 120);
+
+  root.setAttributes({ "yaadly.application.id": a.applicationId, "yaadly.desk_message.to": "applicant", "yaadly.desk_message.channel": a.channel });
+  const sent = a.channel === "whatsapp"
+    ? await sendWhatsApp(addr, a.text, trace, { kind: "desk_message" })
+    : await sendEmail(addr, subject, a.text, trace);
+  if (!sent.sent) return json({ error: sent.reason || "It did not send." }, sent.code === 63016 ? 409 : 502);
+
+  // The ledger, under her name. Best effort: the message has already gone.
+  const rec = await db(req, "rpc/record_desk_applicant_message", {
+    method: "POST",
+    body: JSON.stringify({
+      p_application: a.applicationId, p_channel: a.channel, p_sid: sent.sid ?? "",
+      p_to_addr: addr, p_body: a.text,
+    }),
+  }).catch(() => null);
+  const recorded = !!rec && rec.ok;
+  if (!recorded) root.recordError(`sent but not recorded: ${rec ? "rest " + rec.status : "no response"}`);
+
+  const how = a.channel === "whatsapp" ? "on WhatsApp from the Yaadly number" : "by email from the Yaadly jobs address, with replies coming to you";
+  return json({
+    ok: true,
+    recorded,
+    note: recorded
+      ? `Sent to ${who} ${how}, and recorded against application ${ref} under your name.`
+      : `Sent to ${who} ${how}, but it could not be written to the ledger. Note it on the application so the record stays complete.`,
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -190,16 +255,20 @@ Deno.serve(async (req: Request) => {
 
     const b = await req.json().catch(() => ({})) as Record<string, unknown>;
     const jobId = String(b.job_id ?? "").trim();
+    const applicationId = String(b.application_id ?? "").trim();
     const to = String(b.to ?? "");
     const channel = String(b.channel ?? "");
     const text = String(b.text ?? "").trim();
-    const subject = (String(b.subject ?? "").trim() || `About your job ${jobId}`).slice(0, 120);
 
-    if (!jobId) return json({ error: "Which job is this about?" }, 400);
-    if (to !== "client" && to !== "worker") return json({ error: "A message goes to the client or the worker." }, 400);
+    if (to !== "client" && to !== "worker" && to !== "applicant") return json({ error: "A message goes to the client, the worker or an applicant." }, 400);
     if (channel !== "whatsapp" && channel !== "email") return json({ error: "A message goes by WhatsApp or email." }, 400);
     if (!text) return json({ error: "Nothing to send." }, 400);
     if (text.length > MAX_TEXT) return json({ error: `That is ${text.length} characters. Keep it under ${MAX_TEXT}, or send it as two.` }, 400);
+
+    if (to === "applicant") return await sendToApplicant(req, trace, root, json, { applicationId, channel, text, subject: String(b.subject ?? "") });
+
+    const subject = (String(b.subject ?? "").trim() || `About your job ${jobId}`).slice(0, 120);
+    if (!jobId) return json({ error: "Which job is this about?" }, 400);
 
     // The address, read off the job under her own token. Never from the page.
     const jr = await db(req, `jobs?id=eq.${encodeURIComponent(jobId)}&select=id,client_name,client_phone,client_email,worker_name,worker_phone,worker_email`);
