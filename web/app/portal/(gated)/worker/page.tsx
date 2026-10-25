@@ -12,6 +12,7 @@ import { WorkerInvoices, type WorkerInvoiceJob } from "@/components/portal/Worke
 import { LIVE_QUOTE, type Tender } from "@/components/portal/QuotedJobRoom";
 import { jmd } from "@/lib/money";
 import { WORKER_FEE_RATE } from "@/lib/jobs/addon";
+import { WorkerStages, type Stages } from "@/components/portal/WorkerStages";
 
 // Never cached. A portal showing a stale job is worse than a slow one.
 export const dynamic = "force-dynamic";
@@ -75,6 +76,12 @@ export default async function WorkerPortal() {
      closed quote, so it reads as what happened to them rather than as live
      work on a job that is now somebody else's. */
   const { data: tenderRows } = await supabase.rpc("my_quoted_jobs");
+
+  /* The two stages, 25 Oct 2026: what this worker still has to do before
+     they can quote, and the TRN before their first payment. Their own row
+     only (my_worker_stages); nothing here passes a stage. */
+  const { data: stageRows } = await supabase.rpc("my_worker_stages");
+  const stages = (Array.isArray(stageRows) ? stageRows[0] : stageRows) as Stages | undefined;
 
   const email = (user.email ?? "").toLowerCase();
   type WorkerJob = Job & { pay_method: string | null; pay_ref: string | null; job_type?: string | null; size_band?: string | null };
@@ -315,6 +322,8 @@ export default async function WorkerPortal() {
         The jobs you are on, what each one is waiting for, and what you are owed.
         Paid within 7 days of Yaadly signing the stage off.
       </p>
+
+      {stages && <WorkerStages s={stages} />}
 
       {error && (
         <p

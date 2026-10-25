@@ -6845,5 +6845,6 @@ Nothing is sent by any of this. The desk's "Not sent" is honest: send again once
 4. **"Only an active vetted worker can submit a quote"** still means no live profile. **"Finish your ID stage before you quote"** means the profile is live but the ID stage pass has not been pressed.
 5. **A worker sends their ID stage after the profile stage pass.** Their application stays `passed` and their profile stays live (`yaad-vetting-upload`, submit). The desk phone gets "ID stage sent, ready for ID stage pass".
 6. Profiles that were live before 25 Oct 2026 were marked as having passed the ID stage (`id_checked_by` = "live before the two stages (25 Oct 2026)"), because the old gate demanded the ID check and TRN. All six were tests.
-7. **Not built yet:** the apply page still asks proof of address and the TRN in its second sitting; the worker portal has no "Before you can quote" list or TRN box (`submit_my_trn()` exists for it).
+7. **The apply page** (25 Oct 2026, later): the first sitting needs trades, parishes, name, phone, and one line about their work; email and everything else is optional. The second sitting (the ID stage) no longer asks the TRN or proof of address, and asks for an email if there is none.
+8. **The worker portal** shows "Before you can quote" (email, ID check, Guidelines, referees or skills video, each Done or Needed, with a "Do my ID stage" button) until the ID stage is passed, then "Before your first payment" with a TRN box (`submit_my_trn()`, recorded as pending). Both read `my_worker_stages()`, the worker's own row only.
 

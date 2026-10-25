@@ -249,7 +249,7 @@ const PHASE1_STEPS: Step[] = [
     note: "" },
 { phase: 1, n: "Your track record", body: "port",
     h: "This is what a client sees when choosing who to book",
-    p: "Optional, and you can send without it. But a client picks from what they can see, and a profile with real work on it gets picked more often than an empty one.",
+    p: "One line about your work is needed: it is what your profile says. Everything else here is optional, but a client picks from what they can see, and a profile with real work on it gets picked more often than an empty one.",
     note: "" },
 { phase: 1, n: "Check and send", body: "live",
     h: "This is what goes to a person",
@@ -260,7 +260,7 @@ const PHASE1_STEPS: Step[] = [
 const LATER_STEPS: Step[] = [
 { phase: 2, n: "Identity", body: "id",
     h: "A live photo and a live video, taken on this page",
-    p: "Government photo ID, then a <b>photo this page takes through your camera</b>, and a <b>short video where you turn your face slowly left to right</b>. Both are captured here, in front of us, rather than picked from your files. Then your TRN and proof of address dated within three months.",
+    p: "Government photo ID, then a <b>photo this page takes through your camera</b>, and a <b>short video where you turn your face slowly left to right</b>. Both are captured here, in front of us, rather than picked from your files.",
     note: "A file proves somebody holds a document. A turn taken in front of us proves somebody was sitting there when it was sent. If your browser will not hand over a camera we say so on the row, take an upload instead, and a person checks that one by hand." },
 { phase: 2, n: "References", body: "refs",
     h: "Three people who will vouch for you, optional",
@@ -290,8 +290,6 @@ const CHECKS: Check[] = [
   { k: "form",   b: "Trades and parishes set", s: "From the same list clients pick from" },
   { k: "port",   b: "CV, portfolio or links",  s: "Any one of them is enough to start" },
   { k: "id",     b: "Government photo ID",     s: "Live photo and a left-to-right video turn" },
-  { k: "id2",    b: "TRN verified",            s: "Matched to the name on the ID" },
-  { k: "id3",    b: "Proof of address",        s: "Dated within three months" },
   /* Founder, 2 Oct 2026: referees are optional. Without them, the video of
      the worker talking through their skills (intro_video) gets them on the
      board. Referees are still telephoned before the top tier (over £500,
@@ -647,10 +645,18 @@ export function JoinFlow() {
      it is not worth losing an applicant over, so it stays on the form and out
      of the gate. */
   const hasPhone = phone.trim().length > 5;
-  const hasEmail = /.+@.+\..+/.test(email.trim());
-  const step1Ready =
-    name.trim().length > 1 && (hasPhone || hasEmail) &&
+  /* The profile stage, founder 25 Oct 2026: a phone number is needed (it is
+     how they are reached, and where the ID stage link goes), email is
+     optional until the ID stage, and a line about their work is needed
+     because it is what the live profile says. */
+  const aboutReady = work.trim().length >= 10;
+  // The first screen (trades, parishes, name, phone) opens the second; the
+  // line about their work is on the second screen, so it is only asked of
+  // Send, never of the first Continue.
+  const formReady =
+    name.trim().length > 1 && hasPhone &&
     trades.length > 0 && parishes.length > 0;
+  const step1Ready = formReady && aboutReady;
 
   async function ensureApplication(): Promise<Claim> {
     if (claimRef.current) return claimRef.current;
@@ -940,8 +946,6 @@ export function JoinFlow() {
     id: personaActive
       ? persona.state === "done"
       : has("photo_id") && has("selfie_with_id") && has("face_video"),
-    id2: has("trn"),
-    id3: has("proof_of_address"),
     refs: refsDone || skillsVideo,
     sign: signed && signedName.trim().length > 1,
     live: false,
@@ -983,7 +987,6 @@ export function JoinFlow() {
           <ul className="mt-3 grid gap-2">
             {[
               ["Your identity check", done.id],
-              ["Your TRN", done.id2],
               [refsDone ? "Your referees" : "Your referees, or your skills video", done.refs],
               ["The Worker Guidelines, signed", done.sign],
             ].map(([label, ok]) => (
@@ -1056,7 +1059,7 @@ export function JoinFlow() {
             <b className="text-[15px] text-ink">What happens next</b>
             <ol className="mt-3 grid gap-2 text-[13.5px] leading-relaxed text-mute">
               <li><b className="text-ink">1.</b> A real person reads your application. Not a machine.</li>
-              <li><b className="text-ink">2.</b> Your check: your ID, TRN, and sign the Guidelines. Three referees are optional; without them, a short video of you talking through your skills. Below, when you are ready.</li>
+              <li><b className="text-ink">2.</b> Your ID stage, to quote for jobs: your email, your ID check, and sign the Guidelines. Three referees, or a short video of you talking through your skills. Below, when you are ready. Your TRN is asked just before your first payment.</li>
               <li><b className="text-ink">3.</b> You hear back on WhatsApp, either way. No silence.</li>
               <li><b className="text-ink">4.</b> Once cleared, jobs come to you on WhatsApp. Quote in writing. Always free.</li>
               <li><b className="text-ink">5.</b> Win a quote and we walk you through how the job runs.</li>
@@ -1190,8 +1193,11 @@ export function JoinFlow() {
     ["Trade", trades.length > 0],
     ["Parish", parishes.length > 0],
     ["Name", name.trim().length > 1],
-    ["Contact", hasPhone || hasEmail],
+    ["Phone", hasPhone],
   ];
+  // From the second screen on, Send also needs the line about their work.
+  if (step > 0 && !continuing) needs.push(["About your work", aboutReady]);
+  const ctaReady = step > 0 ? step1Ready : formReady;
   const req = (ok: boolean, yes: string, no: string) => (
     <span className={"ml-auto font-mono text-[10.5px] font-semibold uppercase tracking-[.1em] " + (ok ? "text-green" : "text-goldb")}>
       {ok ? yes : no}
@@ -1302,9 +1308,9 @@ export function JoinFlow() {
                 </div>
               ))}
               <div className="px-4 py-3 text-[12.5px] leading-relaxed text-dim">
-                ID, TRN, proof of address and referees (or a skills video) come{" "}
-                <b className="font-semibold text-mute">after</b> a person says
-                yes. Do not go hunting for any of it now. What applying gets you
+                Your ID check, the Guidelines and referees (or a skills video)
+                come <b className="font-semibold text-mute">after</b> a person
+                says yes, when you want to quote. Do not go hunting for any of it now. What applying gets you
                 is a real person reading it and a straight answer, which is the
                 start of the check rather than the end of it.
               </div>
@@ -1332,7 +1338,7 @@ export function JoinFlow() {
             )}
             {!continuing && (
               <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[.16em] text-dim" aria-current="step">
-                {at + 1} of {STEPS.length} · {d.n}{d.body === "port" ? " · optional" : ""}
+                {at + 1} of {STEPS.length} · {d.n}{""}
               </span>
             )}
             {/* tabIndex -1 so it can be focused programmatically without
@@ -1427,22 +1433,23 @@ export function JoinFlow() {
                 <div className="flex flex-col gap-2.5">
                   <div className="flex items-baseline gap-2.5">
                     <b className="text-[14.5px]">How we reach you</b>
-                    {req(name.trim().length > 1 && (hasPhone || hasEmail), "Done", "Name and one contact")}
+                    {req(name.trim().length > 1 && hasPhone, "Done", "Name and phone needed")}
                   </div>
                   <input className="jin" placeholder="Your name" autoComplete="name"
                     enterKeyHint="next" aria-label="Your full name, required"
                     value={name} onChange={(e) => setName(e.target.value)} />
                   <div className="grid gap-2.5 sm:grid-cols-2">
                     <input className="jin" placeholder="Phone number" inputMode="tel" autoComplete="tel"
-                      enterKeyHint="next" aria-label="Your phone number, or give an email address instead"
+                      enterKeyHint="next" aria-label="Your phone number, needed"
                       value={phone} onChange={(e) => setPhone(e.target.value)} />
                     <input className="jin" placeholder="Email address" inputMode="email" autoComplete="email"
-                      enterKeyHint="done" aria-label="Your email address, or give a phone number instead"
+                      enterKeyHint="done" aria-label="Your email address, optional"
                       value={email} onChange={(e) => setEmail(e.target.value)} />
                   </div>
                   <span className="text-[12.5px] leading-relaxed text-dim">
-                    One of the two is enough. If you give a number, give the one you
-                    actually answer. It is the one we ring about a job.
+                    Your phone number is needed: the one you use for WhatsApp. Jobs
+                    and updates come there. Email is optional for now; you will need
+                    it later to quote, because that is how you sign in.
                   </span>
                 </div>
               </div>
@@ -1468,7 +1475,9 @@ export function JoinFlow() {
                 </div>
 
                 <div className="flex flex-col gap-2.5">
-                  <label className="text-[14.5px] font-bold" htmlFor="jf-work">One line about your work</label>
+                  <label className="text-[14.5px] font-bold" htmlFor="jf-work">One line about your work{" "}
+                    <span className={"src " + (aboutReady ? "ok" : "req")}>{aboutReady ? "Done" : "Needed"}</span>
+                  </label>
                   <textarea id="jf-work" className="jin min-h-[96px] resize-y" rows={3} value={work}
                     onChange={(e) => setWork(e.target.value)}
                     placeholder="e.g. 15 years on roofs across St Catherine and Kingston. Hurricane strapping, zinc and shingle." />
@@ -1719,38 +1728,13 @@ export function JoinFlow() {
                       doc="selfie_with_id" docs={docs} onFile={upload} />
                     <LiveCapture kind="video" label="A short video, face left to right" seconds={10}
                       doc="face_video" docs={docs} onFile={upload} />
-                    <Upload label="Your TRN card" hint="Matched to the name on the ID"
-                      accept={PAPERS} doc="trn" docs={docs} onFile={upload} />
-                    <Upload label="Proof of address" hint="Dated within the last three months"
-                      accept={PAPERS} doc="proof_of_address" docs={docs} onFile={upload} />
                   </>
                 )}
 
-                {/* The TRN, asked for in Phase 2 rather than Phase 1, because
-                    it belongs with verification and not with a two minute
-                    profile. Persona took over step 3 on 30 Aug and the TRN row
-                    went with it, so nothing was collecting one at all.
-
-                    The number, not a photograph of the card: the number is
-                    what gets checked, and an image is another document to
-                    store, redact and destroy for no extra proof. */}
-                <div className="rounded-xl border border-line bg-bg px-4 py-3">
-                  <label className="fl" htmlFor="trn">
-                    Your TRN{" "}
-                    <span className={"src " + (trn.replace(/\D/g, "").length === 9 ? "ok" : "")}>
-                      {trn.replace(/\D/g, "").length === 9 ? "Nine digits" : "Nine digits, from your TRN card"}
-                    </span>
-                  </label>
-                  <input id="trn" className="jf" inputMode="numeric" placeholder="123456789"
-                    value={trn} onChange={(e) => setTrn(e.target.value)} />
-                  <p className="mt-2 text-[12px] leading-relaxed text-dim">
-                    A person at the desk checks it against the name on your ID.
-                    We hold the number, not a picture of the card. It is how you
-                    are paid as your own business rather than as somebody&rsquo;s
-                    staff, and it is what your invoices are raised against.
-                  </p>
-                </div>
-
+                {/* The TRN left this screen on 25 Oct 2026 (founder: ask it
+                    "just before their first payment"). It is asked on the
+                    worker portal then, through submit_my_trn(). Proof of
+                    address was removed the same night. */}
                 {/* Phase 1 takes a phone number OR an email. Everything after
                     this point is keyed on an email: the portal account, the
                     Worker Guidelines signature, and the job alerts themselves.
@@ -1972,9 +1956,9 @@ export function JoinFlow() {
                         What happens next
                       </span>
                       {[
-                        ["01", "A person reads it, inside 24 hours.", "A straight answer either way, by the contact you gave."],
-                        ["02", "Then the check starts.", "Your photo ID, your TRN and a proof of address dated in the last three months. We chase these on WhatsApp."],
-                        ["03", "Referees or a skills video, then the board.", "Referees are optional: a short video of you talking through your skills does instead. We telephone referees before you can take work over £500. Your profile stays held back from clients until the checks clear."],
+                        ["01", "A person reads it, inside 24 hours.", "When they approve it, your profile goes live on the job board and we tell you on WhatsApp."],
+                        ["02", "To quote, your ID stage.", "Your email, your ID check, the Guidelines, and referees or a short skills video. The link comes with the message that your profile is live."],
+                        ["03", "Before your first payment, your TRN.", "Nine digits, from your TRN card. We telephone referees before you can take work over £500."],
                       ].map(([i, t, dd]) => (
                         <div key={i} className="flex gap-3 text-[13.5px] leading-normal text-mute">
                           <span className="w-[18px] flex-none pt-0.5 font-mono text-[11px] font-semibold text-goldb">{i}</span>
@@ -2117,7 +2101,7 @@ export function JoinFlow() {
               <button
                 type="button"
                 className="jbar-cta"
-                disabled={busy || !step1Ready}
+                disabled={busy || !ctaReady}
                 onClick={async () => {
                   setError("");
                   if (d.body === "live") { await send(); return; }
@@ -2133,8 +2117,8 @@ export function JoinFlow() {
               >
                 {busy
                   ? (d.body === "live" ? "Sending…" : "Starting…")
-                  : !step1Ready
-                    ? "Fill the four above to continue"
+                  : !ctaReady
+                    ? (step > 0 ? "Add a line about your work to send" : "Fill the four above to continue")
                     : d.body === "form" ? "Continue"
                     : d.body === "port" ? "Review and send"
                     : "Send my application"}
