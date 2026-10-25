@@ -47,6 +47,15 @@ export default function SignIn() {
   const [otp, setOtp] = useState("");
   const [sent, setSent] = useState(false);
 
+  /* WhatsApp or email, 25 Oct 2026 (founder: "make it so people can sign in
+     through whatsapp or email", "workers and clients"). With a phone number
+     the code is checked by yaad-portal-code, which knows which account the
+     number belongs to and never tells the browser until the code is right;
+     what comes back is the session Supabase issued, set here exactly as a
+     confirmation link's would be. */
+  const [mode, setMode] = useState<"email" | "whatsapp">("email");
+  const [phone, setPhone] = useState("");
+
   // Arriving from a confirmation link.
   //
   // GoTrue returns that session in the URL FRAGMENT, and a fragment is never
@@ -150,12 +159,51 @@ export default function SignIn() {
     router.refresh();
   }
 
+  async function phoneCall(body: Record<string, string>) {
+    const r = await fetch(CODE_FN, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: KEY, Authorization: `Bearer ${KEY}` },
+      body: JSON.stringify(body),
+    });
+    const res = await r.json().catch(() => ({}));
+    return { ok: r.ok && !res.error, res };
+  }
+
+  async function sendPhoneCode() {
+    const { ok, res } = await phoneCall({ phone: phone.trim() });
+    if (!ok) return setError(res.error || "That did not work.");
+    setSent(true);
+  }
+
+  async function verifyPhoneCode(code: string) {
+    const { ok, res } = await phoneCall({ phone: phone.trim(), code });
+    if (!ok || !res.session?.access_token) {
+      setOtp("");
+      setError(res.error || "That code did not match, or it has expired. Ask for a fresh one and type it in.");
+      return;
+    }
+    const supabase = createClient();
+    const { error: setErr } = await supabase.auth.setSession({
+      access_token: res.session.access_token,
+      refresh_token: res.session.refresh_token,
+    });
+    if (setErr) {
+      setError("You are signed in on our side but this browser would not keep it. Try again, or sign in with your email.");
+      return;
+    }
+    router.replace("/portal");
+    router.refresh();
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     const code = normalizeCode(otp);
-    if (isCodeComplete(otp)) {
+    if (mode === "whatsapp") {
+      if (isCodeComplete(otp)) await verifyPhoneCode(code);
+      else await sendPhoneCode();
+    } else if (isCodeComplete(otp)) {
       await verifyCode(code);
     } else {
       await sendCode();
@@ -190,33 +238,80 @@ export default function SignIn() {
         or a tradesperson.
       </p>
 
-      <form onSubmit={onSubmit} className="mt-7" aria-busy={busy}>
+      <div className="mt-6 grid grid-cols-2 gap-1 rounded-full border border-line bg-panel p-1" role="tablist" aria-label="How to sign in">
+        {(["email", "whatsapp"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={mode === m}
+            onClick={() => { setMode(m); setSent(false); setOtp(""); setError(null); }}
+            className={"rounded-full py-2 text-[13.5px] font-semibold transition " + (mode === m ? "bg-linear-to-r from-teal to-mango text-onbrand" : "text-mute hover:text-ink")}
+          >
+            {m === "whatsapp" ? "WhatsApp" : "Email"}
+          </button>
+        ))}
+      </div>
+
+      <form onSubmit={onSubmit} className="mt-5" aria-busy={busy}>
         {sent && (
           <p role="status" className="mb-5 rounded-xl border border-softline bg-soft px-3.5 py-3 text-[13px] leading-relaxed text-mute">
-            Sent. Check your email, and your WhatsApp if we have your number.
-            It lasts about an hour: type it in below.
+            {mode === "whatsapp"
+              ? "If that number is on a Yaadly account, your code is on its way on WhatsApp, and by email if we have one. It lasts about an hour: type it in below."
+              : "Sent. Check your email, and your WhatsApp if we have your number. It lasts about an hour: type it in below."}
           </p>
         )}
 
-        <div className="mb-1.5 flex items-baseline justify-between">
-          <label htmlFor="email" className="text-[11px] font-bold uppercase tracking-[.13em] text-dim">
-            Email
-          </label>
-          <span className="text-[10px] font-bold uppercase tracking-[.1em] text-coral">
-            Required
-          </span>
-        </div>
-        <input
-          id="email"
-          type="email"
-          autoComplete="username"
-          autoFocus
-          required
-          disabled={busy}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="mb-4 w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[15px] text-ink outline-none focus:border-teal disabled:opacity-60"
-        />
+        {mode === "email" ? (
+          <>
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <label htmlFor="email" className="text-[11px] font-bold uppercase tracking-[.13em] text-dim">
+                Email
+              </label>
+              <span className="text-[10px] font-bold uppercase tracking-[.1em] text-coral">
+                Required
+              </span>
+            </div>
+            <input
+              id="email"
+              type="email"
+              autoComplete="username"
+              autoFocus
+              required
+              disabled={busy}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mb-4 w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[15px] text-ink outline-none focus:border-teal disabled:opacity-60"
+            />
+          </>
+        ) : (
+          <>
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <label htmlFor="phone" className="text-[11px] font-bold uppercase tracking-[.13em] text-dim">
+                Your WhatsApp number
+              </label>
+              <span className="text-[10px] font-bold uppercase tracking-[.1em] text-coral">
+                Required
+              </span>
+            </div>
+            <input
+              id="phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              autoFocus
+              required
+              disabled={busy}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+1 876 555 0123"
+              className="mb-1 w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[15px] text-ink outline-none focus:border-teal disabled:opacity-60"
+            />
+            <p className="mb-4 text-[12px] leading-relaxed text-dim">
+              The number on your Yaadly job or worker profile, with the country code: +1 876 for Jamaica, +44 for the UK.
+            </p>
+          </>
+        )}
 
         <div className="mb-1.5 flex items-baseline justify-between">
           <label htmlFor="otp" className="text-[11px] font-bold uppercase tracking-[.13em] text-dim">
@@ -240,8 +335,7 @@ export default function SignIn() {
         <p id="otp-hint" className="-mt-2 mb-4 text-[12px] leading-relaxed text-dim">
           <b className="text-mute">No password.</b> Already got a code from a
           message we sent? Type it above and press the button. Otherwise
-          leave it blank: we send one to your email, and your WhatsApp if we
-          have your number.
+          leave it blank and we send you one.
         </p>
 
         {error && (

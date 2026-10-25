@@ -2483,13 +2483,28 @@ const VIEWS = [
       { label:"This one is real", cls:"g", when:r => r.status === "test",
         rpc:"mark_application_test", args:(r) => ({ p_id: r.id, p_is_test: false }),
         says:r => `Takes the test mark off ${esc(r.name || "this application")}. If it had already been passed, gapped or blocked, it goes back to waiting so you decide it again. Recorded in the ledger as your decision.` },
-      { label:"Pass", cls:"", when:r => r.status !== "passed" && r.status !== "test",
-        rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "passed", p_note: v.note || null }),
-        ask:[{ k:"note", label:"What convinced you? (optional, kept on the record)", placeholder:"references checked, ID matches, 8 years verifiable" }],
-        says:r => `Says ${r.name || "this applicant"} has cleared vetting by your judgement. They are told at once, on WhatsApp or by text and by email, that they are through and that their profile is being set up. Publishing their profile is a separate step and is what actually lets them quote; a second message goes when you publish.` },
+      // The two stages, 25 Oct 2026 (founder: "profile stage then id stage").
+      // Profile stage pass puts the profile live on the job board. ID stage
+      // pass lets them quote. The TRN is approved separately, before the
+      // first payment. Each one is your click, and the database refuses a
+      // pass that is missing something and says what.
+      { label:"Profile stage pass", cls:"", when:r => !["test","blocked","started"].includes(r.status) && !(WPROF[r.id] && WPROF[r.id].active),
+        rpc:"pass_profile_stage", args:(r, v) => ({ p_id: r.id, p_note: v.note || null }),
+        ask:[{ k:"note", label:"Anything to keep on the record? (optional)", placeholder:"eleven years painting, good photos of past work" }],
+        says:r => `Puts ${esc(r.name || "this applicant")}'s profile live on the job board, from what they typed: name, trade, area and about them. It needs a name and a phone number. They are told at once on WhatsApp, and by email if they gave one, that the profile is live, with a link to start their ID stage. They cannot quote until you press ID stage pass.` },
+      { label:"ID stage pass", cls:"", when:r => !!(WPROF[r.id] && WPROF[r.id].active && !WPROF[r.id].id_checked_at),
+        rpc:"pass_id_stage", args:(r, v) => ({ p_id: r.id, p_note: v.note || null }),
+        ask:[{ k:"note", label:"Anything to keep on the record? (optional)", placeholder:"Persona approved, skills video shows the work" }],
+        says:r => `Lets ${esc(r.name || "this worker")} quote and be booked. Refused unless they have an email, an approved ID check, the Guidelines signed, and three referees or a skills video, and the refusal says which is missing. They are told they can quote. Their TRN is still needed before their first payment.` },
+      { label:"TRN approved", cls:"g", when:r => String(r.trn || "").replace(/\D/g, "").length === 9 && r.trn_status === "pending",
+        rpc:"set_application_trn", args:(r) => ({ p_id: r.id, p_status: "approved" }),
+        says:r => `Says the TRN ${esc(r.trn || "")} matches the name on ${esc(r.name || "their")} ID. Check it against the ID first. Without it they cannot be paid.` },
+      { label:"TRN does not match", cls:"d", when:r => String(r.trn || "").replace(/\D/g, "").length === 9 && r.trn_status === "pending",
+        rpc:"set_application_trn", args:(r) => ({ p_id: r.id, p_status: "rejected" }),
+        says:r => `Rejects the TRN ${esc(r.trn || "")}. They can give it again from their portal. Tell them why from your own WhatsApp: nothing is sent by this button.` },
       { label:"Send the gap back", cls:"g", when:r => r.status !== "gap" && r.status !== "test",
         rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "gap", p_note: v.note || null }),
-        ask:[{ k:"note", label:"Which document is missing? (optional, kept on the record)", placeholder:"proof of address, and the second reference never replied" }],
+        ask:[{ k:"note", label:"Which document is missing? (optional, kept on the record)", placeholder:"the ID check, and the second reference never replied" }],
         says:() => "Records the application as waiting on a document, with your name, the time and your note. It sends nothing to the applicant: nobody is told until you tell them. Use Reach them at the top of this panel to send it from your own WhatsApp or email, naming the document, because a gap that is not named cannot be closed." },
       { label:"Block", cls:"d", when:r => r.status !== "blocked" && r.status !== "test",
         rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "blocked", p_note: v.note || null }),
@@ -4176,16 +4191,24 @@ function applicantSteps(r){
     ? ["done", "Worker Guidelines signed", "as " + esc(r.signed_name || "unnamed") + ", " + day_(r.signed_at) + (r.signed_version ? ", version " + esc(r.signed_version) : "")]
     : ["todo", "Worker Guidelines signed", "not signed"]);
 
-  steps.push(r.status === "passed" ? ["done", "Your decision", "Pass" + (r.decided_by ? " by " + esc(r.decided_by) : "") + (r.decided_at ? ", " + day_(r.decided_at) : "") + (r.decision_note ? ". " + esc(r.decision_note) : "")]
+  steps.push(r.status === "passed" ? ["done", "Your decision", "Profile stage pass" + (r.decided_by ? " by " + esc(r.decided_by) : "") + (r.decided_at ? ", " + day_(r.decided_at) : "") + (r.decision_note ? ". " + esc(r.decision_note) : "")]
     : r.status === "gap" ? ["now", "Your decision", "Gap" + (r.decided_by ? " by " + esc(r.decided_by) : "") + (r.decided_at ? ", " + day_(r.decided_at) : "") + ": " + esc(r.decision_note || "no document named") + ". Nothing has been sent to them."]
     : r.status === "blocked" ? ["block", "Your decision", "Blocked" + (r.decided_by ? " by " + esc(r.decided_by) : "") + (r.decided_at ? ", " + day_(r.decided_at) : "") + (r.decision_note ? ". " + esc(r.decision_note) : "")]
     : r.status === "test" ? ["done", "Your decision", "marked as your own test"]
     : ["todo", "Your decision", "waiting on you"]);
 
-  steps.push(prof && prof.active ? ["done", "On the board", "profile published" + (prof.slug ? ", yaadly.co.uk/workers/" + esc(prof.slug) : "")]
-    : prof ? ["now", "On the board", "profile exists, not published"]
-    : decided && r.status === "passed" ? ["now", "On the board", "passed, no profile yet: publish from the Workers view"]
-    : ["todo", "On the board", "no profile; it is made when you pass them"]);
+  steps.push(prof && prof.active ? ["done", "On the job board", "live" + (prof.slug ? ", yaadly.co.uk/workers/" + esc(prof.slug) : "")]
+    : prof ? ["now", "On the job board", "profile exists, not live yet: Profile stage pass puts it live"]
+    : ["todo", "On the job board", "no profile yet; Profile stage pass makes it and puts it live"]);
+
+  steps.push(prof && prof.id_checked_at ? ["done", "ID stage", "passed" + (prof.id_checked_by ? " by " + esc(prof.id_checked_by) : "") + ", " + day_(prof.id_checked_at) + ". They can quote."]
+    : prof && prof.active ? ["now", "ID stage", "live, cannot quote yet. ID stage pass, once their ID check, Guidelines, email and referees or skills video are in"]
+    : ["todo", "ID stage", "after the profile stage"]);
+
+  steps.push(r.trn_status === "approved" ? ["done", "TRN, before first payment", "approved" + (r.trn_checked_at ? ", " + day_(r.trn_checked_at) : "")]
+    : r.trn_status === "pending" ? ["now", "TRN, before first payment", "given, " + esc(r.trn || "") + ": check it against the ID, then TRN approved"]
+    : r.trn_status === "rejected" ? ["block", "TRN, before first payment", "rejected; they can give it again from their portal"]
+    : ["todo", "TRN, before first payment", "not given yet; asked just before their first payment"]);
   return steps;
 }
 
@@ -4195,13 +4218,14 @@ function applicantMissing(r){
   const personaOk = ["approved","completed"].includes(String(r.persona_status || ""));
   const out = [];
   if (r.status === "started") out.push({ hard:true, what:"The application itself", why:"They never pressed Send. Everything else waits on that." });
-  if (!personaOk && !has("photo_id")) out.push({ hard:true, what:"Identity check", why:"Nobody attends a property unverified. Persona, or a photo ID looked at by hand." });
-  if (!has("proof_of_address")) out.push({ hard:false, what:"Proof of address", why:"Where they live, from a bill or a letter." });
-  if (!String(r.trn || "").trim() && r.trn_status !== "checked") out.push({ hard:false, what:"TRN", why:"Needed before any payment can be made to them." });
+  if (!String(r.phone || "").trim()) out.push({ hard:true, what:"Phone number", why:"Needed for the profile stage. It is how they are reached." });
+  if (!personaOk && !has("photo_id")) out.push({ hard:false, what:"Identity check (ID stage)", why:"Needed before they can quote. Nobody attends a property unverified." });
+  if (!String(r.email || "").trim()) out.push({ hard:false, what:"Email (ID stage)", why:"Needed before they can quote: they sign in with it." });
+  if (r.trn_status !== "approved") out.push({ hard:false, what:"TRN (before first payment)", why:"Asked just before their first payment. Pay workers refuses without it." });
   if (r.cert === "yes" && !has("certificate")) out.push({ hard:false, what:"The certificate they said they hold", why:"Said yes to a certificate, none on file. Checked with the issuing body before the trade is shown as certified." });
   const refs = [r.ref1, r.ref2, r.ref3].filter(x => String(x || "").trim()).length;
   if (refs < 3) out.push({ hard:false, what:(3 - refs) + " of 3 referees", why:"Three spoken to directly before any job over £500, inside an occupied home, or holding keys." });
-  if (!r.signed_at) out.push({ hard:true, what:"Worker Guidelines signature", why:"Nothing is agreed until they have signed." });
+  if (!r.signed_at) out.push({ hard:false, what:"Worker Guidelines signature (ID stage)", why:"Needed before they can quote. Nothing is agreed until they have signed." });
   if (r.status === "gap" && r.decision_note) out.push({ hard:true, what:"What you asked for: " + r.decision_note, why:"Your gap note. They have not been told unless you messaged them." });
   return out;
 }
@@ -5609,7 +5633,7 @@ async function preApps(rows){
       .in("application_id", ids).order("created_at", { ascending:false }).limit(200),
     sb.from("vetting_documents").select("application_id,doc_type,outcome,verified_at,purged_at,created_at")
       .in("application_id", ids).limit(400),
-    sb.from("worker_profiles").select("application_id,active,slug,worker_email")
+    sb.from("worker_profiles").select("application_id,active,slug,worker_email,id_checked_at,id_checked_by")
       .in("application_id", ids).limit(200),
   ]);
   for (const r of rev.data || []) if (!VET[r.application_id]) VET[r.application_id] = r;   // newest wins
