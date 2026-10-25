@@ -11,7 +11,7 @@
  * 2026 with her own test application after signing out in another browser.
  *
  * WHAT THIS DOES. It takes a reference and nothing else. If an application
- * with that reference is still open (started or received), it asks
+ * with that reference is still open, it asks
  * yaad-notify-client to send the applicant their own link, to the phone and
  * the email ALREADY ON THE ROW, by the same channel ladder every other worker
  * message uses: WhatsApp inside the 24 hour window, a text message outside
@@ -44,7 +44,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { httpAttrs, SpanKind, Trace } from "./otel.ts";
-import { isOpenApplication, normaliseReference, PER_CALLER_PER_HOUR, PER_REFERENCE_PER_HOUR, SAME_ANSWER } from "./apply-link.ts";
+import { normaliseReference, PER_CALLER_PER_HOUR, PER_REFERENCE_PER_HOUR, SAME_ANSWER } from "./apply-link.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -82,8 +82,11 @@ async function sendIfOpen(admin: any, reference: string, req: Request): Promise<
   try {
     const { data: app } = await admin.from("applications")
       .select("id, status").eq("app_id", reference).maybeSingle();
-    if (!app || !isOpenApplication(app.status)) {
-      s.setAttributes({ "yaadly.apply_link.outcome": app ? "not_open" : "no_such_reference" });
+    // Whether this application gets a link at all is ruled in one place,
+    // applyLinkPhase in yaad-notify-client, which answers told:false for one
+    // that is not open. Only a reference with no row stops here.
+    if (!app) {
+      s.setAttributes({ "yaadly.apply_link.outcome": "no_such_reference" });
       return;
     }
     const { data: secret } = await admin.rpc("notify_trigger_secret");

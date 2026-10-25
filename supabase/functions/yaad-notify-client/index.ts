@@ -65,7 +65,7 @@ import { screenOwnWords } from "./own-words.ts";
 import { captionsLine, namedNextStep, noCaptionPrompt, plainDraft, reportSentReceipt, unearnedClaims, usableCaptions } from "./report-draft.ts";
 import { acceptedForClient, acceptedForWorker, offerForClient, PLATFORM_LABEL as WALK_PLATFORM } from "./walkthrough-offer.ts";
 import { chaseClient, DISPUTE_HOURS, problemForWorker, replyForClient, type SteppedInWhy, steppedInForClient, steppedInForWorker } from "./dispute-lane.ts";
-import { APPLY_LINK_SUBJECT, applyLink, applyLinkText, CHECK_REMINDER_SUBJECT, checkReminderText, jobDelayedWorkerText, SEND_REMINDER_SUBJECT, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
+import { APPLY_LINK_SUBJECT, applyLink, applyLinkPhase, applyLinkText, CHECK_REMINDER_SUBJECT, checkReminderText, jobDelayedWorkerText, SEND_REMINDER_SUBJECT, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -1107,12 +1107,15 @@ Deno.serve(async (req: Request) => {
     // (Phase 1 was never sent); a received one opens at the check.
     if (kind === "worker_apply_link") {
       const { data: app } = await admin.from("applications")
-        .select("id, app_id, name, phone, email, upload_token, status").eq("id", applicationIdIn).maybeSingle();
-      if (!app || (app.status !== "started" && app.status !== "received")) {
+        .select("id, app_id, name, phone, email, upload_token, status, persona_status, trn_status, signed_at").eq("id", applicationIdIn).maybeSingle();
+      // applyLinkPhase (worker-cleared.ts) is the one rule for who gets a link:
+      // started and received, and a passed or gap row that still owes its own
+      // ID check, TRN or signature. Everything else is not open.
+      const phase = app ? applyLinkPhase(app) : null;
+      if (!app || phase === null) {
         root.setAttributes({ "yaadly.notify.outcome": "application_not_open" });
         return json({ ok: true, kind, told: false, reason: "That application is not open." });
       }
-      const phase: 1 | 2 = app.status === "started" ? 1 : 2;
       const link = applyLink(APP_URL, String(app.id), String(app.upload_token), String(app.app_id), phase);
       const text = applyLinkText(String(app.name ?? ""), String(app.app_id), link, phase);
       const phone = String(app.phone ?? "").trim();

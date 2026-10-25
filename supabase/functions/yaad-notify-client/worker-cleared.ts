@@ -106,6 +106,38 @@ export function applyLink(appUrl: string, applicationId: string, uploadToken: st
   return u.toString();
 }
 
+/** Which sitting a "Continue on another device" link reopens, or null when
+ *  there is nothing for the applicant to come back to. The one place this is
+ *  decided: yaad-apply-link hands every real reference here and this rules.
+ *
+ *  `started` is Phase 1 never sent. `received` is sent and waiting on the
+ *  check. Until 25 Oct 2026 that was the whole list, and it stranded APP-DFDA56:
+ *  passed at the desk before the ID check was ever started, with no TRN and no
+ *  signature, so the publish gate (20260830c) could never let the profile out,
+ *  the portal would not open an account without one, and the link refused
+ *  because the row no longer read received. Founder: "yes do it".
+ *
+ *  So `passed` and `gap` also get the check back, but only while the
+ *  applicant still owes a piece of it themselves: the ID check not approved,
+ *  no TRN typed (or one the desk rejected), or the guidelines not signed. A
+ *  TRN that is `pending` is the desk's to check, not theirs to redo. Blocked
+ *  and test rows never get a link. Sending the check sets the row back to
+ *  received (yaad-vetting-upload, submit), so it comes back to the desk to be
+ *  decided again with the ID in front of a person. Nothing here passes,
+ *  publishes or decides anything. */
+export function applyLinkPhase(app: {
+  status?: unknown; persona_status?: unknown; trn_status?: unknown; signed_at?: unknown;
+}): 1 | 2 | null {
+  const status = String(app.status ?? "");
+  if (status === "started") return 1;
+  if (status === "received") return 2;
+  if (status !== "passed" && status !== "gap") return null;
+  const idDone = ["approved", "completed"].includes(String(app.persona_status ?? ""));
+  const trnDone = ["pending", "approved"].includes(String(app.trn_status ?? ""));
+  const signed = Boolean(app.signed_at);
+  return idDone && trnDone && signed ? null : 2;
+}
+
 /** The message that carries the link when the applicant asked for it from
  *  the box on /apply (yaad-apply-link, 25 Oct 2026). It says what the link
  *  is, which application it opens, and that it is theirs alone. It says

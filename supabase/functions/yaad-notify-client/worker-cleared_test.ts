@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { APPLY_LINK_SUBJECT, applyLink, applyLinkText, checkReminderText, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
+import { APPLY_LINK_SUBJECT, applyLink, applyLinkPhase, applyLinkText, checkReminderText, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
 
 Deno.test("the cleared message fits one phone screen, names the board and the pay, and promises nothing", () => {
   const t = workerClearedText("Marcus Brown", "marcus@example.com", "https://app.yaadly.co.uk");
@@ -103,7 +103,28 @@ Deno.test("worker_apply_link is a kind, is answered before any job is loaded, an
   const jobLoad = src.indexOf('.select("id, title, parish, stage, status, portal_code, client_email, client_phone, worker_email")');
   assert(at > 0 && at < jobLoad, "worker_apply_link must be answered before the job is loaded, it has none");
   const branch = src.slice(at, src.indexOf("// A service kind reads services", at));
-  assert(branch.includes('app.status !== "started" && app.status !== "received"'), "only an open application");
+  assert(branch.includes("applyLinkPhase(app)") && branch.includes("phase === null"), "only an open application, by the one rule");
   assert(!/b\.phone|b\.email|meta\.phone|meta\.email/.test(branch), "the address must come off the row, never the request");
   assert(branch.includes("sendToWorker(") && branch.includes("sendPlainEmail("), "the shared ladder, not a new one");
+});
+
+Deno.test("a link reopens started and received, and a passed or gap application only while the applicant still owes the check", () => {
+  assertEquals(applyLinkPhase({ status: "started" }), 1);
+  assertEquals(applyLinkPhase({ status: "received" }), 2);
+  // APP-DFDA56 on 25 Oct 2026: passed at the desk, ID check never started,
+  // no TRN, not signed. Stranded until this rule.
+  assertEquals(applyLinkPhase({ status: "passed", persona_status: null, trn_status: "not_given", signed_at: null }), 2);
+  const done = { persona_status: "approved", trn_status: "pending", signed_at: "2026-10-25T16:00:00Z" };
+  for (const status of ["passed", "gap"]) {
+    assertEquals(applyLinkPhase({ status, ...done }), null, `${status} with nothing owed`);
+    assertEquals(applyLinkPhase({ status, ...done, persona_status: "declined" }), 2, `${status}, ID not approved`);
+    assertEquals(applyLinkPhase({ status, ...done, trn_status: "rejected" }), 2, `${status}, TRN rejected`);
+    assertEquals(applyLinkPhase({ status, ...done, trn_status: null }), 2, `${status}, no TRN`);
+    assertEquals(applyLinkPhase({ status, ...done, signed_at: null }), 2, `${status}, not signed`);
+  }
+  assertEquals(applyLinkPhase({ status: "passed", ...done, persona_status: "completed" }), null);
+  // Blocked is a safety finding and test is her own row: never a link, whatever is missing.
+  for (const status of ["blocked", "test", "approved", "withdrawn", "", null, undefined]) {
+    assertEquals(applyLinkPhase({ status, persona_status: null, trn_status: "not_given", signed_at: null }), null, String(status));
+  }
 });

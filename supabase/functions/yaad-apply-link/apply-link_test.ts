@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { isOpenApplication, normaliseReference, PER_CALLER_PER_HOUR, PER_REFERENCE_PER_HOUR, SAME_ANSWER } from "./apply-link.ts";
+import { normaliseReference, PER_CALLER_PER_HOUR, PER_REFERENCE_PER_HOUR, SAME_ANSWER } from "./apply-link.ts";
 
 Deno.test("a reference is accepted however a person types it, and comes out as the row holds it", () => {
   assertEquals(normaliseReference("APP-48A107"), "APP-48A107");
@@ -23,9 +23,9 @@ Deno.test("the same answer, with no dashes, and no word that says whether the re
   assert(!/not found|no such|does not exist|sent to \+|@/.test(SAME_ANSWER), "must not reveal a result or an address");
 });
 
-Deno.test("only an open application gets a link, and the throttle is three an hour both ways", () => {
-  assert(isOpenApplication("started") && isOpenApplication("received"));
-  for (const s of ["approved", "declined", "withdrawn", "published", "", null, undefined]) assert(!isOpenApplication(s), String(s));
+// Which applications get a link is tested where it is decided, applyLinkPhase
+// in yaad-notify-client/worker-cleared_test.ts.
+Deno.test("the throttle is three an hour both ways", () => {
   assertEquals(PER_REFERENCE_PER_HOUR, 3);
   assertEquals(PER_CALLER_PER_HOUR, 3);
 });
