@@ -6743,3 +6743,17 @@ Built the same afternoon as section 73, because the fault there had three parts 
 5. **To make it live:** apply the migration, deploy `yaad-vetting-upload` (keep `--no-verify-jwt`, it is on the section 12 list) and `yaad-notify-client` (keep `--no-verify-jwt`, same list), deploy the app and the desk. Everything deploys from `main` after the merge, never from a branch.
 6. **"Join as a pro" is "Join as a worker"** on every page and in the app nav since 25 Oct 2026, and the homepage hero carries both doors side by side, Post a job and Join as a worker. Comments and CSS class names keep the old phrase; only what a person reads changed.
 
+## 75. Messaging an applicant who has no job yet (25 Oct 2026)
+
+Found 25 October 2026: every worker application since 5 September had failed at Send (a missing `showcase_consent` column, applied by hand that day), and two real applicants had sat at status `started` for weeks. There was no way to reach an applicant from the desk, because `yaad-desk-message` was keyed on a job. It now also takes an application.
+
+1. **Open Applications, click the applicant.** Under "Reach them" there is now a card called "Message this applicant". To shows the applicant; How offers WhatsApp if the row has a number and Email if it has an address. Write the message. Two buttons:
+   - **Send from Yaadly**: WhatsApp from the Yaadly number, or email from `jobs@in.yaadly.co.uk` with replies to `monique@yaadly.co.uk`, signed Yaadly. Recorded in the ledger under your name against the application reference.
+   - **Open in my own app**: `wa.me` or `mailto` with the text filled in. Sends from your own phone or inbox, works with nothing deployed, is not recorded.
+2. **"WhatsApp will not carry this" (Twilio 63016).** An applicant has usually never messaged the Yaadly number, so the 24 hour window is closed and Send from Yaadly on WhatsApp will refuse. That is expected. Use Email if they gave one, or Open in my own app. Nothing is queued.
+3. **To turn Send from Yaadly on for applicants**, two things, both from disk with main fetched (`git merge-base --is-ancestor origin/main HEAD && echo contains main`):
+   - Apply `supabase/migrations/20261025120000_the_desk_can_message_an_applicant.sql`. One function, `record_desk_applicant_message()`, nothing else. Prove it: `select proname, prosecdef from pg_proc where proname = 'record_desk_applicant_message';` should return one row with `t`.
+   - Deploy the function **without** `--no-verify-jwt`, so the platform check stays on: `supabase functions deploy yaad-desk-message --project-ref leffyisvfvjwzilydlwf`. Then deploy the desk (`concierge-deploy/README.md`). Until the function is deployed, Send from Yaadly on an applicant answers "A message goes to the client or the worker"; Open in my own app works regardless.
+4. **Check it refuses a stranger**: a POST with no token returns 401 from the platform, and a POST with a signed-in non-admin token returns 403.
+5. **"Sent, but it could not be written to the ledger"** means the message went and the migration in step 3 is not applied, or the session is not an admin. Note the send on the application by hand so the record is complete, then apply the migration.
+6. **Reading the record back**: `select at, actor, summary, refs from agent_actions where action = 'desk_message' and refs->>'to' = 'applicant' order by at desc;`. The row has no `job_id`; the application id and reference are in `refs`.
