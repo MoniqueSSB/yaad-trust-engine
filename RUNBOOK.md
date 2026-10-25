@@ -6739,11 +6739,11 @@ Found 25 October 2026: every worker application since 5 September had failed at 
 5. **"Sent, but it could not be written to the ledger"** means the message went and the migration in step 3 is not applied, or the session is not an admin. Note the send on the application by hand so the record is complete, then apply the migration.
 6. **Reading the record back**: `select at, actor, summary, refs from agent_actions where action = 'desk_message' and refs->>'to' = 'applicant' order by at desc;`. The row has no `job_id`; the application id and reference are in `refs`.
 
-7. **PM release limit** is `app_settings.pm_release_limit_jmd`, 100000 (J$100,000, roughly GBP 500; every worker and materials payment is in J$). It was `pm_release_limit_pence` for an hour on 20 Oct and was replaced by 20261020140000. Changing it is a money decision: ledger entry first.
+7. **PM release limit** is `app_settings.pm_release_limit_jmd`, 100000 (J$100,000, roughly GBP 500; every worker and materials payment is in J$). It was `pm_release_limit_pence` for an hour on 20 Oct and was replaced by 20261025160940. Changing it is a money decision: ledger entry first.
 
 ## 74. A Project Manager on the desk (20 Oct 2026)
 
-Migration `20261020140000_a_project_manager_reads_the_job_desk.sql`, applied 20 Oct 2026, guard test `supabase/tests/pm_desk_read_guards.sql` nine PASS.
+Migration `20261025160940_a_project_manager_reads_the_job_desk.sql`, applied 20 Oct 2026, guard test `supabase/tests/pm_desk_read_guards.sql` nine PASS.
 
 1. **Give someone the PM level:** `select public.grant_access('pm@example.com', 'project_manager', 'why');` signed in as Super Admin (runbook 69).
 2. **Add their email to Cloudflare Access** for `concierge.yaadly.co.uk`, or the page is never served to them. That is the Super Admin's click in the Cloudflare dashboard. Check afterwards that a stranger still gets 302: `curl -s -o /dev/null -w "%{http_code}\n" https://concierge.yaadly.co.uk/`.

@@ -7647,7 +7647,7 @@ async function boot(){
   SESSION_EMAIL = who || "";
 
   // desk_role() answers super_admin, project_manager or nothing
-  // (20261020140000). It uses the same predicates row level security uses, so
+  // (20261025160940). It uses the same predicates row level security uses, so
   // this asks the database the question rather than trusting the page. RLS
   // still refuses the rows on its own if this were ever bypassed: hiding a
   // view from a Project Manager below is tidiness, the policies are the lock.

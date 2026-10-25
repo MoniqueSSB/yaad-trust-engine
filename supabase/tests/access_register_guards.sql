@@ -78,7 +78,7 @@ begin
 
     -- 9. the PM release limit is recorded at J$100,000. It was GBP 500 in
     -- 20261020120000 and moved to J$ on the founder's instruction the same
-    -- day (20261020140000), because every worker and materials payment is J$.
+    -- day (20261025160940), because every worker and materials payment is J$.
     res := res || ('9. PM release limit is J$100,000: ' || case when (select value from public.app_settings where key = 'pm_release_limit_jmd') = '100000' then 'PASS' else 'FAIL' end);
 
     raise exception 'rollback';

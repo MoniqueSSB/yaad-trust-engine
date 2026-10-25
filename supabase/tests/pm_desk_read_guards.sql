@@ -1,7 +1,7 @@
 -- Proof that a Project Manager reads the job desk and nothing behind it:
 -- jobs yes, identity documents, applications, secrets and the access
 -- register no, and still no button.
--- Run with execute_sql once 20261020140000 is applied.
+-- Run with execute_sql once 20261025160940 is applied.
 --
 -- NOTHING HERE PERSISTS. The PM is an invented address granted inside a
 -- subtransaction that is thrown away at the end.
