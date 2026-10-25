@@ -358,9 +358,9 @@ export default async function Board({
                   </em>
                 </h1>
                 <p className="mt-4 max-w-[56ch] text-pretty text-[16.5px] leading-relaxed text-mute">
-                  Identity checked with an independent provider, TRN checked against the ID.{" "}
+                  Every profile approved by a person. Nobody quotes or is booked before their ID is checked by an independent provider.{" "}
                   <b className="font-semibold text-ink">
-                    A small network on purpose, nobody appears here until they pass.
+                    A small network on purpose.
                   </b>
                 </p>
               </>
@@ -403,7 +403,7 @@ export default async function Board({
               { n: jobs.length, label: "open to quote", one: "open to quote", tone: "text-ink", box: "border-line bg-linear-to-b from-[var(--card-top-80)] to-[var(--card-bot-60)]" },
               { n: statUrgent, label: "marked urgent", one: "marked urgent", tone: "text-goldb", box: "border-gold/30 bg-linear-to-b from-gold/[0.09] to-[var(--card-bot-60)]" },
               { n: statParishes, label: "parishes covered", one: "parish covered", tone: "text-ink", box: "border-line bg-linear-to-b from-[var(--card-top-80)] to-[var(--card-bot-60)]" },
-              { n: workers.length, label: "identity checked workers", one: "identity checked worker", tone: "text-green", box: "border-line bg-linear-to-b from-[var(--card-top-80)] to-[var(--card-bot-60)]" },
+              { n: workers.length, label: "workers on the board", one: "worker on the board", tone: "text-green", box: "border-line bg-linear-to-b from-[var(--card-top-80)] to-[var(--card-bot-60)]" },
             ].map((s) => (
               <div key={s.label} className={"min-w-[130px] rounded-[14px] border px-4 py-3.5 " + s.box}>
                 <b className={"block font-mono-app text-[26px] font-semibold tabular-nums " + s.tone}>{s.n}</b>
@@ -543,9 +543,9 @@ export default async function Board({
                 <span className="font-mono-app text-[10px] font-semibold uppercase tracking-[0.18em] text-dim">How verification works</span>
                 <div className="mt-3.5 flex flex-col gap-3.5">
                   {[
-                    ["Independent identity check", "Government ID verified by a third-party provider, not by us."],
-                    ["TRN matched to the ID", "The tax number has to belong to the same person."],
-                    ["Trade evidence vetted", "Photographs of past work reviewed before the profile goes live."],
+                    ["A person approves every profile", "Read at Yaadly before it goes live on the board."],
+                    ["Independent identity check", "Government ID verified by a third-party provider, not by us, before anyone can quote."],
+                    ["TRN matched to the ID", "The tax number has to belong to the same person, before they are paid."],
                   ].map(([head, body], i) => (
                     <div key={head} className="flex gap-3">
                       <span className="shrink-0 pt-0.5 font-mono-app text-[12px] font-semibold text-purpleb">0{i + 1}</span>

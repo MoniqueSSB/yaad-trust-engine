@@ -174,6 +174,12 @@ Deno.serve(async (req: Request) => {
     // can never go out and then fail to be recorded against the invoice.
     const { data: checked } = await admin.rpc("worker_bank_checked", { p_worker_email: workerEmail });
     if (checked !== true) return fail(`Call ${wp?.name ?? workerEmail} back on the number you have for them, check their bank details, and press Call-back done on Pay workers first.`, 409);
+    // 25 Oct 2026: the TRN is asked just before the first payment.
+    // mark_worker_paid refuses without it, but a Stripe payout leaves before
+    // that runs, so it is checked here too. Fails closed.
+    const { data: trnReady, error: trnErr } = await admin.rpc("worker_trn_ready", { p_worker_email: workerEmail });
+    if (trnErr) return fail(`Could not check the TRN, so nothing was sent: ${trnErr.message}`, 502);
+    if (trnReady !== true) return fail(`Approve the TRN for ${wp?.name ?? workerEmail} on Applications first. It is asked just before their first payment.`, 409);
     // 20260917180000: the client pays for the work before the worker is paid
     // for it. mark_worker_paid refuses the same, but a Stripe payout leaves
     // before that runs, so it is checked here, on the quote and on the send.

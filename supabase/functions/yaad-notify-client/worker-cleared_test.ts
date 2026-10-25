@@ -1,9 +1,10 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { APPLY_LINK_SUBJECT, applyLink, applyLinkPhase, applyLinkText, checkReminderText, sendReminderText, WORKER_CLEARED_SUBJECT, WORKER_PASSED_SUBJECT, workerClearedText, workerPassedText } from "./worker-cleared.ts";
 
-Deno.test("the cleared message fits one phone screen, names the board and the pay, and promises nothing", () => {
+Deno.test("the ID stage message fits one phone screen, names the board and the pay, and promises nothing", () => {
   const t = workerClearedText("Marcus Brown", "marcus@example.com", "https://app.yaadly.co.uk");
-  assert(t.startsWith("You are cleared, Marcus."));
+  assert(t.startsWith("Your ID stage is passed, Marcus. You can quote for jobs now."));
+  assert(/TRN just before your first payment/.test(t), "the TRN step is not said");
   assert(t.includes("https://app.yaadly.co.uk/portal/sign-in"), "the board is not linked");
   assert(t.includes("marcus@example.com"), "which email to sign in with is not said");
   // No alert promise until the send is wired: the list fills and nothing goes out (job-alerts.ts).
@@ -118,8 +119,10 @@ Deno.test("a link reopens started and received, and a passed or gap application 
   for (const status of ["passed", "gap"]) {
     assertEquals(applyLinkPhase({ status, ...done }), null, `${status} with nothing owed`);
     assertEquals(applyLinkPhase({ status, ...done, persona_status: "declined" }), 2, `${status}, ID not approved`);
-    assertEquals(applyLinkPhase({ status, ...done, trn_status: "rejected" }), 2, `${status}, TRN rejected`);
-    assertEquals(applyLinkPhase({ status, ...done, trn_status: null }), 2, `${status}, no TRN`);
+    // The TRN left the ID stage (asked before the first payment), so it no
+    // longer keeps the link open.
+    assertEquals(applyLinkPhase({ status, ...done, trn_status: "rejected" }), null, `${status}, TRN rejected is not the ID stage`);
+    assertEquals(applyLinkPhase({ status, ...done, trn_status: null }), null, `${status}, no TRN is not the ID stage`);
     assertEquals(applyLinkPhase({ status, ...done, signed_at: null }), 2, `${status}, not signed`);
   }
   assertEquals(applyLinkPhase({ status: "passed", ...done, persona_status: "completed" }), null);
@@ -129,16 +132,18 @@ Deno.test("a link reopens started and received, and a passed or gap application 
   }
 });
 
-Deno.test("the passed message says they are through, says what happens next, and does not say the profile is live", () => {
-  const t = workerPassedText("Devon Campbell");
-  assert(t.startsWith("Good news, Devon."));
-  assert(/you are through/.test(t), "the decision is not said");
-  assert(/You will hear on this number/.test(t), "what happens next is not said");
-  assert(!/is live\b(?! and)/.test(t.replace("when it is live and you can quote", "")), "must not claim the profile is live");
-  assert(!/escrow|held/i.test(t));
-  assert(!/[\u2013\u2014]/.test(t), "no dashes");
+Deno.test("the profile stage message says the profile is live, links the ID stage, and asks no TRN", () => {
+  const link = "https://app.yaadly.co.uk/apply?app=x&token=y&ref=APP-7Q2K9D";
+  const t = workerPassedText("Devon Campbell", link);
+  assert(t.startsWith("Your Yaadly profile is live, Devon. You are on the job board now."));
+  assert(t.includes(link), "the ID stage link is not in it");
+  assert(/finish your ID stage: your email, your ID check, the Guidelines, and referees or a short skills video/.test(t), "what the ID stage is, is not said");
+  assert(!/TRN|proof of address/i.test(t), "the TRN is asked before the first payment, and proof of address was removed");
+  assert(/yours alone/.test(t), "the link warning");
+  assert(!/escrow|held|guarantee|100%|you will get/i.test(t));
+  assert(!/[\u2013\u2014]/.test(t) && !/[\u2013\u2014]/.test(WORKER_PASSED_SUBJECT), "no dashes");
   assert(t.split("\n").length <= 8, "one phone screen");
-  assert(workerPassedText("").startsWith("Good news. It is Yaadly."));
+  assert(workerPassedText("", link).startsWith("Your Yaadly profile is live. You are on the job board now."));
   assert(WORKER_PASSED_SUBJECT.length < 60);
 });
 

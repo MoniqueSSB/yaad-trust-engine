@@ -1012,8 +1012,9 @@ Deno.serve(async (req: Request) => {
     // the body can name a person but cannot put words in the message.
     if (kind === "worker_cleared") {
       const { data: w } = await admin.from("worker_profiles")
-        .select("worker_email, phone, name, active").ilike("worker_email", workerEmailIn).maybeSingle();
-      if (!w || w.active !== true) {
+        .select("worker_email, phone, name, active, id_checked_at").ilike("worker_email", workerEmailIn).maybeSingle();
+      // Since 25 Oct 2026 this is the ID stage pass: live AND ID checked.
+      if (!w || w.active !== true || !w.id_checked_at) {
         root.setAttributes({ "yaadly.notify.outcome": "worker_not_cleared" });
         return json({ ok: true, kind, told: false, reason: "That worker is not published." });
       }
@@ -1149,15 +1150,27 @@ Deno.serve(async (req: Request) => {
     // secret alone cannot put words in a worker's phone.
     if (kind === "worker_passed") {
       const { data: app } = await admin.from("applications")
-        .select("id, app_id, name, phone, email, status").eq("id", applicationIdIn).maybeSingle();
+        .select("id, app_id, name, phone, email, status, upload_token").eq("id", applicationIdIn).maybeSingle();
       if (!app || app.status !== "passed") {
         root.setAttributes({ "yaadly.notify.outcome": "application_not_passed" });
         return json({ ok: true, kind, told: false, reason: "That application is not passed." });
       }
-      const text = workerPassedText(String(app.name ?? ""));
+      // The profile stage pass (25 Oct 2026). The link opens their ID stage
+      // (the second sitting) and goes only to the contacts on the row.
+      const link = applyLink(APP_URL, String(app.id), String(app.upload_token), String(app.app_id));
+      const text = workerPassedText(String(app.name ?? ""), link);
       const phone = String(app.phone ?? "").trim();
+      // Outside the 24 hour window, the approved check reminder template, for
+      // the same reason as worker_apply_link: what it says (incomplete, the
+      // ID and Guidelines left, here is the link) is true of somebody whose
+      // ID stage has not started. Text messages are not switched on, so
+      // without it a worker with no email would hear nothing.
+      const passedSid = await approvedTemplateSid(admin, "TWILIO_CONTENT_SID_WORKER_CHECK_REMINDER", "twilio_content_sid_worker_check_reminder");
+      const passedFirst = String(app.name ?? "").trim().split(/\s+/)[0] ?? "";
       const wa = phone
-        ? await sendToWorker(admin, phone, text, trace, { kind: "worker passed" })
+        ? await sendToWorker(admin, phone, text, trace, { kind: "worker passed" }, passedSid
+          ? { sid: passedSid, vars: { "1": templateVar(passedFirst || "there", 60), "2": link } }
+          : undefined)
         : { sent: false, reason: "no phone on the application", outsideWindow: false };
       const emailed = app.email ? await sendPlainEmail(String(app.email), WORKER_PASSED_SUBJECT, text, trace) : false;
       root.setAttributes({ "yaadly.notify.outcome": "worker_passed", "yaadly.notify.wa_sent": wa.sent, "yaadly.notify.emailed": emailed });

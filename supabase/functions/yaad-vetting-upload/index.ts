@@ -366,7 +366,11 @@ Deno.serve(async (req: Request) => {
       const showcaseConsent = s(b.showcaseConsent) === "granted" ? "granted" : "declined";
 
       const core = {
-        status: "received",
+        // A worker whose profile stage is already passed is sending their ID
+        // stage (25 Oct 2026). They stay passed and live; the desk reads the
+        // ID stage off the documents, not off the status. Anybody else is
+        // received, as before.
+        status: s(app.status) === "passed" ? undefined : "received",
         phone:    e164(s(b.phone)) || undefined,
         email:    s(b.email).toLowerCase() || undefined,
         parish:   s(b.parish) || undefined,
@@ -476,19 +480,36 @@ Deno.serve(async (req: Request) => {
           const yearsInt = parseInt(String(appRow.years ?? "").replace(/\D/g, ""), 10);
           const email = String(appRow.email ?? "").trim().toLowerCase();
 
-          const { error: profErr } = await admin.from("worker_profiles").upsert({
-            application_id: appId,
-            worker_email: email || null,
+          // A profile that already exists is updated, never re-hidden. Until
+          // 25 Oct 2026 this was one upsert carrying active:false, which was
+          // harmless while nothing went live before the ID check; now the
+          // profile stage puts it live first, and a worker sending their ID
+          // stage would have taken themselves off the job board.
+          const fields = {
             name: String(appRow.name).slice(0, 120),
             trade: String(appRow.trade ?? "").split(",")[0].trim() || null,
             parish: String(appRow.parish ?? "").split(",")[0].trim() || null,
             areas: String(appRow.parishes ?? "").slice(0, 400) || null,
             years: Number.isFinite(yearsInt) ? yearsInt : null,
-            slug,
-            active: false,
-            vetting_state: "probation",
             updated_at: new Date().toISOString(),
-          }, { onConflict: "application_id" });
+          };
+          const { data: existing } = await admin.from("worker_profiles")
+            .select("id, worker_email").eq("application_id", appId).maybeSingle();
+          const { error: profErr } = existing
+            ? await admin.from("worker_profiles").update({
+                ...fields,
+                // The email given at the ID stage fills an empty one; it
+                // never replaces one already on the profile.
+                ...(email && !String(existing.worker_email ?? "").trim() ? { worker_email: email } : {}),
+              }).eq("id", existing.id)
+            : await admin.from("worker_profiles").insert({
+                ...fields,
+                application_id: appId,
+                worker_email: email || null,
+                slug,
+                active: false,
+                vetting_state: "probation",
+              });
           if (profErr) root.recordError(`profile: ${profErr.message}`);
           else root.setAttributes({ "yaadly.profile.created": true, "yaadly.profile.slug": slug });
         }
@@ -506,7 +527,9 @@ Deno.serve(async (req: Request) => {
             .select("id", { count: "exact", head: true }).eq("application_id", appId);
           await fetch(`https://ntfy.sh/${st.value}`, {
             method: "POST",
-            headers: { Title: "New Yaadly pro application", Priority: "default", Tags: "hammer" },
+            // A passed worker sending again is their ID stage, for the ID
+            // stage pass on the desk, not a new application.
+            headers: { Title: s(app.status) === "passed" ? "ID stage sent, ready for ID stage pass" : "New Yaadly pro application", Priority: "default", Tags: "hammer" },
             body: `${s(b.trade) || "trade"}, ${s(b.parish) || "parish not given"}. ${count ?? 0} document(s) on file.`
               + (aiConsent === "granted" ? "" : " No AI read, they refused. You promised an answer within 24 hours."),
             signal: AbortSignal.timeout(4000),
