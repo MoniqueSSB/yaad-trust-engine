@@ -1,5 +1,5 @@
 import { assert } from "jsr:@std/assert@1";
-import { applyLink, checkReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
+import { applyLink, checkReminderText, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
 
 Deno.test("the cleared message fits one phone screen, names the board and the pay, and promises nothing", () => {
   const t = workerClearedText("Marcus Brown", "marcus@example.com", "https://app.yaadly.co.uk");
@@ -54,3 +54,17 @@ Deno.test("the job delayed check-in is short, supportive and says a person answe
   assert(t.length <= 160, "one short message");
   assert(!/[\u2013\u2014]/.test(t) && !/guarantee|escrow|100%|held/i.test(t), t);
 });
+
+Deno.test("the send reminder goes once, carries no token, and promises nothing", async () => {
+  const t = sendReminderText("Omar Grant", "https://app.yaadly.co.uk");
+  assert(t.includes("https://app.yaadly.co.uk/apply") && !t.includes("token="), "plain apply link, no claim token");
+  assert(t.includes("same phone") && t.includes("Send my application"), t);
+  for (const line of t.split("\n")) assert(line.length <= 110, `long line: ${line}`);
+  assert(!/[\u2013\u2014]/.test(t), "no dashes");
+  assert(!/approved|accepted|guarantee|you will get|deadline|removed|deleted/i.test(t), t);
+  const mig = await Deno.readTextFile(new URL("../../migrations/20261025150000_an_application_started_and_never_sent_is_noticed.sql", import.meta.url));
+  assert(mig.includes("a.send_reminders = 0"), "never a second reminder");
+  assert(mig.includes("a.status = 'started'") && mig.includes("interval '48 hours'"), "started rows, two days on");
+  assert(mig.includes("'kind', 'worker_send_reminder'"));
+});
+
