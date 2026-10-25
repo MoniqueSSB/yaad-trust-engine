@@ -1,5 +1,5 @@
 {
-  "read_at": "2026-10-25T23:08:42.246Z",
+  "read_at": "2026-10-25T23:22:44.454Z",
   "project_ref": "leffyisvfvjwzilydlwf",
   "tables": {
     "_inv_out": [
@@ -877,6 +877,13 @@
       "last_error",
       "sent_at",
       "to_addr"
+    ],
+    "phone_sign_in_attempts": [
+      "caller_key",
+      "created_at",
+      "id",
+      "kind",
+      "phone_key"
     ],
     "portal_claims": [
       "code",
@@ -1844,6 +1851,7 @@
     "pass_id_stage",
     "pass_profile_stage",
     "pend_portal_code",
+    "phone_sign_in_attempts_sweep",
     "poke_job_on_evidence_insert",
     "portal_claim_on_confirm",
     "post_job_attempts_sweep",
@@ -1925,6 +1933,7 @@
     "sign_completion_report",
     "sign_completion_report_by_code",
     "sign_completion_report_via_whatsapp",
+    "sign_in_candidates_for_phone",
     "sign_off_addon",
     "sketch_freeze_approved",
     "sketch_guard_approval",
