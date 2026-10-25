@@ -1,5 +1,5 @@
 {
-  "read_at": "2026-10-25T22:54:29.117Z",
+  "read_at": "2026-10-25T23:08:42.246Z",
   "project_ref": "leffyisvfvjwzilydlwf",
   "tables": {
     "_inv_out": [
@@ -1803,6 +1803,7 @@
     "my_access_levels",
     "my_quoted_jobs",
     "my_supplier_orders",
+    "my_worker_stages",
     "new_invoice_number",
     "new_report_number",
     "new_sketch_number",
