@@ -8406,7 +8406,7 @@ async function loadOverview(){
     tile(disputesOpen ? "crit" : "ok", "Disputes open", String(disputesOpen), disputesOpen ? "Nothing moves while one is" : "Nothing in dispute", "jobs"),
     tile("", "Evidence with clients", String(evidWaiting), evidWaiting ? "The client reviews it; you step in on an issue" : "Nothing waiting on a client", "evid"),
     tile(intakeNew ? "warn" : "ok", "Waiting on a reply", String(intakeNew), intakeNew ? "Somebody wrote and nobody answered" : "Nobody is waiting", "intake"),
-    tile(appsWaiting || appsStuck ? "warn" : "ok", "Applications", String(appsWaiting), appsStuck ? plural(appsStuck, "started, never sent", "started, never sent") : appsWaiting ? "Vetting not finished" : "None waiting", "apps"),
+    tile(appsWaiting || appsStuck ? "warn" : "ok", "Applications", String(appsWaiting), appsStuck ? appsStuck + " started, never sent" : appsWaiting ? "Vetting not finished" : "None waiting", "apps"),
     tile(quotesOut ? "warn" : "ok", "Quotes to pass on", String(quotesOut), quotesOut ? "Sitting with you" : "None held", "quotes"),
     tile(callsNew ? "warn" : "ok", "Calls requested", String(callsNew), callsNew ? "Somebody wants to talk" : "None asked", "calls"),
     tile(enqNew ? "warn" : "ok", "Enquiries to answer", String(enqNew), enqNew ? "Somebody asked a question" : "All replied to", "enq"),
