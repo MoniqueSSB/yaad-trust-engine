@@ -5430,9 +5430,36 @@ async function preApps(rows){
 
 const VERDICT = { pass:["ok","&#10003;","Pass"], flag:["gap","!","Gap"], unclear:["gap","?","Unclear"], block:["block","&times;","Block"], fail:["block","&times;","Fail"] };
 
+// Opened and never sent (25 Oct 2026). Every worker who tapped Send between
+// 5 September and 25 October was refused by a missing column and this page
+// never showed them, because everything here starts at "received". Two days
+// is the line: a first sitting takes ten minutes, so somebody still at
+// started after two days has walked away or been turned away. The contact
+// buttons are the same Reach them card every application carries.
+function stuckAppsCard(rows){
+  const line = Date.now() - 48 * 3600 * 1000;
+  const stuck = (rows || []).filter(r => String(r.status || "") === "started" && new Date(r.created_at || 0).getTime() < line);
+  if (!stuck.length) return "";
+  const items = stuck.map(r => {
+    const docs = (VDOC[r.id] || []).length;
+    const reach = hasPhone_(r.phone || "") ? "WhatsApp" : isEmail_(r.email || "") ? "email" : "no way back";
+    return `<div class="vitem ${reach === "no way back" ? "block" : "gap"}"><span class="vi">${docs}</span>`
+      + `<div><h6>${esc(r.name || r.app_id || "no name")}</h6><p>${esc(r.trade || "trade not said")} &middot; ${esc(r.parish || "parish not said")} &middot; opened ${esc(ago_(r.created_at))} ago &middot; ${docs} document${docs === 1 ? "" : "s"} on file`
+      + (r.send_reminded_at ? ` &middot; reminded ${esc(ago_(r.send_reminded_at))} ago` : ` &middot; not reminded yet`) + `</p></div>`
+      + `<span class="vs">${esc(reach)}</span></div>`;
+  }).join("");
+  return `<div class="card">
+      <div class="chd"><h3>Started, never sent</h3><span class="chip warn dot">${stuck.length}</span>
+      <span class="sp">opened more than two days ago and never reached Send</span></div>
+      <div class="vrec">${items}</div>
+      <p class="conseq">Each of these people got as far as the form, and some uploaded documents. A reminder goes to them once, two days on, by text message and email; after that it is your call. Open the row below and use Reach them. If it was you testing, mark it so and it drops off.</p>
+    </div>`;
+}
+
 function panelApps(rows){
-  const waiting = (rows || []).filter(r => ["submitted","reviewing"].includes(String(r.status || "")));
-  if (!waiting.length) return "";
+  const waiting = (rows || []).filter(r => ["received","submitted","reviewing"].includes(String(r.status || "")));
+  const stuckCard = stuckAppsCard(rows);
+  if (!waiting.length) return stuckCard;
   const a = waiting[0];
   const v = VET[a.id];
   const docs = VDOC[a.id] || [];
@@ -5461,7 +5488,7 @@ function panelApps(rows){
     + `<span class="sp">${esc(a.trade || "trade not said")} &middot; ${esc(a.parish || "parish not said")} &middot; applied ${esc(ago_(a.created_at))} ago</span></div>`
     + body
     + `<p class="conseq"><b>The agent flags, a person decides.</b> ${v ? esc(v.model || "The model") + " read " + docs.length + " document" + (docs.length === 1 ? "" : "s") + " and raised " + flags + "." : "Nothing has read these documents."} It never approves anybody. Open the row below to record Pass, Gap or Block, and each one says what it does before it does it.</p>`
-    + `</div>`;
+    + `</div>` + stuckCard;
 }
 
 // ---- Quotes: where a quote sits against the others on the same job.
@@ -8105,7 +8132,7 @@ async function loadOverview(){
   VISITS = vis.data || [];
   renderCal();
 
-  const [intakeNew, appsWaiting, evidOwn, quotesOut, callsNew, disputesOpen,
+  const [intakeNew, appsWaiting, appsStuck, evidOwn, quotesOut, callsNew, disputesOpen,
          pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsignedOwn,
          enqNew, asksNew] = await Promise.all([
     // Was countOf("intakes", ...) until 19 September 2026, which is to say it
@@ -8115,7 +8142,13 @@ async function loadOverview(){
     // thing the Intake view now shows: somebody on WhatsApp or the website
     // chat who has been waiting on a human, her own tests excluded.
     countOf("intake_threads", q => q.not("awaiting_human_since", "is", null).not("is_test", "is", true)),
-    countOf("applications",q => q.in("status", ["submitted","reviewing"])),
+    // "received" is what yaad-vetting-upload writes at Send. This counted
+    // "submitted" and "reviewing" until 25 Oct 2026, words no function has
+    // written since the join flow was rebuilt, so the tile said "None
+    // waiting" whatever came in. Kept in the list in case an old row holds one.
+    countOf("applications",q => q.in("status", ["received","submitted","reviewing"])),
+    // Opened, maybe documents uploaded, never sent, two days on (25 Oct 2026).
+    countOf("applications",q => q.eq("status", "started").lt("created_at", new Date(Date.now() - 48 * 3600 * 1000).toISOString())),
     evidenceOwnership(),
     countOf("job_quotes",  q => q.eq("status", "sent")),
     countOf("calls",       q => q.eq("status", "requested")),
@@ -8373,7 +8406,7 @@ async function loadOverview(){
     tile(disputesOpen ? "crit" : "ok", "Disputes open", String(disputesOpen), disputesOpen ? "Nothing moves while one is" : "Nothing in dispute", "jobs"),
     tile("", "Evidence with clients", String(evidWaiting), evidWaiting ? "The client reviews it; you step in on an issue" : "Nothing waiting on a client", "evid"),
     tile(intakeNew ? "warn" : "ok", "Waiting on a reply", String(intakeNew), intakeNew ? "Somebody wrote and nobody answered" : "Nobody is waiting", "intake"),
-    tile(appsWaiting ? "warn" : "ok", "Applications", String(appsWaiting), appsWaiting ? "Vetting not finished" : "None waiting", "apps"),
+    tile(appsWaiting || appsStuck ? "warn" : "ok", "Applications", String(appsWaiting), appsStuck ? plural(appsStuck, "started, never sent", "started, never sent") : appsWaiting ? "Vetting not finished" : "None waiting", "apps"),
     tile(quotesOut ? "warn" : "ok", "Quotes to pass on", String(quotesOut), quotesOut ? "Sitting with you" : "None held", "quotes"),
     tile(callsNew ? "warn" : "ok", "Calls requested", String(callsNew), callsNew ? "Somebody wants to talk" : "None asked", "calls"),
     tile(enqNew ? "warn" : "ok", "Enquiries to answer", String(enqNew), enqNew ? "Somebody asked a question" : "All replied to", "enq"),
@@ -8990,7 +9023,7 @@ async function loadHealth(){
   const [staleW, staleC, unvetted, blob, noTrade, orphanQuotes, unsigned, evidNoPrint] = await Promise.all([
     wgV ? countOf("doc_signatures", q => q.eq("doc_type","worker_guidelines").neq("doc_version", wgV)) : Promise.resolve(0),
     cgV ? countOf("doc_signatures", q => q.eq("doc_type","client_guidelines").neq("doc_version", cgV)) : Promise.resolve(0),
-    countOf("applications", q => q.in("status", ["submitted","reviewing"])),
+    countOf("applications", q => q.in("status", ["received","submitted","reviewing"])),
     countOf("app_state", null),
     countOf("jobs", q => q.is("trade", null)),
     countOf("job_quotes", q => q.is("worker_user", null)),

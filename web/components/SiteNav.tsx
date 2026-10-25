@@ -113,7 +113,7 @@ export function SiteNav({
           <div className="ml-2.5 flex items-center border-l border-line pl-2.5 max-[1340px]:hidden">
             <Link href="/portal/client" className={quiet + (here === "client" ? " font-semibold text-purpleb" : "")}>Client portal</Link>
             <Link href="/portal/worker" className={quiet + (here === "worker" ? " font-semibold text-purpleb" : "")}>Worker portal</Link>
-            <Link href="/apply" className={quiet + (here === "join" ? " font-semibold text-purpleb" : "")}>Join as a pro</Link>
+            <Link href="/apply" className={quiet + (here === "join" ? " font-semibold text-purpleb" : "")}>Join as a worker</Link>
           </div>
         )}
 

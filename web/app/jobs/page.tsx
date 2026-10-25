@@ -533,7 +533,7 @@ export default async function Board({
                   </p>
                 </div>
                 <Link href="/apply" className="whitespace-nowrap rounded-full bg-linear-to-r from-purple to-gold px-5.5 py-3 text-[14px] font-bold text-white shadow-[0_0_24px_rgba(155,115,245,0.28)] transition hover:-translate-y-px hover:brightness-110">
-                  Join as a pro &rarr;
+                  Join as a worker &rarr;
                 </Link>
               </div>
             </div>
@@ -883,7 +883,7 @@ export default async function Board({
                     Pass identity and trade verification once, and every job on this board is yours to quote.
                   </p>
                   <Link href="/apply" className="mt-3.5 inline-flex w-full items-center justify-center rounded-full bg-linear-to-r from-purple to-gold px-4.5 py-2.5 text-[13.5px] font-bold text-white transition hover:brightness-110">
-                    Join as a pro
+                    Join as a worker
                   </Link>
                   <Link href="/portal/guidelines?read=worker_guidelines" className="mt-2.5 block text-center text-[12.5px] text-mute transition hover:text-purpleb">
                     Read the Worker Guidelines
