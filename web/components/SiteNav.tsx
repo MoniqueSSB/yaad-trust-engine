@@ -113,7 +113,7 @@ export function SiteNav({
           <div className="ml-2.5 flex items-center border-l border-line pl-2.5 max-[1340px]:hidden">
             <Link href="/portal/client" className={quiet + (here === "client" ? " font-semibold text-purpleb" : "")}>Client portal</Link>
             <Link href="/portal/worker" className={quiet + (here === "worker" ? " font-semibold text-purpleb" : "")}>Worker portal</Link>
-            <Link href="/apply" className={quiet + (here === "join" ? " font-semibold text-purpleb" : "")}>Join as a pro</Link>
+            <Link href="/apply" className={quiet + (here === "join" ? " font-semibold text-purpleb" : "")}>Join as a worker</Link>
           </div>
         )}
 
@@ -140,12 +140,20 @@ export function SiteNav({
              and for a while this button sent people to a hash that redirected
              to the board: a list of other people's jobs, with no way to post
              one. The job is created here now, and only here. */
-          <a
-            href="/jobs/new"
-            className={`ml-3 shrink-0 whitespace-nowrap rounded-full px-[15px] py-2 text-[12.5px] font-bold text-white transition hover:brightness-110 ${GRAD}`}
-          >
-            Post a job
-          </a>
+          <>
+            <Link
+              href="/apply"
+              className="ml-3 shrink-0 whitespace-nowrap rounded-full border border-purpleb px-[15px] py-2 text-[12.5px] font-bold text-purpleb transition hover:bg-purple/10"
+            >
+              Join as a worker
+            </Link>
+            <a
+              href="/jobs/new"
+              className={`ml-3 shrink-0 whitespace-nowrap rounded-full px-[15px] py-2 text-[12.5px] font-bold text-white transition hover:brightness-110 ${GRAD}`}
+            >
+              Post a job
+            </a>
+          </>
         )}
       </div>
     </nav>

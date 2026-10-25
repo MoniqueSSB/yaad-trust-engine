@@ -2341,7 +2341,7 @@ const VIEWS = [
 
   { k:"quotes", g:"Run the day", label:"Quotes", icon:"money",
     title:"Quotes", table:"job_quotes",
-    sub:"Submitted quotes waiting to reach a client. Client sees labour plus 15%, materials at cost. Worker keeps labour minus 5%, materials at cost. Materials are never fee'd on either side.",
+    sub:"Submitted quotes waiting to reach a client. Client sees labour plus 15%, materials at cost. Worker keeps labour minus 7%, materials at cost. Materials are never fee'd on either side.",
     select:"*",
     order:"created_at", search:["job_id","worker_name","worker_email"],
     empty:["No quotes in","Workers quote from the board. Nothing has been submitted yet."],
@@ -2427,7 +2427,8 @@ const VIEWS = [
 
   { k:"apps", g:"People", label:"Applications", icon:"people",
     title:"Applications", table:"applications",
-    detailTop: r => applicantCard(r), titleOf: r => r.name || r.email || "Application",
+    detailTop: r => applicantCard(r) + applicantMessageCard(r), afterOpen: wireApplicantMessage,
+    titleOf: r => r.name || r.email || "Application",
     sub:"Vetting is by hand and stays that way. The agent reads documents and flags what is missing or does not line up. It never approves anybody: PASS, GAP and BLOCK are your words, not its.",
     select:"*",
     order:"created_at", search:["app_id","name","email","trade","parish"],
@@ -4262,19 +4263,33 @@ function jobContacts(r){
   return c;
 }
 
-function jobMessageCard(r){
-  const cs = jobContacts(r);
-  if (!cs.length) return `<div class="card jpmsg"><div class="chd"><h3>Message about this job</h3></div><p class="hint" style="margin:0">Neither the client nor a tradesperson has a number or an address on this job, so there is nobody to message from here.</p></div>`;
-  const opts = cs.map(c => `<option value="${c.to}">${esc(c.who)} (${c.to === "client" ? "client" : "tradesperson"})</option>`).join("");
-  return `<div class="card jpmsg" data-job="${esc(r.id)}">
-      <div class="chd"><h3>Message about this job</h3><span class="sp">your words, sent as typed</span></div>
+// One card, two owners. A job page and an application drawer both message a
+// person this way, so the markup and the wiring live once, in messageCard()
+// and wireMessageCard(). The spec says who can be reached and what the
+// function is told; nothing else differs. Added 25 October 2026, when the
+// applicant card was built and would otherwise have been a second copy.
+//
+//   key          what the card is about, for the data attribute
+//   title        the card heading
+//   contacts     [{ to, who, kind, phone, email }], to is what the function
+//                receives: client, worker or applicant
+//   subject      the default email subject
+//   placeholder  the example text in the box
+//   payload(c, ch, subject, text)  the JSON body yaad-desk-message gets
+//   recordedOn   "this job" or "this application", for the own-app note
+function messageCard(spec){
+  const cs = spec.contacts;
+  if (!cs.length) return `<div class="card jpmsg"><div class="chd"><h3>${esc(spec.title)}</h3></div><p class="hint" style="margin:0">${esc(spec.nobody)}</p></div>`;
+  const opts = cs.map(c => `<option value="${c.to}">${esc(c.who)} (${esc(c.kind)})</option>`).join("");
+  return `<div class="card jpmsg" data-msg="${esc(spec.key)}">
+      <div class="chd"><h3>${esc(spec.title)}</h3><span class="sp">your words, sent as typed</span></div>
       <div class="row" style="margin-bottom:8px">
         <div><label>To</label><select class="jm-to">${opts}</select></div>
         <div><label>How</label><select class="jm-ch"></select></div>
       </div>
-      <div class="row jm-subj-row hidden" style="margin-bottom:8px"><div style="flex:1"><label>Subject</label><input class="jm-subj" maxlength="120" value="${esc("About your job " + r.id)}"></div></div>
+      <div class="row jm-subj-row hidden" style="margin-bottom:8px"><div style="flex:1"><label>Subject</label><input class="jm-subj" maxlength="120" value="${esc(spec.subject)}"></div></div>
       <label>Message</label>
-      <textarea class="jm-text" rows="4" maxlength="1500" placeholder="The roofer is on site from 8 tomorrow. Please leave the side gate unlocked."></textarea>
+      <textarea class="jm-text" rows="4" maxlength="1500" placeholder="${esc(spec.placeholder)}"></textarea>
       <div class="brow" style="margin-top:10px">
         <button class="btn jm-send">Send from Yaadly</button>
         <button class="btn g jm-own">Open in my own app</button>
@@ -4284,10 +4299,10 @@ function jobMessageCard(r){
     </div>`;
 }
 
-function wireJobMessage(r, el){
-  const card = el.querySelector(".jpmsg[data-job]");
+function wireMessageCard(spec, el){
+  const card = el.querySelector(`.jpmsg[data-msg="${CSS.escape(spec.key)}"]`);
   if (!card) return;
-  const cs = jobContacts(r);
+  const cs = spec.contacts;
   const $$ = (s) => card.querySelector(s);
   const who = () => cs.find(c => c.to === $$(".jm-to").value) || cs[0];
   const fillChannels = () => {
@@ -4314,7 +4329,7 @@ function wireJobMessage(r, el){
     if (!text) { $$(".jm-out").innerHTML = '<div class="msg warn">Write the message first.</div>'; return; }
     if (ch === "email") window.open(`mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent($$(".jm-subj").value || "")}&body=${encodeURIComponent(text + "\n\nMonique\nYaadly")}`, "_blank", "noopener");
     else window.open(`https://wa.me/${digits_(c.phone)}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
-    $$(".jm-out").innerHTML = '<div class="msg ok">Opened in your own app. Nothing is sent until you press send there, and it is not recorded on this job.</div>';
+    $$(".jm-out").innerHTML = `<div class="msg ok">Opened in your own app. Nothing is sent until you press send there, and it is not recorded on ${esc(spec.recordedOn)}.</div>`;
   });
 
   $$(".jm-send").addEventListener("click", async () => {
@@ -4328,7 +4343,7 @@ function wireJobMessage(r, el){
       const res = await fetch(MSG_FN, {
         method: "POST",
         headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
-        body: JSON.stringify({ job_id: r.id, to: c.to, channel: ch, subject: $$(".jm-subj").value || "", text }),
+        body: JSON.stringify(spec.payload(c, ch, $$(".jm-subj").value || "", text)),
       });
       const j = await res.json().catch(() => ({ error: "The function returned something unreadable." }));
       if (!res.ok) throw new Error(j.error || ("http " + res.status));
@@ -4339,6 +4354,46 @@ function wireJobMessage(r, el){
     } finally { b.disabled = false; }
   });
 }
+
+function jobMessageSpec(r){
+  return {
+    key: "job:" + r.id, title: "Message about this job",
+    nobody: "Neither the client nor a tradesperson has a number or an address on this job, so there is nobody to message from here.",
+    contacts: jobContacts(r).map(c => ({ ...c, kind: c.to === "client" ? "client" : "tradesperson" })),
+    subject: "About your job " + r.id,
+    placeholder: "The roofer is on site from 8 tomorrow. Please leave the side gate unlocked.",
+    payload: (c, ch, subject, text) => ({ job_id: r.id, to: c.to, channel: ch, subject, text }),
+    recordedOn: "this job",
+  };
+}
+function jobMessageCard(r){ return messageCard(jobMessageSpec(r)); }
+function wireJobMessage(r, el){ wireMessageCard(jobMessageSpec(r), el); }
+
+// ---- Message an applicant who has no job yet.
+//
+// Asked for on 25 October 2026, the day it was found that every application
+// since 5 September had failed at Send and two real applicants had sat at
+// "started" for weeks with no way to reach them from here. The "Reach them"
+// card above it only opens her own apps; this one can also send from Yaadly
+// and write the send to the ledger under her name, the same path a job uses.
+// The function reads the number and address off the application row itself,
+// under her token (applications are admin only), never off this page.
+function applicantMessageSpec(r){
+  const contacts = [];
+  if (hasPhone_(r.phone || "") || isEmail_(r.email || "")) contacts.push({ to:"applicant", who:r.name || "the applicant", kind:"applicant", phone:r.phone || "", email:r.email || "" });
+  return {
+    key: "app:" + r.id, title: "Message this applicant",
+    nobody: "This application has neither a number nor an email address, so there is nobody to message from here.",
+    contacts,
+    subject: "Your Yaadly application" + (r.app_id ? " " + r.app_id : ""),
+    placeholder: "Hello, this is Yaadly about your application. We have it and are reviewing it. Nothing more is needed from you right now.",
+    payload: (c, ch, subject, text) => ({ application_id: r.id, to: "applicant", channel: ch, subject, text }),
+    recordedOn: "this application",
+  };
+}
+function applicantMessageCard(r){ return messageCard(applicantMessageSpec(r)); }
+function wireApplicantMessage(r, el){ wireMessageCard(applicantMessageSpec(r), el); }
+
 
 // One bar per currency, split by where the money is, counts beside it. Each
 // part's v is a { currency: amount } total from sumByCur. A job bill is in
@@ -5430,9 +5485,36 @@ async function preApps(rows){
 
 const VERDICT = { pass:["ok","&#10003;","Pass"], flag:["gap","!","Gap"], unclear:["gap","?","Unclear"], block:["block","&times;","Block"], fail:["block","&times;","Fail"] };
 
+// Opened and never sent (25 Oct 2026). Every worker who tapped Send between
+// 5 September and 25 October was refused by a missing column and this page
+// never showed them, because everything here starts at "received". Two days
+// is the line: a first sitting takes ten minutes, so somebody still at
+// started after two days has walked away or been turned away. The contact
+// buttons are the same Reach them card every application carries.
+function stuckAppsCard(rows){
+  const line = Date.now() - 48 * 3600 * 1000;
+  const stuck = (rows || []).filter(r => String(r.status || "") === "started" && new Date(r.created_at || 0).getTime() < line);
+  if (!stuck.length) return "";
+  const items = stuck.map(r => {
+    const docs = (VDOC[r.id] || []).length;
+    const reach = hasPhone_(r.phone || "") ? "WhatsApp" : isEmail_(r.email || "") ? "email" : "no way back";
+    return `<div class="vitem ${reach === "no way back" ? "block" : "gap"}"><span class="vi">${docs}</span>`
+      + `<div><h6>${esc(r.name || r.app_id || "no name")}</h6><p>${esc(r.trade || "trade not said")} &middot; ${esc(r.parish || "parish not said")} &middot; opened ${esc(ago_(r.created_at))} ago &middot; ${docs} document${docs === 1 ? "" : "s"} on file`
+      + (r.send_reminded_at ? ` &middot; reminded ${esc(ago_(r.send_reminded_at))} ago` : ` &middot; not reminded yet`) + `</p></div>`
+      + `<span class="vs">${esc(reach)}</span></div>`;
+  }).join("");
+  return `<div class="card">
+      <div class="chd"><h3>Started, never sent</h3><span class="chip warn dot">${stuck.length}</span>
+      <span class="sp">opened more than two days ago and never reached Send</span></div>
+      <div class="vrec">${items}</div>
+      <p class="conseq">Each of these people got as far as the form, and some uploaded documents. A reminder goes to them once, two days on, by text message and email; after that it is your call. Open the row below and use Reach them. If it was you testing, mark it so and it drops off.</p>
+    </div>`;
+}
+
 function panelApps(rows){
-  const waiting = (rows || []).filter(r => ["submitted","reviewing"].includes(String(r.status || "")));
-  if (!waiting.length) return "";
+  const waiting = (rows || []).filter(r => ["received","submitted","reviewing"].includes(String(r.status || "")));
+  const stuckCard = stuckAppsCard(rows);
+  if (!waiting.length) return stuckCard;
   const a = waiting[0];
   const v = VET[a.id];
   const docs = VDOC[a.id] || [];
@@ -5461,7 +5543,7 @@ function panelApps(rows){
     + `<span class="sp">${esc(a.trade || "trade not said")} &middot; ${esc(a.parish || "parish not said")} &middot; applied ${esc(ago_(a.created_at))} ago</span></div>`
     + body
     + `<p class="conseq"><b>The agent flags, a person decides.</b> ${v ? esc(v.model || "The model") + " read " + docs.length + " document" + (docs.length === 1 ? "" : "s") + " and raised " + flags + "." : "Nothing has read these documents."} It never approves anybody. Open the row below to record Pass, Gap or Block, and each one says what it does before it does it.</p>`
-    + `</div>`;
+    + `</div>` + stuckCard;
 }
 
 // ---- Quotes: where a quote sits against the others on the same job.
@@ -6088,7 +6170,7 @@ function addonStory_(r){
   return `<div class="dlvstory">` + rail
     + `<div class="dlvgrid">`
     + `<div><span class="dk">Job</span><div>${id_(r.job_id)} ${sub_("version " + r.rev + (wait ? ", " + wait.toLowerCase() : ""))}</div></div>`
-    + `<div><span class="dk">Money</span><div>Client pays <b>${esc(jmdFmt(r.amount_jmd + fee))}</b> ${sub_(jmdFmt(r.amount_jmd) + " + 15%")}<br>Worker is paid <b>${esc(jmdFmt(pay))}</b> ${sub_("less 5%")}</div></div>`
+    + `<div><span class="dk">Money</span><div>Client pays <b>${esc(jmdFmt(r.amount_jmd + fee))}</b> ${sub_(jmdFmt(r.amount_jmd) + " + 15%")}<br>Worker is paid <b>${esc(jmdFmt(pay))}</b> ${sub_("less 7%")}</div></div>`
     + `</div>`
     + `<div class="dlvbox"><span class="dk">The extra work</span><p style="white-space:pre-wrap">${esc(r.scope)}</p><p class="mute">${r.terms === "in_full" ? "Paid in full before the work starts." : "Half before the work starts, half once it is signed off."}</p></div>`
     + `<div class="dlvbox"><span class="dk">Invoices</span><div data-addon-inv>${mute_("Reading…")}</div></div>`
@@ -6299,7 +6381,7 @@ async function openQuotePackDocument(r){
   if (!w) throw new Error("The browser blocked the new tab. Allow pop-ups for the desk and try again.");
   w.document.write("<p style='font:15px sans-serif;padding:24px'>Building the document.</p>");
   let job = null;
-  if (r.job_id) ({ data: job } = await sb.from("jobs").select("id,title,parish,trades").eq("id", r.job_id).maybeSingle());
+  if (r.job_id) ({ data: job } = await sb.from("jobs").select("id,title,parish,trade").eq("id", r.job_id).maybeSingle());
   w.document.open(); w.document.write(quotePackDocumentHtml(r, job)); w.document.close();
   w.document.title = "Quote pack, " + (r.job_id || r.id);
 }
@@ -6356,7 +6438,7 @@ footer{margin-top:22px;padding-top:9px;border-top:1pt solid var(--line);font-siz
 <div><span class="stamp${approved ? " ok" : ""}">${approved ? "Approved " + esc(dateOf(r.approved_at)) : "Draft, not yet approved"}</span></div>
 <dl class="meta">
   <div><dt>Location</dt><dd>${esc((job && job.parish) || "Not given")}</dd></div>
-  <div><dt>Trade</dt><dd>${esc((job && job.trades) || "Not given")}</dd></div>
+  <div><dt>Trade</dt><dd>${esc((job && job.trade) || "Not given")}</dd></div>
   <div><dt>Drafted</dt><dd>${esc(dateOf(r.created_at))}</dd></div>
 </dl>
 <h2>Scope</h2>${paras(d.scope_summary) || "<p>Not written.</p>"}
@@ -7128,7 +7210,7 @@ function openDetail(k, i){
     </div>`;
   document.body.appendChild(el);
   // A view with live controls on its page wires them here, once the markup
-  // exists. Only the job page has any today: its message card.
+  // exists: the job page and the application drawer each have a message card.
   if (v.afterOpen) v.afterOpen(row, el);
 
   el.addEventListener("click", (e) => { if (e.target === el) closeDrawer(); });
@@ -8136,7 +8218,7 @@ async function loadOverview(){
   VISITS = vis.data || [];
   renderCal();
 
-  const [intakeNew, appsWaiting, evidOwn, quotesOut, callsNew, disputesOpen,
+  const [intakeNew, appsWaiting, appsStuck, evidOwn, quotesOut, callsNew, disputesOpen,
          pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsignedOwn,
          enqNew, asksNew] = await Promise.all([
     // Was countOf("intakes", ...) until 19 September 2026, which is to say it
@@ -8146,7 +8228,13 @@ async function loadOverview(){
     // thing the Intake view now shows: somebody on WhatsApp or the website
     // chat who has been waiting on a human, her own tests excluded.
     countOf("intake_threads", q => q.not("awaiting_human_since", "is", null).not("is_test", "is", true)),
-    countOf("applications",q => q.in("status", ["submitted","reviewing"])),
+    // "received" is what yaad-vetting-upload writes at Send. This counted
+    // "submitted" and "reviewing" until 25 Oct 2026, words no function has
+    // written since the join flow was rebuilt, so the tile said "None
+    // waiting" whatever came in. Kept in the list in case an old row holds one.
+    countOf("applications",q => q.in("status", ["received","submitted","reviewing"])),
+    // Opened, maybe documents uploaded, never sent, two days on (25 Oct 2026).
+    countOf("applications",q => q.eq("status", "started").lt("created_at", new Date(Date.now() - 48 * 3600 * 1000).toISOString())),
     evidenceOwnership(),
     countOf("job_quotes",  q => q.eq("status", "sent")),
     countOf("calls",       q => q.eq("status", "requested")),
@@ -8404,7 +8492,7 @@ async function loadOverview(){
     tile(disputesOpen ? "crit" : "ok", "Disputes open", String(disputesOpen), disputesOpen ? "Nothing moves while one is" : "Nothing in dispute", "jobs"),
     tile("", "Evidence with clients", String(evidWaiting), evidWaiting ? "The client reviews it; you step in on an issue" : "Nothing waiting on a client", "evid"),
     tile(intakeNew ? "warn" : "ok", "Waiting on a reply", String(intakeNew), intakeNew ? "Somebody wrote and nobody answered" : "Nobody is waiting", "intake"),
-    tile(appsWaiting ? "warn" : "ok", "Applications", String(appsWaiting), appsWaiting ? "Vetting not finished" : "None waiting", "apps"),
+    tile(appsWaiting || appsStuck ? "warn" : "ok", "Applications", String(appsWaiting), appsStuck ? appsStuck + " started, never sent" : appsWaiting ? "Vetting not finished" : "None waiting", "apps"),
     tile(quotesOut ? "warn" : "ok", "Quotes to pass on", String(quotesOut), quotesOut ? "Sitting with you" : "None held", "quotes"),
     tile(callsNew ? "warn" : "ok", "Calls requested", String(callsNew), callsNew ? "Somebody wants to talk" : "None asked", "calls"),
     tile(enqNew ? "warn" : "ok", "Enquiries to answer", String(enqNew), enqNew ? "Somebody asked a question" : "All replied to", "enq"),
@@ -9021,7 +9109,7 @@ async function loadHealth(){
   const [staleW, staleC, unvetted, blob, noTrade, orphanQuotes, unsigned, evidNoPrint] = await Promise.all([
     wgV ? countOf("doc_signatures", q => q.eq("doc_type","worker_guidelines").neq("doc_version", wgV)) : Promise.resolve(0),
     cgV ? countOf("doc_signatures", q => q.eq("doc_type","client_guidelines").neq("doc_version", cgV)) : Promise.resolve(0),
-    countOf("applications", q => q.in("status", ["submitted","reviewing"])),
+    countOf("applications", q => q.in("status", ["received","submitted","reviewing"])),
     countOf("app_state", null),
     countOf("jobs", q => q.is("trade", null)),
     countOf("job_quotes", q => q.is("worker_user", null)),
@@ -10069,7 +10157,7 @@ function invFeeTab(t, on){
 function invFeeHint(which = "agency"){
   if (which === "worker") return "Yaadly's 7% worker fee. It is kept out of what the tradesperson is paid, so it is never a payment going out and never an invoice of its own: the worker's pay invoice is their quoted labour less 7%. "
     + "Worked out from each accepted quote at today's rate, not read from an invoice. The pay itself is on Worker pay.";
-  return "Everything on this tab is money to Yaadly from clients. The 15% is taken when the client pays the invoice that carries it, which starts the job. Services are the whole price. Yaadly's 5% from tradespeople is on Worker fees.";
+  return "Everything on this tab is money to Yaadly from clients. The 15% is taken when the client pays the invoice that carries it, which starts the job. Services are the whole price. Yaadly's 7% from tradespeople is on Worker fees.";
 }
 
 function invFeeRows(q, which = "agency"){
