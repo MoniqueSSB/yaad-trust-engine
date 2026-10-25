@@ -6791,3 +6791,15 @@ The number on the row was typed the national way (a UK 07, or a Jamaican 876 wit
 3. **Rows saved before 25 October 2026** were corrected by hand that day with: `update applications set phone = '+44' || substr(regexp_replace(phone, '\D', '', 'g'), 2) where regexp_replace(phone, '\D', '', 'g') ~ '^07\d{9}$';` and the same shape for `^(876|658)\d{7}$` with `'+1' ||`. Run the `select` form first and read what it will touch.
 
 Nothing is sent by any of this. The desk's "Not sent" is honest: send again once the number is right.
+
+---
+
+## 79. What a worker is told when you press Pass, and what the application drawer shows
+
+**Pass sends one message, at once (25 October 2026).** `trg_application_passed` fires on the change of `applications.status` to `passed` and asks `yaad-notify-client` (kind `worker_passed`) to tell the applicant they are through and their profile is being set up: WhatsApp inside the 24 hour window, a text message outside it, and email through Resend. The words are in `worker-cleared.ts`, `workerPassedText()`. It promises no work and no dates and does not say the profile is live. Publish sends its own "You are cleared" message (section on 30 September 2026). **Gap and Block send nothing**, on purpose: a gap names a document and a block is a safety finding, and both are your own words from Reach them.
+
+1. **Did it go?** `select kind, channel, status, to_number, created_at from message_deliveries where kind = 'worker passed' order by created_at desc limit 5;` or the "Did it arrive" page. A row at `not sent` on WhatsApp with a text message beside it is the window, not a fault.
+2. **Nothing at all:** check the trigger exists, `select tgname from pg_trigger where tgname = 'trg_application_passed';`, and that `app_settings.notify_trigger_secret_sha256` is set. The function refuses with `application_not_passed` in its trace if the row is not in fact passed, which is correct.
+3. **Deploy.** Migration `20261025183000_the_worker_hears_when_a_person_passes_them.sql` from a linked checkout, then `supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` (it already runs without platform auth; read `supabase functions list` first).
+
+**The application drawer (same day).** Opening an application draws the person, eight steps read from the row (sent, paperwork, identity, agent read, referees, guidelines signed, your decision, on the board), what is still outstanding, and the two Reach them cards, with every column folded under "Every field, as stored". The upload token is hidden: it is a credential, not a fact. Nothing in the drawer sends or decides; Pass, Gap and Block are still the buttons at the bottom. The demo copy with invented people is built by injecting a fake Supabase client after the supabase-js script tag; the recipe is in the session memory, not in this repository.

@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { APPLY_LINK_SUBJECT, applyLink, applyLinkText, checkReminderText, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
+import { APPLY_LINK_SUBJECT, applyLink, applyLinkText, checkReminderText, sendReminderText, WORKER_CLEARED_SUBJECT, WORKER_PASSED_SUBJECT, workerClearedText, workerPassedText } from "./worker-cleared.ts";
 
 Deno.test("the cleared message fits one phone screen, names the board and the pay, and promises nothing", () => {
   const t = workerClearedText("Marcus Brown", "marcus@example.com", "https://app.yaadly.co.uk");
@@ -106,4 +106,17 @@ Deno.test("worker_apply_link is a kind, is answered before any job is loaded, an
   assert(branch.includes('app.status !== "started" && app.status !== "received"'), "only an open application");
   assert(!/b\.phone|b\.email|meta\.phone|meta\.email/.test(branch), "the address must come off the row, never the request");
   assert(branch.includes("sendToWorker(") && branch.includes("sendPlainEmail("), "the shared ladder, not a new one");
+});
+
+Deno.test("the passed message says they are through, says what happens next, and does not say the profile is live", () => {
+  const t = workerPassedText("Devon Campbell");
+  assert(t.startsWith("Good news, Devon."));
+  assert(/you are through/.test(t), "the decision is not said");
+  assert(/You will hear on this number/.test(t), "what happens next is not said");
+  assert(!/is live\b(?! and)/.test(t.replace("when it is live and you can quote", "")), "must not claim the profile is live");
+  assert(!/escrow|held/i.test(t));
+  assert(!/[\u2013\u2014]/.test(t), "no dashes");
+  assert(t.split("\n").length <= 8, "one phone screen");
+  assert(workerPassedText("").startsWith("Good news. It is Yaadly."));
+  assert(WORKER_PASSED_SUBJECT.length < 60);
 });

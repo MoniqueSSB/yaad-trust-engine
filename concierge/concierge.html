@@ -2486,7 +2486,7 @@ const VIEWS = [
       { label:"Pass", cls:"", when:r => r.status !== "passed" && r.status !== "test",
         rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "passed", p_note: v.note || null }),
         ask:[{ k:"note", label:"What convinced you? (optional, kept on the record)", placeholder:"references checked, ID matches, 8 years verifiable" }],
-        says:r => `Says ${r.name || "this applicant"} has cleared vetting by your judgement. Publishing their profile is a separate step and is what actually lets them quote.` },
+        says:r => `Says ${r.name || "this applicant"} has cleared vetting by your judgement. They are told at once, on WhatsApp or by text and by email, that they are through and that their profile is being set up. Publishing their profile is a separate step and is what actually lets them quote; a second message goes when you publish.` },
       { label:"Send the gap back", cls:"g", when:r => r.status !== "gap" && r.status !== "test",
         rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "gap", p_note: v.note || null }),
         ask:[{ k:"note", label:"Which document is missing? (optional, kept on the record)", placeholder:"proof of address, and the second reference never replied" }],
