@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { e164Digits } from "./e164.ts";
 import { answerText, chatWithFailover, pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
 import { checkTwilioSignature } from "./twilio-signature.ts";
@@ -37,6 +38,7 @@ import { acceptedForClient, linkIn, looksLikeATime, offerSent, PLATFORM_LABEL as
 import { closedReply, problemSent, readDisputeClose, replySent } from "./dispute-lane.ts";
 import { draftShownLate, plainRefusal, readWhileNoteWaits, systemWords, wantsToStopJoining } from "./worker-reply.ts";
 import { ALERTS_AGAIN, applicationRow, CONSENT_NO, CONSENT_YES, continueLink, isJoinLane, isJoinOpener, JOIN_STALE_MS, joinedReply, LEAD_PARISHES, LEAD_TRADES, looksLikeEmail, looksLikeName, newReference, NOT_A_NAME, NOT_AN_EMAIL, PHOTO_PLEASE, Q_EMAIL, Q_NAME, Q_PHOTO, qAlerts, SKIP, WORDS_FIRST } from "./join-lane.ts";
+import { type ApplicationRow, isStatusAsk, parseReference, pickByPhone, type ProfileRow, senderMatches, STATUS_MISS_LANE, statusReply } from "./status-lane.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -756,7 +758,7 @@ async function sendWhatsAppTo(to: string, body: string, trace: Trace, meta: Send
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
-  const digits = to.replace(/\D/g, "");
+  const digits = e164Digits(to);
   if (!sid || !tok || !from || digits.length < 7) return false;
   return await trace.span("twilio.send.whatsapp", SpanKind.CLIENT, {
     "server.address": "api.twilio.com", "messaging.system": "twilio",
@@ -827,7 +829,7 @@ async function sendPhaseMenu(to: string, lead: string, contentSid: string, messa
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
-  const digits = to.replace(/\D/g, "");
+  const digits = e164Digits(to);
   if (!contentSid || !sid || !tok || !from || digits.length < 7) return false;
   // "A Messaging Service is a prerequisite for using Content Templates",
   // Twilio's own words, and the reason this send was refused with 20422
@@ -905,7 +907,7 @@ async function sendReadBackButtons(
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
-  const digits = to.replace(/\D/g, "");
+  const digits = e164Digits(to);
   if (!contentSid || !messagingServiceSid || !sid || !tok || !from || digits.length < 7) return false;
   if (guardrails.scan(screen).length) return false;
   return await trace.span("twilio.send.whatsapp", SpanKind.CLIENT, {
@@ -3347,6 +3349,98 @@ Deno.serve(async (req: Request) => {
           }
           return await askFromList(supabase as unknown as SettingsReader, msg.from, msg.channel, "trades", `You are on the list. ${ALERT_TERMS_JOINED}`, TRADES_TYPED);
         }
+      }
+
+      // ── where is my application: STATUS, a reference, or the plain question ──
+      //
+      // 25 Oct 2026. See status-lane.ts for what this is and is not. After
+      // the join lane and the alert list, so a number mid way through either
+      // keeps its session, and before every worker lane below, so the word
+      // STATUS from an applicant is not read as a job update. Read only: it
+      // reads one applications row and answers from fixed strings; nothing
+      // here writes to the row, decides anything, or names a document.
+      //
+      // A worker on a live job who types STATUS is talking about the job,
+      // not an application, so this lane steps aside for them unless they
+      // sent an APP- reference. A held desk number is held for this too.
+      const statusSaid = msg.text.trim();
+      if (!deskHasThisNumber && !msg.media.length && statusSaid && isStatusAsk(statusSaid)) {
+        const reference = parseReference(statusSaid);
+        const onAJob = reference ? null : await lookupWorkerWithActiveJobs(supabase, msg.from);
+        if (!onAJob) {
+          const missSession = sess && String((sess.answers as any)?._lane ?? "") === STATUS_MISS_LANE ? sess : null;
+          const misses = Number((missSession?.answers as any)?.misses ?? 0);
+          const appBase = Deno.env.get("YAADLY_APP_URL") ?? "https://app.yaadly.co.uk";
+          const cols = "id,app_id,name,phone,status,created_at,submitted_at,upload_token";
+
+          let row: ApplicationRow | null = null;
+          if (reference) {
+            const { data } = await supabase.from("applications").select(cols).eq("app_id", reference).maybeSingle();
+            row = (data as ApplicationRow | null) ?? null;
+          } else {
+            const { data } = await supabase.from("applications").select(cols)
+              .not("phone", "is", null).neq("status", "test")
+              .order("created_at", { ascending: false }).limit(400);
+            row = pickByPhone((data ?? []) as ApplicationRow[], msg.from);
+          }
+          const matches = senderMatches(row, msg.from);
+
+          let profile: ProfileRow = null;
+          if (row && matches && row.status === "passed") {
+            const { data: p } = await supabase.from("worker_profiles").select("active").eq("application_id", row.id).maybeSingle();
+            profile = (p as ProfileRow) ?? null;
+          }
+
+          const reply = statusReply(row, profile, { appBase, misses, referenceGiven: reference, senderMatchesRow: matches });
+          root.setAttributes({
+            "yaadly.status.outcome": reply.outcome,
+            "yaadly.status.by": reference ? "reference" : "phone",
+            "yaadly.status.misses": reply.outcome === "not_found" ? misses + 1 : 0,
+            "yaadly.status.escalated": reply.escalate,
+          });
+
+          // The miss count lives in the session, the way the alert list keeps
+          // its tries, and only when no other lane holds the session. A find
+          // clears it.
+          if (reply.outcome === "not_found" && !reply.escalate && (!sess || missSession)) {
+            await supabase.from("wa_intake_sessions").upsert({
+              wa_id: msg.from, answers: { _lane: STATUS_MISS_LANE, misses: misses + 1 }, photo_count: 0, updated_at: new Date().toISOString(),
+            });
+          } else if (missSession) {
+            await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+          }
+
+          // A blocked applicant, or a number that could not be matched twice,
+          // is handed to a person: the desk is pushed at high priority and the
+          // thread is held the way the client pipeline holds one (human_handling,
+          // with the reply clock started), so the assistant stands down on this
+          // number until she hands it back. No contact details travel in the
+          // push, and the row is not touched.
+          if (reply.escalate) {
+            const nowIso = new Date().toISOString();
+            const why = reply.outcome === "blocked" ? "a blocked application" : "an application nobody could find";
+            await supabase.from("intake_threads").upsert({
+              channel: threadKey.channel, from_addr: threadKey.from_addr,
+              job_id: prior?.job_id ?? null,
+              transcript: `${String(prior?.transcript ?? "")}\n\nApplicant: ${statusSaid.slice(0, 700)}\n\nYaadly: ${reply.text}`.slice(-8000),
+              turns: Number(prior?.turns ?? 0) + 1,
+              stage: prior?.stage ?? "gathering",
+              last_at: nowIso,
+              human_handling: true, awaiting_human_since: nowIso,
+            }, { onConflict: "channel,from_addr" });
+            await pushToDesk(supabase as unknown as SettingsReader, {
+              target: { channel: threadKey.channel, from_addr: threadKey.from_addr },
+              title: `Applicant asking after ${why}`,
+              priority: "high",
+              tags: "raising_hand",
+              body: reply.outcome === "blocked"
+                ? `Somebody whose application is blocked asked on WhatsApp where it is. They were told a person will be in touch directly, and nothing else. The number is held for you.`
+                : `Somebody asked twice on WhatsApp where their application is and no row matched this number${reference ? ` or the reference ${reference}` : ""}. They were told a person will pick it up. The number is held for you.`,
+            }, trace);
+          }
+          return twiml(reply.text);
+        }
+        root.setAttributes({ "yaadly.status.outcome": "skipped_worker_on_job" });
       }
 
       // ── the buttons on a report draft and on the daily check-in ───────────

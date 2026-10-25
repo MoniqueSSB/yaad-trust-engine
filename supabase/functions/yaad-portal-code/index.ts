@@ -40,6 +40,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { httpAttrs, SpanKind, Trace } from "./otel.ts";
+import { e164Digits } from "./e164.ts";
 import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -86,7 +87,7 @@ async function sendVerify(
   if (!sid || !tok) return { sent: false, reason: "TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set" };
   // Verify wants E.164 and nothing else. The free text path is more
   // forgiving because Twilio's Messages API is; this one is not.
-  const digits = to.replace(/\D/g, "");
+  const digits = e164Digits(to);
   if (digits.length < 7) return { sent: false, reason: "number not usable" };
   return await trace.span("twilio.verify.start", SpanKind.CLIENT, {
     "server.address": "verify.twilio.com", "messaging.system": "twilio",
@@ -136,7 +137,7 @@ async function sendTwilio(
   if (!sid || !tok) return { sent: false, reason: "TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set" };
   if (!from) return { sent: false, reason: `TWILIO_${channel === "whatsapp" ? "WHATSAPP" : "SMS"}_FROM not set` };
 
-  const digits = to.replace(/\D/g, "");
+  const digits = e164Digits(to);
   if (digits.length < 7) return { sent: false, reason: "number not usable" };
   const dest = channel === "whatsapp" ? `whatsapp:+${digits}` : `+${digits}`;
 

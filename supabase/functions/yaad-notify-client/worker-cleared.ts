@@ -169,3 +169,25 @@ export const APPLY_LINK_SUBJECT = "Your Yaadly application link";
 export function jobDelayedWorkerText(jobId: string, title: string): string {
   return `${jobId}${title ? ` (${title})` : ""}: the client has been told the job is running late. Is anything holding you up? Reply here and a person will help.`;
 }
+
+/** What a worker is told the moment a person at the desk passes them,
+ *  25 Oct 2026. Until then Pass sent nothing: the desk recorded the decision
+ *  and the worker heard nothing until the profile was published, which can be
+ *  days later and waits on an ID check and a TRN they may not know are
+ *  outstanding. Founder: "when i press pass does an email go to them". No.
+ *  Now it does, by WhatsApp or text and by email. It promises no work, no
+ *  dates, and does not say the profile is live, because it is not yet. */
+export function workerPassedText(name: string): string {
+  const first = (name ?? "").trim().split(/\s+/)[0] ?? "";
+  return [
+    `Good news${first ? `, ${first}` : ""}. It is Yaadly.`,
+    ``,
+    `A person has checked your application and you are through.`,
+    `Your profile is being set up now. You will hear on this number when it is live and you can quote.`,
+    ``,
+    `If anything is still needed from you, Monique will message you here to say what.`,
+    `Questions? Reply here.`,
+  ].join("\n");
+}
+
+export const WORKER_PASSED_SUBJECT = "You are through. Yaadly is setting up your profile.";

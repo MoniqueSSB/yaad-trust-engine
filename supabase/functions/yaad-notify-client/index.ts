@@ -48,6 +48,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { type AttrValue, httpAttrs, SpanKind, Trace } from "./otel.ts";
+import { e164Digits } from "./e164.ts";
 import { pickTextProvider, providerAttrs, chatWithFailover } from "./textmodel.ts";
 import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, type VisionProvider, visionAttrs } from "./visionmodel.ts";
 import * as guardrails from "./guardrails.ts";
@@ -65,7 +66,7 @@ import { screenOwnWords } from "./own-words.ts";
 import { captionsLine, namedNextStep, noCaptionPrompt, plainDraft, reportSentReceipt, unearnedClaims, usableCaptions } from "./report-draft.ts";
 import { acceptedForClient, acceptedForWorker, offerForClient, PLATFORM_LABEL as WALK_PLATFORM } from "./walkthrough-offer.ts";
 import { chaseClient, DISPUTE_HOURS, problemForWorker, replyForClient, type SteppedInWhy, steppedInForClient, steppedInForWorker } from "./dispute-lane.ts";
-import { APPLY_LINK_SUBJECT, applyLink, applyLinkPhase, applyLinkText, CHECK_REMINDER_SUBJECT, checkReminderText, jobDelayedWorkerText, SEND_REMINDER_SUBJECT, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
+import { APPLY_LINK_SUBJECT, applyLink, applyLinkPhase, applyLinkText, CHECK_REMINDER_SUBJECT, checkReminderText, jobDelayedWorkerText, SEND_REMINDER_SUBJECT, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText, WORKER_PASSED_SUBJECT, workerPassedText } from "./worker-cleared.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -80,7 +81,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "stage_signed_off_worker", "stage_paid_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "worker_apply_link", "worker_send_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied", "dispute_stepped_in", "dispute_stepped_in_worker", "dispute_chase_client", "job_live", "stage_paid"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "stage_signed_off_worker", "stage_paid_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_passed", "worker_check_reminder", "worker_apply_link", "worker_send_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied", "dispute_stepped_in", "dispute_stepped_in_worker", "dispute_chase_client", "job_live", "stage_paid"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -127,7 +128,7 @@ async function sendTwilio(
     : (Deno.env.get("TWILIO_SMS_FROM") ?? "");
   if (!sid || !tok) return { sent: false, reason: "TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set" };
   if (!from) return { sent: false, reason: `TWILIO_${channel === "whatsapp" ? "WHATSAPP" : "SMS"}_FROM not set` };
-  const digits = to.replace(/\D/g, "");
+  const digits = e164Digits(to);
   if (digits.length < 7) return { sent: false, reason: "number not usable" };
   const dest = channel === "whatsapp" ? `whatsapp:+${digits}` : `+${digits}`;
   return await trace.span(`twilio.send.${channel}`, SpanKind.CLIENT, {
@@ -183,7 +184,7 @@ async function sendMetaWhatsApp(to: string, body: string, trace: Trace) {
       const r = await fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ messaging_product: "whatsapp", to: to.replace(/\D/g, ""), type: "text", text: { body } }),
+        body: JSON.stringify({ messaging_product: "whatsapp", to: e164Digits(to), type: "text", text: { body } }),
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
@@ -988,7 +989,7 @@ Deno.serve(async (req: Request) => {
     const workerEmailIn = String(b.workerEmail ?? "").trim().toLowerCase();
     // worker_check_reminder and worker_apply_link are about an application: they carry applicationId.
     const applicationIdIn = String(b.applicationId ?? "").trim();
-    const isWorkerOnly = kind === "worker_cleared" || kind === "worker_check_reminder" || kind === "worker_apply_link" || kind === "worker_send_reminder";
+    const isWorkerOnly = kind === "worker_cleared" || kind === "worker_passed" || kind === "worker_check_reminder" || kind === "worker_apply_link" || kind === "worker_send_reminder";
     const workerOnlyKey = kind === "worker_cleared" ? workerEmailIn : applicationIdIn;
     if (!secret || !KINDS.includes(kind) || (isWorkerOnly ? !workerOnlyKey : isService ? !serviceId : !jobId)) {
       return json({ error: "secret, a valid kind, and jobId (or serviceId for a service kind, workerEmail for worker_cleared) are required." }, 400);
@@ -1129,6 +1130,28 @@ Deno.serve(async (req: Request) => {
         : { sent: false, reason: "no phone on the application", outsideWindow: false };
       const emailed = app.email ? await sendPlainEmail(String(app.email), APPLY_LINK_SUBJECT, text, trace) : false;
       root.setAttributes({ "yaadly.notify.outcome": "apply_link", "yaadly.notify.wa_sent": wa.sent, "yaadly.notify.emailed": emailed });
+      return json({ ok: true, kind, told: wa.sent || emailed, whatsapp: wa.sent, via: "via" in wa ? wa.via ?? "" : "", reason: wa.sent ? "" : wa.reason ?? "", emailed });
+    }
+
+    // A person at the desk has passed an application, 25 Oct 2026
+    // (worker-cleared.ts). Fired by trg_application_passed on applications
+    // when status becomes passed. Read off the row, never off the request
+    // body, and refused if the row is not in fact passed, so the trigger
+    // secret alone cannot put words in a worker's phone.
+    if (kind === "worker_passed") {
+      const { data: app } = await admin.from("applications")
+        .select("id, app_id, name, phone, email, status").eq("id", applicationIdIn).maybeSingle();
+      if (!app || app.status !== "passed") {
+        root.setAttributes({ "yaadly.notify.outcome": "application_not_passed" });
+        return json({ ok: true, kind, told: false, reason: "That application is not passed." });
+      }
+      const text = workerPassedText(String(app.name ?? ""));
+      const phone = String(app.phone ?? "").trim();
+      const wa = phone
+        ? await sendToWorker(admin, phone, text, trace, { kind: "worker passed" })
+        : { sent: false, reason: "no phone on the application", outsideWindow: false };
+      const emailed = app.email ? await sendPlainEmail(String(app.email), WORKER_PASSED_SUBJECT, text, trace) : false;
+      root.setAttributes({ "yaadly.notify.outcome": "worker_passed", "yaadly.notify.wa_sent": wa.sent, "yaadly.notify.emailed": emailed });
       return json({ ok: true, kind, told: wa.sent || emailed, whatsapp: wa.sent, via: "via" in wa ? wa.via ?? "" : "", reason: wa.sent ? "" : wa.reason ?? "", emailed });
     }
 

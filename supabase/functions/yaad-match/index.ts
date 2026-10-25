@@ -13,6 +13,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { ALERT_CAP, alertKey, alertVars } from "./alert-lane.ts";
 import { recordAccepted, withStatusCallback } from "./twilio-status.ts";
+import { e164Digits } from "./e164.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -217,7 +218,7 @@ with the subject "Stop job alerts". We switch them off within two working days.
             method: "POST",
             headers: { Authorization: "Basic " + btoa(`${tSid}:${tTok}`), "Content-Type": "application/x-www-form-urlencoded" },
             body: withStatusCallback(new URLSearchParams({
-              To: `whatsapp:+${s.phone.replace(/\D/g, "")}`, From: tFrom, MessagingServiceSid: serviceSid,
+              To: `whatsapp:+${e164Digits(s.phone)}`, From: tFrom, MessagingServiceSid: serviceSid,
               ContentSid: alertSid, ContentVariables: JSON.stringify(alertVars(String(job.trade ?? ""), job.parish ?? null, s.can_quote === true, appUrl)),
             })),
             signal: AbortSignal.timeout(15000),

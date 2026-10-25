@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { APPLY_LINK_SUBJECT, applyLink, applyLinkPhase, applyLinkText, checkReminderText, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
+import { APPLY_LINK_SUBJECT, applyLink, applyLinkPhase, applyLinkText, checkReminderText, sendReminderText, WORKER_CLEARED_SUBJECT, WORKER_PASSED_SUBJECT, workerClearedText, workerPassedText } from "./worker-cleared.ts";
 
 Deno.test("the cleared message fits one phone screen, names the board and the pay, and promises nothing", () => {
   const t = workerClearedText("Marcus Brown", "marcus@example.com", "https://app.yaadly.co.uk");
@@ -127,4 +127,17 @@ Deno.test("a link reopens started and received, and a passed or gap application 
   for (const status of ["blocked", "test", "approved", "withdrawn", "", null, undefined]) {
     assertEquals(applyLinkPhase({ status, persona_status: null, trn_status: "not_given", signed_at: null }), null, String(status));
   }
+});
+
+Deno.test("the passed message says they are through, says what happens next, and does not say the profile is live", () => {
+  const t = workerPassedText("Devon Campbell");
+  assert(t.startsWith("Good news, Devon."));
+  assert(/you are through/.test(t), "the decision is not said");
+  assert(/You will hear on this number/.test(t), "what happens next is not said");
+  assert(!/is live\b(?! and)/.test(t.replace("when it is live and you can quote", "")), "must not claim the profile is live");
+  assert(!/escrow|held/i.test(t));
+  assert(!/[\u2013\u2014]/.test(t), "no dashes");
+  assert(t.split("\n").length <= 8, "one phone screen");
+  assert(workerPassedText("").startsWith("Good news. It is Yaadly."));
+  assert(WORKER_PASSED_SUBJECT.length < 60);
 });
