@@ -6779,3 +6779,15 @@ Found 25 October 2026: every worker application since 5 September had failed at 
    `supabase functions deploy yaad-apply-link --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` (the applicant has no session; this is the eighteenth on the CLAUDE.md §12 list) and
    `supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` (it already runs without platform auth; the new kind is in it). Then the app: `cd web && npm run deploy` from a checkout with `web/.env.local`. Read `supabase functions list` first and keep what is there.
 7. **Probe after deploying.** `curl -s -o /dev/null -w "%{http_code}\n" -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-apply-link -H "Content-Type: application/json" -H "apikey: sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz" -d '{"reference":"APP-ZZZZZZ"}'` returns 200 three times and 429 on the fourth within the hour; a body of `{"reference":"nonsense"}` returns 400. None of those sends anything.
+
+7. **PM release limit** is `app_settings.pm_release_limit_jmd`, 100000 (J$100,000, roughly GBP 500; every worker and materials payment is in J$). It was `pm_release_limit_pence` for an hour on 20 Oct and was replaced by 20261025160940. Changing it is a money decision: ledger entry first.
+
+## 78. A Project Manager on the desk (20 Oct 2026)
+
+Migration `20261025160940_a_project_manager_reads_the_job_desk.sql`, applied 20 Oct 2026, guard test `supabase/tests/pm_desk_read_guards.sql` nine PASS.
+
+1. **Give someone the PM level:** `select public.grant_access('pm@example.com', 'project_manager', 'why');` signed in as Super Admin (runbook 69).
+2. **Add their email to Cloudflare Access** for `concierge.yaadly.co.uk`, or the page is never served to them. That is the Super Admin's click in the Cloudflare dashboard. Check afterwards that a stranger still gets 302: `curl -s -o /dev/null -w "%{http_code}\n" https://concierge.yaadly.co.uk/`.
+3. **What a PM reads:** jobs and everything on a job, invoices, materials, workers, clients, suppliers, conversations. **Never:** vetting documents, applications, signatures, the vetting bucket, secret settings, the sales inbox, anybody else on the access register.
+4. **What a PM can do:** nothing yet. Every desk button is a function checking `is_admin()`, so a PM's click is refused by the database. Approvals and money up to J$100,000 arrive in their own changes.
+5. **"that address has no desk access"** at the desk gate: `select public.access_levels_for('their@email');` should include `project_manager`. If it does and the gate still says no, they signed in with a different address.
