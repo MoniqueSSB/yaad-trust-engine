@@ -3,7 +3,7 @@ import { JoinFlow } from "./JoinFlow";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Join as a pro · Yaadly" };
+export const metadata = { title: "Join as a worker · Yaadly" };
 
 /**
  * Join as a pro.

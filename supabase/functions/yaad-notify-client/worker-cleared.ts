@@ -62,6 +62,30 @@ export function checkReminderText(name: string, link: string, nth: number): stri
 
 export const CHECK_REMINDER_SUBJECT = "Your Yaadly check is waiting";
 
+/** Somebody opened an application, maybe uploaded documents, and never
+ *  reached Send (25 Oct 2026). Sent once, 48 hours on. It names what to do
+ *  and promises nothing. No link with a token: the first sitting lives in
+ *  the browser it was started in, and a token link would open the second
+ *  sitting instead, which they have not earned yet. Same phone, same page. */
+export function sendReminderText(name: string, appUrl: string): string {
+  const first = (name ?? "").trim().split(/\s+/)[0] ?? "";
+  const url = new URL("/apply", appUrl).toString();
+  return [
+    `Hi${first ? ` ${first}` : ""}, it is Yaadly.`,
+    ``,
+    `You started an application with us and it was never sent.`,
+    `If that was our form going wrong, sorry. It is working now.`,
+    `Open this on the same phone and it picks up where you left off:`,
+    url,
+    `Then tap Send my application.`,
+    ``,
+    `Nothing you entered is lost. If you have changed your mind, ignore this.`,
+    `Questions? Ask here.`,
+  ].join("\n");
+}
+
+export const SEND_REMINDER_SUBJECT = "Your Yaadly application was not sent";
+
 /** The link that opens an application on the site, carrying the same claim
  *  the site keeps in its own storage: the application id and its upload
  *  token (JoinFlow.tsx reads them off the address bar and cleans it).

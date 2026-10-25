@@ -457,6 +457,12 @@ export function JoinFlow() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sentRef, setSentRef] = useState("");
+  /* Set when the server says the application landed but one part of it did
+     not save (25 Oct 2026). The sent screen says so in plain words, because
+     the alternative, a tick over a row that is missing two answers, is the
+     page claiming something the database does not hold. Not stored: it is
+     true of one send, and the desk has already been told. */
+  const [sentPartial, setSentPartial] = useState(false);
   /* Phase 1 is sent and they have chosen to carry straight on into the
      verification steps rather than wait to be chased. */
   const [continuing, setContinuing] = useState(false);
@@ -846,7 +852,7 @@ export function JoinFlow() {
     setError(""); setBusy(true);
     try {
       const c = await ensureApplication();
-      await call({
+      const reply = await call({
         action: "submit",
         applicationId: c.applicationId, uploadToken: c.uploadToken,
         name: name.trim(), phone: phone.trim(), email: email.trim(),
@@ -881,6 +887,7 @@ export function JoinFlow() {
         showcaseConsent: showcaseConsent || "declined",
         showcaseConsentVersion: SHOWCASE_CONSENT_VERSION,
       });
+      setSentPartial(reply.partial === "consents");
       setSentConsent("granted");
       setSentRef(c.reference);
       if (continuing) {
@@ -1034,6 +1041,11 @@ export function JoinFlow() {
             <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[.16em] text-dim">Your reference</span>
             <CopyRef reference={sentRef} />
           </div>
+          {sentPartial && (
+            <div className="rounded-2xl border border-gold/40 bg-gold/10 px-4 py-3 text-[13.5px] leading-relaxed text-mute" role="status">
+              <b className="text-ink">One part did not save on our side.</b> Your application is in and everything you uploaded is with us, but your two consent answers were not recorded. Yaadly has been told and will put that right. You do not need to do anything.
+            </div>
+          )}
           {/* Founder, 30 Sep 2026: a welcome and next steps, warm, five points,
               and the portal named, because nothing on this path said it
               existed. Only what is true today: a person decides, quoting waits

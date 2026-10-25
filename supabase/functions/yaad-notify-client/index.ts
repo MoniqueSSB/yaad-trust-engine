@@ -65,7 +65,7 @@ import { screenOwnWords } from "./own-words.ts";
 import { captionsLine, namedNextStep, noCaptionPrompt, plainDraft, reportSentReceipt, unearnedClaims, usableCaptions } from "./report-draft.ts";
 import { acceptedForClient, acceptedForWorker, offerForClient, PLATFORM_LABEL as WALK_PLATFORM } from "./walkthrough-offer.ts";
 import { chaseClient, DISPUTE_HOURS, problemForWorker, replyForClient, type SteppedInWhy, steppedInForClient, steppedInForWorker } from "./dispute-lane.ts";
-import { APPLY_LINK_SUBJECT, applyLink, applyLinkText, CHECK_REMINDER_SUBJECT, checkReminderText, jobDelayedWorkerText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
+import { APPLY_LINK_SUBJECT, applyLink, applyLinkText, CHECK_REMINDER_SUBJECT, checkReminderText, jobDelayedWorkerText, SEND_REMINDER_SUBJECT, sendReminderText, WORKER_CLEARED_SUBJECT, workerClearedText } from "./worker-cleared.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -80,7 +80,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "stage_signed_off_worker", "stage_paid_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "worker_apply_link", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied", "dispute_stepped_in", "dispute_stepped_in_worker", "dispute_chase_client", "job_live", "stage_paid"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "stage_signed_off_worker", "stage_paid_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live", "completion_report_worker", "completion_report_issued", "addon_for_worker", "addon_agreed_worker", "addon_closed_worker", "addon_paid_worker", "addon_for_client", "addon_agreed", "addon_closed", "worker_cleared", "worker_check_reminder", "worker_apply_link", "worker_send_reminder", "walkthrough_offered", "walkthrough_accepted", "walkthrough_accepted_worker", "dispute_replied", "dispute_stepped_in", "dispute_stepped_in_worker", "dispute_chase_client", "job_live", "stage_paid"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -988,7 +988,7 @@ Deno.serve(async (req: Request) => {
     const workerEmailIn = String(b.workerEmail ?? "").trim().toLowerCase();
     // worker_check_reminder and worker_apply_link are about an application: they carry applicationId.
     const applicationIdIn = String(b.applicationId ?? "").trim();
-    const isWorkerOnly = kind === "worker_cleared" || kind === "worker_check_reminder" || kind === "worker_apply_link";
+    const isWorkerOnly = kind === "worker_cleared" || kind === "worker_check_reminder" || kind === "worker_apply_link" || kind === "worker_send_reminder";
     const workerOnlyKey = kind === "worker_cleared" ? workerEmailIn : applicationIdIn;
     if (!secret || !KINDS.includes(kind) || (isWorkerOnly ? !workerOnlyKey : isService ? !serviceId : !jobId)) {
       return json({ error: "secret, a valid kind, and jobId (or serviceId for a service kind, workerEmail for worker_cleared) are required." }, 400);
@@ -1126,6 +1126,49 @@ Deno.serve(async (req: Request) => {
         : { sent: false, reason: "no phone on the application", outsideWindow: false };
       const emailed = app.email ? await sendPlainEmail(String(app.email), APPLY_LINK_SUBJECT, text, trace) : false;
       root.setAttributes({ "yaadly.notify.outcome": "apply_link", "yaadly.notify.wa_sent": wa.sent, "yaadly.notify.emailed": emailed });
+      return json({ ok: true, kind, told: wa.sent || emailed, whatsapp: wa.sent, via: "via" in wa ? wa.via ?? "" : "", reason: wa.sent ? "" : wa.reason ?? "", emailed });
+    }
+
+    // An application opened and never sent, 25 Oct 2026 (worker-cleared.ts).
+    // Fired once by remind_unsent_applications() two days on. The applicant
+    // is nudged to finish; the desk's phone is pushed the reference, trade
+    // and parish, no name and no number, because ntfy is a public relay.
+    if (kind === "worker_send_reminder") {
+      const { data: app } = await admin.from("applications")
+        .select("id, app_id, name, phone, email, status, trade, parish").eq("id", applicationIdIn).maybeSingle();
+      if (!app || app.status !== "started") {
+        root.setAttributes({ "yaadly.notify.outcome": "application_not_started" });
+        return json({ ok: true, kind, told: false, reason: "That application was sent, or is not open." });
+      }
+      const text = sendReminderText(String(app.name ?? ""), APP_URL);
+      const phone = String(app.phone ?? "").trim();
+      const meta: SendMeta = { kind: "send reminder" };
+      // Two days after they last wrote, so outside the window and with no
+      // approved template for it: text message and email carry it.
+      const wa = phone
+        ? await sendToWorker(admin, phone, text, trace, meta)
+        : { sent: false, reason: "no phone on the application", outsideWindow: false };
+      let emailed = false;
+      if (app.email && RESEND_KEY) {
+        try {
+          const r = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ from: `Yaadly <${FROM_EMAIL}>`, to: [String(app.email)], reply_to: REPLY_TO, subject: SEND_REMINDER_SUBJECT, text }),
+            signal: AbortSignal.timeout(15000),
+          });
+          emailed = r.ok;
+        } catch (_) { emailed = false; }
+      }
+      const { count } = await admin.from("vetting_documents")
+        .select("id", { count: "exact", head: true }).eq("application_id", app.id);
+      const how = [wa.sent ? (wa.via ?? "message") : "", emailed ? "email" : ""].filter(Boolean).join(" and ") || "nobody reached, no working contact";
+      await ntfyPush(admin, "Application started, never sent",
+        `${app.app_id}: ${String(app.trade ?? "trade not given")}, ${String(app.parish ?? "parish not given")}. `
+          + `${count ?? 0} document(s) on file, opened two days ago, never sent. Reminded by ${how}. `
+          + `It is under Started, never sent in Applications.`,
+        "hourglass");
+      root.setAttributes({ "yaadly.notify.outcome": "send_reminder", "yaadly.notify.wa_sent": wa.sent, "yaadly.notify.emailed": emailed });
       return json({ ok: true, kind, told: wa.sent || emailed, whatsapp: wa.sent, via: "via" in wa ? wa.via ?? "" : "", reason: wa.sent ? "" : wa.reason ?? "", emailed });
     }
 

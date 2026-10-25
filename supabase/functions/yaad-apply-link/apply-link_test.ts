@@ -8,7 +8,7 @@ Deno.test("a reference is accepted however a person types it, and comes out as t
   assertEquals(normaliseReference("48A107"), "APP-48A107");
   assertEquals(normaliseReference("APP48A107"), "APP-48A107");
   // An en dash typed from a phone keyboard in place of the hyphen.
-  assertEquals(normaliseReference("APP–48A107"), "APP-48A107");
+  assertEquals(normaliseReference("APP\u201348A107"), "APP-48A107");
 });
 
 Deno.test("anything that is not a reference is never looked up", () => {
@@ -18,7 +18,7 @@ Deno.test("anything that is not a reference is never looked up", () => {
 });
 
 Deno.test("the same answer, with no dashes, and no word that says whether the reference exists", () => {
-  assert(!/[–—]/.test(SAME_ANSWER), "no dashes");
+  assert(!/[\u2013\u2014]/.test(SAME_ANSWER), "no dashes");
   assert(/^If that reference is ours/.test(SAME_ANSWER));
   assert(!/not found|no such|does not exist|sent to \+|@/.test(SAME_ANSWER), "must not reveal a result or an address");
 });

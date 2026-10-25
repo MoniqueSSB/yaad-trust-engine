@@ -1,0 +1,32 @@
+[
+  {
+    "ref": "table:worker_showcase",
+    "since": "2026-10-25",
+    "why": "20260905b is not applied. Only its six consent columns were applied by hand on 25 Oct 2026 (RUNBOOK 73). The desk Workers view reads this and fails soft."
+  },
+  {
+    "ref": "table:public_worker_showcase",
+    "since": "2026-10-25",
+    "why": "The view from 20260905b. web/app/workers/[slug] reads it and fails soft. Comes live with the table."
+  },
+  {
+    "ref": "bucket:showcase",
+    "since": "2026-10-25",
+    "why": "The public bucket from 20260905b. Creating the project's first world-readable bucket is a publishing decision (DECISIONS, 25 Oct 2026), so it waits for a deliberate session."
+  },
+  {
+    "ref": "column:jobs.requested_worker_email",
+    "since": "2026-10-25",
+    "why": "20260905a is not applied. yaad-notify-client reads it only for the worker_requested kind and leaves it blank on refusal."
+  },
+  {
+    "ref": "table:my_requested_jobs",
+    "since": "2026-10-25",
+    "why": "The view from 20260905a. web/app/jobs reads it in worker mode and shows an empty list without it."
+  },
+  {
+    "ref": "function:worker_decline_job_request",
+    "since": "2026-10-25",
+    "why": "From 20260905a. The decline button on web/app/jobs calls it; the call fails quietly until the migration is applied."
+  }
+]
