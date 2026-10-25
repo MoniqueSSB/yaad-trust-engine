@@ -5609,7 +5609,7 @@ async function preApps(rows){
       .in("application_id", ids).order("created_at", { ascending:false }).limit(200),
     sb.from("vetting_documents").select("application_id,doc_type,outcome,verified_at,purged_at,created_at")
       .in("application_id", ids).limit(400),
-    sb.from("worker_profiles").select("application_id,active,slug,worker_email,created_at")
+    sb.from("worker_profiles").select("application_id,active,slug,worker_email")
       .in("application_id", ids).limit(200),
   ]);
   for (const r of rev.data || []) if (!VET[r.application_id]) VET[r.application_id] = r;   // newest wins
