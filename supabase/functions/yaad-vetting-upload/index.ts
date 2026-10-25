@@ -80,6 +80,24 @@ const CORS = {
 
 const s = (v: unknown) => String(v ?? "").trim();
 
+// One push to Monique's phone, the same ntfy shape every other function
+// uses. Never throws: an alert must never break the application it is about.
+// Nothing personal goes through it, because ntfy.sh is a public relay: a
+// reference, a trade, a parish and an error message, no name and no number.
+// deno-lint-ignore no-explicit-any
+async function tellDesk(admin: any, title: string, body: string, tags: string): Promise<void> {
+  try {
+    const { data: st } = await admin.from("app_settings").select("value").eq("key", "ntfy_topic").single();
+    if (!st?.value) return;
+    await fetch(`https://ntfy.sh/${st.value}`, {
+      method: "POST",
+      headers: { Title: title.slice(0, 120), Priority: "high", Tags: tags },
+      body: body.slice(0, 1500),
+      signal: AbortSignal.timeout(4000),
+    });
+  } catch (_) { /* never let a notification break an application */ }
+}
+
 async function sha256(buf: ArrayBuffer): Promise<string> {
   const d = await crypto.subtle.digest("SHA-256", buf);
   return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -159,7 +177,7 @@ Deno.serve(async (req: Request) => {
     // The credential check. Both halves must match one row.
     const { data: app } = await admin
       .from("applications")
-      .select("id, upload_token, status")
+      .select("id, app_id, upload_token, status")
       .eq("id", appId)
       .maybeSingle();
 
@@ -346,14 +364,8 @@ Deno.serve(async (req: Request) => {
       // public_worker_showcase re-tests this word on every single read.
       const showcaseConsent = s(b.showcaseConsent) === "granted" ? "granted" : "declined";
 
-      const { error } = await admin.from("applications").update({
+      const core = {
         status: "received",
-        ai_review_consent: aiConsent,
-        ai_review_consent_at: new Date().toISOString(),
-        ai_review_consent_version: s(b.aiReviewConsentVersion).slice(0, 40) || "ai-review-v1",
-        showcase_consent: showcaseConsent,
-        showcase_consent_at: new Date().toISOString(),
-        showcase_consent_version: s(b.showcaseConsentVersion).slice(0, 40) || "showcase-v1",
         phone:    s(b.phone)  || undefined,
         email:    s(b.email).toLowerCase() || undefined,
         parish:   s(b.parish) || undefined,
@@ -380,8 +392,56 @@ Deno.serve(async (req: Request) => {
         signed_at:      signedName ? new Date().toISOString() : undefined,
         signed_version: signedName ? s(b.signedVersion) || "v1" : undefined,
         submitted_at:   new Date().toISOString(),
-      }).eq("id", appId);
-      if (error) { root.recordError(error.message); return json({ error: error.message }, 500); }
+      };
+      // The two consents, written with the application. Kept apart from
+      // `core` because of 25 October 2026: this function had been writing
+      // showcase_consent since 5 September while production never had the
+      // column, so every Send for seven weeks was refused with a database
+      // error on the worker's screen and the desk heard nothing. 18 rows,
+      // none received. An application must land even when a column is
+      // missing, and a person must be told the same minute.
+      const consents = {
+        ai_review_consent: aiConsent,
+        ai_review_consent_at: new Date().toISOString(),
+        ai_review_consent_version: s(b.aiReviewConsentVersion).slice(0, 40) || "ai-review-v1",
+        showcase_consent: showcaseConsent,
+        showcase_consent_at: new Date().toISOString(),
+        showcase_consent_version: s(b.showcaseConsentVersion).slice(0, 40) || "showcase-v1",
+      };
+      const ref = s(app.app_id) || appId;
+      const where = `${s(b.trade) || "trade not given"}, ${s(b.parish) || "parish not given"}`;
+      // What did not save, if anything. Read by the page, which says so to
+      // the applicant in plain words, and by the branch below that decides
+      // whether the machine read may run.
+      let partial = "";
+
+      const first = await admin.from("applications").update({ ...core, ...consents }).eq("id", appId);
+      if (first.error) {
+        const firstMsg = String(first.error.message ?? first.error);
+        root.recordError(firstMsg);
+        // Second attempt: the application without the consent columns. If
+        // THIS one lands the applicant is received and only the two answers
+        // are missing, which the desk can put right by hand from the alert.
+        const again = await admin.from("applications").update(core).eq("id", appId);
+        if (again.error) {
+          const againMsg = String(again.error.message ?? again.error);
+          root.recordError(againMsg);
+          await tellDesk(admin, "An application could not be sent",
+            `${ref} (${where}) failed at Send twice. The applicant was told you know. `
+              + `First: ${firstMsg}. Then: ${againMsg}. Their details and uploads are still on the row at status started.`,
+            "rotating_light");
+          root.setAttributes({ "yaadly.vetting.outcome": "submit_failed" });
+          return json({
+            error: "Your application is saved on our side, with everything you uploaded, but the final step failed on our end. "
+              + "Yaadly has been told and will put it right. You do not need to do anything, and nothing you entered is lost.",
+          }, 500);
+        }
+        partial = "consents";
+        await tellDesk(admin, "Application sent, one part did not save",
+          `${ref} (${where}) is received, but the two consent answers were not recorded: ${firstMsg}. `
+            + `No machine read has run on it. Record the answers by hand, then run the check from the desk.`,
+          "warning");
+      }
 
       // ── the public profile, created here and not after vetting ────────────
       //
@@ -468,7 +528,7 @@ Deno.serve(async (req: Request) => {
       // not have it run anyway because a background job was already wired up.
       // yaad-vetting-review checks the same column itself, so this is the first
       // of two gates rather than the only one.
-      if (aiConsent === "granted") try {
+      if (aiConsent === "granted" && !partial) try {
         const review = fetch(`${SUPABASE_URL}/functions/v1/yaad-vetting-review`, {
           method: "POST",
           headers: {
@@ -483,8 +543,8 @@ Deno.serve(async (req: Request) => {
         if (rt?.waitUntil) rt.waitUntil(review);
       } catch (_) { /* never let the reviewer break an application */ }
 
-      root.setAttributes({ "yaadly.vetting.outcome": "submitted", "yaadly.vetting.ai_consent": aiConsent });
-      return json({ ok: true });
+      root.setAttributes({ "yaadly.vetting.outcome": "submitted", "yaadly.vetting.ai_consent": aiConsent, "yaadly.vetting.partial": partial });
+      return json({ ok: true, partial: partial || undefined });
     }
 
     return json({ error: "Unknown action." }, 400);
