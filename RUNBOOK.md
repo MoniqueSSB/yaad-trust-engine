@@ -6837,3 +6837,13 @@ Nothing is sent by any of this. The desk's "Not sent" is honest: send again once
 3. **What happens when they finish.** Saving the check sets the application back to `received`, so it comes back to your waiting queue. Pass it again with the ID in front of you, set the TRN to approved, then publish. The worker hears "you are cleared" and can sign in with their email from then on.
 4. **Deploy both together**, from disk: `supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` and the same for `yaad-apply-link`. Both run without platform auth already; keep it that way.
 
+## 83. Profile stage, ID stage, TRN: the three passes for a worker (25 Oct 2026)
+
+1. **Profile stage pass** (Applications, open the applicant). Puts the profile live on the job board from what they typed. Needs a name and a phone number; the database says which is missing. They get one message, on WhatsApp and by email if they gave one: the profile is live, and a link to start their ID stage. Outside WhatsApp's 24 hour window it goes as the approved check reminder template. They cannot quote yet, and the card on the board says "ID not yet checked".
+2. **ID stage pass.** Shows once the profile is live. Lets them quote and be booked. Refused unless they have an email, an ID check reading approved or completed, the Guidelines signed, and three referees or a skills video (`intro_video`). The refusal names what is missing. They get the "you can quote" message (`worker_cleared`), which needs an email on the profile.
+3. **TRN approved / TRN does not match.** Shows when a nine digit TRN is pending. Check it against the name on the ID first. Pay workers (`mark_worker_paid`) and the Stripe payout (`yaad-payout-send`) refuse anyone whose profile came from an application without an approved TRN. A profile made by hand at the desk is not held.
+4. **"Only an active vetted worker can submit a quote"** still means no live profile. **"Finish your ID stage before you quote"** means the profile is live but the ID stage pass has not been pressed.
+5. **A worker sends their ID stage after the profile stage pass.** Their application stays `passed` and their profile stays live (`yaad-vetting-upload`, submit). The desk phone gets "ID stage sent, ready for ID stage pass".
+6. Profiles that were live before 25 Oct 2026 were marked as having passed the ID stage (`id_checked_by` = "live before the two stages (25 Oct 2026)"), because the old gate demanded the ID check and TRN. All six were tests.
+7. **Not built yet:** the apply page still asks proof of address and the TRN in its second sitting; the worker portal has no "Before you can quote" list or TRN box (`submit_my_trn()` exists for it).
+
