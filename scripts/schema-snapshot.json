@@ -1,5 +1,5 @@
 {
-  "read_at": "2026-10-25T16:05:45.545Z",
+  "read_at": "2026-10-25T16:31:37.837Z",
   "project_ref": "leffyisvfvjwzilydlwf",
   "tables": {
     "_inv_out": [
@@ -67,6 +67,8 @@
       "ref2",
       "ref3",
       "refs_told",
+      "send_reminded_at",
+      "send_reminders",
       "showcase_consent",
       "showcase_consent_at",
       "showcase_consent_version",
@@ -85,6 +87,12 @@
       "wants_to_quote_at",
       "work",
       "years"
+    ],
+    "apply_link_attempts": [
+      "caller_key",
+      "created_at",
+      "id",
+      "ref_key"
     ],
     "arrival_log": [
       "accuracy_m",
@@ -1641,6 +1649,7 @@
     "agree_quote_as_me",
     "agree_quote_via_whatsapp",
     "application_decision_attributed",
+    "apply_link_attempts_sweep",
     "approve_addon_as_me",
     "approve_kickoff_pack",
     "approve_quote_pack_draft",
@@ -1856,6 +1865,7 @@
     "raise_worker_pay_invoice_on_stage_approval",
     "rate_finding",
     "recommend_quote",
+    "record_desk_applicant_message",
     "record_desk_delivery",
     "record_desk_message",
     "record_materials_receipt",
@@ -1871,6 +1881,7 @@
     "release_materials_to_supplier",
     "release_materials_tranche",
     "remind_unfinished_applications",
+    "remind_unsent_applications",
     "reply_dispute_via_whatsapp",
     "report_draft_for_code",
     "report_guard_human",
