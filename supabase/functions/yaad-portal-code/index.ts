@@ -42,12 +42,121 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { httpAttrs, SpanKind, Trace } from "./otel.ts";
 import { e164Digits } from "./e164.ts";
 import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
+import { LIMITS, phoneCode, phoneCodeLine, phoneDigits, PHONE_SAME_ANSWER, PHONE_WRONG_CODE, pickEmail } from "./phone-sign-in.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const FROM_EMAIL = Deno.env.get("YAAD_FROM_EMAIL") ?? "jobs@in.yaadly.co.uk";
 const REPLY_TO = Deno.env.get("YAAD_REPLY_TO") ?? "monique@yaadly.co.uk";
+// Public by design. Used only to check a code the person typed, exactly as
+// the browser would, so the session that comes back is theirs, not ours.
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+
+/** A throttle key, not a log. Hashed, truncated, never stored raw, and
+ *  nothing joins to it. Same recipe as yaad-apply-link. */
+async function hashKey(prefix: string, raw: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(prefix + raw));
+  return Array.from(new Uint8Array(digest)).slice(0, 16).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/* ── signing in by WhatsApp, 25 Oct 2026 ────────────────────────────────
+ *
+ * Founder: "make it so people can sign in through whatsapp or email",
+ * "workers and clients". The person types a phone number instead of an
+ * email. Two steps, both through this function:
+ *
+ *   {phone}        find the ONE account that number belongs to (a live
+ *                  worker profile, or a client job whose email already has
+ *                  an account), make that account's code, and send it to the
+ *                  number on WhatsApp and to the email. The browser is told
+ *                  the same sentence whatever happened, and the lookup runs
+ *                  after the answer has gone.
+ *   {phone, code}  find the same account, check the code with Supabase the
+ *                  way the browser would, and return the session only if
+ *                  Supabase accepted it.
+ *
+ * Why the check happens here and not in the browser: a code is checked
+ * against an email, and the person who typed a phone number must not be
+ * told which email it belongs to before they have proved they hold the
+ * WhatsApp number. So this function, which knows the email, asks Supabase,
+ * and hands back nothing but the session Supabase issued. It still never
+ * mints a session itself: Supabase does, on a correct code.
+ *
+ * What does not move: a phone number never opens a new client account (the
+ * job code gate on /portal/join is untouched), and a number behind more than
+ * one account is refused rather than guessed. */
+// deno-lint-ignore no-explicit-any
+async function emailForPhone(admin: any, digits: string): Promise<{ email: string; source: "worker" | "client" } | null> {
+  const { data: rows } = await admin.rpc("sign_in_candidates_for_phone", { p_tail: digits.slice(-9) });
+  const candidates = (rows ?? []) as { email: string | null; phone: string | null; source: string | null }[];
+  const accounts = new Map<string, boolean>();
+  for (const c of candidates) {
+    const e = String(c.email ?? "").trim().toLowerCase();
+    if (c.source === "client" && e && !accounts.has(e)) {
+      const { data: has } = await admin.rpc("email_has_account", { p_email: e });
+      accounts.set(e, has === true);
+    }
+  }
+  return pickEmail(digits, candidates, (e) => accounts.get(e) === true);
+}
+
+// deno-lint-ignore no-explicit-any
+async function sendPhoneCode(admin: any, digits: string, req: Request): Promise<void> {
+  const trace = new Trace("yaad-portal-code", req);
+  const s = trace.startSpan("phone_code.send", SpanKind.INTERNAL, {});
+  try {
+    const who = await emailForPhone(admin, digits);
+    if (!who) {
+      s.setAttributes({ "yaadly.phone_code.outcome": "no_single_account" });
+      return;
+    }
+    // A worker with a live profile may not have opened their account yet.
+    // The email path opens it the same way (admin create, no password).
+    const { data: has } = await admin.rpc("email_has_account", { p_email: who.email });
+    if (has !== true && who.source === "worker") {
+      const { error: createErr } = await admin.auth.admin.createUser({ email: who.email, email_confirm: false });
+      if (createErr && !/already|registered|exists/i.test(String(createErr.message))) {
+        s.recordError(createErr.message);
+        return;
+      }
+    }
+    const { data: link, error: linkErr } = await admin.auth.admin.generateLink({ type: "magiclink", email: who.email });
+    if (linkErr || !link?.properties?.email_otp) {
+      s.recordError(linkErr?.message ?? "no email_otp returned");
+      return;
+    }
+    const otp = String(link.properties.email_otp);
+    const line = phoneCodeLine(otp);
+    // WhatsApp first, on the number they typed (which is the number on file).
+    let wa = await sendVerify(digits, otp, "whatsapp", trace);
+    if (!wa.sent) wa = await sendTwilio(digits, line, "whatsapp", trace);
+    if (!wa.sent) {
+      const sms = await sendTwilio(digits, line, "sms", trace);
+      if (sms.sent) wa = sms;
+    }
+    // And the email, which reaches them outside WhatsApp's 24 hour window.
+    let emailed = false;
+    if (RESEND_KEY) {
+      try {
+        const r = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ from: `Yaadly <${FROM_EMAIL}>`, to: [who.email], reply_to: REPLY_TO, subject: `${otp} is your Yaadly sign in code`, text: line }),
+          signal: AbortSignal.timeout(15000),
+        });
+        emailed = r.ok;
+      } catch (_) { emailed = false; }
+    }
+    s.setAttributes({ "yaadly.phone_code.outcome": wa.sent || emailed ? "sent" : "nowhere", "yaadly.phone_code.whatsapp": wa.sent, "yaadly.phone_code.emailed": emailed, "yaadly.phone_code.source": who.source });
+    if (!wa.sent && !emailed) console.error("yaad-portal-code: phone code reached nobody", wa.reason ?? "");
+  } catch (e) {
+    s.recordError(e);
+  } finally {
+    s.end();
+    trace.flush();
+  }
+}
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -186,6 +295,61 @@ Deno.serve(async (req: Request) => {
 
   try {
     const b = await req.json().catch(() => ({})) as Record<string, unknown>;
+
+    // ── sign in by WhatsApp: a phone number and no email ──────────────────
+    if (String(b.phone ?? "").trim() && !String(b.email ?? "").trim()) {
+      const digits = phoneDigits(b.phone);
+      if (!digits) {
+        return json({ error: "That does not look like a full phone number. Put the country code in front: +1 876 for Jamaica, +44 for the UK." }, 400);
+      }
+      const code = String(b.code ?? "").trim() ? phoneCode(b.code) : null;
+      if (String(b.code ?? "").trim() && !code) return json({ error: "A sign in code is six digits." }, 400);
+      const kind: "send" | "verify" = code ? "verify" : "send";
+      const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+
+      const ip = req.headers.get("cf-connecting-ip") ?? (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
+      const phoneKey = await hashKey("yaadly-phone-sign-in:", digits);
+      const callerKey = await hashKey("yaadly-phone-caller:", ip);
+      const hourAgo = new Date(Date.now() - 3600_000).toISOString();
+      const [{ count: byPhone }, { count: byCaller }] = await Promise.all([
+        admin.from("phone_sign_in_attempts").select("id", { count: "exact", head: true }).eq("phone_key", phoneKey).eq("kind", kind).gt("created_at", hourAgo),
+        admin.from("phone_sign_in_attempts").select("id", { count: "exact", head: true }).eq("caller_key", callerKey).eq("kind", kind).gt("created_at", hourAgo),
+      ]);
+      if ((byPhone ?? 0) >= LIMITS[kind].phone || (byCaller ?? 0) >= LIMITS[kind].caller) {
+        root.setAttributes({ "yaadly.phone_code.throttled": kind });
+        return json({ error: "That is too many tries in an hour. Wait a while, then try again, or sign in with your email." }, 429);
+      }
+      await admin.from("phone_sign_in_attempts").insert({ phone_key: phoneKey, caller_key: callerKey, kind });
+
+      if (kind === "send") {
+        const after = (async () => {
+          await sendPhoneCode(admin, digits, req);
+          try { await admin.rpc("phone_sign_in_attempts_sweep"); } catch (_) { /* housekeeping only */ }
+        })();
+        const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+        if (rt?.waitUntil) rt.waitUntil(after); else await after;
+        root.setAttributes({ "yaadly.code.outcome": "phone_send_queued" });
+        return json({ ok: true, message: PHONE_SAME_ANSWER });
+      }
+
+      // Checking a code. Supabase decides; this only asks on their behalf.
+      const who = await emailForPhone(admin, digits);
+      if (!who || !ANON_KEY) {
+        root.setAttributes({ "yaadly.code.outcome": "phone_verify_refused" });
+        return json({ error: PHONE_WRONG_CODE }, 400);
+      }
+      const asker = createClient(SUPABASE_URL, ANON_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+      for (const type of ["email", "magiclink"] as const) {
+        const { data, error } = await asker.auth.verifyOtp({ email: who.email, token: code!, type });
+        if (!error && data?.session) {
+          root.setAttributes({ "yaadly.code.outcome": "phone_verified", "yaadly.phone_code.source": who.source });
+          return json({ ok: true, session: { access_token: data.session.access_token, refresh_token: data.session.refresh_token } });
+        }
+      }
+      root.setAttributes({ "yaadly.code.outcome": "phone_code_rejected" });
+      return json({ error: PHONE_WRONG_CODE }, 400);
+    }
+
     const email = String(b.email ?? "").trim().toLowerCase();
     const code = String(b.code ?? "").trim().toUpperCase();
     const role = String(b.role ?? "client") === "worker" ? "worker" : "client";
