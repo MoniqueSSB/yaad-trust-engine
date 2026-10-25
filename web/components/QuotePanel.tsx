@@ -4,6 +4,7 @@ import { useState } from "react";
 import { submitQuote } from "@/app/jobs/actions";
 import { jmd } from "@/lib/money";
 import { clientBill } from "@/lib/jobs/client-bill";
+import { WORKER_FEE_RATE, workerFeePct } from "@/lib/jobs/worker-fee";
 import { BILLING_THRESHOLD_JMD, stageBillingAllowed, type BillingMode } from "@/lib/jobs/billing";
 
 /**
@@ -285,8 +286,8 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
           <div className="flex justify-between text-mute"><span>Client fee, 15% on labour</span><span>+{jmd(Math.round(labour * 0.15))}</span></div>
           <div className="flex justify-between font-bold text-ink"><span>Client sees one number</span><span>{jmd(Math.round(labour * 1.15) + materials)}</span></div>
           <div className="my-2 h-px bg-line" />
-          <div className="flex justify-between text-mute"><span>Yaadly&rsquo;s margin, 5% on labour</span><span>{jmd(Math.round(labour * 0.05))}</span></div>
-          <div className="flex justify-between font-bold text-tealb"><span>Yaadly pays you</span><span>{jmd(Math.round(labour * 0.95) + materials)}</span></div>
+          <div className="flex justify-between text-mute"><span>Yaadly&rsquo;s margin, {workerFeePct(WORKER_FEE_RATE)} on labour</span><span>{jmd(Math.round(labour * WORKER_FEE_RATE))}</span></div>
+          <div className="flex justify-between font-bold text-tealb"><span>Yaadly pays you</span><span>{jmd(labour - Math.round(labour * WORKER_FEE_RATE) + materials)}</span></div>
           <p className="mt-2.5 text-[11.5px] leading-relaxed text-dim">
             The client is shown the all-in total before they accept, never a
             base price with the fee added at the end.
