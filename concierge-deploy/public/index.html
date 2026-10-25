@@ -2427,7 +2427,11 @@ const VIEWS = [
 
   { k:"apps", g:"People", label:"Applications", icon:"people",
     title:"Applications", table:"applications",
-    detailTop: r => applicantCard(r) + applicantMessageCard(r), afterOpen: wireApplicantMessage,
+    page: applicantPage, afterOpen: wireApplicantMessage,
+    // The upload token is what lets a phone add documents to this application.
+    // It is a credential, not a fact about the person, so it stays off the
+    // screen (25 Oct 2026, after it was pasted into a chat from this drawer).
+    hide: ["upload_token"],
     titleOf: r => r.name || r.email || "Application",
     sub:"Vetting is by hand and stays that way. The agent reads documents and flags what is missing or does not line up. It never approves anybody: PASS, GAP and BLOCK are your words, not its.",
     select:"*",
@@ -2482,7 +2486,7 @@ const VIEWS = [
       { label:"Pass", cls:"", when:r => r.status !== "passed" && r.status !== "test",
         rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "passed", p_note: v.note || null }),
         ask:[{ k:"note", label:"What convinced you? (optional, kept on the record)", placeholder:"references checked, ID matches, 8 years verifiable" }],
-        says:r => `Says ${r.name || "this applicant"} has cleared vetting by your judgement. Publishing their profile is a separate step and is what actually lets them quote.` },
+        says:r => `Says ${r.name || "this applicant"} has cleared vetting by your judgement. They are told at once, on WhatsApp or by text and by email, that they are through and that their profile is being set up. Publishing their profile is a separate step and is what actually lets them quote; a second message goes when you publish.` },
       { label:"Send the gap back", cls:"g", when:r => r.status !== "gap" && r.status !== "test",
         rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "gap", p_note: v.note || null }),
         ask:[{ k:"note", label:"Which document is missing? (optional, kept on the record)", placeholder:"proof of address, and the second reference never replied" }],
@@ -4113,6 +4117,132 @@ function contactCard(r){
 // updates the row and stops). This card is where the applicant actually hears
 // about it: a draft naming the document from the note she wrote, opened in her
 // own WhatsApp or mail app. Nothing is sent by the desk.
+// ---- An application, drawn as a record (25 October 2026).
+//
+// Opening an application used to print its columns, upload token included.
+// The questions it is actually opened for are "how far have they got",
+// "what is still missing" and "what did I decide", so the drawer now answers
+// those at the top and folds the columns underneath. Every line is read from
+// the row or from VET, VDOC and WPROF; a step with nothing behind it says so.
+// Nothing here sends anything or changes a status: Pass, Gap and Block stay
+// the buttons at the bottom, and Reach them stays the way out to the person.
+const DOC_LABEL = {
+  photo_id:"Government photo ID", selfie_with_id:"Selfie with ID", face_video:"Face video",
+  intro_video:"Introduction video", profile_photo:"Profile photo", proof_of_address:"Proof of address",
+  trn:"TRN", certificate:"Certificate", cv:"CV", portfolio:"Portfolio", police_record:"Police record",
+  work_photo:"Photo of finished work", reference_letter:"Reference letter",
+};
+const docName_ = (t) => DOC_LABEL[String(t || "")] || String(t || "document").replace(/_/g, " ");
+
+function applicantSteps(r){
+  const docs = (VDOC[r.id] || []).filter(d => !d.purged_at);
+  const v = VET[r.id], prof = WPROF[r.id];
+  const personaOk = ["approved","completed"].includes(String(r.persona_status || ""));
+  const hasIdDoc = docs.some(d => d.doc_type === "photo_id");
+  const refs = [r.ref1, r.ref2, r.ref3].filter(x => String(x || "").trim()).length;
+  const decided = ["passed","gap","blocked"].includes(String(r.status || ""));
+  const steps = [];
+
+  steps.push(r.submitted_at
+    ? ["done", "Application sent", day_(r.submitted_at) + (r.app_id ? ", reference " + esc(r.app_id) : "")]
+    : r.status === "started"
+    ? ["now", "Application sent", "opened " + esc(ago_(r.created_at)) + " ago and never sent; the row is here because they got as far as the form"]
+    : ["todo", "Application sent", "no send recorded"]);
+
+  const paper = docs.filter(d => !["photo_id","selfie_with_id","face_video"].includes(d.doc_type));
+  steps.push(paper.length
+    ? ["done", "Paperwork on file", paper.map(d => docName_(d.doc_type)).join(", ")]
+    : ["todo", "Paperwork on file", "nothing beyond the form yet"]);
+
+  steps.push(personaOk
+    ? ["done", "Identity checked", "Persona: " + esc(r.persona_status) + (r.persona_checked_at ? ", " + day_(r.persona_checked_at) : "")]
+    : r.persona_status
+    ? ["now", "Identity checked", "Persona says " + esc(r.persona_status) + "; not through yet"]
+    : hasIdDoc
+    ? ["now", "Identity checked", "photo ID uploaded without Persona; it has to be looked at by hand"]
+    : ["todo", "Identity checked", "no ID yet; the second sitting has not happened"]);
+
+  steps.push(!v ? ["todo", "Documents read by the agent", r.ai_review_consent === "granted" ? "not run yet" : "no consent recorded, so it cannot run"]
+    : v.error ? ["block", "Documents read by the agent", "the last run failed: " + esc(v.error)]
+    : [(v.flag_count || 0) ? "now" : "done", "Documents read by the agent",
+       esc(v.model || "the model") + " raised " + plural_(v.flag_count || 0, "flag", "flags") + (v.created_at ? ", " + day_(v.created_at) : "") + ". It flags; you decide."]);
+
+  steps.push(refs === 3
+    ? ["done", "Three referees given", r.refs_told ? "and they were told to expect a call" : "not yet told to expect a call"]
+    : refs ? ["now", "Three referees given", refs + " of 3 so far"]
+    : ["todo", "Three referees given", "none yet; needed before any job over £500, inside an occupied home, or holding keys"]);
+
+  steps.push(r.signed_at
+    ? ["done", "Worker Guidelines signed", "as " + esc(r.signed_name || "unnamed") + ", " + day_(r.signed_at) + (r.signed_version ? ", version " + esc(r.signed_version) : "")]
+    : ["todo", "Worker Guidelines signed", "not signed"]);
+
+  steps.push(r.status === "passed" ? ["done", "Your decision", "Pass" + (r.decided_by ? " by " + esc(r.decided_by) : "") + (r.decided_at ? ", " + day_(r.decided_at) : "") + (r.decision_note ? ". " + esc(r.decision_note) : "")]
+    : r.status === "gap" ? ["now", "Your decision", "Gap" + (r.decided_by ? " by " + esc(r.decided_by) : "") + (r.decided_at ? ", " + day_(r.decided_at) : "") + ": " + esc(r.decision_note || "no document named") + ". Nothing has been sent to them."]
+    : r.status === "blocked" ? ["block", "Your decision", "Blocked" + (r.decided_by ? " by " + esc(r.decided_by) : "") + (r.decided_at ? ", " + day_(r.decided_at) : "") + (r.decision_note ? ". " + esc(r.decision_note) : "")]
+    : r.status === "test" ? ["done", "Your decision", "marked as your own test"]
+    : ["todo", "Your decision", "waiting on you"]);
+
+  steps.push(prof && prof.active ? ["done", "On the board", "profile published" + (prof.slug ? ", yaadly.co.uk/workers/" + esc(prof.slug) : "")]
+    : prof ? ["now", "On the board", "profile exists, not published"]
+    : decided && r.status === "passed" ? ["now", "On the board", "passed, no profile yet: publish from the Workers view"]
+    : ["todo", "On the board", "no profile; it is made when you pass them"]);
+  return steps;
+}
+
+function applicantMissing(r){
+  const docs = (VDOC[r.id] || []).filter(d => !d.purged_at);
+  const has = (t) => docs.some(d => d.doc_type === t);
+  const personaOk = ["approved","completed"].includes(String(r.persona_status || ""));
+  const out = [];
+  if (r.status === "started") out.push({ hard:true, what:"The application itself", why:"They never pressed Send. Everything else waits on that." });
+  if (!personaOk && !has("photo_id")) out.push({ hard:true, what:"Identity check", why:"Nobody attends a property unverified. Persona, or a photo ID looked at by hand." });
+  if (!has("proof_of_address")) out.push({ hard:false, what:"Proof of address", why:"Where they live, from a bill or a letter." });
+  if (!String(r.trn || "").trim() && r.trn_status !== "checked") out.push({ hard:false, what:"TRN", why:"Needed before any payment can be made to them." });
+  if (r.cert === "yes" && !has("certificate")) out.push({ hard:false, what:"The certificate they said they hold", why:"Said yes to a certificate, none on file. Checked with the issuing body before the trade is shown as certified." });
+  const refs = [r.ref1, r.ref2, r.ref3].filter(x => String(x || "").trim()).length;
+  if (refs < 3) out.push({ hard:false, what:(3 - refs) + " of 3 referees", why:"Three spoken to directly before any job over £500, inside an occupied home, or holding keys." });
+  if (!r.signed_at) out.push({ hard:true, what:"Worker Guidelines signature", why:"Nothing is agreed until they have signed." });
+  if (r.status === "gap" && r.decision_note) out.push({ hard:true, what:"What you asked for: " + r.decision_note, why:"Your gap note. They have not been told unless you messaged them." });
+  return out;
+}
+
+function applicantPage(r){
+  const steps = applicantSteps(r);
+  const done = steps.filter(s => s[0] === "done").length;
+  const mark = { done:"&#10003;", now:"&#8226;", block:"!", todo:"" };
+  const missing = r.status === "blocked" || r.status === "test" ? [] : applicantMissing(r);
+  const hard = missing.filter(m => m.hard);
+  const trades = String(r.trade || "").trim() || "trade not said";
+  const where = String(r.parishes || r.parish || "").trim() || "parish not said";
+  const reach = (hasPhone_(r.phone) ? chip_("ok", "WhatsApp") : "") + " " + (isEmail_(r.email) ? chip_("ok", "Email") : "")
+              + (!hasPhone_(r.phone) && !isEmail_(r.email) ? chip_("crit", "no way back") : "");
+
+  const head = `<div class="card" style="margin-bottom:4px">
+      <div class="chd"><h3>${esc(r.name || r.app_id || "Application")}</h3><span class="sp">${tone_(r.status)} ${reach}</span></div>
+      <p class="hint" style="margin:0">${esc(trades)} &middot; ${esc(where)}${r.years ? " &middot; " + esc(r.years) + " years" : ""}
+        &middot; applied ${esc(ago_(r.created_at))} ago${r.app_id ? " &middot; " + esc(r.app_id) : ""}</p>
+      ${r.work ? `<p class="hint" style="margin:8px 0 0"><b>Their work, in their words:</b> ${esc(String(r.work).slice(0, 400))}</p>` : ""}
+    </div>`;
+
+  const progress = `<div class="card" style="margin:12px 0 4px">
+      <div class="chd"><h3>Where they are</h3><span class="sp">${done} of ${steps.length}</span></div>
+      <div class="so">${steps.map(s => `<div class="sorow ${s[0]}"><i>${mark[s[0]]}</i><div><b>${s[1]}</b>${s[2] ? `<span>${s[2]}</span>` : ""}</div></div>`).join("")}</div>
+      <p class="conseq">Every line is read from a row. Purple is done, gold is where it stands now, coral is a stop. The agent reads and flags; you are the only one who passes, gaps or blocks, and nobody is told anything until you message them.</p>
+    </div>`;
+
+  const outstanding = `<div class="card" style="margin:12px 0 4px">
+      <div class="chd"><h3>Still outstanding</h3><span class="sp">${r.status === "blocked" ? chip_("crit", "blocked") : missing.length ? chip_(hard.length ? "crit" : "warn", plural_(missing.length, "thing", "things")) : chip_("ok", "nothing missing")}</span></div>
+      ${r.status === "blocked"
+        ? `<p class="hint" style="margin:0">Blocked is a safety finding, not a to-do list. Say it to them plainly, from Reach them below.</p>`
+        : !missing.length
+        ? `<p class="hint" style="margin:0">Nothing is missing. This one is yours to decide on.</p>`
+        : `<div class="reqlist" style="margin-top:0">` + hard.concat(missing.filter(m => !m.hard)).map(m =>
+            `<div class="reqrow ${m.hard ? "miss" : ""}"><i></i><div><b>${esc(m.what)}</b><br>${esc(m.why)}</div></div>`).join("") + `</div>`}
+    </div>`;
+
+  return head + progress + outstanding + applicantCard(r) + applicantMessageCard(r);
+}
+
 function applicantCard(r){
   const first = String(r.name || "").trim().split(/\s+/)[0] || "there";
   const phone = r.phone || "", email = r.email || "";
@@ -5473,15 +5603,20 @@ async function preApps(rows){
   for (const k in VET) delete VET[k];
   for (const k in VDOC) delete VDOC[k];
   if (!ids.length) return;
-  const [rev, doc] = await Promise.all([
+  for (const k in WPROF) delete WPROF[k];
+  const [rev, doc, prof] = await Promise.all([
     sb.from("vetting_reviews").select("application_id,model,summary,checks,flag_count,created_at,error")
       .in("application_id", ids).order("created_at", { ascending:false }).limit(200),
     sb.from("vetting_documents").select("application_id,doc_type,outcome,verified_at,purged_at,created_at")
       .in("application_id", ids).limit(400),
+    sb.from("worker_profiles").select("application_id,active,slug,worker_email")
+      .in("application_id", ids).limit(200),
   ]);
   for (const r of rev.data || []) if (!VET[r.application_id]) VET[r.application_id] = r;   // newest wins
   for (const d of doc.data || []) (VDOC[d.application_id] = VDOC[d.application_id] || []).push(d);
+  for (const w of prof.data || []) if (w.application_id) WPROF[w.application_id] = w;
 }
+const WPROF = {};
 
 const VERDICT = { pass:["ok","&#10003;","Pass"], flag:["gap","!","Gap"], unclear:["gap","?","Unclear"], block:["block","&times;","Block"], fail:["block","&times;","Fail"] };
 

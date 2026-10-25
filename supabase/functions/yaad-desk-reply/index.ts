@@ -42,6 +42,7 @@
  */
 
 import { httpAttrs, SpanKind, Trace } from "./otel.ts";
+import { e164Digits } from "./e164.ts";
 import { withMessagingService } from "./twilio-status.ts";
 
 const CORS = {
@@ -106,7 +107,7 @@ async function sendTwilio(
   if (!sid || !tok) return { sent: false, reason: "TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set" };
   if (!from) return { sent: false, reason: `TWILIO_${channel === "whatsapp" ? "WHATSAPP" : "SMS"}_FROM not set` };
 
-  const digits = to.replace(/\D/g, "");
+  const digits = e164Digits(to);
   if (digits.length < 7) return { sent: false, reason: "number not usable" };
   const dest = channel === "whatsapp" ? `whatsapp:+${digits}` : `+${digits}`;
 
