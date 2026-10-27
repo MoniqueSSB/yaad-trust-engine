@@ -16,7 +16,7 @@ module.exports = {
     ["Parish", ""], ["Date of visit", ""],
     ["Checklist agreed on", ""], ["Reference", ""],
   ],
-  preparedBy: preparedBy("The checker who attends records and photographs. They do not rate what they see, give an opinion on it, or advise. If you want a view on what the photographs show, that is a Condition Report or a Technical Sign-off."),
+  preparedBy: preparedBy("The checker who attends records and photographs. They do not rate what they see, give an opinion on it, or advise. If something in the photographs needs looking at, we can bring in the right trade to look at it and quote."),
   blocks: [
     { contents: [
       ["A", "How to read this record", "what it is, and the one mark on each line"],
